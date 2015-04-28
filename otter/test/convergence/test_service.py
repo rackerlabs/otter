@@ -161,6 +161,8 @@ class ConvergerTests(SynchronousTestCase):
         dispatcher = SequenceDispatcher([])  # "nothing happens"
         converger = self._converger(lambda *a, **kw: 1 / 0,
                                     dispatcher=dispatcher)
+        # Doesn't try to get buckets
+        self.fake_partitioner.get_current_buckets = lambda s: 1 / 0
         converger.divergent_changed(['group1', 'group2'])
 
     def test_divergent_changed_not_ours(self):
