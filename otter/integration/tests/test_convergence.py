@@ -83,7 +83,6 @@ class TestConvergence(unittest.TestCase):
         for a CLB (as of this writing).
         """
         return self._perform_oobd_clb_test(25)
-    test_scaling_to_clb_max_after_oob_delete_type1.timeout = 1800
 
     def test_scaling_to_clb_max_after_oob_delete_type2(self):
         """This test starts with a scaling group with no servers.  We scale up
@@ -99,7 +98,6 @@ class TestConvergence(unittest.TestCase):
         for a CLB (as of this writing).  We use max of CLB + 25.
         """
         return self._perform_oobd_clb_test(50)
-    test_scaling_to_clb_max_after_oob_delete_type2.timeout = 1800
 
     def _perform_oobd_clb_test(self, scaling_group_max_entities):
         rcs = TestResources()
@@ -223,7 +221,6 @@ class TestConvergence(unittest.TestCase):
                 self.scaling_group.wait_for_N_servers, 5, timeout=1800
             )
         )
-    test_reaction_to_oob_deletion_then_scale_up.timeout = 1800
 
     def test_reaction_to_oob_server_deletion(self):
         """
@@ -251,11 +248,6 @@ class TestConvergence(unittest.TestCase):
             pool=self.pool
         )
 
-        self.scaling_policy = ScalingPolicy(
-            scale_by=1,
-            scaling_group=self.scaling_group
-        )
-
         return (
             self.identity.authenticate_user(
                 rcs,
@@ -272,8 +264,7 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self._choose_half_the_servers)
             .addCallback(self._delete_those_servers, rcs)
             # This policy is simply ussed to trigger convergence
-            .addCallback(self.scaling_policy.start, self)
-            .addCallback(self.scaling_policy.execute)
+            .addCallback(self.scaling_group.trigger_convergence)
             .addCallback(lambda _: self.removed_ids)
             .addCallback(
                 self.scaling_group.wait_for_deleted_id_removal,
@@ -281,7 +272,6 @@ class TestConvergence(unittest.TestCase):
                 total_servers=N_SERVERS,
             )
         )
-    test_reaction_to_oob_server_deletion.timeout = 1800
 
     def test_scale_down_after_oobd_non_constrained_z_lessthan_y(self):
         """
@@ -342,8 +332,6 @@ class TestConvergence(unittest.TestCase):
             rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
             scale_servers=y)
 
-    test_scale_down_after_oobd_non_constrained_z_greaterthan_y.timeout = 1800
-
     def test_scale_down_after_oobd_non_constrained_z_equal_y(self):
         """
         Validate the following edge case:
@@ -371,8 +359,6 @@ class TestConvergence(unittest.TestCase):
         return self._scale_down_after_oobd_non_constrained_param(
             rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
             scale_servers=y)
-
-    test_scale_down_after_oobd_non_constrained_z_equal_y.timeout = 1800
 
     def _scale_down_after_oobd_non_constrained_param(
             self, rcs, min_servers=0, max_servers=25, set_to_servers=0,

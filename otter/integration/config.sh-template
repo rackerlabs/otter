@@ -27,3 +27,7 @@ export AS_REGION=IAD
 
 # This is the test tenant ID that is enabled for convergence in mimic.
 export AS_CONVERGENCE_TENANT=000000
+
+# Use this to set the verbosity of the convergence tests.
+# If this is not defined, it will be assumed to be zero.
+#export AS_VERBOSITY=3
