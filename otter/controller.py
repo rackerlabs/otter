@@ -174,15 +174,22 @@ def delete_group(log, trans_id, group, force):
             raise GroupNotEmptyError(group.tenant_id, group.uuid)
 
     if tenant_is_enabled(group.tenant_id, config_value):
-        return (trigger_convergence_deletion(log, group)
-                if force else group.modify_state(check_and_delete))
+        if force:
+            # We don't care about servers in the group. So trigger deletion
+            # since it will take precedence over other status
+            d = trigger_convergence_deletion(log, group)
+        else:
+            # Delete only if desired is 0 which must be done with a lock to
+            # ensure desired is not getting modified by another thread/node
+            # when executing policy
+            d = group.modify_state(check_and_delete)
     else:
         if force:
             d = empty_group(log, trans_id, group)
             d.addCallback(lambda _: group.delete_group())
         else:
             d = group.delete_group()
-        return d
+    return d
 
 
 def trigger_convergence_deletion(log, group):
