@@ -1478,38 +1478,31 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         dispatcher.
         """
         self.state.desired = 2
-        fake_super = FakeSupervisor()
 
-        dispatcher = ComposedDispatcher([
-            test_dispatcher(),
-            SequenceDispatcher([
-                self._tenant_retry(
-                    get_server_details('server_id').intent,
-                    lambda _: (StubResponse(200, {}), self.server_details)),
-                (GetScalingGroupInfo(tenant_id='tenant_id',
-                                     group_id='group_id'),
-                    lambda _: (self.group, self.group_manifest_info)),
-                self._tenant_retry(
-                    EvictServerFromScalingGroup(log=self.log,
-                                                transaction_id=self.trans_id,
-                                                scaling_group=self.group,
-                                                server_id='server_id'),
-                    lambda i: sync_perform(dispatcher, Effect(i)))
-            ]),
-            get_eviction_dispatcher(fake_super)
+        seq_dispatcher = SequenceDispatcher([
+            self._tenant_retry(
+                get_server_details('server_id').intent,
+                lambda _: (StubResponse(200, {}), self.server_details)),
+            (GetScalingGroupInfo(tenant_id='tenant_id',
+                                 group_id='group_id'),
+                lambda _: (self.group, self.group_manifest_info)),
+            self._tenant_retry(
+                EvictServerFromScalingGroup(log=self.log,
+                                            transaction_id=self.trans_id,
+                                            scaling_group=self.group,
+                                            server_id='server_id'),
+                lambda _: (StubResponse(200, {}), None))
         ])
+        dispatcher = ComposedDispatcher([test_dispatcher(), seq_dispatcher])
 
-        d = controller.perform_convergence_remove_from_group(
-            self.log, self.trans_id, 'server_id', False, False,
-            self.group, self.state, dispatcher)
+        with seq_dispatcher.consume():
+            result = self.successResultOf(
+                controller.perform_convergence_remove_from_group(
+                    self.log, self.trans_id, 'server_id', False, False,
+                    self.group, self.state, dispatcher))
 
-        result = self.successResultOf(d)
         self.assert_states_equivalent_except_desired(result, self.state)
         self.assertEqual(result.desired, self.state.desired - 1)
-
-        self.assertEqual(fake_super.scrub_calls,
-                         [(self.log, self.trans_id, self.group.tenant_id,
-                           'server_id')])
 
     def test_non_convergence_uses_supervisor_remove(self):
         """
