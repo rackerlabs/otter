@@ -1,16 +1,16 @@
 """Tests for :mod:`otter.integration.lib.cloud_load_balancer`"""
 from testtools.matchers import Equals
 
-from otter.util.deferredutils import TimedOutError
+from twisted.internet.defer import succeed
+from twisted.internet.task import Clock
+from twisted.trial.unittest import SynchronousTestCase
+
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer,
     ContainsAllIPs,
     ExcludesAllIPs,
     HasLength)
-
-from twisted.internet.defer import succeed
-from twisted.internet.task import Clock
-from twisted.trial.unittest import SynchronousTestCase
+from otter.util.deferredutils import TimedOutError
 
 
 class WaitForNodesTestCase(SynchronousTestCase):
