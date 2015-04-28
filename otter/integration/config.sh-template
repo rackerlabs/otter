@@ -25,11 +25,9 @@ export AS_REGION=IAD
 # Mimic defaults to using ORD as the region
 #export AS_REGION=ORD
 
-# Use this key to specify a specific tenant_id
-# If running against the convergence enabled tenant in Mimic, use 000000
+# This is the test tenant ID that is enabled for convergence in mimic.
 export AS_CONVERGENCE_TENANT=000000
 
 # Use this to set the verbosity of the convergence tests.
 # If this is not defined, it will be assumed to be zero.
 #export AS_VERBOSITY=3
-
