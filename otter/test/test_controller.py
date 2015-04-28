@@ -38,6 +38,7 @@ from otter.test.utils import (
     patch,
     raise_,
     test_dispatcher)
+from otter.util.fp import assoc_obj
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN
@@ -1171,7 +1172,9 @@ _should_retry_params = ShouldDelayAndRetry(
 
 class ConvergenceRemoveServerTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.controller.convergence_remove_server_from_group`
+    Tests for :func:`otter.controller.convergence_remove_server_from_group`,
+    :func:`otter.controller.perform_convergence_remove_from_group`, and
+    :func:`otter.controller.remove_server_from_group`
     """
     def setUp(self):
         """
@@ -1244,8 +1247,8 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
 
     def _remove(self, replace, purge, seq_dispatcher):
         eff = controller.convergence_remove_server_from_group(
-            self.log, self.trans_id, self.group, self.state, 'server_id',
-            replace, purge)
+            self.log, self.trans_id, 'server_id', replace, purge,
+            self.group, self.state)
 
         with seq_dispatcher.consume():
             return sync_perform(
@@ -1318,7 +1321,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                 get_server_details('server_id').intent,
                 lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
-                lambda _: self.group_manifest_info)
+                lambda _: (self.group, self.group_manifest_info))
         ])
         self.assertRaises(
             CannotDeleteServerBelowMinError, self._remove, False, False,
@@ -1338,7 +1341,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                 get_server_details('server_id').intent,
                 lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
-                lambda _: self.group_manifest_info)
+                lambda _: (self.group, self.group_manifest_info))
         ])
         self.assertRaises(
             ServerNotFoundError, self._remove, False, False, seq_dispatcher)
@@ -1374,7 +1377,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                 get_server_details('server_id').intent,
                 lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
-                lambda _: self.group_manifest_info),
+                lambda _: (self.group, self.group_manifest_info)),
             self._tenant_retry(
                 set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
                 lambda _: (StubResponse(200, {}), None))
@@ -1422,7 +1425,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
 
     def test_checks_pass_replace_false_no_purge_success(self):
         """
-        If all the checks pass, and purge is true and replace is false, then
+        If all the checks pass, and purge is false and replace is false, then
         "DRAINING" is added to the server's metadata.  If this is successful,
         then the whole effect is a success, and returns the state the function
         was called with, with the desired value decremented.
@@ -1433,7 +1436,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                 get_server_details('server_id').intent,
                 lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
-                lambda _: self.group_manifest_info),
+                lambda _: (self.group, self.group_manifest_info)),
             self._tenant_retry(
                 EvictServerFromScalingGroup(log=self.log,
                                             transaction_id=self.trans_id,
@@ -1464,3 +1467,92 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         ])
         self.assertRaises(ValueError, self._remove, True, False,
                           seq_dispatcher)
+
+    def test_perform_convergence_remove_from_group(self):
+        """
+        Perform :func:`convergence_remove_server_from_group` with the given
+        dispatcher.
+        """
+        self.state.desired = 2
+
+        seq_dispatcher = SequenceDispatcher([
+            self._tenant_retry(
+                get_server_details('server_id').intent,
+                lambda _: (StubResponse(200, {}), self.server_details)),
+            (GetScalingGroupInfo(tenant_id='tenant_id',
+                                 group_id='group_id'),
+                lambda _: (self.group, self.group_manifest_info)),
+            self._tenant_retry(
+                EvictServerFromScalingGroup(log=self.log,
+                                            transaction_id=self.trans_id,
+                                            scaling_group=self.group,
+                                            server_id='server_id'),
+                lambda _: (StubResponse(200, {}), None))
+        ])
+        dispatcher = ComposedDispatcher([test_dispatcher(), seq_dispatcher])
+
+        with seq_dispatcher.consume():
+            result = self.successResultOf(
+                controller.perform_convergence_remove_from_group(
+                    self.log, self.trans_id, 'server_id', False, False,
+                    self.group, self.state, dispatcher))
+
+        self.assert_states_equivalent_except_desired(result, self.state)
+        self.assertEqual(result.desired, self.state.desired - 1)
+
+    def test_non_convergence_uses_supervisor_remove(self):
+        """
+        If the tenant is not convergence-enabled, the controller's
+        :func:`remove_server_from_group` calls the supervisor's
+        :func:`remove_server_from_group` function with the same arguments.
+        """
+        supervisor_remove = patch(
+            self, 'otter.controller.worker_remove_server_from_group',
+            return_value=defer.succeed('worker success'))
+
+        d = controller.remove_server_from_group(
+            self.log, self.trans_id, 'server_id', False, False,
+            self.group, self.state,
+            config_value={'convergence-tenants': []}.get)
+
+        self.assertEqual(self.successResultOf(d), 'worker success')
+
+        supervisor_remove.assert_called_once_with(
+            self.log, self.trans_id, 'server_id', False, False,
+            self.group, self.state)
+
+    @mock.patch('otter.controller.perform_convergence_remove_from_group',
+                autospec=True)
+    @mock.patch('otter.controller.get_convergence_starter', autospec=True)
+    def test_convergence_uses_convergence_remove(self, mock_get_starter,
+                                                 mock_performer):
+        """
+        If the tenant is convergence-enabled, the controller's
+        :func:`remove_server_from_group` calls
+        :func:`perform_convergence_remove_from_group` with a dispatcher that
+        can handle :class:`EvictServerFromScalingGroup`.
+
+        Then, a convergence cycle is kicked off, and whatever state that
+        :func:`convergence_remove_server_from_group` returned is propagated as
+        the return value.
+        """
+        new_state = assoc_obj(self.state, desired=self.state.desired - 1)
+        mock_performer.return_value = defer.succeed(new_state)
+        mock_starter = mock.MagicMock(
+            spec=['start_convergence'], dispatcher=object())
+        mock_get_starter.return_value = mock_starter
+
+        d = controller.remove_server_from_group(
+            self.log, self.trans_id, 'server_id', False, False,
+            self.group, self.state,
+            config_value={'convergence-tenants': [self.group.tenant_id]}.get)
+
+        mock_performer.assert_called_once_with(
+            self.log, self.trans_id, 'server_id', False, False, self.group,
+            self.state, mock_starter.dispatcher)
+
+        result = self.successResultOf(d)
+        self.assertIs(result, new_state)
+
+        mock_starter.start_convergence.assert_called_once_with(
+            self.log, 'tenant_id', 'group_id')
