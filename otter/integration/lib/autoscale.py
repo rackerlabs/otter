@@ -293,10 +293,14 @@ class ScalingGroup(object):
 
     def get_servicenet_ips(self, rcs, server_ids=None):
         """
-        Gets the servicenet IPs for the following server IDs - if no IDs are
+        Get the servicenet IPs for the following server IDs - if no IDs are
         provided, gets the servicenet IPs for all the active servers on the
         group.
 
+        Note that this requires that the nova endpoint already found be on RCS.
+
+        :param rcs: A :class:`otter.integration.lib.resources.TestResources`
+            instance.
         :param iterable server_ids: An iterable of server ids - this function
             does not check whether the servers belong the the group
 
