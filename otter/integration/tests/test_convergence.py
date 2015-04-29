@@ -140,10 +140,6 @@ class TestConvergence(unittest.TestCase):
             )
         )
 
-    def test_aaa(self):  # XXX: Testing purposes only
-        return self.test_scale_over_group_max_after_metadata_removal()
-    test_aaa.timeout = 1800
-
     def test_scaling_to_clb_max_after_oob_delete_type1(self):
         """This test starts with a scaling group with no servers.  We scale up
         to 24 servers, but after that's done, we delete 2 directly through
