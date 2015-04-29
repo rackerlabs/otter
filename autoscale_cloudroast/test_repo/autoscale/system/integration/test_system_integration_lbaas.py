@@ -318,7 +318,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         self.assertTrue(all([server_ip not in node_list_on_lb
                              for server_ip in server_ip_list]))
 
-    @tags(speed='slow', type='lbaas', convergence='error')
+    @tags(speed='slow', type='lbaas', convergence='yes')
     def test_force_delete_group_with_load_balancer(self):
         """
         Force delete a scaling group with active servers and load balancer,
