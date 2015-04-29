@@ -555,8 +555,8 @@ class AutoscaleBehaviors(BaseBehavior):
                 # here.
                 nodes = self.rcv3_client.get_nodes_on_pool(group_id).entity
                 server_list = [n for n in nodes.nodes
-                               if (safe_hasattr(n, "cloud_server"))
-                               and (n.status == "ACTIVE")]
+                               if (safe_hasattr(n, "cloud_server")) and
+                               (n.status == "ACTIVE")]
                 num_servers = len(server_list)
                 if num_servers == expected_servers:
                     return [n.id for n in server_list]
