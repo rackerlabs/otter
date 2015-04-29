@@ -118,7 +118,7 @@ class ScalingGroup(object):
     :ivar reactor: a :class:`twisted.internet.interfaces.IReactorTime`
         provider, to be used for timeouts and retries
 
-    :ivar _treq: the treq module to use for making requests - if not provided,
+    :ivar treq: the treq module to use for making requests - if not provided,
         the default library :mod:`treq` will be used.  Mainly to be used for
         injecting stubs during tests.
     """
