@@ -231,7 +231,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                             self.load_balancer_1)]
         self.assertTrue(set(scaled_down_server_ip) not in set(lb_node_list))
 
-    @tags(speed='slow', type='lbaas', convergence='error')
+    @tags(speed='slow', type='lbaas', convergence='yes')
     def test_delete_group_when_autoscale_server_is_the_last_node_on_lb(self):
         """
         Create a scaling group with load balancer.  After the servers on the
@@ -361,7 +361,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             self.assert_servers_deleted_successfully(
                 group.launchConfiguration.server.name)
 
-    @tags(speed='slow', type='lbaas', convergence='error')
+    @tags(speed='slow', type='lbaas', convergence='yes')
     def test_load_balancer_pending_update_or_error_state(self):
         """
         Ensure all the servers are created and added to the load balancer and
