@@ -197,8 +197,7 @@ class ScalingGroup(object):
             order.  If not found, the result code will be 404, and the state
             will be None.
         """
-        if success_codes is None:
-            success_codes = [200, 404]
+        success_codes = [200, 404] if success_codes is None else success_codes
 
         def decide(resp):
             if resp.code == 200:
