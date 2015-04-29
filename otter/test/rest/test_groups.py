@@ -1000,6 +1000,27 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(resp['error']['type'], 'GroupNotEmptyError')
         self.flushLoggedErrors(GroupNotEmptyError)
 
+    @mock.patch('otter.rest.groups.get_convergence_starter')
+    def test_group_converge_enabled_tenant(self, mock_gcs):
+        """
+        Calling `../converge` on convergence enabled tenant triggers
+        convergence and returns Deferred with None after enabling it
+        """
+        set_config_data({'convergence-tenants': ['11111']})
+        self.addCleanup(set_config_data, {})
+        cs = mock_gcs.return_value
+        cs.start_convergence.return_value = defer.succeed(None)
+        self.assert_status_code(
+            204, endpoint='{}converge'.format(self.endpoint), method='POST')
+        cs.start_convergence.assert_called_once_with(mock.ANY, '11111', 'one')
+
+    def test_group_converge_worker_tenant(self):
+        """
+        Calling `../converge` on non-convergence enabled tenant returns 404
+        """
+        self.assert_status_code(
+            404, endpoint='{}converge'.format(self.endpoint), method='POST')
+
 
 class GroupStateTestCase(RestAPITestMixin, SynchronousTestCase):
     """
