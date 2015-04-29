@@ -91,10 +91,11 @@ class GetAllServerDetailsTests(SynchronousTestCase):
                     'servers/detail?limit=10')
         self.servers = [{'id': i} for i in range(9)]
 
-    def test_get_all_less_batch_size(self):
+    def test_get_all_without_link_to_next_page(self):
         """
-        `get_all_server_details` will not fetch again if first get returns
-        results with size < batch_size
+        `get_all_server_details` will not fetch again if first does not have
+        a link to the next page (either pagination is not supported, or there
+        are no more pages)
         """
         fake_response = object()
         body = {'servers': self.servers}
@@ -103,23 +104,47 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         result = resolve_svcreq(svcreq, (fake_response, body), *self.req)
         self.assertEqual(result, self.servers)
 
-    def test_get_all_above_batch_size(self):
+    def test_get_all_ignores_non_next_links(self):
         """
-        `get_all_server_details` will fetch again until batch returned has
-        size < batch_size
+        `get_all_server_details` will ignore links that do not have
+        "rel" = "next".
         """
-        servers = [{'id': i} for i in range(19)]
-        req2 = (ServiceType.CLOUD_SERVERS, 'GET',
-                'servers/detail?limit=10&marker=9')
+        fake_response = object()
+        body = {'servers': self.servers,
+                'server_links': [{'href': 'meh', 'rel': 'prev'}]}
+        eff = get_all_server_details(batch_size=10)
+        svcreq = resolve_retry_stubs(eff)
+        result = resolve_svcreq(svcreq, (fake_response, body), *self.req)
+        self.assertEqual(result, self.servers)
+
+    def test_get_all_with_link_to_next_page(self):
+        """
+        `get_all_server_details` will fetch again and again until there is
+        no more next page.
+        """
+        servers = [{'id': i} for i in range(20)]
+        # first request
         svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
         fake_response = object()
-        body = {'servers': servers[:10]}
+        body = {'servers': servers[:10],
+                'servers_links': [{'href': 'nexturl1', 'rel': 'next'}]}
+        result = resolve_svcreq(svcreq, (fake_response, body), *self.req)
+        self.assertIsInstance(result, Effect)
 
-        next_retry = resolve_svcreq(svcreq, (fake_response, body),
-                                    *self.req)
-        next_req = resolve_retry_stubs(next_retry)
-        body = {'servers': servers[10:]}
-        result = resolve_svcreq(next_req, (fake_response, body), *req2)
+        # next request, because previous had a next link
+        next_req = resolve_retry_stubs(result)
+        body = {'servers': servers[10:],
+                'servers_links': [{'href': 'nexturl2', 'rel': 'next'}]}
+        result = resolve_svcreq(next_req, (fake_response, body),
+                                ServiceType.CLOUD_SERVERS, 'GET', 'nexturl1')
+        self.assertIsInstance(result, Effect)
+
+        # third request, because previous had a next link
+        next_req = resolve_retry_stubs(result)
+        body = {'servers': []}
+        result = resolve_svcreq(next_req, (fake_response, body),
+                                ServiceType.CLOUD_SERVERS, 'GET', 'nexturl2')
+
         self.assertEqual(result, servers)
 
     def test_with_changes_since(self):

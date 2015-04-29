@@ -41,30 +41,28 @@ def get_all_server_details(changes_since=None, batch_size=100):
     url = append_segments('servers', 'detail')
     query = {'limit': batch_size}
     if changes_since is not None:
-        query['changes_since'] = '{}Z'.format(changes_since.isoformat())
+        query['changes_since'] = '{0}Z'.format(changes_since.isoformat())
+    url = "{0}?{1}".format(url, urlencode(query))
 
-    def get_server_details(marker):
-        # sort based on query name to make the tests predictable
-        if marker is not None:
-            query.update({'marker': marker})
-        urlparams = sorted(query.items())
+    def get_server_details(url_with_query):
         eff = retry_effect(
-            service_request(
-                ServiceType.CLOUD_SERVERS,
-                'GET', '{}?{}'.format(url, urlencode(urlparams))),
+            service_request(ServiceType.CLOUD_SERVERS, 'GET',
+                            url_with_query),
             retry_times(5), exponential_backoff_interval(2))
         return eff.on(continue_)
 
     def continue_(result):
         _response, body = result
         servers = body['servers']
-        if len(servers) < batch_size:
-            return servers
-        else:
-            more_eff = get_server_details(servers[-1]['id'])
+        # Only continue if pagination is supported and there is another page
+        continuation = [link['href'] for link in body.get('servers_links', [])
+                        if link['rel'] == 'next']
+        if continuation:
+            more_eff = get_server_details(continuation[0])
             return more_eff.on(lambda more_servers: servers + more_servers)
+        return servers
 
-    return get_server_details(marker=None)
+    return get_server_details(url)
 
 
 def _discard_response((response, body)):
