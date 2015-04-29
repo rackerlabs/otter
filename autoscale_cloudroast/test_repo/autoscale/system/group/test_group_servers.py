@@ -41,10 +41,7 @@ class ServersTests(AutoscaleFixture):
         return self.autoscale_behaviors.retry(check_deleted, timeout=150,
                                               interval_time=15)
 
-    @tags(speed='slow', convergence='error')
-    # TODO: https://github.com/rackerlabs/otter/issues/1238
-    # DELETE doesn't work on servers created with convergence.
-    # This affects a lot of tests in this module!
+    @tags(speed='slow', convergence='yes')
     def test_delete_removes_and_replaces(self, replace=None):
         """
         `DELETE serverId` actually deletes the server and replaces with new
@@ -62,9 +59,9 @@ class ServersTests(AutoscaleFixture):
         # Is server really deleted?
         self.assert_server_deleted(server_id)
         # New server replaced?
-        self.verify_group_state(self.groupid, 1)
+        self.wait_for_expected_group_state(self.groupid, 1)
 
-    @tags(speed='slow', convergence='error')
+    @tags(speed='slow', convergence='yes')
     def test_delete_removed_replaced_arg(self):
         """
         `DELETE serverId?replace=true` actually deletes the server and
@@ -72,7 +69,7 @@ class ServersTests(AutoscaleFixture):
         """
         self.test_delete_removes_and_replaces('true')
 
-    @tags(speed='slow', convergence='error')
+    @tags(speed='slow', convergence='yes')
     def test_delete_removed_not_replaced(self):
         """
         `DELETE serverId?replace=false` removes the sever and does not replace
@@ -93,7 +90,7 @@ class ServersTests(AutoscaleFixture):
         # Is server really deleted?
         self.assert_server_deleted(server_id)
         # New server not replaced?
-        self.verify_group_state(self.groupid, 1)
+        self.wait_for_expected_group_state(self.groupid, 1)
 
     @tags(convergence='yes')
     def test_delete_server_not_found(self):
