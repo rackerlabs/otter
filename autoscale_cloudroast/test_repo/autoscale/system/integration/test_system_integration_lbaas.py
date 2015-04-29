@@ -43,7 +43,13 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                           cls.lbaas_client.delete_load_balancer)
         cls.lb_other_region = 0000
 
-    @tags(speed='slow', type='lbaas', convergence='error')
+    @tags(speed='slow', type='lbaas', convergence='never')
+    # Convergence: This doesn't work because Convergence just puts the group
+    # into ERROR, because when the load balancer is deleted, it notices the LB
+    # nodes are gone, and then tries to recreate the LB node for all active
+    # servers. This is done simultaneously with deleting one server during the
+    # scale-down in this test, but that doesn't matter much, because the failed
+    # "add node" operation causes the entire convergence to fail.
     def test_delete_server_if_deleted_load_balancer_during_scale_down(self):
         """
         Create a load balancer and provide it in the launch config during
@@ -78,7 +84,10 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             group.launchConfiguration.server.name, 1)
         self.assertEquals(actual_remaining_servers, remaining_servers)
 
-    @tags(speed='slow', type='lbaas', convergence='error')
+    @tags(speed='slow', type='lbaas', convergence='never')
+    # Convergence: Convergence does not delete servers when they can't be added
+    # to the LB: it just puts the group into ERROR and it's up to the user to
+    # recreate the LB.
     def test_delete_server_if_deleted_load_balancer_during_scale_up(self):
         """
         Create a load balancer and provide it in the launch config during
@@ -345,7 +354,10 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         self.assertTrue(all([server_ip not in node_list_on_lb for server_ip
                              in server_ip_list]))
 
-    @tags(speed='slow', type='lbaas', convergence='error')
+    @tags(speed='slow', type='lbaas', convergence='never')
+    # Convergence: Convergence does not delete servers when they can't be added
+    # to the LB: it just puts the group into ERROR and it's up to the user to
+    # recreate the LB.
     def test_negative_create_group_with_invalid_load_balancer(self):
         """
         Create group with a random number/lb from a differnt region as the load
@@ -400,7 +412,10 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             group.launchConfiguration.server.name,
             self.gc_min_entities_alt)
 
-    @tags(speed='slow', type='lbaas', convergence='error')
+    @tags(speed='slow', type='lbaas', convergence='never')
+    # Convergence: Convergence does not delete servers when they can't be added
+    # to the LB: it just puts the group into ERROR and it's up to the user to
+    # recreate the LB.
     def test_group_with_invalid_load_balancer_among_multiple_load_balancers(
             self):
         """
