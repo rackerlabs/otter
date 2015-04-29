@@ -1,10 +1,12 @@
-"""Contains reusable classes relating to autoscale."""
+"""Contains reusable classes and utilities relating to cloud load balancers."""
 
 from __future__ import print_function
 
 import json
 
 from characteristic import Attribute, attributes
+
+from testtools.matchers import MatchesPredicateWithParams
 
 import treq
 
@@ -21,6 +23,7 @@ from otter.util.retry import (
 
 @attributes([
     Attribute('pool', default_value=None),
+    Attribute('treq', default_value=treq)
 ])
 class CloudLoadBalancer(object):
     """The CloudLoadBalancer class represents a Rackspace Cloud Load Balancer
@@ -63,7 +66,7 @@ class CloudLoadBalancer(object):
             the current cloud load balancer state.
         """
         return (
-            treq.get(
+            self.treq.get(
                 "%s/loadbalancers/%s" % (
                     str(rcs.endpoints["loadbalancers"]),
                     self.clb_id
@@ -72,7 +75,7 @@ class CloudLoadBalancer(object):
                 pool=self.pool,
             )
             .addCallback(check_success, [200])
-            .addCallback(treq.json_content)
+            .addCallback(self.treq.json_content)
         )
 
     def wait_for_state(
@@ -144,13 +147,13 @@ class CloudLoadBalancer(object):
             self.clb_id = str(resp["loadBalancer"]["id"])
             return rcs
 
-        return (treq.post("%s/loadbalancers" %
-                          str(rcs.endpoints["loadbalancers"]),
-                          json.dumps(self.config()),
-                          headers=headers(str(rcs.token)),
-                          pool=self.pool)
+        return (self.treq.post("%s/loadbalancers" %
+                               str(rcs.endpoints["loadbalancers"]),
+                               json.dumps(self.config()),
+                               headers=headers(str(rcs.token)),
+                               pool=self.pool)
                 .addCallback(check_success, [202])
-                .addCallback(treq.json_content)
+                .addCallback(self.treq.json_content)
                 .addCallback(record_results))
 
     def delete(self, rcs):
@@ -160,7 +163,7 @@ class CloudLoadBalancer(object):
             calls with.
         """
         return (
-            treq.delete(
+            self.treq.delete(
                 "%s/loadbalancers/%s" % (
                     str(rcs.endpoints["loadbalancers"]),
                     self.clb_id
@@ -169,3 +172,91 @@ class CloudLoadBalancer(object):
                 pool=self.pool
             ).addCallback(check_success, [202, 404])
         ).addCallback(lambda _: rcs)
+
+    def wait_for_nodes(self, rcs, matcher, timeout, period=10, clock=None):
+        """
+        Wait for the nodes on the load balancer to reflect a certain state,
+        specified by matcher.
+
+        :param rcs: a :class:`otter.integration.lib.resources.TestResources`
+            instance
+        :param matcher: A :mod:`testtool.matcher`, as specified in
+            module: testtools.matchers in
+            http://testtools.readthedocs.org/en/latest/api.html.
+        :param timeout: The amount of time to wait until this step is
+            considered failed.
+        :param period: How long to wait before polling again.
+        :param clock: a :class:`twisted.internet.interfaces.IReactorTime`
+            provider
+
+        :return: None, if the state is reached
+        :raises: :class:`TimedOutError` if the state is never reached within
+            the requisite amount of time.
+
+        Example usage:
+
+        ```
+        matcher = MatchesAll(
+            ExcludesAllIPs(excluded_ips)),
+            ContainsAllIps(included_ips),
+            HasLength(5)
+        )
+
+        ..wait_for_nodes(rcs, matchers, timeout=60)
+        ```
+        """
+        def check(nodes):
+            mismatch = matcher.match(nodes['nodes'])
+            if mismatch:
+                raise TransientRetryError(mismatch.describe())
+
+        def poll():
+            return (
+                self.treq.get(
+                    "{0}/loadbalancers/{1}/nodes".format(
+                        str(rcs.endpoints["loadbalancers"]),
+                        self.clb_id
+                    ),
+                    headers=headers(str(rcs.token)),
+                    pool=self.pool
+                )
+                .addCallback(check_success, [200])
+                .addCallback(self.treq.json_content)
+                .addCallback(check)
+            )
+
+        return retry_and_timeout(
+            poll, timeout,
+            can_retry=transient_errors_except(),
+            next_interval=repeating_interval(period),
+            clock=clock or reactor,
+            deferred_description="Waiting for nodes to reach state {0}".format(
+                str(matcher))
+        )
+
+
+HasLength = MatchesPredicateWithParams(
+    lambda nodes, length: len(nodes) == length,
+    "len({0}) is not {1}"
+)
+"""
+Matcher that asserts something about the number of nodes on the CLB.
+"""
+
+ExcludesAllIPs = MatchesPredicateWithParams(
+    lambda nodes, ips: not set(node['address'] for node in nodes).intersection(
+        set(ips)),
+    "The nodes {0} should not contain any of the following IP addresses: {1}"
+)
+"""
+Matcher that asserts that all the given IPs are no longer on the load balancer.
+"""
+
+ContainsAllIPs = MatchesPredicateWithParams(
+    lambda nodes, ips: set(ips).issubset(
+        set(node['address'] for node in nodes)),
+    "The nodes {0} should have all of the following IP addresses: {1}"
+)
+"""
+Matcher that asserts that all the given IPs are on the load balancer.
+"""
