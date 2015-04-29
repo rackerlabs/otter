@@ -72,7 +72,7 @@ def get_all_server_details(changes_since=None, batch_size=100):
                     "When gathering server details, got the same 'next' link "
                     "twice from Nova: {0}".format(last_link[-1]))
 
-            last_link.append(continuation[0])
+            last_link[:] = [continuation[0]]
             more_eff = get_server_details(continuation[0])
             return more_eff.on(lambda more_servers: servers + more_servers)
         return servers
