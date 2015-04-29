@@ -160,7 +160,6 @@ class TestConvergence(unittest.TestCase):
             ).addCallback(
                 self.scaling_group.wait_for_N_servers, 12, timeout=1800
             ).addCallback(
-            .addCallback(
                 self.untouchable_scaling_group.get_scaling_group_state
             ).addCallback(check_state, then=double_check_state)
         )
