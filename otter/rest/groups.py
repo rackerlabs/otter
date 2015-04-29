@@ -8,6 +8,7 @@ from functools import partial
 
 from otter import controller
 from otter.convergence.composition import tenant_is_enabled
+from otter.convergence.service import get_convergence_starter
 from otter.json_schema.group_schemas import (
     MAX_ENTITIES,
     validate_launch_config_servicenet,
@@ -594,6 +595,21 @@ class OtterGroup(object):
         deferred.addCallback(_format_and_stackify)
         deferred.addCallback(json.dumps)
         return deferred
+
+    @app.route('/converge/', methods=['POST'])
+    @with_transaction_id()
+    @fails_with(exception_codes)
+    @succeeds_with(204)
+    def converge_scaling_group(self, request):
+        """
+        Trigger convergence on given scaling group
+        """
+        if tenant_is_enabled(self.tenant_id, config_value):
+            cs = get_convergence_starter()
+            return cs.start_convergence(self.log, self.tenant_id,
+                                        self.group_id)
+        else:
+            request.setResponseCode(404)
 
     @app.route('/pause/', methods=['POST'])
     @with_transaction_id()
