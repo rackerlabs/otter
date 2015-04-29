@@ -31,3 +31,17 @@ export AS_CONVERGENCE_TENANT=000000
 # Use this to set the verbosity of the convergence tests.
 # If this is not defined, it will be assumed to be zero.
 #export AS_VERBOSITY=3
+
+# Adjust this if your Openstack implementation registers your autoscaling
+# service under a different key in the service catalog.
+export AS_AUTOSCALE_SC_KEY=autoscale
+
+# When testing locally, Mimic won't have (enabled) its own support for the
+# Autoscale API.  This URL provides the endpoint for the locally running
+# instance of Autoscale.  The {0} is important, for it signifies the current
+# tenant ID.
+export AS_AUTOSCALE_LOCAL_URL=http://localhost:9000/v1.0/{0}
+
+# Adjust this if your Openstack implementation registers your cloud computing
+# service under a different key in the service catalog.
+export AS_NOVA_SC_KEY=cloudServersOpenStack

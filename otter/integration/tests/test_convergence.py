@@ -2,6 +2,9 @@
 Tests covering self-healing should be placed in a separate test file.
 """
 
+from __future__ import print_function
+
+import json
 import os
 import random
 
@@ -38,6 +41,9 @@ region = os.environ['AS_REGION']
 # Get vs dict lookup because it will return None if not found,
 # not throw an exception.  None is a valid value for convergence_tenant.
 convergence_tenant = os.environ.get('AS_CONVERGENCE_TENANT')
+otter_key = os.environ['AS_AUTOSCALE_SC_KEY']
+otter_url = os.environ.get('AS_AUTOSCALE_LOCAL_URL')
+nova_key = os.environ['AS_NOVA_SC_KEY']
 
 
 class TestConvergence(unittest.TestCase):
@@ -68,6 +74,71 @@ class TestConvergence(unittest.TestCase):
                 return
             return deferLater(reactor, 0, _check_fds, None)
         return self.pool.closeCachedConnections().addBoth(_check_fds)
+
+    def test_scale_over_group_max_after_metadata_removal(self):
+        """
+        Attempt to scale over the group max, but only after metadata removal on
+        some random sampling of servers.
+        """
+
+        rcs = TestResources()
+
+        scaling_group_body = create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+        )
+
+        self.scaling_group = ScalingGroup(
+            group_config=scaling_group_body,
+            pool=self.pool
+        )
+
+        self.scale_up_to_max = ScalingPolicy(
+            scale_by=25,
+            scaling_group=self.scaling_group
+        )
+
+        self.scale_beyond_max = ScalingPolicy(
+            scale_by=5,
+            scaling_group=self.scaling_group
+        )
+
+        def expect_403(failure):
+            if not isinstance(failure, Failure):
+                raise Exception("Failure expected")
+            failure.trap(APIError)
+            if failure.value.code != 403:
+                failure.raiseException()
+            return rcs
+
+        return (
+            self.identity.authenticate_user(
+                rcs,
+                resources={
+                    "otter": (otter_key, otter_url),
+                    "nova": (nova_key,),
+                },
+                region=region,
+            ).addCallback(self.scaling_group.start, self)
+            .addCallback(self.scale_up_to_max.start, self)
+            .addCallback(self.scale_beyond_max.start, self)
+            .addCallback(self.scale_up_to_max.execute)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers, 25, timeout=1800
+            ).addCallback(self.scaling_group.get_scaling_group_state)
+            .addCallback(self._choose_random_servers, 3)
+            .addCallback(self._remove_metadata, rcs)
+            .addCallback(lambda _: rcs)
+            .addCallback(self.scale_beyond_max.execute)
+            .addBoth(expect_403)
+            .addCallback(lambda _: self.removed_ids)
+            .addCallback(
+                self.scaling_group.wait_for_deleted_id_removal,
+                rcs,
+                total_servers=25,
+            ).addCallback(
+                self.scaling_group.wait_for_N_servers, 25, timeout=1800
+            )
+        )
 
     def test_scaling_to_clb_max_after_oob_delete_type1(self):
         """This test starts with a scaling group with no servers.  We scale up
@@ -108,11 +179,11 @@ class TestConvergence(unittest.TestCase):
                 self.identity.authenticate_user(rcs)
                 .addCallback(
                     rcs.find_end_point,
-                    "otter", "autoscale", region,
+                    "otter", otter_key, region,
                     default_url='http://localhost:9000/v1.0/{0}'
                 ).addCallback(
                     rcs.find_end_point,
-                    "nova", "cloudServersOpenStack", region
+                    "nova", nova_key, region
                 ).addCallback(
                     rcs.find_end_point,
                     "loadbalancers", "cloudLoadBalancers", region
@@ -200,8 +271,8 @@ class TestConvergence(unittest.TestCase):
             self.identity.authenticate_user(
                 rcs,
                 resources={
-                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
-                    "nova": ("cloudServersOpenStack",),
+                    "otter": (otter_key, otter_url),
+                    "nova": (nova_key,),
                 },
                 region=region
             ).addCallback(self.scaling_group.start, self)
@@ -252,8 +323,8 @@ class TestConvergence(unittest.TestCase):
             self.identity.authenticate_user(
                 rcs,
                 resources={
-                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
-                    "nova": ("cloudServersOpenStack",),
+                    "otter": (otter_key, otter_url),
+                    "nova": (nova_key,),
                 },
                 region=region
             ).addCallback(self.scaling_group.start, self)
@@ -443,8 +514,8 @@ class TestConvergence(unittest.TestCase):
             self.identity.authenticate_user(
                 rcs,
                 resources={
-                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
-                    "nova": ("cloudServersOpenStack",),
+                    "otter": (otter_key, otter_url),
+                    "nova": (nova_key,),
                 },
                 region=region
             ).addCallback(self.scaling_group.start, self)
@@ -639,3 +710,47 @@ class TestConvergence(unittest.TestCase):
         # If no error occurs while deleting, all the results will be the
         # same.  So just return the 1st, which is just our rcs value.
         return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
+
+    def _list_metadata(self, svr_id, rcs):
+        """Uses Nova to get the server's metadata."""
+        return (
+            treq.get(
+                "{}/servers/{}/metadata".format(
+                    str(rcs.endpoints["nova"]), svr_id
+                ),
+                headers=headers(str(rcs.token)),
+                pool=self.pool,
+            ).addCallback(check_success, [200])
+            .addCallback(treq.json_content)
+        )
+
+    def _update_metadata(self, metadata, svr_id, rcs):
+        """Uses Nova to alter a server's metadata."""
+        return (
+            treq.put(
+                "{}/servers/{}/metadata".format(
+                    str(rcs.endpoints["nova"]), svr_id
+                ),
+                json.dumps(metadata),
+                headers=headers(str(rcs.token)),
+                pool=self.pool,
+            ).addCallback(check_success, [200])
+            .addCallback(lambda _: rcs)
+        )
+
+    def _remove_metadata(self, ids, rcs):
+        """Given a list of server IDs, use Nova to remove their metadata.
+        This will strip them of their association with Autoscale.
+        """
+
+        def remove_metadata(id):
+            return (
+                self._list_metadata(id, rcs)
+                .addCallback(
+                    lambda m: {'metadata': {k: "" for k in m['metadata']}}
+                ).addCallback(self._update_metadata, id, rcs)
+            )
+
+        self.removed_ids = ids
+        deferreds = map(remove_metadata, ids)
+        return gatherResults(deferreds).addCallback(lambda r: r[0])
