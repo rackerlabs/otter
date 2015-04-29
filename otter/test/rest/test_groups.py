@@ -769,6 +769,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         super(OneGroupTestCase, self).setUp()
         self.mock_group.uuid = "one"
+        self.mock_controller = patch(self, 'otter.rest.groups.controller')
 
     def test_view_manifest_404(self):
         """
@@ -942,105 +943,41 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
 
     def test_group_delete(self):
         """
-        Deleting an existing group succeeds with a 204.
+        Deleting an existing group succeeds with a 204 by delegating it
+        to `controller.delete_group`
         """
-        self.mock_group.update_config.return_value = defer.succeed(None)
-        self.mock_group.delete_group.return_value = defer.succeed(None)
-
+        self.mock_controller.delete_group.return_value = defer.succeed(None)
         response_body = self.assert_status_code(204, method="DELETE")
         self.assertEqual(response_body, "")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
-        self.assertEqual(0, self.mock_group.update_config.call_count)
-        self.mock_group.delete_group.assert_called_once_with()
+        self.mock_controller.delete_group.assert_called_once_with(
+            mock.ANY, 'transaction-id', self.mock_group, False)
 
     def test_group_delete_force(self):
         """
-        Deleting a group with force sets min/max to zero and deletes it.
+        Force deleting a group will be delegated to
+        `controller.delete_group` with force argument as True
         """
-        self.mock_controller = patch(self, 'otter.rest.groups.controller')
-
-        self.mock_group.view_manifest.return_value = defer.succeed(
-            {'groupConfiguration':
-                {'name': 'group1', 'minEntities': '10', 'maxEntities': '1000'},
-             'launchConfiguration':
-                {'this': 'is_a_launch_config'},
-             'id': 'one'})
-        self.mock_group.delete_group.return_value = defer.succeed(None)
-        self.mock_group.update_config.return_value = defer.succeed(None)
-        self.mock_controller.obey_config_change.return_value = defer.succeed(
-            None)
-
+        self.mock_controller.delete_group.return_value = defer.succeed(None)
         self.assert_status_code(
             204, endpoint="{0}?force=true".format(self.endpoint),
             method="DELETE")
-
-        expected_config = {'maxEntities': 0,
-                           'minEntities': 0,
-                           'name': 'group1'}
-        self.mock_group.view_manifest.assert_called_once_with(
-            with_policies=False)
-        self.mock_group.update_config.assert_called_once_with(expected_config)
-        self.mock_controller.obey_config_change.assert_called_once_with(
-            mock.ANY, "transaction-id", expected_config, self.mock_group,
-            self.mock_state, launch_config={'this': 'is_a_launch_config'})
-        self.mock_group.delete_group.assert_called_once_with()
-
-    def test_group_delete_force_case_insensitive(self):
-        """
-        The 'true' specified in force is case insensitive.
-        """
-        self.mock_controller = patch(self, 'otter.rest.groups.controller')
-
-        self.mock_group.view_manifest.return_value = defer.succeed(
-            {'groupConfiguration': {'name': 'group1'},
-             'launchConfiguration': {'this': 'is_a_launch_config'},
-             'id': 'one'})
-        self.mock_group.delete_group.return_value = defer.succeed(None)
-        self.mock_group.update_config.return_value = defer.succeed(None)
-        self.mock_controller.obey_config_change.return_value = defer.succeed(
-            None)
-
-        self.assert_status_code(
-            204, endpoint="{0}?force=true".format(self.endpoint),
-            method="DELETE")
-
-        expected_config = {'maxEntities': 0,
-                           'minEntities': 0,
-                           'name': 'group1'}
-        self.mock_group.view_manifest.assert_called_once_with(
-            with_policies=False)
-        self.mock_group.update_config.assert_called_once_with(expected_config)
-        self.mock_controller.obey_config_change.assert_called_once_with(
-            mock.ANY, "transaction-id", expected_config, self.mock_group,
-            self.mock_state, launch_config={'this': 'is_a_launch_config'})
-        self.mock_group.delete_group.assert_called_once_with()
-
-    def test_group_delete_force_garbage_arg(self):
-        """
-        Providing an force argument other than 'true' causes an error.
-        """
-        self.mock_group.delete_group.return_value = defer.succeed(None)
-        self.mock_group.update_config.return_value = defer.succeed(None)
-
-        self.assert_status_code(
-            400, endpoint="{0}?force=blah".format(self.endpoint),
-            method="DELETE")
-
-        self.assertEqual(0, self.mock_group.update_config.call_count)
-        self.assertEqual(0, self.mock_group.delete_group.call_count)
+        self.mock_controller.delete_group.assert_called_once_with(
+            mock.ANY, "transaction-id", self.mock_group, True)
 
     def test_group_delete_404(self):
         """
         Deleting a non-existant group fails with a 404.
         """
-        self.mock_group.delete_group.return_value = defer.fail(
+        self.mock_controller.delete_group.return_value = defer.fail(
             NoSuchScalingGroupError('11111', '1'))
 
         response_body = self.assert_status_code(404, method="DELETE")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
-        self.mock_group.delete_group.assert_called_once_with()
+        self.mock_controller.delete_group.assert_called_once_with(
+            mock.ANY, "transaction-id", self.mock_group, False)
 
         resp = json.loads(response_body)
         self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
@@ -1050,17 +987,39 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         Deleting a non-empty group fails with a 403.
         """
-        self.mock_group.delete_group.return_value = defer.fail(
+        self.mock_controller.delete_group.return_value = defer.fail(
             GroupNotEmptyError('11111', '1'))
 
         response_body = self.assert_status_code(403, method="DELETE")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
-        self.mock_group.delete_group.assert_called_once_with()
+        self.mock_controller.delete_group.assert_called_once_with(
+            mock.ANY, "transaction-id", self.mock_group, False)
 
         resp = json.loads(response_body)
         self.assertEqual(resp['error']['type'], 'GroupNotEmptyError')
         self.flushLoggedErrors(GroupNotEmptyError)
+
+    @mock.patch('otter.rest.groups.get_convergence_starter')
+    def test_group_converge_enabled_tenant(self, mock_gcs):
+        """
+        Calling `../converge` on convergence enabled tenant triggers
+        convergence and returns Deferred with None after enabling it
+        """
+        set_config_data({'convergence-tenants': ['11111']})
+        self.addCleanup(set_config_data, {})
+        cs = mock_gcs.return_value
+        cs.start_convergence.return_value = defer.succeed(None)
+        self.assert_status_code(
+            204, endpoint='{}converge'.format(self.endpoint), method='POST')
+        cs.start_convergence.assert_called_once_with(mock.ANY, '11111', 'one')
+
+    def test_group_converge_worker_tenant(self):
+        """
+        Calling `../converge` on non-convergence enabled tenant returns 404
+        """
+        self.assert_status_code(
+            404, endpoint='{}converge'.format(self.endpoint), method='POST')
 
 
 class GroupStateTestCase(RestAPITestMixin, SynchronousTestCase):
@@ -1191,9 +1150,9 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         Mock remove_server_from_group
         """
         super(GroupServersTests, self).setUp()
-        self.mock_rsfg = patch(self,
-                               'otter.rest.groups.remove_server_from_group',
-                               return_value=None)
+        self.mock_rsfg = patch(
+            self, 'otter.rest.groups.controller.remove_server_from_group',
+            return_value=None)
         self.patch(groups, "extract_bool_arg", self._extract_bool_arg)
         self._replace = self._purge = True
 

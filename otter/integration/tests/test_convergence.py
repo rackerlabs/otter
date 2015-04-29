@@ -4,6 +4,7 @@ Tests covering self-healing should be placed in a separate test file.
 
 from __future__ import print_function
 
+import json
 import os
 import random
 
@@ -13,6 +14,7 @@ from twisted.internet import reactor
 from twisted.internet.defer import gatherResults
 from twisted.internet.task import deferLater
 from twisted.internet.tcp import Client
+from twisted.python.failure import Failure
 from twisted.trial import unittest
 from twisted.web.client import HTTPConnectionPool
 
@@ -27,7 +29,7 @@ from otter.integration.lib.cloud_load_balancer import CloudLoadBalancer
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.resources import TestResources
 
-from otter.util.http import check_success, headers
+from otter.util.http import APIError, check_success, headers
 
 
 username = os.environ['AS_USERNAME']
@@ -39,10 +41,14 @@ region = os.environ['AS_REGION']
 # Get vs dict lookup because it will return None if not found,
 # not throw an exception.  None is a valid value for convergence_tenant.
 convergence_tenant = os.environ.get('AS_CONVERGENCE_TENANT')
+otter_key = os.environ['AS_AUTOSCALE_SC_KEY']
+otter_url = os.environ.get('AS_AUTOSCALE_LOCAL_URL')
+nova_key = os.environ['AS_NOVA_SC_KEY']
 
 
 class TestConvergence(unittest.TestCase):
     """This class contains test cases aimed at the Otter Converger."""
+    timeout = 1800
 
     def setUp(self):
         """Establish an HTTP connection pool and commonly used resources for
@@ -186,12 +192,20 @@ class TestConvergence(unittest.TestCase):
             scaling_group=self.scaling_group
         )
 
+        def expect_403(failure):
+            if not isinstance(failure, Failure):
+                raise Exception("Failure expected")
+            failure.trap(APIError)
+            if failure.value.code != 403:
+                failure.raiseException()
+            return rcs
+
         return (
             self.identity.authenticate_user(
                 rcs,
                 resources={
-                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
-                    "nova": ("cloudServersOpenStack",),
+                    "otter": (otter_key, otter_url),
+                    "nova": (nova_key,),
                 },
                 region=region,
             ).addCallback(self.scaling_group.start, self)
@@ -202,10 +216,10 @@ class TestConvergence(unittest.TestCase):
                 self.scaling_group.wait_for_N_servers, 25, timeout=1800
             ).addCallback(self.scaling_group.get_scaling_group_state)
             .addCallback(self._choose_random_servers, 3)
-            # Beyond this point, untested. XXX
             .addCallback(self._remove_metadata, rcs)
             .addCallback(lambda _: rcs)
             .addCallback(self.scale_beyond_max.execute)
+            .addBoth(expect_403)
             .addCallback(lambda _: self.removed_ids)
             .addCallback(
                 self.scaling_group.wait_for_deleted_id_removal,
@@ -236,7 +250,6 @@ class TestConvergence(unittest.TestCase):
         for a CLB (as of this writing).
         """
         return self._perform_oobd_clb_test(25)
-    test_scaling_to_clb_max_after_oob_delete_type1.timeout = 1800
 
     def test_scaling_to_clb_max_after_oob_delete_type2(self):
         """This test starts with a scaling group with no servers.  We scale up
@@ -252,7 +265,6 @@ class TestConvergence(unittest.TestCase):
         for a CLB (as of this writing).  We use max of CLB + 25.
         """
         return self._perform_oobd_clb_test(50)
-    test_scaling_to_clb_max_after_oob_delete_type2.timeout = 1800
 
     def _perform_oobd_clb_test(self, scaling_group_max_entities):
         rcs = TestResources()
@@ -263,11 +275,11 @@ class TestConvergence(unittest.TestCase):
                 self.identity.authenticate_user(rcs)
                 .addCallback(
                     rcs.find_end_point,
-                    "otter", "autoscale", region,
+                    "otter", otter_key, region,
                     default_url='http://localhost:9000/v1.0/{0}'
                 ).addCallback(
                     rcs.find_end_point,
-                    "nova", "cloudServersOpenStack", region
+                    "nova", nova_key, region
                 ).addCallback(
                     rcs.find_end_point,
                     "loadbalancers", "cloudLoadBalancers", region
@@ -292,32 +304,8 @@ class TestConvergence(unittest.TestCase):
                 scaling_group=self.scaling_group
             )
 
-            # If we didn't have this policy, then this test would always pass
-            # on an Otter deployment w/out Convergence enabled.  Reason: we
-            # start off with 24 servers.  We OOB-delete 2 of them, leaving 22
-            # actually running; however, Otter will still think 24 exist.  We
-            # scale up by one, and:
-            #
-            # - If Otter doesn't converge, then it'll just spin up another
-            # server, and will meet the test criteria, OR,
-            #
-            # - If Otter converges, it's entirely possible for it to notice
-            # that two servers are gone, for it to attempt to provision
-            # replacements, and then provision the third and final server, all
-            # before we get a response back from
-            # scaling_group.get_scaling_group_state.
-            #
-            # So, we need an intermediate step that *guarantees* our test the
-            # ability to inspect Otter's behavior.  This is that step.
             self.second_scaling_policy = ScalingPolicy(
-                scale_by=-1,
-                scaling_group=self.scaling_group
-            )
-
-            # We scale up by 2 here instead of 1, to make up for the -1 in the
-            # previous scaling policy.
-            self.third_scaling_policy = ScalingPolicy(
-                scale_by=2,
+                scale_by=1,
                 scaling_group=self.scaling_group
             )
 
@@ -325,7 +313,6 @@ class TestConvergence(unittest.TestCase):
                 self.scaling_group.start(rcs, self)
                 .addCallback(self.first_scaling_policy.start, self)
                 .addCallback(self.second_scaling_policy.start, self)
-                .addCallback(self.third_scaling_policy.start, self)
                 .addCallback(self.first_scaling_policy.execute)
                 .addCallback(
                     self.scaling_group.wait_for_N_servers, 24, timeout=1800
@@ -338,8 +325,7 @@ class TestConvergence(unittest.TestCase):
                     self.scaling_group.wait_for_deleted_id_removal,
                     rcs,
                     total_servers=24,
-                ).addCallback(self.third_scaling_policy.execute)
-                .addCallback(
+                ).addCallback(
                     self.scaling_group.wait_for_N_servers, 25, timeout=1800
                 )
             )
@@ -381,8 +367,8 @@ class TestConvergence(unittest.TestCase):
             self.identity.authenticate_user(
                 rcs,
                 resources={
-                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
-                    "nova": ("cloudServersOpenStack",),
+                    "otter": (otter_key, otter_url),
+                    "nova": (nova_key,),
                 },
                 region=region
             ).addCallback(self.scaling_group.start, self)
@@ -402,9 +388,8 @@ class TestConvergence(unittest.TestCase):
                 self.scaling_group.wait_for_N_servers, 5, timeout=1800
             )
         )
-    test_reaction_to_oob_deletion_then_scale_up.timeout = 1800
 
-    def test_reaction_to_oob_server_deletion(self):
+    def test_reaction_to_oob_server_deletion_below_min(self):
         """
         Validate the following edge case:
         - When out of band deletions bring the number of active servers below
@@ -430,8 +415,54 @@ class TestConvergence(unittest.TestCase):
             pool=self.pool
         )
 
-        self.scaling_policy = ScalingPolicy(
-            scale_by=-1,
+        return (
+            self.identity.authenticate_user(
+                rcs,
+                resources={
+                    "otter": (otter_key, otter_url),
+                    "nova": (nova_key,),
+                },
+                region=region
+            ).addCallback(self.scaling_group.start, self)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers,
+                N_SERVERS, timeout=1800
+            ).addCallback(self.scaling_group.get_scaling_group_state)
+            .addCallback(self._choose_half_the_servers)
+            .addCallback(self._delete_those_servers, rcs)
+            # This policy is simply ussed to trigger convergence
+            .addCallback(self.scaling_group.trigger_convergence)
+            .addCallback(lambda _: self.removed_ids)
+            .addCallback(
+                self.scaling_group.wait_for_deleted_id_removal,
+                rcs,
+                total_servers=N_SERVERS,
+            )
+        )
+
+    def test_group_config_update_triggers_convergence(self):
+        """
+        Validate the following edge case:
+        - On a group that has experienced and out of band delete,
+          when the group configuration is updated convergence is triggered
+        """
+        set_to_servers = 5
+        max_servers = 10
+
+        rcs = TestResources()
+
+        scaling_group_body = create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            max_entities=max_servers
+        )
+
+        self.scaling_group = ScalingGroup(
+            group_config=scaling_group_body,
+            pool=self.pool
+        )
+
+        self.policy_set = ScalingPolicy(
+            set_to=set_to_servers,
             scaling_group=self.scaling_group
         )
 
@@ -444,23 +475,24 @@ class TestConvergence(unittest.TestCase):
                 },
                 region=region
             ).addCallback(self.scaling_group.start, self)
+            .addCallback(self.policy_set.start, self)
+            .addCallback(self.policy_set.execute)
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
-                N_SERVERS, timeout=1800
+                set_to_servers, timeout=1800
             ).addCallback(self.scaling_group.get_scaling_group_state)
             .addCallback(self._choose_half_the_servers)
             .addCallback(self._delete_those_servers, rcs)
-            # This policy is simply ussed to trigger convergence
-            .addCallback(self.scaling_policy.start, self)
-            .addCallback(self.scaling_policy.execute)
+            .addCallback(
+                self.scaling_group.update_group_config,
+                maxEntities=max_servers + 2)
             .addCallback(lambda _: self.removed_ids)
             .addCallback(
                 self.scaling_group.wait_for_deleted_id_removal,
                 rcs,
-                total_servers=N_SERVERS,
+                total_servers=set_to_servers,
             )
         )
-    test_reaction_to_oob_server_deletion.timeout = 1800
 
     def test_scale_down_after_oobd_non_constrained_z_lessthan_y(self):
         """
@@ -472,10 +504,10 @@ class TestConvergence(unittest.TestCase):
           never happened.)
 
             Create a group with min N servers
-            Scale the group up by x for a total of (N + x) servers
+            Set the group to a desired capacity of x servers
             Delete z (where z<x) of the servers out of band
             Scale down by (y) servers (where z + y < x)
-            Validate end state of (N + x - y) servers for:
+            Validate end state of (x - y) servers for:
                 - z < |y|
 
         """
@@ -502,10 +534,10 @@ class TestConvergence(unittest.TestCase):
           never happened.)
 
             Create a group with min N servers
-            Scale the group up by x for a total of (N + x) servers
+            Set the group to a desired capacity of x servers
             Delete z (where z<x) of the servers out of band
             Scale down by (y) servers (where z + y < x)
-            Validate end state of (N + x - y) servers for:
+            Validate end state of (x - y) servers for:
                 - z > |y|
 
         """
@@ -521,8 +553,6 @@ class TestConvergence(unittest.TestCase):
             rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
             scale_servers=y)
 
-    test_scale_down_after_oobd_non_constrained_z_greaterthan_y.timeout = 1800
-
     def test_scale_down_after_oobd_non_constrained_z_equal_y(self):
         """
         Validate the following edge case:
@@ -533,10 +563,10 @@ class TestConvergence(unittest.TestCase):
           never happened.)
 
             Create a group with min N servers
-            Scale the group up by x for a total of (N + x) servers
+            Set the group to a desired capacity of x servers
             Delete z (where z<x) of the servers out of band
             Scale down by (y) servers (where z + y < x)
-            Validate end state of (N + x - y) servers for:
+            Validate end state of (x - y) servers for:
                 - z == |y|
 
         """
@@ -551,12 +581,9 @@ class TestConvergence(unittest.TestCase):
             rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
             scale_servers=y)
 
-    test_scale_down_after_oobd_non_constrained_z_equal_y.timeout = 1800
-
     def _scale_down_after_oobd_non_constrained_param(
             self, rcs, min_servers=0, max_servers=25, set_to_servers=0,
             oobd_servers=0, scale_servers=1):
-
         # This only applies if not constrained by max/min
         converged_servers = set_to_servers + scale_servers
 
@@ -583,8 +610,8 @@ class TestConvergence(unittest.TestCase):
             self.identity.authenticate_user(
                 rcs,
                 resources={
-                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
-                    "nova": ("cloudServersOpenStack",),
+                    "otter": (otter_key, otter_url),
+                    "nova": (nova_key,),
                 },
                 region=region
             ).addCallback(self.scaling_group.start, self)
@@ -592,7 +619,7 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self.policy_set.execute)
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
-                set_to_servers, timeout=120
+                set_to_servers, timeout=1800
             ).addCallback(self.scaling_group.get_scaling_group_state)
             .addCallback(self._choose_random_servers, oobd_servers)
             .addCallback(self._delete_those_servers, rcs)
@@ -608,6 +635,130 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self.scaling_group.wait_for_expected_state, rcs,
                          active=converged_servers, pending=0)
         )
+
+    def test_scale_up_after_oobd_at_group_max(self):
+        """
+        Validate the following edge case:
+        - Scaling up when already at the max returns a 403 even after an out
+          of band delete (OOBD) has reduced the number of servers below the
+          group max. Even though the policy cannot execute, convergence is
+          triggered and the deleted servers are replaced.
+
+            Create a group and set the group a capacity of max_servers
+            Delete z of the servers out of band
+            Attempt to scale up by (y) servers
+            Validate end state max_servers
+        """
+        rcs = TestResources()
+
+        max_servers = 10
+        x = max_servers
+        z = 2
+        y = 5
+
+        return self._scale_down_after_oobd_hitting_constraints(
+            rcs, set_to_servers=x, oobd_servers=z, max_servers=max_servers,
+            scale_servers=y, converged_servers=max_servers)
+
+    def test_scale_down_past_group_min_after_oobd(self):
+        """
+        Validate the following edge case:
+        - Scaling down when already at the min returns a 403 after an out
+          of band delete (OOBD) has reduced the number of servers below the
+          group min. Even though the policy cannot execute, convergence is
+          triggered and the deleted servers are replaced.
+
+            Create a group with min_servers
+            Delete z of the servers out of band
+            Attempt to scale down by (y) servers
+            Validate end state min_servers
+        """
+        rcs = TestResources()
+
+        min_servers = 5
+        z = 2
+        y = -2
+
+        return self._scale_down_after_oobd_hitting_constraints(
+            rcs, oobd_servers=z, min_servers=min_servers,
+            scale_servers=y,
+            converged_servers=min_servers)
+
+    def _assert_error_status_code(self, result, code, rcs):
+        """
+        Validate that the returned value was a failure with the specified
+        status code.
+        """
+        if not isinstance(result, Failure):
+            self.fail('Unexpectedly, this succeeded when it was '
+                      'expected to fail')
+        elif not result.check(APIError):
+            self.fail('Received {0} instead of expected APIError'.format(
+                      result.type))
+        elif result.value.code != code:
+            self.fail('Expected status code {0} but received {1}'.format(
+                      code, result.value.code))
+        else:
+            return rcs
+
+    def _scale_down_after_oobd_hitting_constraints(
+            self, rcs, min_servers=0, max_servers=25, set_to_servers=None,
+            oobd_servers=0, scale_servers=1, converged_servers=0):
+
+        converged_servers = set_to_servers
+
+        scaling_group_body = create_scaling_group_dict(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=min_servers, max_entities=max_servers
+        )
+
+        self.scaling_group = ScalingGroup(
+            group_config=scaling_group_body,
+            pool=self.pool
+        )
+
+        self.policy_scale = ScalingPolicy(
+            scale_by=scale_servers,
+            scaling_group=self.scaling_group
+        )
+        d = self.identity.authenticate_user(
+            rcs,
+            resources={
+                "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
+                "nova": ("cloudServersOpenStack",),
+            },
+            region=region
+        ).addCallback(self.scaling_group.start, self)
+
+        if set_to_servers is not None:
+            self.policy_set = ScalingPolicy(
+                set_to=set_to_servers,
+                scaling_group=self.scaling_group
+            )
+            (d.addCallback(self.policy_set.start, self)
+             .addCallback(self.policy_set.execute))
+
+        (d.addCallback(
+            self.scaling_group.wait_for_N_servers,
+            min_servers if set_to_servers is None else set_to_servers,
+            timeout=120)
+         .addCallback(self.scaling_group.get_scaling_group_state)
+         .addCallback(self._choose_random_servers, oobd_servers)
+         .addCallback(self._delete_those_servers, rcs)
+         # The execution of the policy triggers convergence
+         .addCallback(self.policy_scale.start, self)
+         .addCallback(self.policy_scale.execute)
+         .addBoth(self._assert_error_status_code, 403, rcs)
+         # Need to add a check for the expected 403
+         .addCallback(lambda _: self.removed_ids)
+         .addCallback(
+            self.scaling_group.wait_for_deleted_id_removal,
+            rcs,
+            total_servers=set_to_servers,)
+         .addCallback(self.scaling_group.wait_for_expected_state, rcs,
+                      active=converged_servers, pending=0))
+
+        return d
 
     def _choose_half_the_servers(self, (code, response)):
         """Select the first half of the servers returned by the
@@ -660,11 +811,27 @@ class TestConvergence(unittest.TestCase):
         """Uses Nova to get the server's metadata."""
         return (
             treq.get(
-                "{}/servers/{}/metadata".format(str(rcs.endpoints["nova"]), svr_id),
+                "{}/servers/{}/metadata".format(
+                    str(rcs.endpoints["nova"]), svr_id
+                ),
                 headers=headers(str(rcs.token)),
                 pool=self.pool,
             ).addCallback(check_success, [200])
             .addCallback(treq.json_content)
+        )
+
+    def _update_metadata(self, metadata, svr_id, rcs):
+        """Uses Nova to alter a server's metadata."""
+        return (
+            treq.put(
+                "{}/servers/{}/metadata".format(
+                    str(rcs.endpoints["nova"]), svr_id
+                ),
+                json.dumps(metadata),
+                headers=headers(str(rcs.token)),
+                pool=self.pool,
+            ).addCallback(check_success, [200])
+            .addCallback(lambda _: rcs)
         )
 
     def _remove_metadata(self, ids, rcs):
@@ -675,10 +842,10 @@ class TestConvergence(unittest.TestCase):
         def remove_metadata(id):
             return (
                 self._list_metadata(id, rcs)
-                .addCallback(print)
-                .addCallback(lambda _: rcs)
+                .addCallback(
+                    lambda m: {'metadata': {k: "" for k in m['metadata']}}
+                ).addCallback(self._update_metadata, id, rcs)
             )
-            return rcs
 
         self.removed_ids = ids
         deferreds = map(remove_metadata, ids)

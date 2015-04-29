@@ -235,13 +235,13 @@ class ConvergenceStarter(object):
     for that).
     """
     def __init__(self, dispatcher):
-        self._dispatcher = dispatcher
+        self.dispatcher = dispatcher
 
     def start_convergence(self, log, tenant_id, group_id, perform=perform):
         """Record that a group needs converged by creating a ZooKeeper node."""
         log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id)
         eff = mark_divergent(tenant_id, group_id)
-        d = perform(self._dispatcher, eff)
+        d = perform(self.dispatcher, eff)
 
         def success(r):
             log.msg('mark-dirty-success')
@@ -449,12 +449,13 @@ class Converger(MultiService):
         tenants associated with this service's buckets, a convergence will be
         triggered.
         """
+        if self.partitioner.get_current_state() != PartitionState.ACQUIRED:
+            return
         my_buckets = self.partitioner.get_current_buckets()
         changed_buckets = set(
             bucket_of_tenant(parse_dirty_flag(child)[0], len(self._buckets))
             for child in children)
-        if (self.partitioner.get_current_state() == PartitionState.ACQUIRED and
-                set(my_buckets).intersection(changed_buckets)):
+        if set(my_buckets).intersection(changed_buckets):
             # the return value is ignored, but we return this for testing
             eff = self._converge_all(my_buckets, children)
             return perform(self._dispatcher, eff)
