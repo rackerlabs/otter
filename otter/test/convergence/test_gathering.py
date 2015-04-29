@@ -25,6 +25,7 @@ from otter.auth import NoSuchEndpoint
 from otter.cloud_client import service_request
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
+    UnexpectedBehaviorError,
     extract_CLB_drained_at,
     get_all_convergence_data,
     get_all_server_details,
@@ -146,6 +147,29 @@ class GetAllServerDetailsTests(SynchronousTestCase):
                                 ServiceType.CLOUD_SERVERS, 'GET', 'nexturl2')
 
         self.assertEqual(result, servers)
+
+    def test_get_all_blows_up_if_got_same_link_twice(self):
+        """
+        `get_all_server_details` will raise an exception if it attempts to get
+        the same next page link twice in a row (not related to retries - this
+        is if Nova returns the same link twice in a row)
+        """
+        servers = [{'id': i} for i in range(20)]
+        # first request
+        svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
+        fake_response = object()
+        body = {'servers': servers[:10],
+                'servers_links': [{'href': 'nexturl1', 'rel': 'next'}]}
+        result = resolve_svcreq(svcreq, (fake_response, body), *self.req)
+        self.assertIsInstance(result, Effect)
+
+        # next request, because previous had a next link
+        next_req = resolve_retry_stubs(result)
+        body = {'servers': servers[10:],
+                'servers_links': [{'href': 'nexturl1', 'rel': 'next'}]}
+        self.assertRaises(UnexpectedBehaviorError,
+                          resolve_svcreq, next_req, (fake_response, body),
+                          ServiceType.CLOUD_SERVERS, 'GET', 'nexturl1')
 
     def test_with_changes_since(self):
         """

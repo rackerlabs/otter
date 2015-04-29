@@ -28,6 +28,12 @@ from otter.util.retry import (
 from otter.util.timestamp import timestamp_to_epoch
 
 
+class UnexpectedBehaviorError(Exception):
+    """
+    Error to be raised when something happens that Autoscale does not expect.
+    """
+
+
 def get_all_server_details(changes_since=None, batch_size=100):
     """
     Return all servers of a tenant.
@@ -44,6 +50,8 @@ def get_all_server_details(changes_since=None, batch_size=100):
         query['changes_since'] = '{0}Z'.format(changes_since.isoformat())
     url = "{0}?{1}".format(url, urlencode(query))
 
+    last_link = []
+
     def get_server_details(url_with_query):
         eff = retry_effect(
             service_request(ServiceType.CLOUD_SERVERS, 'GET',
@@ -58,6 +66,13 @@ def get_all_server_details(changes_since=None, batch_size=100):
         continuation = [link['href'] for link in body.get('servers_links', [])
                         if link['rel'] == 'next']
         if continuation:
+            # blow up if we try to fetch the same link twice
+            if last_link and last_link[-1] == continuation[0]:
+                raise UnexpectedBehaviorError(
+                    "When gathering server details, got the same 'next' link "
+                    "twice from Nova: {0}".format(last_link[-1]))
+
+            last_link.append(continuation[0])
             more_eff = get_server_details(continuation[0])
             return more_eff.on(lambda more_servers: servers + more_servers)
         return servers
