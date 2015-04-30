@@ -23,21 +23,24 @@ class GroupState(object):
         object represents
     :ivar bytes group_name: the name of the scaling group whose state this
         object represents
-    :ivar int desired: the desired capacity of the scaling group
     :ivar dict active: the mapping of active server ids and their info
     :ivar dict pending: the list of pending job ids and their info
-    :ivar bool paused: whether the scaling group is paused in scaling activities
+    :ivar bytes group_touched: timezone-aware ISO860 formatted timestamp
+        that represents when the last time any policy was executed
+        on the group. Could be None.
     :ivar dict policy_touched: dictionary mapping policy ids to the last time
-        they were executed, if ever.
-    :ivar bytes group_touched: timezone-aware timestamp that represents when the
-        last time any policy was executed on the group.  Could be None.
-    :ivar callable now: callable that returns a :class:`bytes` timestamp - used for
-        testing purposes.  Defaults to :func:`timestamp.now`
+        they were executed, if ever. The time is stored as ISO860 format str
+    :ivar bool paused: whether the scaling group is paused in
+        scaling activities
+    :ivar int desired: the desired capacity of the scaling group
+    :ivar callable now: callable that returns a :class:`bytes` timestamp
+        used for testing purposes. Defaults to :func:`timestamp.now`
 
     TODO: ``remove_active``, ``pause`` and ``resume`` ?
     """
-    def __init__(self, tenant_id, group_id, group_name, active, pending, group_touched,
-                 policy_touched, paused, desired=0, now=timestamp.now):
+    def __init__(self, tenant_id, group_id, group_name, active, pending,
+                 group_touched, policy_touched, paused, desired=0,
+                 now=timestamp.now):
         self.tenant_id = tenant_id
         self.group_id = group_id
         self.group_name = group_name
@@ -250,6 +253,7 @@ class ScalingGroupStatus(Names):
     """
     Status of scaling group
     """
+
     ACTIVE = NamedConstant()
     "Group is active and executing policies/converging"
 
@@ -257,6 +261,12 @@ class ScalingGroupStatus(Names):
     """
     Group has errored due to (mostly) invalid launch configuration and has
     stopped executing policies/converging
+    """
+
+    DELETING = NamedConstant()
+    """
+    Group is getting deleted and all it's resources servers/CLBs
+    are getting deleted
     """
 
 
@@ -267,7 +277,8 @@ class IScalingGroup(Interface):
     uuid = Attribute("UUID of the scaling group - immutable.")
     tenant_id = Attribute("Rackspace Tenant ID of the owner of this group.")
 
-    def view_manifest(with_policies=True, with_webhooks=False):
+    def view_manifest(with_policies=True, with_webhooks=False,
+                      get_deleting=False):
         """
         The manifest contains everything required to configure this scaling:
         the config, the launch config, and all the scaling policies.
@@ -275,6 +286,9 @@ class IScalingGroup(Interface):
         :param bool with_policies: Should policies information be included?
         :param bool with_webhooks: If policies are included, should webhooks
             information be included?
+        :param bool get_deleting: Should group be returned if it is deleting?
+            If True, then returned manifest will contain "status" that will be
+            one of "ACTIVE", "ERROR" or "DELETING"
 
         :return: a dictionary corresponding to the JSON schema at
             :data:`otter.json_schema.model_schemas.manifest`

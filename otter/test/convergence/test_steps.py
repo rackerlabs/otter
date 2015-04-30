@@ -11,7 +11,13 @@ from testtools.matchers import IsInstance
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.cloud_client import ServiceRequest, has_code, service_request
+from otter.cloud_client import (
+    NoSuchServerError,
+    NovaRateLimitError,
+    ServerMetadataOverLimitError,
+    ServiceRequest,
+    has_code,
+    service_request)
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
@@ -29,6 +35,8 @@ from otter.convergence.steps import (
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
     UnexpectedServerStatus,
+    _clb_check_change_node,
+    _clb_check_change_node_handlers,
     _RCV3_LB_DOESNT_EXIST_PATTERN,
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_ALREADY_A_MEMBER_PATTERN,
@@ -318,7 +326,9 @@ class DeleteServerTests(SynchronousTestCase):
 
         self.assertEqual(
             resolve_effect(eff, (None, {})),
-            (StepResult.SUCCESS, []))
+            (StepResult.RETRY, [
+                'must re-gather after deletion in order to update the active '
+                'cache']))
 
     def test_delete_and_verify_del_404(self):
         """
@@ -415,44 +425,55 @@ class StepAsEffectTests(SynchronousTestCase):
     def test_set_metadata_item(self):
         """
         :obj:`SetMetadataItemOnServer.as_effect` produces a request for
-        setting a metadata item on a particular server.
+        setting a metadata item on a particular server.  It succeeds if
+        successful, but does not fail for any errors.
         """
-        meta = SetMetadataItemOnServer(server_id='abc123', key='metadata_key',
+        server_id = u'abc123'
+        meta = SetMetadataItemOnServer(server_id=server_id, key='metadata_key',
                                        value='teapot')
         eff = meta.as_effect()
         self.assertEqual(
-            eff.intent,
-            service_request(
-                ServiceType.CLOUD_SERVERS,
-                'PUT',
-                'servers/abc123/metadata/metadata_key',
-                data={'meta': {'metadata_key': 'teapot'}},
-                success_pred=has_code(200, 404)).intent)
-
-        self.assertEqual(
             resolve_effect(eff, (None, {})),
             (StepResult.SUCCESS, []))
+
+        exceptions = (NoSuchServerError("msg", server_id=server_id),
+                      ServerMetadataOverLimitError("msg", server_id=server_id),
+                      NovaRateLimitError("msg"),
+                      APIError(code=500, body="", headers={}))
+        for exception in exceptions:
+            self.assertRaises(
+                type(exception),
+                resolve_effect,
+                eff, (type(exception), exception, None),
+                is_error=True)
 
     def test_change_load_balancer_node(self):
         """
         :obj:`ChangeCLBNode.as_effect` produces a request for
         modifying a load balancer node.
         """
-        changenode = ChangeCLBNode(
+        change_node = ChangeCLBNode(
             lb_id='abc123',
             node_id='node1',
             condition=CLBNodeCondition.DRAINING,
             weight=50,
             type=CLBNodeType.PRIMARY)
-        self.assertEqual(
-            changenode.as_effect(),
-            service_request(
-                ServiceType.CLOUD_LOAD_BALANCERS,
-                'PUT',
-                'loadbalancers/abc123/nodes/node1',
-                data={'condition': 'DRAINING',
-                      'weight': 50},
-                success_pred=has_code(202)))
+        eff = change_node.as_effect()
+
+        handled_codes = _clb_check_change_node_handlers.keys()
+        expected_intent = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'PUT',
+            'loadbalancers/abc123/nodes/node1',
+            data={'condition': 'DRAINING',
+                  'weight': 50},
+            success_pred=has_code(*handled_codes)).intent
+        self.assertEqual(eff.intent, expected_intent)
+
+        (on_success, on_error), = eff.callbacks
+        self.assertIdentical(on_error, None)
+        self.assertIdentical(on_success.func, _clb_check_change_node)
+        self.assertEqual(on_success.args, (change_node,))
 
     def test_add_nodes_to_clb(self):
         """
@@ -515,8 +536,11 @@ class StepAsEffectTests(SynchronousTestCase):
                 }),
                 request)
 
-        self.assertEqual(get_result(StubResponse(202, {}), ''),
-                         (StepResult.SUCCESS, []))
+        self.assertEqual(
+            get_result(StubResponse(202, {}), ''),
+            (StepResult.RETRY,
+             ['must re-gather after adding to CLB in order to update the '
+              'active cache']))
 
         self.assertEqual(
             get_result(
@@ -527,7 +551,9 @@ class StepAsEffectTests(SynchronousTestCase):
                                "balancer.",
                     "code": 422
                 }),
-            (StepResult.SUCCESS, []))
+            (StepResult.RETRY,
+             ['must re-gather after adding to CLB in order to update the '
+              'active cache']))
 
     def test_add_nodes_to_clb_failure_response_codes(self):
         """
@@ -771,8 +797,40 @@ class StepAsEffectTests(SynchronousTestCase):
         for removing any combination of nodes from any combination of RCv3
         load balancers.
         """
-        self._generic_bulk_rcv3_step_test(
-            BulkRemoveFromRCv3, "DELETE")
+        self._generic_bulk_rcv3_step_test(BulkRemoveFromRCv3, "DELETE")
+
+
+class CLBCheckChangeNodeTests(SynchronousTestCase):
+    """
+    Tests for :func:`_clb_check_change_node`.
+    """
+    example_step = ChangeCLBNode(lb_id="lb_id",
+                                 node_id="node_id",
+                                 condition=CLBNodeCondition.ENABLED,
+                                 weight=10,
+                                 type=CLBNodeType.PRIMARY)
+
+    def test_good_response(self):
+        """
+        If the response code indicates success, the response was successful.
+        """
+        response = StubResponse(202, {})
+        body = None
+        result = _clb_check_change_node(self.example_step, (response, body))
+        self.assertEqual(result, (StepResult.SUCCESS, []))
+
+    def test_disappearing_server(self):
+        """
+        If the node we're trying to update has vanished, retry convergence.
+        """
+        response = StubResponse(404, {})
+        body = None
+        result = _clb_check_change_node(self.example_step, (response, body))
+        self.assertEqual(
+            result,
+            (StepResult.RETRY, [{"reason": "CLB node not found",
+                                 "node": self.example_step.node_id,
+                                 "lb": self.example_step.lb_id}]))
 
 
 _RCV3_TEST_DATA = {
@@ -876,7 +934,9 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
     """
     def test_good_response(self):
         """
-        If the response code indicates success, the response was successful.
+        If the response code indicates success, the step returns a RETRY so
+        that another convergence cycle can be done to update the active server
+        list.
         """
         node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
         lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
@@ -891,7 +951,11 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
                  "load_balancer_pool": {"id": lb_id}}
                 for (lb_id, node_id) in pairs]
         res = _rcv3_check_bulk_add(pairs, (resp, body))
-        self.assertEqual(res, (StepResult.SUCCESS, []))
+        self.assertEqual(
+            res,
+            (StepResult.RETRY,
+             ['must re-gather after adding to LB in order to update the '
+              'active cache']))
 
     def test_try_again(self):
         """
@@ -1207,6 +1271,7 @@ class ConvergeLaterTests(SynchronousTestCase):
         """
         `ConvergeLater.as_effect` returns effect with RETRY
         """
-        eff = ConvergeLater().as_effect()
+        eff = ConvergeLater(reasons=['building']).as_effect()
         self.assertEqual(
-            sync_perform(base_dispatcher, eff), (StepResult.RETRY, []))
+            sync_perform(base_dispatcher, eff),
+            (StepResult.RETRY, ['building']))

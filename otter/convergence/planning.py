@@ -8,13 +8,20 @@ from toolz.curried import filter, groupby
 from toolz.itertoolz import concat, concatv, mapcat
 
 from otter.convergence.model import (
-    CLBDescription, CLBNode, CLBNodeCondition, IDrainable,
-    RCv3Description, RCv3Node, ServerState)
+    CLBDescription,
+    CLBNode,
+    CLBNodeCondition,
+    DRAINING_METADATA,
+    IDrainable,
+    RCv3Description,
+    RCv3Node,
+    ServerState)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeCLBNode,
+    ConvergeLater,
     CreateServer,
     DeleteServer,
     RemoveNodesFromCLB,
@@ -131,9 +138,14 @@ def _drain_and_delete(server, timeout, current_lb_nodes, now):
     """
     If server is not already in draining state, put it into draining state.
     If the server is free of load balancers, just delete it.
+
+    If a server is in building, it can just be deleted, along with any
+    load balancer nodes associated with it, regardless of timeouts.
     """
     lb_draining_steps = _remove_from_lb_with_draining(
-        timeout, current_lb_nodes, now)
+        timeout if server.state != ServerState.BUILD else 0,
+        current_lb_nodes,
+        now)
 
     # if there are no load balancers that are waiting on draining timeouts or
     # connections, just delete the server too
@@ -147,8 +159,8 @@ def _drain_and_delete(server, timeout, current_lb_nodes, now):
     if server.state != ServerState.DRAINING:
         return lb_draining_steps + [
             SetMetadataItemOnServer(server_id=server.id,
-                                    key='rax:auto_scaling_draining',
-                                    value='draining')]
+                                    key=DRAINING_METADATA[0],
+                                    value=DRAINING_METADATA[1])]
 
     return lb_draining_steps
 
@@ -241,12 +253,18 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
             [node for node in load_balancer_contents if node.matches(server)])
         ]
 
+    # if there are any building servers left, also return a ConvergeLater step.
+    converge_later = []
+    if any((s not in servers_to_delete for s in waiting_for_build)):
+        converge_later = [ConvergeLater(reasons=['building servers'])]
+
     return pbag(create_steps +
                 scale_down_steps +
                 delete_error_steps +
                 cleanup_errored_and_deleted_steps +
                 delete_timeout_steps +
-                lb_converge_steps)
+                lb_converge_steps +
+                converge_later)
 
 
 _optimizers = {}

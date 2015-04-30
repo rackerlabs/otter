@@ -5,7 +5,7 @@ import unittest
 
 from cafe.drivers.unittest.decorators import tags
 
-from test_repo.autoscale.fixtures import AutoscaleFixture
+from test_repo.autoscale.fixtures import AutoscaleFixture, only_run_if_mimic_is
 
 
 class NegativeGroupFixture(AutoscaleFixture):
@@ -97,11 +97,17 @@ class NegativeGroupFixture(AutoscaleFixture):
             group_state.desiredCapacity, 0,
             msg='Desired capacity is not equal to expected number of servers')
 
-    @tags(speed='quick', convergence='error')
+    @only_run_if_mimic_is(True)
+    @tags(speed='quick', convergence='never')
     def test_user_delete_some_servers_out_of_band(self):
         """
         Create a group with 4 minentities and verify the group state when user
-        deletes one of the servers on the group
+        deletes one of the servers on the group.  When the server is deleted
+        out of band, while autoscale is waiting for the servers to finish
+        building, then autoscale will treat the deletion as an error during
+        the build, and decrease the desired capacity by 1 accordingly.
+
+        This should never be the case in convergence.
         """
         server_count = 4
         group_response = self.autoscale_behaviors.create_scaling_group_given(

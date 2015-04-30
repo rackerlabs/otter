@@ -2,6 +2,7 @@
 
 import json
 from functools import partial
+from uuid import uuid4
 
 from effect import (
     ComposedDispatcher,
@@ -10,27 +11,75 @@ from effect import (
     TypeDispatcher,
     base_dispatcher,
     sync_perform)
+from effect.testing import EQFDispatcher
+
+import six
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import Authenticate, InvalidateToken
 from otter.cloud_client import (
+    CLBDeletedError,
+    CLBPendingUpdateError,
+    CLBRateLimitError,
+    NoSuchCLBError,
+    NoSuchCLBNodeError,
+    NoSuchServerError,
+    NovaRateLimitError,
+    ServerMetadataOverLimitError,
     ServiceRequest,
     TenantScope,
     add_bind_service,
+    change_clb_node,
     concretize_service_request,
+    get_server_details,
     perform_tenant_scope,
-    service_request)
+    service_request,
+    set_nova_metadata_item)
 from otter.constants import ServiceType
-from otter.test.utils import resolve_effect, stub_pure_response
+from otter.test.utils import (
+    StubResponse,
+    resolve_effect,
+    stub_pure_response)
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.http import APIError, headers
 from otter.util.pure_http import Request, has_code
 
 
+fake_service_configs = {
+    ServiceType.CLOUD_SERVERS: {
+        'name': 'cloudServersOpenStack',
+        'region': 'DFW'},
+    ServiceType.CLOUD_LOAD_BALANCERS: {
+        'name': 'cloudLoadBalancers',
+        'region': 'DFW'}
+}
+
+
 def resolve_authenticate(eff, token='token'):
     """Resolve an Authenticate effect with test data."""
     return resolve_effect(eff, (token, fake_service_catalog))
+
+
+def service_request_eqf(stub_response):
+    """
+    Return a function to be used as the value matching a ServiceRequest in
+    :class:`EQFDispatcher`.
+    """
+    def resolve_service_request(service_request_intent):
+        eff = concretize_service_request(
+            authenticator=object(),
+            log=object(),
+            service_configs=fake_service_configs,
+            tenant_id='000000',
+            service_request=service_request_intent)
+
+        # "authenticate"
+        eff = resolve_authenticate(eff)
+        # make request
+        return resolve_effect(eff, stub_response)
+
+    return resolve_service_request
 
 
 class BindServiceTests(SynchronousTestCase):
@@ -77,8 +126,7 @@ class ServiceRequestTests(SynchronousTestCase):
                     log=None,
                     reauth_codes=(401, 403),
                     success_pred=has_code(200),
-                    json_response=True,
-                    parse_errors=False
+                    json_response=True
                 )
             )
         )
@@ -199,54 +247,13 @@ class PerformServiceRequestTests(SynchronousTestCase):
 
         self.assertEqual(cm.exception.body, "THIS IS A FAILURE")
 
-    def test_chosen_per_service_type_if_parse_errors_true(self):
-        """
-        If `parse_errors` is True and there is a parser for that service, the
-        parser will be invoked on that ServiceRequest.  If there is no parser
-        for that service, even if `parse_errors` is True, no error will be
-        parsed.
-        """
-        def resolve_svcreq_of_type(service_type):
-            svc_req = service_request(
-                service_type, "GET", "athing", parse_errors=True).intent
-            eff = self._concrete(svc_req)
-            next_eff = resolve_authenticate(eff)
-            stub_response = stub_pure_response("FOO", code=400)
-            resolve_effect(next_eff, stub_response)
-
-        self.assertRaises(APIError, resolve_svcreq_of_type,
-                          ServiceType.CLOUD_SERVERS)
-
-        self.assertRaises(ValueError, resolve_svcreq_of_type,
-                          ServiceType.CLOUD_LOAD_BALANCERS)
-
-    def test_no_error_parsing_if_parse_errors_false(self):
-        """
-        If the ServiceRequest has specified that ``parse_error`` is False, then
-        there will be no error parsing even if there is a parser.
-        """
-        svc_req = service_request(ServiceType.CLOUD_LOAD_BALANCERS,
-                                  "GET", "athing").intent
-        eff = self._concrete(svc_req)
-        next_eff = resolve_authenticate(eff)
-        stub_response = stub_pure_response("FOO", code=400)
-
-        self.assertRaises(APIError, resolve_effect, next_eff, stub_response)
-
-    def test_error_parsing_only_applies_to_apierrors(self):
-        """
-        If the request results in a non-:class:`APIError`, the error parsing
-        is not called at all.
-        """
-        svc_req = service_request(ServiceType.CLOUD_LOAD_BALANCERS,
-                                  "GET", "athing").intent
-        eff = self._concrete(svc_req)
-        next_eff = resolve_authenticate(eff)
-        with self.assertRaises(Exception):
-            resolve_effect(
-                next_eff,
-                (Exception, Exception("Cannot make request!"), None),
-                is_error=True)
+    def test_params(self):
+        """Params are passed through."""
+        svcreq = service_request(ServiceType.CLOUD_SERVERS, "GET", "servers",
+                                 params={"foo": ["bar"]}).intent
+        eff = self._concrete(svcreq)
+        pure_request_eff = resolve_authenticate(eff)
+        self.assertEqual(pure_request_eff.intent.params, {"foo": ["bar"]})
 
 
 class PerformTenantScopeTests(SynchronousTestCase):
@@ -304,3 +311,273 @@ class PerformTenantScopeTests(SynchronousTestCase):
             sync_perform(self.dispatcher, Effect(tscope)),
             ('concretized', self.authenticator, self.log, self.service_configs,
              1, ereq.intent))
+
+
+class CLBClientTests(SynchronousTestCase):
+    """
+    Tests for CLB client functions, such as :obj:`change_clb_node`.
+    """
+    @property
+    def lb_id(self):
+        """What is my LB ID"""
+        return u"123456"
+
+    def assert_parses_common_clb_errors(self, intent, eff):
+        """
+        Assert that the effect produced performs the common CLB error parsing:
+        :class:`CLBPendingUpdateError`, :class:`CLBDescription`,
+        :class:`NoSuchCLBError`, :class:`CLBRateLimitError`,
+        :class:`APIError`
+        """
+        json_responses_and_errs = [
+            ("Load Balancer '{0}' has a status of 'PENDING_UPDATE' and is "
+             "considered immutable.", 422, CLBPendingUpdateError),
+            ("Load Balancer '{0}' has a status of 'PENDING_DELETE' and is "
+             "considered immutable.", 422, CLBDeletedError),
+            ("The load balancer is deleted and considered immutable.",
+             422, CLBDeletedError),
+            ("Load balancer not found.", 404, NoSuchCLBError),
+            ("OverLimit Retry...", 413, CLBRateLimitError)
+        ]
+
+        for msg, code, err in json_responses_and_errs:
+            msg = msg.format(self.lb_id)
+            resp = stub_pure_response(
+                json.dumps({'message': msg, 'code': code, 'details': ''}),
+                code)
+            with self.assertRaises(err) as cm:
+                sync_perform(
+                    EQFDispatcher([(intent, service_request_eqf(resp))]),
+                    eff)
+            self.assertEqual(cm.exception, err(msg, lb_id=self.lb_id))
+
+        bad_resps = [
+            stub_pure_response(
+                json.dumps({
+                    'message': ("Load Balancer '{0}' has a status of 'BROKEN' "
+                                "and is considered immutable."),
+                    'code': 422}),
+                422),
+            stub_pure_response(
+                json.dumps({
+                    'message': ("The load balancer is deleted and considered "
+                                "immutable"),
+                    'code': 404}),
+                404),
+            stub_pure_response(
+                json.dumps({
+                    'message': "Cloud load balancers is down",
+                    'code': 500}),
+                500),
+            stub_pure_response("random repose error message", 404),
+            stub_pure_response("random repose error message", 413)
+        ]
+
+        for resp in bad_resps:
+            with self.assertRaises(APIError) as cm:
+                sync_perform(
+                    EQFDispatcher([(intent, service_request_eqf(resp))]),
+                    eff)
+            self.assertEqual(
+                cm.exception,
+                APIError(headers={}, code=resp[0].code, body=resp[1]))
+
+    def test_change_clb_node(self):
+        """
+        Produce a request for modifying a load balancer, which returns a
+        successful result on 202.
+
+        Parse the common CLB errors, and :class:`NoSuchCLBNodeError`.
+        """
+        eff = change_clb_node(lb_id=self.lb_id, node_id=u'1234',
+                              condition="DRAINING", weight=50)
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'PUT',
+            'loadbalancers/{0}/nodes/1234'.format(self.lb_id),
+            data={'condition': 'DRAINING',
+                  'weight': 50},
+            success_pred=has_code(202))
+
+        # success
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(stub_pure_response('', 202)))])
+        self.assertEqual(sync_perform(dispatcher, eff),
+                         stub_pure_response(None, 202))
+
+        # NoSuchCLBNode failure
+        msg = "Node with id #1234 not found for loadbalancer #{0}".format(
+            self.lb_id)
+        no_such_node = stub_pure_response(
+            json.dumps({'message': msg, 'code': 404}), 404)
+        dispatcher = EQFDispatcher([(
+            expected.intent, service_request_eqf(no_such_node))])
+
+        with self.assertRaises(NoSuchCLBNodeError) as cm:
+            sync_perform(dispatcher, eff)
+        self.assertEqual(
+            cm.exception,
+            NoSuchCLBNodeError(msg, lb_id=self.lb_id, node_id=u'1234'))
+
+        # all the common failures
+        self.assert_parses_common_clb_errors(expected.intent, eff)
+
+
+class NovaClientTests(SynchronousTestCase):
+    """
+    Tests for Nova client functions, such as :obj:`set_nova_metadata_item`.
+    """
+    def _setup_for_set_nova_metadata_item(self):
+        """
+        Produce the data needed to test :obj:`set_nova_metadata_item`: a tuple
+        of (server_id, expected_effect, real_effect)
+        """
+        server_id = unicode(uuid4())
+        real = set_nova_metadata_item(server_id=server_id, key='k', value='v')
+        expected = service_request(
+            ServiceType.CLOUD_SERVERS,
+            'PUT',
+            'servers/{0}/metadata/k'.format(server_id),
+            data={'meta': {'k': 'v'}},
+            reauth_codes=(401,),
+            success_pred=has_code(200))
+        return (server_id, expected, real)
+
+    def assert_handles_no_such_server(self, intent, effect, server_id):
+        """
+        If the provided intent returns a response consistent with a server not
+        existing, then performing the effect will return a
+        :class:`NoSuchServerError`.
+        """
+        message = "Server does not exist"
+        failure_body = {"itemNotFound": {"message": message, "code": 404}}
+
+        dispatcher = EQFDispatcher([(
+            intent,
+            service_request_eqf(
+                stub_pure_response(json.dumps(failure_body), 404)))])
+
+        with self.assertRaises(NoSuchServerError) as cm:
+            sync_perform(dispatcher, effect)
+
+        self.assertEqual(
+            cm.exception,
+            NoSuchServerError(message, server_id=six.text_type(server_id)))
+
+    def assert_handles_nova_rate_limiting(self, intent, effect):
+        """
+        If the provided intent returns a response consistent with Nova
+        rate-limiting requests, then performing the effect will return a
+        :class:`NovaRateLimitError`.
+        """
+        failure_body = {
+            "overLimit": {
+                "code": 413,
+                "message": "OverLimit Retry...",
+                "details": "Error Details...",
+                "retryAfter": "2015-02-27T23:42:27Z"
+            }
+        }
+        dispatcher = EQFDispatcher([(
+            intent,
+            service_request_eqf(
+                stub_pure_response(json.dumps(failure_body), 413)))])
+
+        with self.assertRaises(NovaRateLimitError) as cm:
+            sync_perform(dispatcher, effect)
+
+        self.assertEqual(cm.exception,
+                         NovaRateLimitError("OverLimit Retry..."))
+
+    def test_set_nova_metadata_item_success(self):
+        """
+        Produce a request setting a metadata item on a Nova server, which
+        returns a successful result on 200.
+        """
+        server_id, expected, real = self._setup_for_set_nova_metadata_item()
+
+        success_body = {"meta": {"k": "v"}}
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(
+                stub_pure_response(json.dumps(success_body), 200)))])
+
+        self.assertEqual(sync_perform(dispatcher, real),
+                         (StubResponse(200, {}), success_body))
+
+    def test_set_nova_metadata_item_too_many_metadata_items(self):
+        """
+        Return a :class:`ServerMetadataOverLimitError` if there are too many
+        metadata items on a server.
+        """
+        server_id, expected, real = self._setup_for_set_nova_metadata_item()
+
+        message = "Maximum number of metadata items exceeds 40"
+        failure_body = {"forbidden": {"message": message, "code": 403}}
+
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(
+                stub_pure_response(json.dumps(failure_body), 403)))])
+
+        with self.assertRaises(ServerMetadataOverLimitError) as cm:
+            sync_perform(dispatcher, real)
+
+        self.assertEqual(
+            cm.exception,
+            ServerMetadataOverLimitError(message,
+                                         server_id=six.text_type(server_id)))
+
+    def test_set_nova_metadata_item_no_such_server(self):
+        """
+        Return a :class:`NoSuchServerError` if the server doesn't exist.
+        """
+        server_id, expected, eff = self._setup_for_set_nova_metadata_item()
+        self.assert_handles_no_such_server(expected.intent, eff, server_id)
+
+    def test_set_nova_metadata_rate_limiting(self):
+        """
+        Return a :class:`NovaRateLimitError` if Nova starts rate-limiting
+        requests.
+        """
+        server_id, expected, eff = self._setup_for_set_nova_metadata_item()
+        self.assert_handles_nova_rate_limiting(expected.intent, eff)
+
+    def _setup_for_get_server_details(self):
+        """
+        Produce the data needed to test :obj:`get_server_details`: a tuple
+        of (server_id, expected_effect, real_effect)
+        """
+        server_id = unicode(uuid4())
+        real = get_server_details(server_id=server_id)
+        expected = service_request(
+            ServiceType.CLOUD_SERVERS,
+            'GET',
+            'servers/{0}'.format(server_id),
+            success_pred=has_code(200))
+        return (server_id, expected, real)
+
+    def test_get_server_details_success(self):
+        """
+        Produce a request getting a Nova server's details, which
+        returns a successful result on 200.
+        """
+        server_id, expected, real = self._setup_for_get_server_details()
+
+        success_body = {"so much": "data"}
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(
+                stub_pure_response(json.dumps(success_body), 200)))])
+
+        self.assertEqual(sync_perform(dispatcher, real),
+                         (StubResponse(200, {}), success_body))
+
+    def test_get_server_details_errors(self):
+        """
+        Correctly parses nova rate limiting errors and no such server errors.
+        """
+        server_id, expected, eff = self._setup_for_get_server_details()
+        self.assert_handles_no_such_server(expected.intent, eff, server_id)
+        self.assert_handles_nova_rate_limiting(expected.intent, eff)

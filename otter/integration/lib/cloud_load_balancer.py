@@ -43,6 +43,17 @@ class CloudLoadBalancer(object):
             }
         }
 
+    def scaling_group_spec(self):
+        """Computes the necessary CLB specification to use when creating a
+        scaling group.  See also the lib.autoscale.create_scaling_group_dict
+        function for more details.
+        """
+
+        return {
+            "port": 80,
+            "loadBalancerId": self.clb_id,
+        }
+
     def get_state(self, rcs):
         """Returns the current state of the cloud load balancer.
 
@@ -129,7 +140,6 @@ class CloudLoadBalancer(object):
         test.addCleanup(self.stop, rcs)
 
         def record_results(resp):
-            print(resp)
             rcs.clbs.append(resp)
             self.clb_id = str(resp["loadBalancer"]["id"])
             return rcs

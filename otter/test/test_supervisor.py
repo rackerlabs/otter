@@ -1,7 +1,6 @@
 """
 Tests for the worker supervisor.
 """
-
 from effect import Constant, Effect
 
 import mock
@@ -21,8 +20,12 @@ from otter.constants import ServiceType
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchScalingGroupError)
 from otter.supervisor import (
-    CannotDeleteServerBelowMinError, ISupervisor, ServerNotFoundError,
-    SupervisorService, execute_launch_config, remove_server_from_group,
+    CannotDeleteServerBelowMinError,
+    ISupervisor,
+    ServerNotFoundError,
+    SupervisorService,
+    execute_launch_config,
+    remove_server_from_group,
     set_supervisor)
 from otter.test.utils import (
     CheckFailure, DummyException, FakeSupervisor, IsBoundWith, iMock, matches,
@@ -889,9 +892,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
 
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
-
+        self.assertIsNone(self.successResultOf(self.completion_deferred))
+        self.assertEqual(self.group.modify_state_values, [self.state])
         self.assertEqual(self.state.pending, {})
         self.assertEqual(
             self.state.active,
@@ -927,8 +929,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
 
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
+        self.assertIsNone(self.successResultOf(self.completion_deferred))
+        self.assertEqual(self.group.modify_state_values, [self.state])
 
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
@@ -969,8 +971,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.job.start(self.mock_launch)
         self.completion_deferred.errback(DummyException('e'))
 
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
+        self.assertIsNone(self.successResultOf(self.completion_deferred))
+        self.assertEqual(self.group.modify_state_values, [self.state])
 
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
@@ -990,8 +992,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         self.job.start(self.mock_launch)
         self.completion_deferred.errback(DummyException('e'))
 
-        self.assertIs(self.successResultOf(self.completion_deferred),
-                      self.state)
+        self.assertIsNone(self.successResultOf(self.completion_deferred))
+        self.assertEqual(self.group.modify_state_values, [self.state])
 
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})

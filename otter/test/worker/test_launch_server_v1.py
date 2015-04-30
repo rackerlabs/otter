@@ -57,7 +57,6 @@ from otter.worker.launch_server_v1 import (
     delete_and_verify,
     delete_server,
     find_server,
-    generate_server_metadata,
     launch_server,
     prepare_launch_config,
     remove_from_load_balancer,
@@ -1573,27 +1572,20 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
                          'loadBalancers': [
                              {'loadBalancerId': 12345, 'port': 80},
-                             {'loadBalancerId': 54321, 'port': 81}
-                         ]}
-
-        load_balancer_metadata = {
-            'rax:auto_scaling_server_name': 'as000000',
-            'rax:auto_scaling_group_id': '1111111-11111-11111-11111111'}
+                             {'loadBalancerId': 54321, 'port': 81}]}
 
         prepared_load_balancers = [
-            {'loadBalancerId': 12345, 'port': 80,
-             'metadata': load_balancer_metadata},
-            {'loadBalancerId': 54321, 'port': 81,
-             'metadata': load_balancer_metadata}
+            {'loadBalancerId': 12345, 'port': 80},
+            {'loadBalancerId': 54321, 'port': 81}
         ]
 
         expected_server_config = {
             'imageRef': '1', 'flavorRef': '1', 'name': 'as000000',
             'metadata': {
                 'rax:auto_scaling_group_id': '1111111-11111-11111-11111111',
-                'rax:auto_scaling_lbids': '[12345, 54321]',
-                'rax:auto_scaling:lb:12345': '{"port": 80}',
-                'rax:auto_scaling:lb:54321': '{"port": 81}'
+                'rax:autoscale:group:id': '1111111-11111-11111-11111111',
+                'rax:autoscale:lb:CloudLoadBalancer:12345': '[{"port": 80}]',
+                'rax:autoscale:lb:CloudLoadBalancer:54321': '[{"port": 81}]'
             }
         }
 
@@ -1704,8 +1696,11 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         wait_for_active.return_value = succeed(server_details)
 
         d = self._launch_server(launch_config)
-        expected_metadata = generate_server_metadata(self.scaling_group.uuid,
-                                                     launch_config)
+        expected_metadata = {
+            "rax:auto_scaling_group_id": self.scaling_group.uuid,
+            "rax:autoscale:group:id": self.scaling_group.uuid,
+            "rax:autoscale:lb:CloudLoadBalancer:12345": '[{"port": 80}]'
+        }
 
         self.successResultOf(d)
         self.assertEqual(
@@ -1871,24 +1866,33 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_active')
-    def test_launch_retries_on_error(self, mock_wfa, mock_cs, mock_addlb, mock_vd):
+    def test_launch_retries_on_error(self, mock_wfa, mock_cs, mock_addlb,
+                                     mock_vd):
         """
-        If server goes into ERROR state, launch_server deletes it and creates a new
-        one instead
+        If server goes into ERROR state, launch_server deletes it and creates
+        a new one instead
         """
-        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
-                         'loadBalancers': [
-                             {'loadBalancerId': 12345, 'port': 80},
-                             {'loadBalancerId': 54321, 'port': 81}
-                         ]}
+        launch_config = {
+            'server': {'imageRef': '1', 'flavorRef': '1'},
+            'loadBalancers': [{'loadBalancerId': 12345, 'port': 80},
+                              {'loadBalancerId': 54321, 'port': 81}]
+        }
+
+        metadata = {
+            "rax:auto_scaling_group_id": self.scaling_group.uuid,
+            "rax:autoscale:group:id": self.scaling_group.uuid,
+            "rax:autoscale:lb:CloudLoadBalancer:12345": '[{"port": 80}]',
+            "rax:autoscale:lb:CloudLoadBalancer:54321": '[{"port": 81}]'
+        }
 
         server_details = {
             'server': {
                 'id': '1',
                 'addresses': {'private': [
                     {'version': 4, 'addr': '10.0.0.1'}]},
-                'metadata': generate_server_metadata(self.scaling_group.uuid,
-                                                     launch_config)}}
+                'metadata': metadata
+            }
+        }
 
         mock_cs.side_effect = lambda *a, **kw: succeed(server_details)
 
@@ -2036,34 +2040,6 @@ class ConfigPreparationTests(SynchronousTestCase):
 
         self.scaling_group_uuid = '1111111-11111-11111-11111111'
 
-    def test_generate_server_metadata_adds_scaling_group_name(self):
-        """
-        The server metadata contains the group name.
-        """
-        output = generate_server_metadata(self.scaling_group_uuid,
-                                          {'server': {}})
-        self.assertEqual(output,
-                         {'rax:auto_scaling_group_id': self.scaling_group_uuid})
-
-    def test_generate_server_metadata_adds_lb_index_and_lb_keys(self):
-        """
-        If load balancers are configured, load balancer ids and the relevant
-        information needed to add the the server to the load balancer (IP and
-        port for now)
-        """
-        output = generate_server_metadata(
-            self.scaling_group_uuid,
-            {"loadBalancers": [
-                {'loadBalancerId': 1, 'port': 80},
-                {'loadBalancerId': 2, 'port': 2200}
-            ]})
-        self.assertEqual(output, {
-            'rax:auto_scaling_group_id': self.scaling_group_uuid,
-            'rax:auto_scaling_lbids': '[1, 2]',
-            'rax:auto_scaling:lb:1': '{"port": 80}',
-            'rax:auto_scaling:lb:2': '{"port": 2200}'
-        })
-
     def test_server_name_suffix(self):
         """
         The server name uses the name specified in the launch config as a
@@ -2093,9 +2069,15 @@ class ConfigPreparationTests(SynchronousTestCase):
         """
         The auto scaling group should be added to the server metadata.
         """
-        test_config = {'server': {}}
+        test_config = {'server': {},
+                       "loadBalancers": [{'loadBalancerId': 1, 'port': 80},
+                                         {'loadBalancerId': 2, 'port': 2200}]}
         expected_metadata = {
-            'rax:auto_scaling_group_id': self.scaling_group_uuid}
+            'rax:auto_scaling_group_id': self.scaling_group_uuid,
+            'rax:autoscale:group:id': self.scaling_group_uuid,
+            'rax:autoscale:lb:CloudLoadBalancer:1': '[{"port": 80}]',
+            'rax:autoscale:lb:CloudLoadBalancer:2': '[{"port": 2200}]'
+        }
 
         launch_config = prepare_launch_config(self.scaling_group_uuid,
                                               test_config)
@@ -2110,6 +2092,7 @@ class ConfigPreparationTests(SynchronousTestCase):
         test_config = {'server': {'metadata': {'foo': 'bar'}}}
         expected_metadata = {
             'rax:auto_scaling_group_id': self.scaling_group_uuid,
+            'rax:autoscale:group:id': self.scaling_group_uuid,
             'foo': 'bar'}
 
         launch_config = prepare_launch_config(self.scaling_group_uuid,
@@ -2117,42 +2100,6 @@ class ConfigPreparationTests(SynchronousTestCase):
 
         self.assertEqual(expected_metadata,
                          launch_config['server']['metadata'])
-
-    def test_load_balancer_metadata(self):
-        """
-        auto scaling group and auto scaling server name should be
-        added to the node metadata for a load balancer.
-        """
-        test_config = {'server': {},
-                       'loadBalancers': [{'loadBalancerId': 1, 'port': 80}]}
-
-        expected_metadata = {
-            'rax:auto_scaling_group_id': self.scaling_group_uuid,
-            'rax:auto_scaling_server_name': 'as000000'}
-
-        launch_config = prepare_launch_config(self.scaling_group_uuid,
-                                              test_config)
-
-        self.assertEqual(expected_metadata,
-                         launch_config['loadBalancers'][0]['metadata'])
-
-    def test_load_balancer_metadata_merge(self):
-        """
-        auto scaling metadata should be merged with user specified metadata.
-        """
-        test_config = {'server': {}, 'loadBalancers': [
-            {'loadBalancerId': 1, 'port': 80, 'metadata': {'foo': 'bar'}}]}
-
-        expected_metadata = {
-            'rax:auto_scaling_group_id': self.scaling_group_uuid,
-            'rax:auto_scaling_server_name': 'as000000',
-            'foo': 'bar'}
-
-        launch_config = prepare_launch_config(self.scaling_group_uuid,
-                                              test_config)
-
-        self.assertEqual(expected_metadata,
-                         launch_config['loadBalancers'][0]['metadata'])
 
     def test_launch_config_is_copy(self):
         """
@@ -2176,8 +2123,14 @@ sample_launch_config = {
         {'loadBalancerId': 54321, 'port': 81}
     ]
 }
-sample_otter_metadata = generate_server_metadata("group_id",
-                                                 sample_launch_config)
+
+sample_otter_metadata = {
+    "rax:auto_scaling_group_id": "group_id",
+    "rax:autoscale:group:id": "group_id",
+    "rax:autoscale:lb:CloudLoadBalancer:12345": '[{"port": 80}]',
+    "rax:autoscale:lb:CloudLoadBalancer:54321": '[{"port": 81}]'
+}
+
 sample_user_metadata = {"some_user_key": "some_user_value"}
 
 

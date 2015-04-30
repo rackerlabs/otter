@@ -1,3 +1,3 @@
 """
-System tests for Autoscale
+System tests for Autoscale.
 """

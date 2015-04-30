@@ -1,8 +1,6 @@
 """
 Tests for `/groups/<groupId>/servers/` endpoint
 """
-import time
-
 from cafe.drivers.unittest.decorators import tags
 
 from test_repo.autoscale.fixtures import AutoscaleFixture
@@ -33,20 +31,17 @@ class ServersTests(AutoscaleFixture):
         """
         Assert if given server is still in group
         """
-        tries = 10
-        interval = 15
-        while tries > 0:
+        def check_deleted(time_elapsed):
             servers = self.get_servers_containing_given_name_on_tenant(
                 group_id=self.groupid)
             if server_id in servers:
-                tries -= 1
-                time.sleep(interval)
-            else:
-                return
-        self.fail('Server {} in group {} not deleted'.format(server_id,
-                                                             self.groupid))
+                self.fail('Server {} in group {} not deleted after {} seconds'
+                          .format(server_id, self.groupid, time_elapsed))
 
-    @tags(speed='slow', convergence='error')
+        return self.autoscale_behaviors.retry(check_deleted, timeout=150,
+                                              interval_time=15)
+
+    @tags(speed='slow', convergence='yes')
     def test_delete_removes_and_replaces(self, replace=None):
         """
         `DELETE serverId` actually deletes the server and replaces with new
@@ -64,9 +59,9 @@ class ServersTests(AutoscaleFixture):
         # Is server really deleted?
         self.assert_server_deleted(server_id)
         # New server replaced?
-        self.verify_group_state(self.groupid, 1)
+        self.wait_for_expected_group_state(self.groupid, 1)
 
-    @tags(speed='slow', convergence='error')
+    @tags(speed='slow', convergence='yes')
     def test_delete_removed_replaced_arg(self):
         """
         `DELETE serverId?replace=true` actually deletes the server and
@@ -74,7 +69,7 @@ class ServersTests(AutoscaleFixture):
         """
         self.test_delete_removes_and_replaces('true')
 
-    @tags(speed='slow', convergence='error')
+    @tags(speed='slow', convergence='yes')
     def test_delete_removed_not_replaced(self):
         """
         `DELETE serverId?replace=false` removes the sever and does not replace
@@ -95,7 +90,7 @@ class ServersTests(AutoscaleFixture):
         # Is server really deleted?
         self.assert_server_deleted(server_id)
         # New server not replaced?
-        self.verify_group_state(self.groupid, 1)
+        self.wait_for_expected_group_state(self.groupid, 1)
 
     @tags(convergence='yes')
     def test_delete_server_not_found(self):

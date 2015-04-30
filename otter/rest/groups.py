@@ -6,8 +6,6 @@ import json
 
 from functools import partial
 
-from twisted.internet import defer
-
 from otter import controller
 from otter.convergence.composition import tenant_is_enabled
 from otter.json_schema.group_schemas import (
@@ -34,7 +32,7 @@ from otter.rest.errors import InvalidMinEntities, exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.rest.policies import OtterPolicies, linkify_policy_list
 from otter.rest.webhooks import _format_webhook
-from otter.supervisor import get_supervisor, remove_server_from_group
+from otter.supervisor import get_supervisor
 from otter.util.config import config_value
 from otter.util.http import (
     get_autoscale_links,
@@ -556,42 +554,9 @@ class OtterGroup(object):
         """
         group = self.store.get_scaling_group(self.log, self.tenant_id,
                                              self.group_id)
-        force = False
-        try:
-            force_arg = request.args.get('force')[0].lower()
-            if force_arg == 'true':
-                force = True
-            else:
-                return defer.fail(InvalidQueryArgument(
-                    'Invalid query argument for "limit"'))
-        except (IndexError, TypeError):
-            # There is no argument
-            pass
-        if force:
-            d = group.view_manifest(with_policies=False)
-
-            def update_config(group_info):
-                group_info['groupConfiguration']['minEntities'] = 0
-                group_info['groupConfiguration']['maxEntities'] = 0
-                du = group.update_config(group_info['groupConfiguration'])
-                return du.addCallback(lambda _: group_info)
-
-            d.addCallback(update_config)
-
-            def modify_state(group_info):
-                d = group.modify_state(
-                    partial(
-                        controller.obey_config_change,
-                        self.log,
-                        transaction_id(request),
-                        group_info['groupConfiguration'],
-                        launch_config=group_info['launchConfiguration']))
-                return d
-            d.addCallback(modify_state)
-
-            return d.addCallback(lambda _: group.delete_group())
-        else:
-            return group.delete_group()
+        force = extract_bool_arg(request, 'force', False)
+        return controller.delete_group(
+            log, transaction_id(request), group, force)
 
     @app.route('/state/', methods=['GET'])
     @with_transaction_id()
@@ -739,7 +704,7 @@ class OtterServers(object):
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.scaling_group_id)
         d = group.modify_state(
-            partial(remove_server_from_group,
+            partial(controller.remove_server_from_group,
                     self.log.bind(server_id=server_id),
                     transaction_id(request), server_id,
                     extract_bool_arg(request, 'replace', True),
