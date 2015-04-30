@@ -18,9 +18,8 @@ from otter.convergence.model import (
     RCv3Node,
     ServerState)
 from otter.convergence.planning import (
-    _default_limit_step_count,
-    _limit_step_count,
     converge,
+    limit_steps_by_count,
     optimize_steps,
     plan)
 from otter.convergence.steps import (
@@ -33,6 +32,7 @@ from otter.convergence.steps import (
     DeleteServer,
     RemoveNodesFromCLB,
     SetMetadataItemOnServer)
+from otter.convergence.transforming import _limit_step_count
 
 
 def copy_clb_desc(clb_desc, condition=CLBNodeCondition.ENABLED, weight=1):
@@ -1258,7 +1258,7 @@ class LimitStepCount(SynchronousTestCase):
         """
         The default limit limits server creation to up to 3 steps.
         """
-        limits = _default_limit_step_count.keywords["step_limits"]
+        limits = limit_steps_by_count.keywords["step_limits"]
         self.assertEqual(limits, pmap({CreateServer: 3}))
 
 
