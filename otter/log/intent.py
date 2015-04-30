@@ -4,50 +4,45 @@ Logging intents and performing functions
 
 from functools import partial
 
+from characteristic import attributes
+
 from effect import ComposedDispatcher, Effect, TypeDispatcher, perform
 
 from toolz.dicttoolz import merge
 
 
+@attributes(['msg', 'fields'])
 class Log(object):
     """
     Intent to log message
     """
-    def __init__(self, msg, fields):
-        self.msg = msg
-        self.fields = fields
 
 
+@attributes(['failure', 'msg', 'fields'])
 class LogErr(object):
     """
     Intent to log error
     """
-    def __init__(self, failure, msg, fields):
-        self.failure = failure
-        self.msg = msg
-        self.fields = fields
 
 
+@attributes(['effect', 'fields'])
 class BoundFields(object):
     """
     Intent that binds log fields to an effect. Any log or err effect
     found when performing given effect will be expanded with these fields
     """
-    def __init__(self, effect, fields):
-        self.effect = effect
-        self.fields = fields
 
 
 def with_log(effect, **fields):
-    return Effect(BoundFields(effect, fields))
+    return Effect(BoundFields(effect=effect, fields=fields))
 
 
 def msg(msg, **fields):
-    return Effect(Log(msg, fields))
+    return Effect(Log(msg=msg, fields=fields))
 
 
 def err(failure, msg, **fields):
-    return Effect(LogErr(failure, msg, fields))
+    return Effect(LogErr(failure=failure, msg=msg, fields=fields))
 
 
 def perform_logging(log, fields, disp, intent, box):
