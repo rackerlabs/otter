@@ -42,9 +42,10 @@ region = os.environ['AS_REGION']
 # Get vs dict lookup because it will return None if not found,
 # not throw an exception.  None is a valid value for convergence_tenant.
 convergence_tenant = os.environ.get('AS_CONVERGENCE_TENANT')
-otter_key = os.environ['AS_AUTOSCALE_SC_KEY']
+otter_key = os.environ.get('AS_AUTOSCALE_SC_KEY', 'autoscale')
 otter_url = os.environ.get('AS_AUTOSCALE_LOCAL_URL')
-nova_key = os.environ['AS_NOVA_SC_KEY']
+nova_key = os.environ.get('AS_NOVA_SC_KEY', 'cloudServersOpenStack')
+clb_key = os.environ.get('AS_CLB_SC_KEY', 'cloudLoadBalancers')
 
 
 class TestConvergence(unittest.TestCase):
@@ -266,17 +267,14 @@ class TestConvergence(unittest.TestCase):
         def create_clb_first():
             self.clb = CloudLoadBalancer(pool=self.pool)
             return (
-                self.identity.authenticate_user(rcs)
-                .addCallback(
-                    rcs.find_end_point,
-                    "otter", otter_key, region,
-                    default_url='http://localhost:9000/v1.0/{0}'
-                ).addCallback(
-                    rcs.find_end_point,
-                    "nova", nova_key, region
-                ).addCallback(
-                    rcs.find_end_point,
-                    "loadbalancers", "cloudLoadBalancers", region
+                self.identity.authenticate_user(
+                    rcs,
+                    resources={
+                        "otter": (otter_key, otter_url),
+                        "nova": (nova_key,),
+                        "loadbalancers": (clb_key,)
+                    },
+                    region=region,
                 ).addCallback(self.clb.start, self)
                 .addCallback(self.clb.wait_for_state, "ACTIVE", 600)
             )
@@ -464,8 +462,8 @@ class TestConvergence(unittest.TestCase):
             self.identity.authenticate_user(
                 rcs,
                 resources={
-                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
-                    "nova": ("cloudServersOpenStack",),
+                    "otter": (otter_key, otter_url),
+                    "nova": (nova_key,),
                 },
                 region=region
             ).addCallback(self.scaling_group.start, self)
@@ -718,8 +716,8 @@ class TestConvergence(unittest.TestCase):
         d = self.identity.authenticate_user(
             rcs,
             resources={
-                "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
-                "nova": ("cloudServersOpenStack",),
+                "otter": (otter_key, otter_url),
+                "nova": (nova_key,),
             },
             region=region
         ).addCallback(self.scaling_group.start, self)
