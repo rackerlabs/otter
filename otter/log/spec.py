@@ -7,13 +7,24 @@ from twisted.python.failure import Failure
 
 # mapping from msg type -> message
 msg_types = {
+    # Keep these in alphabetical order so merges can be deterministic
+    "add-server-clb": ("Adding {server_id} with IP address {ip_address} "
+                       "to CLB {clb_id}"),
+    "converge-all-groups": "Attempting to converge all dirty groups",
+    "converge-all-groups-error": "Error while converging all groups",
+    "converge-fatal-error": (
+        "Fatal error while converging group {scaling_group_id}."),
+    "converge-non-fatal-error": (
+        "Non-fatal error while converging group {scaling_group_id}"),
+    "delete-server": "Deleting {server_id} server",
     "execute-convergence": "Executing convergence",
     "execute-convergence-results": (
         "Got result of {worst_status} after executing convergence"),
     "launch-servers": "Launching {num_servers} servers",
-    "delete-server": "Deleting {server_id} server",
-    "add-server-clb": ("Adding {server_id} with IP address {ip_address} "
-                       "to CLB {clb_id}"),
+    "mark-clean-success": "Marked group {scaling_group_id} clean",
+    "mark-clean-failure": "Failed to mark group {scaling_group_id} clean",
+    "mark-dirty-success": "Marked group {scaling_group_id} dirty",
+    "mark-dirty-failure": "Failed to mark group {scaling_group_id} dirty",
     "remove-server-clb": ("Removing server {server_id} with IP address "
                           "{ip_address} from CLB {clb_id}"),
 }
