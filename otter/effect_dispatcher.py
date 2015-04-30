@@ -16,7 +16,6 @@ from .auth import (
     perform_invalidate_token,
 )
 from .cloud_client import TenantScope, perform_tenant_scope
-from .log import get_log_dispatcher
 from .models.cass import CQLQueryExecute, perform_cql_query
 from .models.intents import get_model_dispatcher
 from .util.pure_http import Request, perform_request
@@ -55,8 +54,7 @@ def get_full_dispatcher(reactor, authenticator, log, service_configs,
     return ComposedDispatcher([
         get_legacy_dispatcher(reactor, authenticator, log, service_configs),
         get_zk_dispatcher(kz_client),
-        get_model_dispatcher(log, store),
-        get_log_dispatcher(log, {})
+        get_model_dispatcher(log, store)
     ])
 
 
