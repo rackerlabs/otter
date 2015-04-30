@@ -10,6 +10,7 @@ import random
 
 import treq
 
+
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults
 from twisted.internet.task import deferLater
@@ -74,6 +75,95 @@ class TestConvergence(unittest.TestCase):
                 return
             return deferLater(reactor, 0, _check_fds, None)
         return self.pool.closeCachedConnections().addBoth(_check_fds)
+
+    def test_scale_over_group_max_after_metadata_removal_reduced_grp_max(self):
+        """
+        Attempt to scale over the group max, but only after metadata removal on
+        some random sampling of servers.  Note that this version exercises the
+        path that group max is less than CLB max.
+        """
+
+        rcs = TestResources()
+
+        self.untouchable_scaling_group = ScalingGroup(
+            group_config=create_scaling_group_dict(
+                image_ref=image_ref, flavor_ref=flavor_ref, min_entities=4,
+            ),
+            pool=self.pool
+        )
+
+        self.scaling_group = ScalingGroup(
+            group_config=create_scaling_group_dict(
+                image_ref=image_ref, flavor_ref=flavor_ref, max_entities=12,
+            ),
+            pool=self.pool
+        )
+
+        self.scale_up_to_max = ScalingPolicy(
+            scale_by=12,
+            scaling_group=self.scaling_group
+        )
+
+        self.scale_beyond_max = ScalingPolicy(
+            scale_by=5,
+            scaling_group=self.scaling_group
+        )
+
+        def check_state(state, then=None):
+            code, response = state
+            if code == 404:
+                raise Exception("Enterprise to Scaling Group, please respond.")
+            if then:
+                return then(response)
+
+        def keep_state(response):
+            self.untouchable_group_ids = extract_active_ids(response)
+            return rcs
+
+        def double_check_state(response):
+            latest_ids = extract_active_ids(response)
+            if not all(i in self.untouchable_group_ids for i in latest_ids):
+                raise Exception("Untouchable group mutilated somehow.")
+            return rcs
+
+        return (
+            self.identity.authenticate_user(
+                rcs,
+                resources={
+                    "otter": (otter_key, otter_url),
+                    "nova": (nova_key,),
+                },
+                region=region,
+            ).addCallback(self.scaling_group.start, self)
+            .addCallback(self.untouchable_scaling_group.start, self)
+            .addCallback(
+                self.untouchable_scaling_group.wait_for_N_servers, 4,
+                timeout=1800
+            ).addCallback(
+                self.untouchable_scaling_group.get_scaling_group_state
+            ).addCallback(check_state, then=keep_state)
+            .addCallback(self.scale_up_to_max.start, self)
+            .addCallback(self.scale_beyond_max.start, self)
+            .addCallback(self.scale_up_to_max.execute)
+            .addCallback(
+                self.scaling_group.wait_for_N_servers, 12, timeout=1800
+            ).addCallback(self.scaling_group.get_scaling_group_state)
+            .addCallback(self._choose_random_servers, 3)
+            .addCallback(self._remove_metadata, rcs)
+            .addCallback(lambda _: rcs)
+            .addCallback(self.scale_beyond_max.execute)
+            .addBoth(self._assert_error_status_code, 403, rcs)
+            .addCallback(lambda _: self.removed_ids)
+            .addCallback(
+                self.scaling_group.wait_for_deleted_id_removal,
+                rcs,
+                total_servers=12,
+            ).addCallback(
+                self.scaling_group.wait_for_N_servers, 12, timeout=1800
+            ).addCallback(
+                self.untouchable_scaling_group.get_scaling_group_state
+            ).addCallback(check_state, then=double_check_state)
+        )
 
     def test_scale_over_group_max_after_metadata_removal(self):
         """
