@@ -10,6 +10,7 @@ import random
 
 import treq
 
+
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults
 from twisted.internet.task import deferLater
@@ -129,8 +130,8 @@ class TestConvergence(unittest.TestCase):
             self.identity.authenticate_user(
                 rcs,
                 resources={
-                    "otter": ("autoscale", "http://localhost:9000/v1.0/{0}"),
-                    "nova": ("cloudServersOpenStack",),
+                    "otter": (otter_key, otter_url),
+                    "nova": (nova_key,),
                 },
                 region=region,
             ).addCallback(self.scaling_group.start, self)
@@ -148,10 +149,10 @@ class TestConvergence(unittest.TestCase):
                 self.scaling_group.wait_for_N_servers, 12, timeout=1800
             ).addCallback(self.scaling_group.get_scaling_group_state)
             .addCallback(self._choose_random_servers, 3)
-            # Beyond this point, untested. XXX
             .addCallback(self._remove_metadata, rcs)
             .addCallback(lambda _: rcs)
             .addCallback(self.scale_beyond_max.execute)
+            .addBoth(self._assert_error_status_code, 403, rcs)
             .addCallback(lambda _: self.removed_ids)
             .addCallback(
                 self.scaling_group.wait_for_deleted_id_removal,
@@ -227,12 +228,6 @@ class TestConvergence(unittest.TestCase):
             ).addCallback(
                 self.scaling_group.wait_for_N_servers, 25, timeout=1800
             )
-        )
-
-    def test_aaa(self):  # XXX: Testing purposes only
-        return (
-            self
-            .test_scale_over_group_max_after_metadata_removal_reduced_grp_max()
         )
 
     def test_scaling_to_clb_max_after_oob_delete_type1(self):
