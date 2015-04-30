@@ -6,10 +6,11 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 """
 
 import time
+import uuid
 from functools import partial
 from hashlib import sha1
 
-from effect import Effect, FirstError, Func, parallel
+from effect import Effect, ComposedDispatcher, FirstError, Func, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
 from effect.twisted import exc_info_to_failure, perform
@@ -30,7 +31,7 @@ from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
-from otter.log.intent import err, msg, with_log
+from otter.log.intent import err, get_log_dispatcher, msg, with_log
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, ModifyGroupState)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
@@ -94,7 +95,6 @@ def execute_convergence(tenant_id, group_id,
     group state, and then execute the convergence.
 
     :param group_id: group id
-    :param log: bound logger
     :param get_all_convergence_data: like :func`get_all_convergence_data`, used
         for testing.
 
@@ -214,7 +214,7 @@ def mark_divergent(tenant_id, group_id):
     return eff
 
 
-def delete_divergent_flag(log, tenant_id, group_id, version):
+def delete_divergent_flag(tenant_id, group_id, version):
     """
     Delete the dirty flag, if its version hasn't changed. See comment in
     :func:`mark_divergent` for more info.
@@ -224,9 +224,9 @@ def delete_divergent_flag(log, tenant_id, group_id, version):
     flag = format_dirty_flag(tenant_id, group_id)
     path = CONVERGENCE_DIRTY_DIR + '/' + flag
     return Effect(DeleteNode(path=path, version=version)).on(
-        success=lambda r: log.msg('mark-clean-success'),
-        error=lambda e: log.err(exc_info_to_failure(e), 'mark-clean-failure',
-                                path=path, dirty_version=version))
+        success=lambda r: msg('mark-clean-success'),
+        error=lambda e: err(exc_info_to_failure(e), 'mark-clean-failure',
+                            path=path, dirty_version=version))
 
 
 class ConvergenceStarter(object):
@@ -260,7 +260,6 @@ def non_concurrently(locks, key, eff):
     """
     Run some Effect non-concurrently.
 
-    :param log: bound log
     :param Reference locks: A reference to a PSet that will be used to record
         which operations are currently being executed.
     :param key: the key to use for this particular operation, which will be
@@ -326,7 +325,7 @@ def converge_one_group(currently_converging, tenant_id, group_id, version,
         return
     except NoSuchScalingGroupError:
         yield err(None, 'converge-fatal-error')
-        yield delete_divergent_flag(log, tenant_id, group_id, version)
+        yield delete_divergent_flag(tenant_id, group_id, version)
         return
     except Exception:
         # We specifically don't clean up the dirty flag in the case of
@@ -334,7 +333,7 @@ def converge_one_group(currently_converging, tenant_id, group_id, version,
         yield err(None, 'converge-non-fatal-error')
     else:
         if result in (StepResult.FAILURE, StepResult.SUCCESS):
-            yield delete_divergent_flag(log, tenant_id, group_id, version)
+            yield delete_divergent_flag(tenant_id, group_id, version)
         # TODO: if result is FAILURE, put the group into ERROR state.
         # https://github.com/rackerlabs/otter/issues/885
 
@@ -361,7 +360,7 @@ def converge_all_groups(currently_converging, my_buckets, all_buckets,
         tenant_id, group_id = info['tenant_id'], info['group_id']
         eff = Effect(GetStat(info['dirty-flag'])).on(
             lambda stat, info=info: Effect(TenantScope(
-                converge_one_group(log, currently_converging,
+                converge_one_group(currently_converging,
                                    tenant_id, group_id, stat.version),
                 tenant_id)))
         effs.append(with_log(eff, tenant_id=tenant_id, group_id=group_id))
@@ -426,11 +425,11 @@ class Converger(MultiService):
 
     def _converge_all(self, my_buckets, divergent_flags):
         """Run :func:`converge_all_groups` and log errors."""
-        eff = self._converge_all_groups(self.log, self.currently_converging,
+        eff = self._converge_all_groups(self.currently_converging,
                                         my_buckets, self._buckets,
                                         divergent_flags)
         return eff.on(
-            error=lambda e: self.log.err(
+            error=lambda e: err(
                 exc_info_to_failure(e), 'converge-all-groups-error'))
 
     def buckets_acquired(self, my_buckets):
