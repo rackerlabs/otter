@@ -1,3 +1,5 @@
+"""Tests for otter.convergence.transforming."""
+
 from pyrsistent import pbag, pmap, pset, s
 
 from toolz import groupby

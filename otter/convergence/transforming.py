@@ -5,7 +5,7 @@ There are a few classes of transformations here:
 
 - optimizing (converting multiple steps into one for the purposes of reducing
   API roundtrips)
-- throttling (by truncating the number of steps we take)
+- limiting (by truncating the number of steps we take)
 - throttling (by wrapping multiple steps with one that gradually executes them)
 """
 
