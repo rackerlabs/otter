@@ -28,6 +28,7 @@ from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
+from otter.log.intent import err, msg, with_log
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupState
 from otter.models.interface import NoSuchScalingGroupError
 from otter.util.fp import assoc_obj
@@ -115,12 +116,10 @@ def execute_convergence(tenant_id, group_id,
     desired_group_state = get_desired_group_state(
         group_id, launch_config, group_state.desired)
     steps = plan(desired_group_state, servers, lb_nodes, now)
-    yield log_plan(steps)
     active = determine_active(servers, lb_nodes)
-    yield Effect(
-        Log('execute-convergence',
-            servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
-            desired=desired_group_state, active=active))
+    yield msg('execute-convergence',
+              servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
+              desired=desired_group_state, active=active)
     yield _update_active(scaling_group, active)
     if len(steps) == 0:
         yield do_return(StepResult.SUCCESS)
@@ -130,16 +129,10 @@ def execute_convergence(tenant_id, group_id,
     priority = sorted(results,
                       key=lambda (status, reasons): order.index(status))
     worst_status = priority[0][0]
-    yield Effect(
-        Log('execute-convergence-results',
-            results=zip(steps, results),
-            worst_status=worst_status))
+    yield msg('execute-convergence-results',
+              results=zip(steps, results),
+              worst_status=worst_status)
     yield do_return(worst_status)
-
-
-def log_plan(steps):
-    kind = groupby(type, steps)
-    return Effect(Log('launch-servers', num_servers=len(kind[CreateServer])))
 
 
 def format_dirty_flag(tenant_id, group_id):
@@ -320,7 +313,7 @@ def get_my_divergent_groups(my_buckets, all_buckets):
 
 
 @do
-def converge_one_group(log, group_locks, tenant_id, group_id, version,
+def converge_one_group(group_locks, tenant_id, group_id, version,
                        execute_convergence=execute_convergence):
     """
     Converge one group, non-concurrently, and clean up the dirty flag when
@@ -329,22 +322,20 @@ def converge_one_group(log, group_locks, tenant_id, group_id, version,
     :param group_locks: A lock function, produced from :func:`make_lock_set`.
     :param version: version number of ZNode of the group's dirty flag
     """
-    log_fields = dict(tenant_id=tenant_id, group_id=group_id)
     eff = execute_convergence(tenant_id, group_id)
-    eff = BoundLog(eff, **log_fields)
     try:
         result = yield group_locks(group_id, eff)
     except ConcurrentError:
         # We don't need to spam the logs about this, it's to be expected
         return
     except NoSuchScalingGroupError:
-        log.err(None, 'converge-fatal-error')
+        yield err(None, 'converge-fatal-error')
         yield delete_divergent_flag(log, tenant_id, group_id, version)
         return
     except Exception:
         # We specifically don't clean up the dirty flag in the case of
         # unexpected errors, so convergence will be retried.
-        log.err(None, 'converge-non-fatal-error')
+        yield err(None, 'converge-non-fatal-error')
     else:
         if result in (StepResult.FAILURE, StepResult.SUCCESS):
             yield delete_divergent_flag(log, tenant_id, group_id, version)
@@ -353,7 +344,7 @@ def converge_one_group(log, group_locks, tenant_id, group_id, version,
 
 
 @do
-def converge_all_groups(log, group_locks, my_buckets, all_buckets,
+def converge_all_groups(group_locks, my_buckets, all_buckets,
                         get_my_divergent_groups=get_my_divergent_groups,
                         converge_one_group=converge_one_group):
     """
@@ -368,17 +359,16 @@ def converge_all_groups(log, group_locks, my_buckets, all_buckets,
     group_infos = yield get_my_divergent_groups(my_buckets, all_buckets)
     if not group_infos:
         return
-    log.msg('converge-all-groups', group_infos=group_infos)
+    yield msg('converge-all-groups', group_infos=group_infos)
     # TODO: Log currently converging
     # https://github.com/rackerlabs/otter/issues/1216
-    effs = [
-        Effect(TenantScope(
-            converge_one_group(log, group_locks,
-                               info['tenant_id'],
-                               info['group_id'],
-                               info['version']),
-            info['tenant_id']))
-        for info in group_infos]
+    for info in group_infos:
+        tenant_id, group_id = info['tenant_id'], info['group_id']
+        eff =  Effect(
+            TenantScope(
+                converge_one_group(group_locks, tenant_id, group_id,
+                                   info['version'])))
+        effs.append(with_log(eff, tenant_id=tenant_id, group_id=group_id))
     yield do_return(parallel(effs))
 
 
@@ -418,9 +408,10 @@ class Converger(MultiService):
             create an :obj:`Partitioner` to distribute the buckets.
         """
         MultiService.__init__(self)
-        self._dispatcher = dispatcher
-        self._buckets = buckets
         self.log = log.bind(system='converger')
+        self._dispatcher = ComposedDispatcher([
+            get_log_dispatcher(self.log, {}), dispatcher])
+        self._buckets = buckets
         self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
         self.partitioner.setServiceParent(self)
         self.group_locks = make_lock_set()
@@ -432,10 +423,12 @@ class Converger(MultiService):
 
         This is used as the partitioner callback.
         """
-        eff = self._converge_all_groups(self.log, self.group_locks,
+        eff = self._converge_all_groups(self.group_locks,
                                         my_buckets, self._buckets)
+        run_id = uuid.uuid1()
+        eff = with_log(eff, converger_run_id=run_id)
         result = perform(self._dispatcher, eff).addErrback(
-            self.log.err, 'converge-all-groups-error')
+            self.log.err, 'converge-all-groups-error', converger_run_id=run_id)
         # the return value is ignored, but we return this for testing
         return result
 
