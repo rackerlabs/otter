@@ -5,12 +5,14 @@ scaling group configuration, and policies.
 
 from copy import deepcopy
 from datetime import datetime
-import calendar
 
 from croniter import croniter
+
+from iso8601 import ParseError
+
 from toolz import get_in
 
-from otter.util.timestamp import from_timestamp
+from otter.util.timestamp import timestamp_to_epoch
 from otter.json_schema import format_checker
 from jsonschema import ValidationError
 
@@ -342,21 +344,20 @@ def validate_launch_config_servicenet(lc):
 @format_checker.checks('date-time', raises=ValueError)
 def validate_datetime(dt_str):
     """
-    Validate date-time string in json. Return True if valid and raise ValueError if invalid
+    Validate date-time string in json. Return True if valid and raise
+    ValueError if invalid
     """
     if dt_str and dt_str[-1] != 'Z':
         raise ValueError('Expecting Zulu-format UTC time')
     try:
-        dt = from_timestamp(dt_str)
-    except:
-        # It is checking for any exception since from_timestamp throws
-        # TypeError instead of ParseError with certain invalid inputs like only date or time.
-        # This issue has been raised and tracked http://code.google.com/p/pyiso8601/issues/detail?id=8
-        # and http://code.google.com/p/pyiso8601/issues/detail?id=24
+        ep = timestamp_to_epoch(dt_str)
+    except ParseError:
         raise ValueError('Error parsing datetime str')
-    # Ensure time is in future
-    if datetime.utcfromtimestamp(calendar.timegm(dt.utctimetuple())) <= datetime.utcnow():
-        raise ValidationError('Invalid "{}" datetime: It must be in the future'.format(dt_str))
+    # Ensure time is in future - can't just parse into a datetime and compare
+    # because we cannot compare naive datetimes with timezone-aware datetimes
+    if datetime.utcfromtimestamp(ep) <= datetime.utcnow():
+        raise ValidationError(
+            'Invalid "{0}" datetime: It must be in the future'.format(dt_str))
     return True
 
 
