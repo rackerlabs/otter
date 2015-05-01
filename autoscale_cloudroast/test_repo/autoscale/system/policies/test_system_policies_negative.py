@@ -137,6 +137,10 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
         building).  The user will be able to delete the group and autoscaling
         will delete the servers on the group (AUTO-339)
         """
+        # wait for them to be building or done first
+        self.check_for_expected_number_of_building_servers(
+            group_id=self.group.id,
+            expected_servers=self.group.groupConfiguration.minEntities)
         server_name = self.group.launchConfiguration.server.name
         self._update_group_min_max_entities(group=self.group,
                                             maxentities=0, minentities=0)
