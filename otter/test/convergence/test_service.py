@@ -29,6 +29,7 @@ from otter.convergence.service import (
     determine_active, execute_convergence, get_my_divergent_groups,
     non_concurrently)
 from otter.convergence.steps import ConvergeLater
+from otter.log.intent import Log, get_log_dispatcher
 from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,
@@ -609,6 +610,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         }
         gsgi_result = (self.group, self.manifest)
         self.expected_intents = [(gsgi, gsgi_result)]
+        self.log = mock_log()
 
     def _get_dispatcher(self, expected_intents=None):
         if expected_intents is None:
@@ -619,6 +621,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 ParallelEffects: perform_parallel_async,
                 ModifyGroupState: perform_modify_group_state,
             }),
+            get_log_dispatcher(self.log, {}),
             base_dispatcher,
         ])
 
@@ -633,11 +636,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         If state of world matches desired, no steps are executed, but the
         `active` servers are still updated, and SUCCESS is the return value.
         """
-        log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
         for serv in self.servers:
             serv.desired_lbs = pset()
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   get_all_convergence_data=gacd)
         expected_active = {
             'a': {'id': 'a', 'links': [{'href': 'link1', 'rel': 'self'}]},
@@ -653,30 +655,37 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         Executes the plan and returns SUCCESS when that's the most severe
         result.
         """
-        log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
+        dgs = get_desired_group_state(self.group_id, self.lc, 2)
+        steps = [
+            TestStep(
+                Effect(
+                    {'dgs': dgs,
+                     'servers': tuple(self.servers),
+                     'lb_nodes': (),
+                     'now': 500})
+                .on(lambda _: (StepResult.SUCCESS, [])))]
 
         def plan(dgs, servers, lb_nodes, now):
-            return [
-                TestStep(
-                    Effect(
-                        {'dgs': dgs,
-                         'servers': servers,
-                         'lb_nodes': lb_nodes,
-                         'now': now})
-                    .on(lambda _: (StepResult.SUCCESS, [])))]
+            return steps
 
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   get_all_convergence_data=gacd,
                                   plan=plan)
 
         sequence = SequenceDispatcher([
             (Func(time.time), lambda i: 500),
+            (Log('execute-convergence',
+                 dict(servers=tuple(self.servers), lb_nodes=(), steps=steps,
+                      now=500, desired=dgs, active=[])), lambda i: None),
             ({'dgs': get_desired_group_state(self.group_id, self.lc, 2),
               'servers': tuple(self.servers),
               'lb_nodes': (),
               'now': 500},
-             lambda i: None)
+             lambda i: None),
+            (Log('execute-convergence-results',
+                 {'results': [(steps[0], (StepResult.SUCCESS, []))],
+                  'worst_status': StepResult.SUCCESS}), lambda i: None)
         ])
         dispatcher = ComposedDispatcher([sequence, self._get_dispatcher()])
         with sequence.consume():
@@ -689,12 +698,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         If the GetScalingGroupInfo effect fails, its exception is raised
         directly, without the FirstError wrapper.
         """
-        log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
         for srv in self.servers:
             srv.desired_lbs = pmap()
 
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   get_all_convergence_data=gacd)
 
         # Perform the GetScalingGroupInfo by raising an exception
@@ -716,14 +724,13 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         all servers and group is deleted if the steps return SUCCESS. The
         group is not deleted is the step do not succeed
         """
-        log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
 
         def _plan(dsg, *a):
             self.dsg = dsg
             return [TestStep(Effect(Constant((StepResult.SUCCESS, []))))]
 
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   get_all_convergence_data=gacd, plan=_plan)
 
         # setup intents for DeleteGroup and GetScalingGroupInfo
@@ -737,7 +744,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             TypeDispatcher({
                 ParallelEffects: perform_parallel_async,
             }),
-            base_dispatcher,
+            get_log_dispatcher(self.log, {}),
+            base_dispatcher
         ])
         # This succeeded without `ModifyGroupState` dispatcher in it
         # ensuring that it was not called
@@ -750,7 +758,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         def fplan(*a):
             return [TestStep(Effect(Constant((StepResult.RETRY, []))))]
 
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   get_all_convergence_data=gacd, plan=fplan)
         disp = self._get_dispatcher([(self.gsgi, (self.group, self.manifest))])
         # This succeeded without DeleteGroup performer being there ensuring
@@ -762,7 +770,6 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         If a step that results in RETRY is returned, and there are no FAILUREs,
         then the ultimate result of executing convergence will be a RETRY.
         """
-        log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
 
         def plan(*args, **kwargs):
@@ -771,7 +778,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 ConvergeLater(reasons=['mywish']),
                 TestStep(Effect(Constant((StepResult.SUCCESS, []))))])
 
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   plan=plan,
                                   get_all_convergence_data=gacd)
         dispatcher = self._get_dispatcher()
@@ -783,7 +790,6 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         of executing convergence will be a FAILURE, regardless of the other
         step results.
         """
-        log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
 
         def plan(*args, **kwargs):
@@ -795,7 +801,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
             ])
 
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   plan=plan,
                                   get_all_convergence_data=gacd)
         dispatcher = self._get_dispatcher()
