@@ -1,6 +1,5 @@
 """Tests for convergence gathering."""
 
-import calendar
 from datetime import datetime
 from functools import partial
 from urllib import urlencode
@@ -49,7 +48,7 @@ from otter.test.utils import (
 )
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
-from otter.util.timestamp import from_timestamp
+from otter.util.timestamp import timestamp_to_epoch
 
 
 def _request(requests):
@@ -287,11 +286,12 @@ class ExtractDrainedTests(SynchronousTestCase):
     summary = ("Node successfully updated with address: "
                "'10.23.45.6', port: '8080', weight: '1', "
                "condition: 'DRAINING'")
-    updated = '2014-10-23T18:10:48.000Z'
-    feed = ('<feed xmlns="http://www.w3.org/2005/Atom">' +
-            '<entry><summary>{}</summary><updated>{}</updated></entry>' +
-            '<entry><summary>else</summary><updated>badtime</updated></entry>' +
-            '</feed>')
+    updated = '2014-10-23T18:10:48.001Z'
+    feed = (
+        '<feed xmlns="http://www.w3.org/2005/Atom">' +
+        '<entry><summary>{}</summary><updated>{}</updated></entry>' +
+        '<entry><summary>else</summary><updated>badtime</updated></entry>' +
+        '</feed>')
 
     def test_first_entry(self):
         """
@@ -299,8 +299,7 @@ class ExtractDrainedTests(SynchronousTestCase):
         """
         feed = self.feed.format(self.summary, self.updated)
         self.assertEqual(extract_CLB_drained_at(feed),
-                         calendar.timegm(
-                             from_timestamp(self.updated).utctimetuple()))
+                         timestamp_to_epoch(self.updated))
 
     def test_invalid_first_entry(self):
         """
