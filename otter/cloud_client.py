@@ -13,8 +13,11 @@ from effect import (
     catch,
     perform,
     sync_performer)
+from effect.twisted import perform as deferred_performer, twisted_perform
 
 import six
+
+from twisted.internet.defer import DeferredSemaphore
 
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType
@@ -147,6 +150,7 @@ class TenantScope(object):
 
 
 def concretize_service_request(
+        throttler,
         authenticator, log, service_configs,
         tenant_id,
         service_request):
@@ -155,6 +159,8 @@ def concretize_service_request(
     of :obj:`pure_http.Request`. This doesn't directly conform to the Intent
     performer interface, but it's intended to be used by a performer.
 
+    :param throttler: A function of ServiceType, HTTP method ->
+        DeferredSemaphore or None, used to throttle requests.
     :param ICachingAuthenticator authenticator: the caching authenticator
     :param tenant_id: tenant ID.
     :param BoundLog log: info about requests will be logged to this.
@@ -192,7 +198,48 @@ def concretize_service_request(
             data=service_request.data,
             params=service_request.params,
             log=log)
-    return auth_eff.on(got_auth)
+
+    eff = auth_eff.on(got_auth)
+    limiter = throttler(service_request.service_type,
+                        service_request.method.lower())
+    if limiter is not None:
+        return _DeferredConcurrencyLimiterIntent(limiter, eff)
+    else:
+        return eff
+
+
+@attributes(['limiter', 'effect'])
+class _DeferredConcurrencyLimiterIntent(object):
+    """
+    A grody hack to allow using a Deferred concurrency limiter in Effectful
+    code.
+
+    Ideally Effect would just have built-in concurrency limiters/idioms.
+
+    :param limiter: The Deferred concurrency limiter to run the effect in
+    :param Effect effect: The effect to run while the limiter is acquired
+    """
+
+
+@deferred_performer
+def _perform_deferred_concurrency_limiter_intent(dispatcher, ds_intent):
+    """
+    Perform :obj:`_DeferredConcurrencyLimiterIntent` by performing the nested
+    effect while the limiter is acquired.
+    """
+    return ds_intent.limiter.run(
+        twisted_perform, dispatcher, ds_intent.effect)
+
+
+def make_default_throttler():
+    """Get a throttler function with default throttling policies."""
+    cs_mutation_semaphore = DeferredSemaphore(1)
+
+    def throttler(service_type, method):
+        if (service_type == ServiceType.CLOUD_SERVERS and
+                method in ('post', 'delete')):
+            return cs_mutation_semaphore
+    return throttler
 
 
 def perform_tenant_scope(
@@ -218,6 +265,22 @@ def perform_tenant_scope(
         TypeDispatcher({ServiceRequest: scoped_performer}),
         dispatcher])
     perform(new_disp, tenant_scope.effect.on(box.succeed, box.fail))
+
+
+def get_cloud_client_dispatcher(authenticator, log, service_configs):
+    """
+    Get a dispatcher suitable for running :obj:`ServiceRequest` and
+    :obj:`TenantScope` intents.
+    """
+    # ideally this throttler would be parameterized but for now it's basically
+    # a hack that we want to keep private to this module
+    throttler = make_default_throttler()
+    return TypeDispatcher({
+        TenantScope: partial(perform_tenant_scope, authenticator, log,
+                             service_configs, throttler),
+        _DeferredConcurrencyLimiterIntent:
+            _perform_deferred_concurrency_limiter_intent,
+    })
 
 
 # ----- CLB requests and error parsing -----
