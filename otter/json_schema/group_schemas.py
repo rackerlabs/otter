@@ -10,11 +10,12 @@ from croniter import croniter
 
 from iso8601 import ParseError
 
+from jsonschema import ValidationError
+
 from toolz import get_in
 
-from otter.util.timestamp import timestamp_to_epoch
 from otter.json_schema import format_checker
-from jsonschema import ValidationError
+from otter.util.timestamp import timestamp_to_epoch
 
 # This is built using union types which may not be available in Draft 4
 # see: http://stackoverflow.com/questions/9029524/json-schema-specify-field-is-
