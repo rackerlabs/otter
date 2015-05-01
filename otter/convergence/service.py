@@ -363,7 +363,8 @@ def converge_all_groups(currently_converging, my_buckets, all_buckets,
                 converge_one_group(currently_converging,
                                    tenant_id, group_id, stat.version),
                 tenant_id)))
-        effs.append(with_log(eff, tenant_id=tenant_id, group_id=group_id))
+        effs.append(
+            with_log(eff, tenant_id=tenant_id, scaling_group_id=group_id))
 
     yield do_return(parallel(effs))
 
