@@ -40,7 +40,8 @@ def timestamp_to_epoch(timestamp):
     :param str timestamp: A UTC timestamp string
     :return: EPOCH seconds as float
     """
-    return calendar.timegm(from_timestamp(timestamp).utctimetuple())
+    dt = from_timestamp(timestamp)
+    return calendar.timegm(dt.utctimetuple()) + dt.microsecond / 1000000.
 
 
 def epoch_to_utctimestr(epoch):
