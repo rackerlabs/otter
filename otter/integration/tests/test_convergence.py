@@ -4,12 +4,8 @@ Tests covering self-healing should be placed in a separate test file.
 
 from __future__ import print_function
 
-import json
 import os
 import random
-
-import treq
-
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults
@@ -28,9 +24,10 @@ from otter.integration.lib.autoscale import (
 )
 from otter.integration.lib.cloud_load_balancer import CloudLoadBalancer
 from otter.integration.lib.identity import IdentityV2
+from otter.integration.lib.nova import NovaServer, delete_servers
 from otter.integration.lib.resources import TestResources
 
-from otter.util.http import APIError, check_success, headers
+from otter.util.http import APIError
 
 
 username = os.environ['AS_USERNAME']
@@ -353,7 +350,6 @@ class TestConvergence(unittest.TestCase):
         else:
             return rcs
 
-
     def _choose_half_the_servers(self, (code, response)):
         """
         FACTOR_OUT
@@ -387,66 +383,19 @@ class TestConvergence(unittest.TestCase):
         """
         Delete each of the servers selected, and save a list of the
         ids of the deleted servers."""
-
-        def delete_server_by_id(i):
-            return (
-                treq.delete(
-                    "{}/servers/{}".format(str(rcs.endpoints["nova"]), i),
-                    headers=headers(str(rcs.token)),
-                    pool=self.pool
-                ).addCallback(check_success, [204])
-                .addCallback(lambda _: rcs)
-            )
-
-        deferreds = map(delete_server_by_id, ids)
         self.removed_ids = ids
-        # If no error occurs while deleting, all the results will be the
-        # same.  So just return the 1st, which is just our rcs value.
-        return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
-
-    def _list_metadata(self, svr_id, rcs):
-        """Uses Nova to get the server's metadata."""
         return (
-            treq.get(
-                "{}/servers/{}/metadata".format(
-                    str(rcs.endpoints["nova"]), svr_id
-                ),
-                headers=headers(str(rcs.token)),
-                pool=self.pool,
-            ).addCallback(check_success, [200])
-            .addCallback(treq.json_content)
-        )
-
-    def _update_metadata(self, metadata, svr_id, rcs):
-        """Uses Nova to alter a server's metadata."""
-        return (
-            treq.put(
-                "{}/servers/{}/metadata".format(
-                    str(rcs.endpoints["nova"]), svr_id
-                ),
-                json.dumps(metadata),
-                headers=headers(str(rcs.token)),
-                pool=self.pool,
-            ).addCallback(check_success, [200])
-            .addCallback(lambda _: rcs)
+            delete_servers(ids, rcs, pool=self.pool)
+            .addCallback(lambda rslts: rcs)
         )
 
     def _remove_metadata(self, ids, rcs):
         """Given a list of server IDs, use Nova to remove their metadata.
         This will strip them of their association with Autoscale.
         """
-
-        def remove_metadata(id):
-            return (
-                self._list_metadata(id, rcs)
-                .addCallback(
-                    lambda m: {'metadata': {k: "" for k in m['metadata']}}
-                ).addCallback(self._update_metadata, id, rcs)
-            )
-
         self.removed_ids = ids
-        deferreds = map(remove_metadata, ids)
-        return gatherResults(deferreds).addCallback(lambda r: r[0])
+        return gatherResults([NovaServer(id=_id).update_metadata({}, rcs)
+                              for _id in ids]).addCallback(lambda _: rcs)
 
 
 class ConvergenceSet1(unittest.TestCase):
@@ -882,7 +831,6 @@ class ConvergenceSet1(unittest.TestCase):
         self.n_killed = self.n_servers / 2
         return ids[:self.n_killed]
 
-
     def _assert_error_status_code(self, result, code, rcs):
         """
         FACTOR_OUT
@@ -965,66 +913,20 @@ class ConvergenceSet1(unittest.TestCase):
         """
         Delete each of the servers selected, and save a list of the
         ids of the deleted servers."""
-
-        def delete_server_by_id(i):
-            return (
-                treq.delete(
-                    "{}/servers/{}".format(str(rcs.endpoints["nova"]), i),
-                    headers=headers(str(rcs.token)),
-                    pool=self.pool
-                ).addCallback(check_success, [204])
-                .addCallback(lambda _: rcs)
-            )
-
-        deferreds = map(delete_server_by_id, ids)
         self.removed_ids = ids
-        # If no error occurs while deleting, all the results will be the
-        # same.  So just return the 1st, which is just our rcs value.
-        return gatherResults(deferreds).addCallback(lambda rslts: rslts[0])
-
-    def _list_metadata(self, svr_id, rcs):
-        """Uses Nova to get the server's metadata."""
         return (
-            treq.get(
-                "{}/servers/{}/metadata".format(
-                    str(rcs.endpoints["nova"]), svr_id
-                ),
-                headers=headers(str(rcs.token)),
-                pool=self.pool,
-            ).addCallback(check_success, [200])
-            .addCallback(treq.json_content)
-        )
-
-    def _update_metadata(self, metadata, svr_id, rcs):
-        """Uses Nova to alter a server's metadata."""
-        return (
-            treq.put(
-                "{}/servers/{}/metadata".format(
-                    str(rcs.endpoints["nova"]), svr_id
-                ),
-                json.dumps(metadata),
-                headers=headers(str(rcs.token)),
-                pool=self.pool,
-            ).addCallback(check_success, [200])
-            .addCallback(lambda _: rcs)
+            delete_servers(ids, rcs, pool=self.pool)
+            .addCallback(lambda rslts: rcs)
         )
 
     def _remove_metadata(self, ids, rcs):
         """Given a list of server IDs, use Nova to remove their metadata.
         This will strip them of their association with Autoscale.
         """
-
-        def remove_metadata(id):
-            return (
-                self._list_metadata(id, rcs)
-                .addCallback(
-                    lambda m: {'metadata': {k: "" for k in m['metadata']}}
-                ).addCallback(self._update_metadata, id, rcs)
-            )
-
         self.removed_ids = ids
-        deferreds = map(remove_metadata, ids)
-        return gatherResults(deferreds).addCallback(lambda r: r[0])
+        return gatherResults([NovaServer(id=_id).update_metadata({}, rcs)
+                              for _id in ids]).addCallback(lambda _: rcs)
+
     def _choose_random_servers(self, state, n):
         """Selects ``n`` randomly selected servers from those returned by the
         ``get_scaling_group_state`` function.

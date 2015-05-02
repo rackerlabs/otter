@@ -14,6 +14,7 @@ import treq
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults
 
+from otter.integration.lib.nova import NovaServer
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import check_success, headers
 from otter.util.retry import (
@@ -108,7 +109,8 @@ def create_scaling_group_dict(
     Attribute('group_config', instance_of=dict),
     Attribute('pool', default_value=None),
     Attribute('reactor', default_value=None),
-    Attribute('treq', default_value=treq)
+    Attribute('treq', default_value=treq),
+    Attribute('server_client', default_value=NovaServer)
 ])
 class ScalingGroup(object):
     """This class encapsulates a scaling group resource.  It provides a means
@@ -404,7 +406,7 @@ class ScalingGroup(object):
         :rtype: ``dict``
         """
         def _extract_servicenet_id(server_info):
-            private = server_info['server']['addresses'].get('private')
+            private = server_info['addresses'].get('private')
             if private is not None:
                 return [addr['addr'] for addr in private
                         if addr['version'] == 4][0]
@@ -413,13 +415,9 @@ class ScalingGroup(object):
         def _get_the_ips(the_server_ids):
             the_server_ids = set(the_server_ids)
             return gatherResults([
-                self.treq.get(
-                    "{0}/servers/{1}".format(rcs.endpoints["nova"], server_id),
-                    headers=headers(str(rcs.token)),
-                    pool=self.pool)
-                .addCallback(check_success, [200])
-                .addCallback(self.treq.json_content)
-                .addCallback(_extract_servicenet_id)
+                self.server_client(
+                    id=server_id, pool=self.pool, treq=self.treq)
+                .get_addresses(rcs).addCallback(_extract_servicenet_id)
 
                 for server_id in the_server_ids
             ]).addCallback(lambda results: dict(zip(the_server_ids, results)))
