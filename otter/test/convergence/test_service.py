@@ -1,4 +1,5 @@
 import time
+import uuid
 
 from effect import (
     ComposedDispatcher, Constant, Effect, Error, Func, ParallelEffects,
@@ -9,6 +10,8 @@ from effect.testing import EQDispatcher, EQFDispatcher, SequenceDispatcher
 
 from kazoo.exceptions import BadVersionError
 from kazoo.recipe.partitioner import PartitionState
+
+import mock
 
 from pyrsistent import freeze, pbag, pmap, pset, s
 
@@ -29,7 +32,7 @@ from otter.convergence.service import (
     determine_active, execute_convergence, get_my_divergent_groups,
     non_concurrently)
 from otter.convergence.steps import ConvergeLater
-from otter.log.intent import Log, get_log_dispatcher
+from otter.log.intent import BoundFields, Log, LogErr, get_log_dispatcher
 from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,
@@ -105,24 +108,33 @@ class ConvergerTests(SynchronousTestCase):
         When buckets are allocated, the result of converge_all_groups is
         performed.
         """
-        def converge_all_groups(log, currently_converging, _my_buckets,
+        def converge_all_groups(currently_converging, _my_buckets,
                                 all_buckets, divergent_flags):
             return Effect(
-                ('converge-all', log, currently_converging, _my_buckets,
+                ('converge-all', currently_converging, _my_buckets,
                  all_buckets, divergent_flags))
+
+        def perform_ca_eff(bound_fields):
+            _sequence = SequenceDispatcher([
+                (GetChildren(CONVERGENCE_DIRTY_DIR),
+                 lambda i: ['flag1', 'flag2']),
+                (('converge-all',
+                  transform_eq(lambda cc: cc is converger.currently_converging,
+                               True),
+                  my_buckets,
+                  self.buckets,
+                  ['flag1', 'flag2']),
+                 lambda i: 'foo')
+            ])
+            with _sequence.consume():
+                return sync_perform(_sequence, bound_fields.effect)
 
         my_buckets = [0, 5]
         sequence = SequenceDispatcher([
-            (GetChildren(CONVERGENCE_DIRTY_DIR), lambda i: ['flag1', 'flag2']),
-
-            (('converge-all',
-              matches(IsBoundWith(otter_service='converger')),
-              transform_eq(lambda cc: cc is converger.currently_converging,
-                           True),
-              my_buckets,
-              self.buckets,
-              ['flag1', 'flag2']),
-             lambda i: 'foo')
+            (Func(uuid.uuid1), lambda i: 'uid'),
+            (BoundFields(
+                mock.ANY, {'system': 'converger', 'converger_run_id': 'uid'}),
+             perform_ca_eff)
         ])
 
         converger = self._converger(converge_all_groups, dispatcher=sequence)
@@ -136,23 +148,35 @@ class ConvergerTests(SynchronousTestCase):
         Errors raised from performing the converge_all_groups effect are
         logged, and None is the ultimate result.
         """
-        def converge_all_groups(log, currently_converging, _my_buckets,
+        def converge_all_groups(currently_converging, _my_buckets,
                                 all_buckets, divergent_flags):
             return Effect('converge-all')
 
+        def perform_ca_eff(bound_fields):
+            _sequence = SequenceDispatcher([
+                (GetChildren(CONVERGENCE_DIRTY_DIR),
+                 lambda i: ['flag1', 'flag2']),
+                ('converge-all', lambda i: raise_(RuntimeError('foo'))),
+                (LogErr(
+                    CheckFailureValue(RuntimeError('foo')),
+                    'converge-all-groups-error', {}), lambda i: None)
+            ])
+            with _sequence.consume():
+                return sync_perform(_sequence, bound_fields.effect)
+
         sequence = SequenceDispatcher([
-            (GetChildren(CONVERGENCE_DIRTY_DIR), lambda i: ['flag1', 'flag2']),
-            ('converge-all', lambda i: raise_(RuntimeError('foo')))
+            (Func(uuid.uuid1), lambda i: 'uid'),
+            (BoundFields(
+                mock.ANY, {'system': 'converger', 'converger_run_id': 'uid'}),
+             perform_ca_eff)
         ])
+
         # relying on the side-effect of setting up self.fake_partitioner
         self._converger(converge_all_groups, dispatcher=sequence)
 
         with sequence.consume():
             result = self.fake_partitioner.got_buckets([0])
         self.assertEqual(self.successResultOf(result), None)
-        self.log.err.assert_called_once_with(
-            CheckFailureValue(RuntimeError('foo')),
-            'converge-all-groups-error', otter_service='converger')
 
     def test_divergent_changed_not_acquired(self):
         """
@@ -184,7 +208,7 @@ class ConvergerTests(SynchronousTestCase):
         and the list of child nodes is passed on to
         :func:`converge_all_groups`.
         """
-        def converge_all_groups(log, currently_converging, _my_buckets,
+        def converge_all_groups(currently_converging, _my_buckets,
                                 all_buckets, divergent_flags):
             return Effect(('converge-all-groups', divergent_flags))
         dispatcher = SequenceDispatcher([

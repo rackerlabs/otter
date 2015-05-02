@@ -10,7 +10,7 @@ import uuid
 from functools import partial
 from hashlib import sha1
 
-from effect import Effect, ComposedDispatcher, FirstError, Func, parallel
+from effect import Effect, FirstError, Func, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
 from effect.twisted import exc_info_to_failure, perform
@@ -31,7 +31,7 @@ from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
-from otter.log.intent import err, get_log_dispatcher, msg, with_log
+from otter.log.intent import err, msg, with_log
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, ModifyGroupState)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
@@ -416,8 +416,7 @@ class Converger(MultiService):
         """
         MultiService.__init__(self)
         self.log = log.bind(system='converger')
-        self._dispatcher = ComposedDispatcher([
-            get_log_dispatcher(self.log, {}), dispatcher])
+        self._dispatcher = dispatcher
         self._buckets = buckets
         self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
         self.partitioner.setServiceParent(self)
@@ -439,10 +438,12 @@ class Converger(MultiService):
 
         This is used as the partitioner callback.
         """
-        eff = Effect(GetChildren(CONVERGENCE_DIRTY_DIR)).on(
+        ceff = Effect(GetChildren(CONVERGENCE_DIRTY_DIR)).on(
             partial(self._converge_all, my_buckets))
-        return perform(self._dispatcher,
-                       with_log(eff, converger_run_id=str(uuid.uuid1())))
+        eff = Effect(Func(uuid.uuid1)).on(
+            lambda uid: with_log(ceff, system='converger',
+                                 converger_run_id=uid))
+        return perform(self._dispatcher, eff)
 
     def divergent_changed(self, children):
         """
