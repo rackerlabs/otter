@@ -1,5 +1,6 @@
 import time
 import uuid
+from functools import partial
 
 from effect import (
     ComposedDispatcher, Constant, Effect, Error, Func, ParallelEffects,
@@ -402,7 +403,6 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
     """Tests for :func:`converge_all_groups`."""
 
     def setUp(self):
-        self.log = mock_log()
         self.currently_converging = Reference(pset())
         self.my_buckets = [1, 6]
         self.all_buckets = range(10)
@@ -415,12 +415,12 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
     def _converge_all_groups(self, flags):
         return converge_all_groups(
-            self.log, self.currently_converging, self.my_buckets,
+            self.currently_converging, self.my_buckets,
             self.all_buckets,
             flags,
             converge_one_group=self._converge_one_group)
 
-    def _converge_one_group(self, log, currently_converging, tenant_id,
+    def _converge_one_group(self, currently_converging, tenant_id,
                             group_id, version):
         return Effect(('converge', tenant_id, group_id, version))
 
@@ -431,38 +431,36 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         """
         eff = self._converge_all_groups(['00_g1', '01_g2'])
 
+        def perform_gs_effect(tid, gid, intent):
+            tscope = TenantScope(Effect(('converge', tid, gid, 1)), tid)
+            _s = SequenceDispatcher([
+                (GetStat(path='/groups/divergent/{}_{}'.format(tid, gid)),
+                 lambda i: ZNodeStatStub(version=1)),
+                (tscope, lambda i: i.effect),
+                (('converge', tid, gid, 1),
+                 lambda i: 'converged {}!'.format(tid))])
+            with _s.consume():
+                return sync_perform(_s, intent.effect)
+
         sequence = SequenceDispatcher([
             (ReadReference(ref=self.currently_converging),
              lambda i: pset()),
-
-            (GetStat(path='/groups/divergent/00_g1'),
-             lambda i: ZNodeStatStub(version=1)),
-            (TenantScope(
-                Effect(('converge', '00', 'g1', 1)),
-                '00'),
-             lambda tscope: tscope.effect),
-            (('converge', '00', 'g1', 1),
-             lambda i: 'converged one!'),
-
-            (GetStat(path='/groups/divergent/01_g2'),
-             lambda i: ZNodeStatStub(version=5)),
-            (TenantScope(
-                Effect(('converge', '01', 'g2', 5)),
-                '01'),
-             lambda tscope: tscope.effect),
-            (('converge', '01', 'g2', 5),
-             lambda i: 'converged two!'),
+            (Log('converge-all-groups',
+                 dict(group_infos=self.group_infos, currently_converging=[])),
+             lambda i: None),
+            (BoundFields(mock.ANY, dict(tenant_id='00',
+                                        scaling_group_id='g1')),
+             partial(perform_gs_effect, '00', 'g1')),
+            (BoundFields(mock.ANY, dict(tenant_id='01',
+                                        scaling_group_id='g2')),
+             partial(perform_gs_effect, '01', 'g2'))
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
 
         with sequence.consume():
             self.assertEqual(
                 sync_perform(dispatcher, eff),
-                ['converged one!', 'converged two!'])
-        self.log.msg.assert_called_once_with(
-            'converge-all-groups',
-            group_infos=self.group_infos,
-            currently_converging=[])
+                ['converged 00!', 'converged 01!'])
 
     def test_filter_out_currently_converging(self):
         """
@@ -473,7 +471,14 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         sequence = SequenceDispatcher([
             (ReadReference(ref=self.currently_converging),
              lambda i: pset(['g1'])),
+            (Log('converge-all-groups',
+                 dict(group_infos=[self.group_infos[1]],
+                      currently_converging=['g1'])),
+             lambda i: None),
 
+            (BoundFields(mock.ANY, dict(tenant_id='01',
+                                        scaling_group_id='g2')),
+             lambda i: i.effect),
             (GetStat(path='/groups/divergent/01_g2'),
              lambda i: ZNodeStatStub(version=5)),
             (TenantScope(
@@ -487,10 +492,6 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
         with sequence.consume():
             self.assertEqual(sync_perform(dispatcher, eff), ['converged two!'])
-        self.log.msg.assert_called_once_with(
-            'converge-all-groups',
-            group_infos=[self.group_infos[1]],
-            currently_converging=['g1'])
 
     def test_no_log_on_no_groups(self):
         """When there's no work, no log message is emitted."""
@@ -499,12 +500,9 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             1 / 0
 
         result = converge_all_groups(
-            self.log, self.currently_converging, self.my_buckets,
-            self.all_buckets,
-            [],
+            self.currently_converging, self.my_buckets, self.all_buckets, [],
             converge_one_group=converge_one_group)
         self.assertEqual(sync_perform(_get_dispatcher(), result), None)
-        self.assertEqual(self.log.msg.mock_calls, [])
 
 
 class GetMyDivergentGroupsTests(SynchronousTestCase):

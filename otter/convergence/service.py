@@ -355,14 +355,18 @@ def converge_all_groups(currently_converging, my_buckets, all_buckets,
         return
     yield msg('converge-all-groups', group_infos=group_infos,
               currently_converging=list(cc))
-    effs = []
-    for info in group_infos:
-        tenant_id, group_id = info['tenant_id'], info['group_id']
-        eff = Effect(GetStat(info['dirty-flag'])).on(
-            lambda stat, info=info: Effect(TenantScope(
+
+    def converge(tenant_id, group_id, dirty_flag):
+        return Effect(GetStat(dirty_flag)).on(
+            lambda stat: Effect(TenantScope(
                 converge_one_group(currently_converging,
                                    tenant_id, group_id, stat.version),
                 tenant_id)))
+
+    effs = []
+    for info in group_infos:
+        tenant_id, group_id = info['tenant_id'], info['group_id']
+        eff = converge(tenant_id, group_id, info['dirty-flag'])
         effs.append(
             with_log(eff, tenant_id=tenant_id, scaling_group_id=group_id))
 
