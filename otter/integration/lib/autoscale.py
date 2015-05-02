@@ -6,13 +6,14 @@ import datetime
 import json
 import os
 import pprint
+import random
 
 from characteristic import Attribute, attributes
 
 import treq
 
 from twisted.internet import reactor
-from twisted.internet.defer import gatherResults
+from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 
 from otter.integration.lib.nova import NovaServer
 from otter.util.deferredutils import retry_and_timeout
@@ -278,8 +279,7 @@ class ScalingGroup(object):
             ),
             headers=headers(str(rcs.token)),
             pool=self.pool
-        ).addCallback(check_success, [204, 404, 403]))  # HACKITY HACK - Set to
-        # 403 until force delete is fixed in convergence
+        ).addCallback(check_success, [204, 404]))
 
     def get_scaling_group_state(self, rcs, success_codes=None):
         """Retrieve the state of the scaling group.
@@ -532,6 +532,17 @@ class ScalingGroup(object):
             clock=reactor,
             deferred_description=report
         )
+
+    @inlineCallbacks
+    def choose_random_servers(self, rcs, n):
+        """
+        Choose n servers from the active servers on the scaling
+        group.
+        """
+        code, body = yield self.get_scaling_group_state(rcs, [200])
+
+        ids = extract_active_ids(body)
+        returnValue(random.sample(ids, n))
 
 
 @attributes([

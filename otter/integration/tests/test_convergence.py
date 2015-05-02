@@ -5,7 +5,6 @@ Tests covering self-healing should be placed in a separate test file.
 from __future__ import print_function
 
 import os
-import random
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults
@@ -147,8 +146,7 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self.scale_up_to_max.execute)
             .addCallback(
                 self.scaling_group.wait_for_N_servers, 12, timeout=1800
-            ).addCallback(self.scaling_group.get_scaling_group_state)
-            .addCallback(self._choose_random_servers, 3)
+            ).addCallback(self.scaling_group.choose_random_servers, 3)
             .addCallback(self._remove_metadata, rcs)
             .addCallback(lambda _: rcs)
             .addCallback(self.scale_beyond_max.execute)
@@ -216,8 +214,7 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self.scale_up_to_max.execute)
             .addCallback(
                 self.scaling_group.wait_for_N_servers, 25, timeout=1800
-            ).addCallback(self.scaling_group.get_scaling_group_state)
-            .addCallback(self._choose_random_servers, 3)
+            ).addCallback(self.scaling_group.choose_random_servers, 3)
             .addCallback(self._remove_metadata, rcs)
             .addCallback(lambda _: rcs)
             .addCallback(self.scale_beyond_max.execute)
@@ -315,8 +312,7 @@ class TestConvergence(unittest.TestCase):
                 .addCallback(self.first_scaling_policy.execute)
                 .addCallback(
                     self.scaling_group.wait_for_N_servers, 24, timeout=1800
-                ).addCallback(self.scaling_group.get_scaling_group_state)
-                .addCallback(self._choose_random_servers, 2)
+                ).addCallback(self.scaling_group.choose_random_servers, 2)
                 .addCallback(self._delete_those_servers, rcs)
                 .addCallback(self.second_scaling_policy.execute)
                 .addCallback(lambda _: self.removed_ids)
@@ -349,35 +345,6 @@ class TestConvergence(unittest.TestCase):
                       code, result.value.code))
         else:
             return rcs
-
-    def _choose_half_the_servers(self, (code, response)):
-        """
-        FACTOR_OUT
-
-        Select the first half of the servers returned by the
-        ``get_scaling_group_state`` function.  Record the number of servers
-        received in ``n_servers`` attribute, and the number killed (which
-        should be roughly half) in ``n_killed``.
-        """
-
-        if code == 404:
-            raise Exception("Got 404; where'd the scaling group go?")
-        ids = extract_active_ids(response)
-        self.n_servers = len(ids)
-        self.n_killed = self.n_servers / 2
-        return ids[:self.n_killed]
-
-    def _choose_random_servers(self, state, n):
-        """Selects ``n`` randomly selected servers from those returned by the
-        ``get_scaling_group_state`` function.
-        """
-        code, response = state
-        if code == 404:
-            raise Exception("Got 404; dude, where's my scaling group?")
-        ids = extract_active_ids(response)
-        self.n_servers = len(ids)
-        self.n_killed = n
-        return random.sample(ids, n)
 
     def _delete_those_servers(self, ids, rcs):
         """
@@ -470,8 +437,8 @@ class ConvergenceSet1(unittest.TestCase):
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
                 N_SERVERS, timeout=1800
-            ).addCallback(self.scaling_group.get_scaling_group_state)
-            .addCallback(self._choose_half_the_servers)
+            ).addCallback(self.scaling_group.choose_random_servers,
+                          N_SERVERS / 2)
             .addCallback(self._delete_those_servers, rcs)
             # This policy is simply ussed to trigger convergence
             .addCallback(self.scaling_group.trigger_convergence)
@@ -526,8 +493,7 @@ class ConvergenceSet1(unittest.TestCase):
             ).addCallback(self.scaling_group.start, self)
             .addCallback(
                 self.scaling_group.wait_for_N_servers, 3, timeout=1800
-            ).addCallback(self.scaling_group.get_scaling_group_state)
-            .addCallback(self._choose_random_servers, 1)
+            ).addCallback(self.scaling_group.choose_random_servers, 1)
             .addCallback(self._delete_those_servers, rcs)
             .addCallback(self.scaling_policy.start, self)
             .addCallback(self.scaling_policy.execute)
@@ -540,7 +506,6 @@ class ConvergenceSet1(unittest.TestCase):
                 self.scaling_group.wait_for_N_servers, 5, timeout=1800
             )
         )
-    # test_reaction_to_oob_deletion_then_scale_up.skip = 'skip'
 
     def test_scale_down_after_oobd_non_constrained_z_lessthan_y(self):
         """
@@ -573,8 +538,6 @@ class ConvergenceSet1(unittest.TestCase):
             rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
             scale_servers=y)
 
-    # test_scale_down_after_oobd_non_constrained_z_lessthan_y.skip = 'skip'
-
     def test_scale_down_after_oobd_non_constrained_z_greaterthan_y(self):
         """
         CATC:6.2
@@ -606,7 +569,6 @@ class ConvergenceSet1(unittest.TestCase):
         return self._scale_down_after_oobd_non_constrained_param(
             rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
             scale_servers=y)
-    # test_scale_down_after_oobd_non_constrained_z_greaterthan_y.skip = 'skip'
 
     def test_scale_down_after_oobd_non_constrained_z_equal_y(self):
         """
@@ -638,7 +600,6 @@ class ConvergenceSet1(unittest.TestCase):
         return self._scale_down_after_oobd_non_constrained_param(
             rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
             scale_servers=y)
-    # test_scale_down_after_oobd_non_constrained_z_equal_y.skip = 'skip'
 
     def _scale_down_after_oobd_non_constrained_param(
             self, rcs, min_servers=0, max_servers=25, set_to_servers=0,
@@ -682,8 +643,8 @@ class ConvergenceSet1(unittest.TestCase):
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
                 set_to_servers, timeout=1800
-            ).addCallback(self.scaling_group.get_scaling_group_state)
-            .addCallback(self._choose_random_servers, oobd_servers)
+            ).addCallback(self.scaling_group.choose_random_servers,
+                          oobd_servers)
             .addCallback(self._delete_those_servers, rcs)
             # The execution of the policy triggers convergence
             .addCallback(self.policy_scale.start, self)
@@ -724,7 +685,6 @@ class ConvergenceSet1(unittest.TestCase):
         return self._scale_down_after_oobd_hitting_constraints(
             rcs, set_to_servers=x, oobd_servers=z, max_servers=max_servers,
             scale_servers=y, converged_servers=max_servers)
-    # test_scale_up_after_oobd_at_group_max.skip = 'skip'
 
     def test_scale_down_past_group_min_after_oobd(self):
         """
@@ -752,8 +712,6 @@ class ConvergenceSet1(unittest.TestCase):
             rcs, oobd_servers=z, min_servers=min_servers,
             scale_servers=y,
             converged_servers=min_servers)
-
-    # test_scale_down_past_group_min_after_oobd.skip = 'skip'
 
     def test_group_config_update_triggers_convergence(self):
         """
@@ -798,8 +756,8 @@ class ConvergenceSet1(unittest.TestCase):
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
                 set_to_servers, timeout=1800
-            ).addCallback(self.scaling_group.get_scaling_group_state)
-            .addCallback(self._choose_half_the_servers)
+            ).addCallback(self.scaling_group.choose_random_servers,
+                          set_to_servers / 2)
             .addCallback(self._delete_those_servers, rcs)
             .addCallback(
                 self.scaling_group.update_group_config,
@@ -811,25 +769,6 @@ class ConvergenceSet1(unittest.TestCase):
                 total_servers=set_to_servers,
             )
         )
-
-    # test_group_config_update_triggers_convergence.skip = 'skip'
-
-    def _choose_half_the_servers(self, (code, response)):
-        """
-        FACTOR_OUT
-
-        Select the first half of the servers returned by the
-        ``get_scaling_group_state`` function.  Record the number of servers
-        received in ``n_servers`` attribute, and the number killed (which
-        should be roughly half) in ``n_killed``.
-        """
-
-        if code == 404:
-            raise Exception("Got 404; where'd the scaling group go?")
-        ids = extract_active_ids(response)
-        self.n_servers = len(ids)
-        self.n_killed = self.n_servers / 2
-        return ids[:self.n_killed]
 
     def _assert_error_status_code(self, result, code, rcs):
         """
@@ -891,8 +830,8 @@ class ConvergenceSet1(unittest.TestCase):
             self.scaling_group.wait_for_N_servers,
             min_servers if set_to_servers is None else set_to_servers,
             timeout=120)
-         .addCallback(self.scaling_group.get_scaling_group_state)
-         .addCallback(self._choose_random_servers, oobd_servers)
+         .addCallback(self.scaling_group.choose_random_servers,
+                      oobd_servers)
          .addCallback(self._delete_those_servers, rcs)
          # The execution of the policy triggers convergence
          .addCallback(self.policy_scale.start, self)
@@ -926,15 +865,3 @@ class ConvergenceSet1(unittest.TestCase):
         self.removed_ids = ids
         return gatherResults([NovaServer(id=_id).update_metadata({}, rcs)
                               for _id in ids]).addCallback(lambda _: rcs)
-
-    def _choose_random_servers(self, state, n):
-        """Selects ``n`` randomly selected servers from those returned by the
-        ``get_scaling_group_state`` function.
-        """
-        code, response = state
-        if code == 404:
-            raise Exception("Got 404; dude, where's my scaling group?")
-        ids = extract_active_ids(response)
-        self.n_servers = len(ids)
-        self.n_killed = n
-        return random.sample(ids, n)
