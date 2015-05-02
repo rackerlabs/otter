@@ -506,7 +506,6 @@ class ConvergenceSet1(unittest.TestCase):
                 self.scaling_group.wait_for_N_servers, 5, timeout=1800
             )
         )
-    # test_reaction_to_oob_deletion_then_scale_up.skip = 'skip'
 
     def test_scale_down_after_oobd_non_constrained_z_lessthan_y(self):
         """
@@ -539,8 +538,6 @@ class ConvergenceSet1(unittest.TestCase):
             rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
             scale_servers=y)
 
-    # test_scale_down_after_oobd_non_constrained_z_lessthan_y.skip = 'skip'
-
     def test_scale_down_after_oobd_non_constrained_z_greaterthan_y(self):
         """
         CATC:6.2
@@ -572,7 +569,6 @@ class ConvergenceSet1(unittest.TestCase):
         return self._scale_down_after_oobd_non_constrained_param(
             rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
             scale_servers=y)
-    # test_scale_down_after_oobd_non_constrained_z_greaterthan_y.skip = 'skip'
 
     def test_scale_down_after_oobd_non_constrained_z_equal_y(self):
         """
@@ -604,7 +600,6 @@ class ConvergenceSet1(unittest.TestCase):
         return self._scale_down_after_oobd_non_constrained_param(
             rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
             scale_servers=y)
-    # test_scale_down_after_oobd_non_constrained_z_equal_y.skip = 'skip'
 
     def _scale_down_after_oobd_non_constrained_param(
             self, rcs, min_servers=0, max_servers=25, set_to_servers=0,
@@ -690,7 +685,6 @@ class ConvergenceSet1(unittest.TestCase):
         return self._scale_down_after_oobd_hitting_constraints(
             rcs, set_to_servers=x, oobd_servers=z, max_servers=max_servers,
             scale_servers=y, converged_servers=max_servers)
-    # test_scale_up_after_oobd_at_group_max.skip = 'skip'
 
     def test_scale_down_past_group_min_after_oobd(self):
         """
@@ -718,8 +712,6 @@ class ConvergenceSet1(unittest.TestCase):
             rcs, oobd_servers=z, min_servers=min_servers,
             scale_servers=y,
             converged_servers=min_servers)
-
-    # test_scale_down_past_group_min_after_oobd.skip = 'skip'
 
     def test_group_config_update_triggers_convergence(self):
         """
