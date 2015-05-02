@@ -13,11 +13,12 @@ from effect import (
     catch,
     perform,
     sync_performer)
-from effect.twisted import perform as deferred_performer, twisted_perform
+from effect.twisted import deferred_performer, perform as twisted_perform
 
 import six
 
-from twisted.internet.defer import DeferredSemaphore
+from twisted.internet.defer import DeferredLock
+from twisted.internet.task import deferLater
 
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType
@@ -150,8 +151,7 @@ class TenantScope(object):
 
 
 def concretize_service_request(
-        throttler,
-        authenticator, log, service_configs,
+        authenticator, log, service_configs, throttler,
         tenant_id,
         service_request):
     """
@@ -159,13 +159,13 @@ def concretize_service_request(
     of :obj:`pure_http.Request`. This doesn't directly conform to the Intent
     performer interface, but it's intended to be used by a performer.
 
-    :param throttler: A function of ServiceType, HTTP method ->
-        DeferredSemaphore or None, used to throttle requests.
     :param ICachingAuthenticator authenticator: the caching authenticator
-    :param tenant_id: tenant ID.
     :param BoundLog log: info about requests will be logged to this.
     :param dict service_configs: As returned by
         :func:`otter.constants.get_service_configs`.
+    :param throttler: A function of ServiceType, HTTP method ->
+        Deferred concurrency limiter or None, used to throttle requests.
+    :param tenant_id: tenant ID.
     """
     auth_eff = Effect(Authenticate(authenticator, tenant_id, log))
     invalidate_eff = Effect(InvalidateToken(authenticator, tenant_id))
@@ -200,50 +200,60 @@ def concretize_service_request(
             log=log)
 
     eff = auth_eff.on(got_auth)
-    limiter = throttler(service_request.service_type,
-                        service_request.method.lower())
-    if limiter is not None:
-        return _DeferredConcurrencyLimiterIntent(limiter, eff)
+    lock = throttler(service_request.service_type,
+                     service_request.method.lower())
+    if lock is not None:
+        return Effect(_Throttle(lock=lock, effect=eff))
     else:
         return eff
 
 
-@attributes(['limiter', 'effect'])
-class _DeferredConcurrencyLimiterIntent(object):
+@attributes(['lock', 'effect'])
+class _Throttle(object):
     """
     A grody hack to allow using a Deferred concurrency limiter in Effectful
     code.
 
-    Ideally Effect would just have built-in concurrency limiters/idioms.
+    A "Deferred bracketer" is some function of type
+    ``((f, *args, **kwargs) -> Deferred) -> Deferred``
+    basically, something that "brackets" a call to some Deferred-returning
+    function. This is the case for the ``run`` method of objects like
+    :obj:`.DeferredSemaphore` and :obj:`.DeferredLock`.
 
-    :param limiter: The Deferred concurrency limiter to run the effect in
-    :param Effect effect: The effect to run while the limiter is acquired
+    https://wiki.haskell.org/Bracket_pattern
+
+    Ideally Effect would just have built-in concurrency limiters/idioms without
+    relying on Twisted.
+
+    :param bracketer: The Deferred bracketer to run the effect in
+    :param Effect effect: The effect to perform inside the bracketer
     """
 
 
 @deferred_performer
-def _perform_deferred_concurrency_limiter_intent(dispatcher, ds_intent):
+def _perform_throttle(clock, dispatcher, throttle):
     """
-    Perform :obj:`_DeferredConcurrencyLimiterIntent` by performing the nested
-    effect while the limiter is acquired.
+    Perform :obj:`_Throttle` by performing the effect after acquiring a lock
+    and delaying but some period of time.
     """
-    return ds_intent.limiter.run(
-        twisted_perform, dispatcher, ds_intent.effect)
+    lock = throttle.lock
+    eff = throttle.effect
+    return lock(lambda: deferLater(clock, 1, twisted_perform, dispatcher, eff))
 
 
 def make_default_throttler():
     """Get a throttler function with default throttling policies."""
-    cs_mutation_semaphore = DeferredSemaphore(1)
-
-    def throttler(service_type, method):
-        if (service_type == ServiceType.CLOUD_SERVERS and
-                method in ('post', 'delete')):
-            return cs_mutation_semaphore
-    return throttler
+    # Serialize creation and deletion of cloud servers because the Compute team
+    # has suggested we do this.
+    policy = {
+        (ServiceType.CLOUD_SERVERS, 'post'): DeferredLock().run,
+        (ServiceType.CLOUD_SERVERS, 'delete'): DeferredLock().run,
+    }
+    return lambda stype, meth: policy.get((stype, meth))
 
 
 def perform_tenant_scope(
-        authenticator, log, service_configs,
+        authenticator, log, service_configs, throttler,
         dispatcher, tenant_scope, box,
         _concretize=concretize_service_request):
     """
@@ -259,7 +269,7 @@ def perform_tenant_scope(
     @sync_performer
     def scoped_performer(dispatcher, service_request):
         return _concretize(
-            authenticator, log, service_configs,
+            authenticator, log, service_configs, throttler,
             tenant_scope.tenant_id, service_request)
     new_disp = ComposedDispatcher([
         TypeDispatcher({ServiceRequest: scoped_performer}),
@@ -267,7 +277,7 @@ def perform_tenant_scope(
     perform(new_disp, tenant_scope.effect.on(box.succeed, box.fail))
 
 
-def get_cloud_client_dispatcher(authenticator, log, service_configs):
+def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
     """
     Get a dispatcher suitable for running :obj:`ServiceRequest` and
     :obj:`TenantScope` intents.
@@ -278,8 +288,7 @@ def get_cloud_client_dispatcher(authenticator, log, service_configs):
     return TypeDispatcher({
         TenantScope: partial(perform_tenant_scope, authenticator, log,
                              service_configs, throttler),
-        _DeferredConcurrencyLimiterIntent:
-            _perform_deferred_concurrency_limiter_intent,
+        _Throttle: partial(_perform_throttle, reactor),
     })
 
 

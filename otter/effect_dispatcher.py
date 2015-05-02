@@ -66,7 +66,8 @@ def get_legacy_dispatcher(reactor, authenticator, log, service_configs):
     worker code.
     """
     return ComposedDispatcher([
-        get_cloud_client_dispatcher(authenticator, log, service_configs),
+        get_cloud_client_dispatcher(
+            reactor, authenticator, log, service_configs),
         get_simple_dispatcher(reactor),
     ])
 
