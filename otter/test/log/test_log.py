@@ -298,6 +298,17 @@ class PEP3101FormattingWrapperTests(SynchronousTestCase):
         self.observer.assert_called_once_with({'why': 'Hello World',
                                                'name': 'World'})
 
+    def test_no_format_why_if_system_is_ignored(self):
+        """
+        PEP3101FormattingWrapper does not format the why argument to log.err
+        if the system is an ignored system.
+        """
+        self.wrapper({'why': 'Hello {name}', 'name': 'World',
+                      'system': 'kazoo'})
+        self.observer.assert_called_once_with({'why': 'Hello {name}',
+                                               'name': 'World',
+                                               'system': 'kazoo'})
+
     def test_format_message(self):
         """
         PEP3101FormattingWrapper formats the message.
@@ -306,6 +317,16 @@ class PEP3101FormattingWrapperTests(SynchronousTestCase):
         self.observer.assert_called_once_with(
             {'message': ('foo bar',), 'bar': 'bar'})
 
+    def test_no_format_message_if_system_is_ignored(self):
+        """
+        PEP3101FormattingWrapper does not format the message if the system is
+        an ignored system.
+        """
+        self.wrapper({'message': ('foo {bar}',), 'bar': 'bar',
+                      'system': 'kazoo'})
+        self.observer.assert_called_once_with(
+            {'message': ('foo {bar}',), 'bar': 'bar', 'system': 'kazoo'})
+
     def test_format_message_tuple(self):
         """
         PEP3101FormattingWrapper joins the message tuple before formatting.
@@ -313,6 +334,18 @@ class PEP3101FormattingWrapperTests(SynchronousTestCase):
         self.wrapper({'message': ('foo', 'bar', 'baz', '{bax}'), 'bax': 'bax'})
         self.observer.assert_called_once_with(
             {'message': ('foo bar baz bax',), 'bax': 'bax'})
+
+    def test_no_joins_no_format_message_tuple(self):
+        """
+        PEP3101FormattingWrapper neither joins nor formats the message tuple
+        if the system is an ignored system.
+        """
+        self.wrapper({'message': ('foo', 'bar', 'baz', '{bax}'),
+                      'bax': 'bax',
+                      'system': 'kazoo'})
+        self.observer.assert_called_once_with(
+            {'message': ('foo', 'bar', 'baz', '{bax}',), 'bax': 'bax',
+             'system': 'kazoo'})
 
     def test_formatting_failure(self):
         """
