@@ -13,12 +13,19 @@ from effect import (
     sync_perform)
 from effect.testing import EQFDispatcher
 
+import mock
+
 import six
 
 from twisted.trial.unittest import SynchronousTestCase
+from twisted.internet.defer import succeed
+from twisted.internet.task import Clock
 
 from otter.auth import Authenticate, InvalidateToken
 from otter.cloud_client import (
+    _Throttle,
+    _perform_throttle,
+    _serialize_and_delay,
     CLBDeletedError,
     CLBPendingUpdateError,
     CLBRateLimitError,
@@ -257,6 +264,50 @@ class PerformServiceRequestTests(SynchronousTestCase):
         eff = self._concrete(svcreq)
         pure_request_eff = resolve_authenticate(eff)
         self.assertEqual(pure_request_eff.intent.params, {"foo": ["bar"]})
+
+    def test_throttling(self):
+        """
+        When the throttler function returns a bracketing function, it's used to
+        throttle the request.
+        """
+
+
+class ThrottleTests(SynchronousTestCase):
+    """Tests for :obj:`_Throttle` and :func:`_perform_throttle`."""
+
+    def test_perform_throttle(self):
+        """
+        The bracket given to :obj:`_Throttle` is used to call the nested
+        performer.
+        """
+        def bracket(f, *args, **kwargs):
+            return f(*args, **kwargs).addCallback(lambda r: ('bracketed', r))
+        throttle = _Throttle(bracket=bracket, effect=Effect(Constant('foo')))
+        dispatcher = ComposedDispatcher([
+            TypeDispatcher({_Throttle: _perform_throttle}),
+            base_dispatcher])
+        result = sync_perform(dispatcher, Effect(throttle))
+        self.assertEqual(result, ('bracketed', 'foo'))
+
+
+class SerializeAndDelayTests(SynchronousTestCase):
+    """Tests for :func:`_serialize_and_delay`."""
+
+    @mock.patch('otter.cloud_client.DeferredLock')
+    def test_serialize_and_delay(self, deferred_lock):
+        class DeferredLock(object):
+            def run(self, f, *args, **kwargs):
+                return f(*args, **kwargs).addCallback(lambda r: ('locked', r))
+        deferred_lock.side_effect = DeferredLock
+
+        clock = Clock()
+        bracket = _serialize_and_delay(clock, 15)
+
+        result = bracket(lambda: succeed('foo'))
+        clock.advance(14)
+        self.assertEqual(result.called, False)
+        clock.advance(15)
+        self.assertEqual(self.successResultOf(result), ('locked', 'foo'))
 
 
 class PerformTenantScopeTests(SynchronousTestCase):

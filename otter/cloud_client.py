@@ -232,23 +232,32 @@ class _Throttle(object):
 
 
 @deferred_performer
-def _perform_throttle(clock, dispatcher, throttle):
+def _perform_throttle(dispatcher, throttle):
     """
     Perform :obj:`_Throttle` by performing the effect after acquiring a lock
     and delaying but some period of time.
     """
     lock = throttle.bracket
     eff = throttle.effect
-    return lock(lambda: deferLater(clock, 1, twisted_perform, dispatcher, eff))
+    return lock(twisted_perform, dispatcher, eff)
 
 
-def make_default_throttler():
+def _serialize_and_delay(clock, delay):
+    """
+    Return a function that when invoked with another function will run it
+    serialized and after a delay.
+    """
+    lock = DeferredLock()
+    return partial(lock.run, deferLater, clock, delay)
+
+
+def make_default_throttler(clock):
     """Get a throttler function with default throttling policies."""
     # Serialize creation and deletion of cloud servers because the Compute team
     # has suggested we do this.
     policy = {
-        (ServiceType.CLOUD_SERVERS, 'post'): DeferredLock().run,
-        (ServiceType.CLOUD_SERVERS, 'delete'): DeferredLock().run,
+        (ServiceType.CLOUD_SERVERS, 'post'): _serialize_and_delay(clock, 1),
+        (ServiceType.CLOUD_SERVERS, 'delete'): _serialize_and_delay(clock, 1),
     }
     return lambda stype, meth: policy.get((stype, meth))
 
@@ -285,11 +294,11 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
     """
     # ideally this throttler would be parameterized but for now it's basically
     # a hack that we want to keep private to this module
-    throttler = make_default_throttler()
+    throttler = make_default_throttler(reactor)
     return TypeDispatcher({
         TenantScope: partial(perform_tenant_scope, authenticator, log,
                              service_configs, throttler),
-        _Throttle: partial(_perform_throttle, reactor),
+        _Throttle: partial(_perform_throttle),
     })
 
 
