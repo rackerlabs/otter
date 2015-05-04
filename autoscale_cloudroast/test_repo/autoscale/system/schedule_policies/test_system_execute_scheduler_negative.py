@@ -16,7 +16,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
     Verify update scheduler policy
     """
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_execute_at_style_scale_up_when_min_maxentities_are_met(self):
         """
         When min and max entities are already met on a scaling group, an at style
@@ -30,7 +30,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             group.id, scale_down=True)
         self.verify_group_state(group.id, group.groupConfiguration.maxEntities)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_execute_cron_style_scale_up_when_min_maxentities_are_met(self):
         """
         When min and max entities are already met on a scaling group, a cron style
@@ -54,7 +54,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         self.verify_group_state(group.id, self.gc_min_entities)
 
     @unittest.skip("Skipping until CRON timing test issues are addressed")
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_cron_style_when_policy_cooldown_over_trigger_period(self):
         """
         When policy cooldown is set to be greater than a minute by few seconds for a
@@ -75,7 +75,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         self.verify_group_state(group.id, self.sp_change * 2)
 
     @unittest.skip("Skipping until CRON timing test issues are addressed")
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_cron_style_when_group_cooldown_over_trigger_period(self):
         """
         When group cooldown is set to be greater than a minute by few seconds for a
@@ -95,7 +95,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         sleep(70 + self.scheduler_interval)
         self.verify_group_state(group.id, self.sp_change * 2)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_at_cron_style_execution_after_delete(self):
         """
         Create an at style and cron scheduler policy and delete them.
@@ -127,7 +127,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         """
         pass
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_scheduler_batch(self):
         """
         Create more number of policies than specified in scheduler batch size and verify all
@@ -154,7 +154,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         self.check_for_expected_number_of_building_servers(group.id, self.scheduler_batch * size)
         self.verify_group_state(group.id, self.scheduler_batch * size)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_create_multiple_scheduler_policies_to_execute_simaltaneously(self):
         """
         Create multiple scheduler policies within the same group such that all of them are
@@ -178,7 +178,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         sleep(5 + self.scheduler_interval)
         self.verify_group_state(group.id, 1 + 2 + 3)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_update_at_and_cron_style_scheduler_policy_to_webhook_type(self):
         """
         Policy updation fails when a cron style scheduler /at style scheduler is updated to

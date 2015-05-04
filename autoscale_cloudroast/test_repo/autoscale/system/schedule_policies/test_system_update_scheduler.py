@@ -26,7 +26,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
         self.cron_policy_args = {'cron': '* * * * *'}
         self.policy_style_args = {'at': self.autoscale_behaviors.get_time_in_utc(30)}
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_update_at_style_scheduler_to_execute_now(self):
         """
         Create an at style scheduler policy to execute next week,
@@ -44,7 +44,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 at_style_policy['change'])
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_update_at_style_scheduler_to_execute_in_the_future(self):
         """
         Create an at style scheduler policy to execute in the next few seconds,
@@ -64,7 +64,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 (at_style_policy['change'] * 2))
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_update_cron_style_scheduler_to_execute_now(self):
         """
         Create an cron style scheduler policy to execute on a future day,
@@ -82,7 +82,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 cron_style_policy['change'])
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_update_cron_style_scheduler_to_execute_in_the_future(self):
         """
         Create an cron style scheduler policy to execute the next minute,
@@ -104,7 +104,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 (cron_style_policy['change'] + 2))
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_update_change_for_cron_style_scheduled_policy(self):
         """
         Create an cron style scheduler policy to execute the next minute,
@@ -128,7 +128,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
             self.group.id, self.group.groupConfiguration.minEntities + 3,
             60 + self.scheduler_interval, time_scale=False)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_update_name_for_cron_style_scheduled_policy(self):
         """
         Create an cron style scheduler policy to execute the next minute,
@@ -144,7 +144,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 cron_style_policy['change'])
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_update_cooldown_for_cron_style_scheduled_policy(self):
         """
         Create an cron style scheduler policy to execute the next minute,
@@ -161,7 +161,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 cron_style_policy['change'])
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_update_name_for_at_style_scheduler_policy(self):
         """
         Create an at style scheduler policy to execute in the next few seconds,
@@ -176,7 +176,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 at_style_policy['change'])
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_update_cooldown_for_at_style_scheduler_policy(self):
         """
         Create an at style scheduler policy to execute in the next few seconds,
@@ -191,7 +191,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 at_style_policy['change'])
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_update_change_for_at_style_scheduler_policy(self):
         """
         Create an at style scheduler policy to execute in the next few seconds,

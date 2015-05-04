@@ -35,7 +35,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             cooldown=self.gc_cooldown, type='schedule', name='multi_at_style',
             change=self.change)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_group_multiple_webhook_policies_with_same_attributes(self):
         """
         Creating a group with a list of multiple webhook policies,
@@ -43,7 +43,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         """
         self._create_multi_policy_group(2, 201, self.wb_policy)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_create_multiple_scheduler_policies_same_payload(self):
         """
         Creating a group with a list of multiple scheduler policies, (at style and
@@ -52,7 +52,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         self._create_multi_policy_group(
             2, 201, self.at_style_policy, self.cron_style_policy)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_webhook_and_scheduler_policies_same_group(self):
         """
         Create a group with scheduler and webhook policies and verify the
@@ -64,7 +64,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, 3 * self.change)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_webhook_and_scheduler_policies_different_groups(self):
         """
         Create 2 groups each with the same type of scheduler and webhook policies and
@@ -79,7 +79,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         self.verify_group_state(group1.id, 3 * self.change)
         self.verify_group_state(group2.id, 3 * self.change)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_all_types_webhook_and_scheduler_policies(self):
         """
         Creating a group with scheduler and webhook policies for all types of changes
@@ -102,7 +102,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             wb_policy_cp, at_style_policy_cp, cron_style_policy_cp,
             wb_policy_dc, at_style_policy_dc, cron_style_policy_dc)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_all_types_webhook_and_scheduler_policies_negative(self):
         """
         Creating a group with scheduler and webhook policies for all types of changes
@@ -128,7 +128,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             wb_policy_cp, at_style_policy_cp, cron_style_policy_cp,
             wb_policy_dc, at_style_policy_dc, cron_style_policy_dc)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_webhook_and_scheduler_policies_many_different_groups(self):
         """
         Create many groups each with the same type of scheduler and webhook

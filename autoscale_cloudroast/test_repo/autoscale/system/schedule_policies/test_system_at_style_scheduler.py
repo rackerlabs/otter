@@ -24,7 +24,7 @@ class AtStyleSchedulerTests(AutoscaleFixture):
         self.group = create_group_response.entity
         self.resources.add(self.group, self.empty_scaling_group)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_at_style_change_policy_up_down(self):
         """
         Create an at style schedule policy via change to scale up by 2, followed by an
@@ -41,7 +41,7 @@ class AtStyleSchedulerTests(AutoscaleFixture):
         self.verify_group_state(
             self.group.id, self.group.groupConfiguration.minEntities)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_at_style_desired_capacity_policy_up_down(self):
         """
         Create an at style schedule policy via desired capacity to scale up by 1,
@@ -64,7 +64,7 @@ class AtStyleSchedulerTests(AutoscaleFixture):
         sleep(20 + self.scheduler_interval)
         self.verify_group_state(self.group.id, 0)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_at_style_execute_before_cooldown(self):
         """
         Create an at style scheduler policy via change to scale up with cooldown>0,
@@ -84,7 +84,7 @@ class AtStyleSchedulerTests(AutoscaleFixture):
         self.assertEquals(execute_scheduled_policy.status_code, 403)
         self.verify_group_state(self.group.id, self.sp_change)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_at_style_execute_after_cooldown(self):
         """
         Create an at style scheduler policy via change to scale up with cooldown>0,
