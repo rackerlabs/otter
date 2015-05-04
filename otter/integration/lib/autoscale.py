@@ -21,7 +21,7 @@ from otter.util.http import check_success, headers
 from otter.util.retry import (
     TransientRetryError,
     repeating_interval,
-    transient_errors_except,
+    terminal_errors_except
 )
 
 pp = pprint.PrettyPrinter(indent=4)
@@ -348,7 +348,7 @@ class ScalingGroup(object):
 
         return retry_and_timeout(
             poll, timeout,
-            can_retry=transient_errors_except(BreakLoopException),
+            can_retry=terminal_errors_except(TransientRetryError),
             next_interval=repeating_interval(period),
             clock=clock or reactor,
             deferred_description=(
@@ -482,7 +482,7 @@ class ScalingGroup(object):
 
         return retry_and_timeout(
             poll, timeout,
-            can_retry=transient_errors_except(BreakLoopException),
+            can_retry=terminal_errors_except(TransientRetryError),
             next_interval=repeating_interval(period),
             clock=reactor,
             deferred_description=report,
@@ -527,7 +527,7 @@ class ScalingGroup(object):
             )
         return retry_and_timeout(
             poll, timeout,
-            can_retry=transient_errors_except(BreakLoopException),
+            can_retry=terminal_errors_except(TransientRetryError),
             next_interval=repeating_interval(period),
             clock=reactor,
             deferred_description=report

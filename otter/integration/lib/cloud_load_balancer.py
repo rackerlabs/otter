@@ -17,7 +17,7 @@ from otter.util.http import check_success, headers
 from otter.util.retry import (
     TransientRetryError,
     repeating_interval,
-    transient_errors_except,
+    terminal_errors_except
 )
 
 
@@ -29,7 +29,6 @@ class CloudLoadBalancer(object):
     """The CloudLoadBalancer class represents a Rackspace Cloud Load Balancer
     resource.
     """
-
     def config(self):
         """Returns the JSON structure (as a Python dictionary) used to
         configure the cloud load balancer via API operations.
@@ -111,7 +110,7 @@ class CloudLoadBalancer(object):
 
         return retry_and_timeout(
             poll, timeout,
-            can_retry=transient_errors_except(),
+            can_retry=terminal_errors_except(TransientRetryError),
             next_interval=repeating_interval(period),
             clock=clock or reactor,
             deferred_description=(
@@ -227,7 +226,7 @@ class CloudLoadBalancer(object):
 
         return retry_and_timeout(
             poll, timeout,
-            can_retry=transient_errors_except(),
+            can_retry=terminal_errors_except(TransientRetryError),
             next_interval=repeating_interval(period),
             clock=clock or reactor,
             deferred_description="Waiting for nodes to reach state {0}".format(
