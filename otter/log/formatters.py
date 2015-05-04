@@ -27,6 +27,8 @@ THROTTLED_MESSAGES = [
 
 THROTTLE_COUNT = 50
 
+NON_PEP3101_SYSTEMS = ('kazoo',)
+
 
 class LoggingEncoder(json.JSONEncoder):
     """
@@ -127,16 +129,17 @@ def PEP3101FormattingWrapper(observer):
     :rtype: :class:`ILogObserver`
     """
     def PEP3101FormattingObserver(eventDict):
-        if eventDict.get('why'):
+        if (eventDict.get('why') and
+                eventDict.get('system') not in NON_PEP3101_SYSTEMS):
             eventDict['why'] = eventDict['why'].format(**eventDict)
 
         if 'message' in eventDict:
             message = ' '.join(eventDict['message'])
 
-            if message:
+            if message and eventDict.get('system') not in NON_PEP3101_SYSTEMS:
                 try:
                     eventDict['message'] = (message.format(**eventDict),)
-                except:
+                except Exception:
                     failure = Failure()
                     eventDict['message_formatting_error'] = str(failure)
                     eventDict['message'] = message

@@ -412,6 +412,17 @@ class TimestampTests(SynchronousTestCase):
         self.assertEqual(
             timestamp.epoch_to_utctimestr(0), '1970-01-01T00:00:00Z')
 
+    def test_timestamp_to_epoch(self):
+        """
+        ``timestamp_to_epoch`` returns an epoch as a float with microseconds.
+        """
+        self.assertEqual(
+            timestamp.timestamp_to_epoch('1970-01-01T00:00:00Z'),
+            0.0)
+        self.assertEqual(
+            timestamp.timestamp_to_epoch('2015-05-01T04:51:12.078580Z'),
+            1430455872.078580)
+
 
 class ConfigTest(SynchronousTestCase):
     """

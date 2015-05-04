@@ -110,45 +110,33 @@ class GetServicenetIPs(SynchronousTestCase):
         """Create our simulated clock and scaling group."""
         self.clock = Clock()
         self.pool = object()
+        self.treq = object()
         self.queried_server_ids = []
 
         class FakeRCS(object):
             endpoints = {'nova': 'novaurl'}
             token = "token"
 
-        @attributes(['code', 'fake_json_response'])
-        class Resp(object):
-            pass
-
-        class FakeTreq(object):
-
-            @classmethod
-            def get(cls, url, headers, pool):
-                self.assertIs(self.pool, pool)
-                self.assertEqual(["token"], headers.get('x-auth-token'))
-                url_segments = url.split('/')
-                self.assertEqual(3, len(url_segments))
-                self.assertEqual(['novaurl', 'servers'], url_segments[:2])
-                self.queried_server_ids.append(url_segments[-1])
-                return defer.succeed(Resp(code=200, fake_json_response={
-                    'server': {
-                        'addresses': {
-                            'private': [
-                                {'addr': '10.0.0.{0}'.format(
-                                    len(self.queried_server_ids)),
-                                 'version': 4}
-                            ]
-                        }
+        @attributes(['id', 'pool', 'treq'])
+        class FakeNova(object):
+            def get_addresses(nova_self, rcs):
+                self.assertIs(nova_self.pool, self.pool)
+                self.assertIs(nova_self.treq, self.treq)
+                self.queried_server_ids.append(nova_self.id)
+                return defer.succeed({
+                    'addresses': {
+                        'private': [
+                            {'addr': '10.0.0.{0}'.format(
+                                len(self.queried_server_ids)),
+                             'version': 4}
+                        ]
                     }
-                }))
-
-            @classmethod
-            def json_content(cls, resp):
-                return defer.succeed(resp.fake_json_response)
+                })
 
         self.rcs = FakeRCS()
         self.sg = ScalingGroup(group_config={}, pool=self.pool,
-                               reactor=self.clock, treq=FakeTreq)
+                               reactor=self.clock, treq=self.treq,
+                               server_client=FakeNova)
 
     def test_queries_for_provided_server_ids(self):
         """

@@ -30,8 +30,11 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
         self.servers_before_scaledown = (self.gc_min_entities_alt +
                                          self.policy_up['change'])
         self.resources.add(self.group, self.empty_scaling_group)
+        self.check_for_expected_number_of_building_servers(
+            self.group.id,
+            self.servers_before_scaledown)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_execute_webhook_scale_down_change(self):
         """
         Execute a scale down webhook with change as the number
@@ -46,14 +49,14 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
                 execute_webhook=True)
         self.assertEquals(execute_scale_down_webhook[
                           'execute_response'], 202)
-        self.wait_for_expected_group_state(
+        self.check_for_expected_number_of_building_servers(
             self.group.id,
             self.group.groupConfiguration.minEntities)
         self.assert_servers_deleted_successfully(
             self.group.launchConfiguration.server.name,
             self.group.groupConfiguration.minEntities)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_execute_webhook_scale_down_change_percent(self):
         """
         Execute a webhook with scale down with change percentage 60
@@ -70,13 +73,13 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             current=self.group.groupConfiguration.minEntities +
             self.policy_up['change'],
             percentage=policy_down['change_percent'])
-        self.wait_for_expected_group_state(self.group.id,
-                                           servers_from_scale_down)
+        self.check_for_expected_number_of_building_servers(
+            self.group.id, servers_from_scale_down)
         self.assert_servers_deleted_successfully(
             self.group.launchConfiguration.server.name,
             servers_from_scale_down)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_execute_webhook_scale_down_desired_capacity(self):
         """
         Execute a webhook with scale down with desired capacity as the
@@ -91,8 +94,8 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
                 execute_webhook=True)
         self.assertEquals(execute_webhook_desired_capacity[
                           'execute_response'], 202)
-        self.wait_for_expected_group_state(self.group.id,
-                                           policy_down['desired_capacity'])
+        self.check_for_expected_number_of_building_servers(
+            self.group.id, policy_down['desired_capacity'])
         self.assert_servers_deleted_successfully(
             self.group.launchConfiguration.server.name,
             policy_down['desired_capacity'])
