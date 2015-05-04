@@ -139,7 +139,7 @@ def PEP3101FormattingWrapper(observer):
             if message and eventDict.get('system') not in NON_PEP3101_SYSTEMS:
                 try:
                     eventDict['message'] = (message.format(**eventDict),)
-                except:
+                except Exception:
                     failure = Failure()
                     eventDict['message_formatting_error'] = str(failure)
                     eventDict['message'] = message
