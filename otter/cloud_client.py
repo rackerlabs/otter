@@ -208,13 +208,13 @@ def concretize_service_request(
         return eff
 
 
-@attributes(['lock', 'effect'])
+@attributes(['bracket', 'effect'])
 class _Throttle(object):
     """
     A grody hack to allow using a Deferred concurrency limiter in Effectful
     code.
 
-    A "Deferred bracketer" is some function of type
+    A "Deferred bracket" is some function of type
     ``((f, *args, **kwargs) -> Deferred) -> Deferred``
     basically, something that "brackets" a call to some Deferred-returning
     function. This is the case for the ``run`` method of objects like
@@ -223,10 +223,10 @@ class _Throttle(object):
     https://wiki.haskell.org/Bracket_pattern
 
     Ideally Effect would just have built-in concurrency limiters/idioms without
-    relying on Twisted.
+    relying on Twisted and Deferreds.
 
-    :param bracketer: The Deferred bracketer to run the effect in
-    :param Effect effect: The effect to perform inside the bracketer
+    :param callable bracket: The bracket to run the effect in
+    :param Effect effect: The effect to perform inside the bracket
     """
 
 
@@ -236,7 +236,7 @@ def _perform_throttle(clock, dispatcher, throttle):
     Perform :obj:`_Throttle` by performing the effect after acquiring a lock
     and delaying but some period of time.
     """
-    lock = throttle.lock
+    lock = throttle.bracket
     eff = throttle.effect
     return lock(lambda: deferLater(clock, 1, twisted_perform, dispatcher, eff))
 
