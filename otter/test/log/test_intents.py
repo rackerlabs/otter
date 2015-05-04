@@ -1,5 +1,5 @@
 """
-Tests for :mod:`otter.log.effect`
+Tests for :mod:`otter.log.intents`
 """
 
 from effect import (
