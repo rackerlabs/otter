@@ -251,7 +251,7 @@ def _serialize_and_delay(clock, delay):
     return partial(lock.run, deferLater, clock, delay)
 
 
-def make_default_throttler(clock):
+def _make_default_throttler(clock):
     """Get a throttler function with default throttling policies."""
     # Serialize creation and deletion of cloud servers because the Compute team
     # has suggested we do this.
@@ -294,7 +294,7 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
     """
     # ideally this throttler would be parameterized but for now it's basically
     # a hack that we want to keep private to this module
-    throttler = make_default_throttler(reactor)
+    throttler = _make_default_throttler(reactor)
     return TypeDispatcher({
         TenantScope: partial(perform_tenant_scope, authenticator, log,
                              service_configs, throttler),

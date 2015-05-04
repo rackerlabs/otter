@@ -41,6 +41,7 @@ from otter.cloud_client import (
     service_request,
     set_nova_metadata_item,
     _Throttle,
+    _make_default_throttler,
     _perform_throttle,
     _serialize_and_delay)
 from otter.constants import ServiceType
@@ -313,6 +314,24 @@ class SerializeAndDelayTests(SynchronousTestCase):
         self.assertNoResult(result)
         clock.advance(15)
         self.assertEqual(self.successResultOf(result), ('locked', 'foo'))
+
+
+class MakeDefaultThrottleTests(SynchronousTestCase):
+    """Tests for :func:`_make_default_throttler`."""
+
+    def test_make_default_throttler_mismatch(self):
+        """policy doesn't have a throttler for random junk."""
+        throttler = _make_default_throttler(None)
+        self.assertIs(throttler("foo", "get"), None)
+
+    def test_make_default_throttler_post_cloud_servers(self):
+        clock = Clock()
+        throttler = _make_default_throttler(clock)
+        bracket = throttler(ServiceType.CLOUD_SERVERS, 'post')
+        d = bracket(lambda: 'foo')
+        self.assertNoResult(d)
+        clock.advance(1)
+        self.assertEqual(self.successResultOf(d), 'foo')
 
 
 class PerformTenantScopeTests(SynchronousTestCase):
