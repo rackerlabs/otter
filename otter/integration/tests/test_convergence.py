@@ -656,7 +656,7 @@ class ConvergenceSet1(unittest.TestCase):
                 total_servers=set_to_servers,
             )
             .addCallback(self.scaling_group.wait_for_expected_state, rcs,
-                         active=converged_servers, pending=0)
+                         timeout=1800, active=converged_servers, pending=0)
         )
 
     def test_scale_up_after_oobd_at_group_max(self):
@@ -844,7 +844,7 @@ class ConvergenceSet1(unittest.TestCase):
             rcs,
             total_servers=set_to_servers,)
          .addCallback(self.scaling_group.wait_for_expected_state, rcs,
-                      active=converged_servers, pending=0))
+                      timeout=1800, active=converged_servers, pending=0))
 
         return d
 
