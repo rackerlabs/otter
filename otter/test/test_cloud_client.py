@@ -71,6 +71,7 @@ def service_request_eqf(stub_response):
             authenticator=object(),
             log=object(),
             service_configs=fake_service_configs,
+            throttler=lambda stype, url: None,
             tenant_id='000000',
             service_request=service_request_intent)
 
@@ -154,7 +155,9 @@ class PerformServiceRequestTests(SynchronousTestCase):
         Call :func:`concretize_service_request` with premade test objects.
         """
         return concretize_service_request(
-            self.authenticator, self.log, self.service_configs, 1, svcreq,
+            self.authenticator, self.log, self.service_configs,
+            lambda stype, url: None,
+            1, svcreq,
             **kwargs)
 
     def test_authenticates(self):
@@ -269,14 +272,17 @@ class PerformTenantScopeTests(SynchronousTestCase):
                 'region': 'DFW'}
         }
 
-        def concretize(au, lo, smap, tenid, srvreq):
-            return Effect(Constant(('concretized', au, lo, smap, tenid,
-                                    srvreq)))
+        self.throttler = lambda stype, url: None
+
+        def concretize(au, lo, smap, throttler, tenid, srvreq):
+            return Effect(Constant(('concretized', au, lo, smap, throttler,
+                                    tenid, srvreq)))
 
         self.dispatcher = ComposedDispatcher([
             TypeDispatcher({
                 TenantScope: partial(perform_tenant_scope, self.authenticator,
                                      self.log, self.service_configs,
+                                     self.throttler,
                                      _concretize=concretize)}),
             base_dispatcher])
 
@@ -296,7 +302,7 @@ class PerformTenantScopeTests(SynchronousTestCase):
         self.assertEqual(
             sync_perform(self.dispatcher, Effect(tscope)),
             ('concretized', self.authenticator, self.log, self.service_configs,
-             1, ereq.intent))
+             self.throttler, 1, ereq.intent))
 
     def test_perform_srvreq_nested(self):
         """
@@ -310,7 +316,7 @@ class PerformTenantScopeTests(SynchronousTestCase):
         self.assertEqual(
             sync_perform(self.dispatcher, Effect(tscope)),
             ('concretized', self.authenticator, self.log, self.service_configs,
-             1, ereq.intent))
+             self.throttler, 1, ereq.intent))
 
 
 class CLBClientTests(SynchronousTestCase):

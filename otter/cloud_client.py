@@ -163,8 +163,9 @@ def concretize_service_request(
     :param BoundLog log: info about requests will be logged to this.
     :param dict service_configs: As returned by
         :func:`otter.constants.get_service_configs`.
-    :param throttler: A function of ServiceType, HTTP method ->
-        Deferred concurrency limiter or None, used to throttle requests.
+    :param callable throttler: A function of ServiceType, HTTP method ->
+        Deferred bracketer or None, used to throttle requests. See
+        :obj:`_Throttle`.
     :param tenant_id: tenant ID.
     """
     auth_eff = Effect(Authenticate(authenticator, tenant_id, log))
@@ -203,7 +204,7 @@ def concretize_service_request(
     lock = throttler(service_request.service_type,
                      service_request.method.lower())
     if lock is not None:
-        return Effect(_Throttle(lock=lock, effect=eff))
+        return Effect(_Throttle(bracket=lock, effect=eff))
     else:
         return eff
 
