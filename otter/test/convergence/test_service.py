@@ -1,6 +1,5 @@
 import time
 import uuid
-from functools import partial
 
 from effect import (
     ComposedDispatcher, Constant, Effect, Error, Func, ParallelEffects,
@@ -48,7 +47,8 @@ from otter.test.utils import (
     mock_group, mock_log,
     raise_,
     test_dispatcher,
-    transform_eq)
+    transform_eq,
+    unwrap_wrapped_effect)
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 
@@ -114,27 +114,25 @@ class ConvergerTests(SynchronousTestCase):
                 ('converge-all', currently_converging, _my_buckets,
                  all_buckets, divergent_flags))
 
-        def perform_ca_eff(bound_fields):
-            _sequence = SequenceDispatcher([
-                (GetChildren(CONVERGENCE_DIRTY_DIR),
-                 lambda i: ['flag1', 'flag2']),
-                (('converge-all',
-                  transform_eq(lambda cc: cc is converger.currently_converging,
-                               True),
-                  my_buckets,
-                  self.buckets,
-                  ['flag1', 'flag2']),
-                 lambda i: 'foo')
-            ])
-            with _sequence.consume():
-                return sync_perform(_sequence, bound_fields.effect)
-
         my_buckets = [0, 5]
+        bound_sequence = [
+            (GetChildren(CONVERGENCE_DIRTY_DIR),
+                lambda i: ['flag1', 'flag2']),
+            (('converge-all',
+                transform_eq(lambda cc: cc is converger.currently_converging,
+                             True),
+                my_buckets,
+                self.buckets,
+                ['flag1', 'flag2']),
+                lambda i: 'foo')
+        ]
+
         sequence = SequenceDispatcher([
             (Func(uuid.uuid1), lambda i: 'uid'),
-            (BoundFields(
-                mock.ANY, {'system': 'converger', 'converger_run_id': 'uid'}),
-             perform_ca_eff)
+            unwrap_wrapped_effect(
+                BoundFields, dict(fields={'system': 'converger',
+                                          'converger_run_id': 'uid'}),
+                bound_sequence)
         ])
 
         converger = self._converger(converge_all_groups, dispatcher=sequence)
@@ -152,23 +150,21 @@ class ConvergerTests(SynchronousTestCase):
                                 all_buckets, divergent_flags):
             return Effect('converge-all')
 
-        def perform_ca_eff(bound_fields):
-            _sequence = SequenceDispatcher([
-                (GetChildren(CONVERGENCE_DIRTY_DIR),
-                 lambda i: ['flag1', 'flag2']),
-                ('converge-all', lambda i: raise_(RuntimeError('foo'))),
-                (LogErr(
-                    CheckFailureValue(RuntimeError('foo')),
-                    'converge-all-groups-error', {}), lambda i: None)
-            ])
-            with _sequence.consume():
-                return sync_perform(_sequence, bound_fields.effect)
+        bound_sequence = [
+            (GetChildren(CONVERGENCE_DIRTY_DIR),
+                lambda i: ['flag1', 'flag2']),
+            ('converge-all', lambda i: raise_(RuntimeError('foo'))),
+            (LogErr(
+                CheckFailureValue(RuntimeError('foo')),
+                'converge-all-groups-error', {}), lambda i: None)
+        ]
 
         sequence = SequenceDispatcher([
             (Func(uuid.uuid1), lambda i: 'uid'),
-            (BoundFields(
-                mock.ANY, {'system': 'converger', 'converger_run_id': 'uid'}),
-             perform_ca_eff)
+            unwrap_wrapped_effect(
+                BoundFields, dict(fields={'system': 'converger',
+                                          'converger_run_id': 'uid'}),
+                bound_sequence)
         ])
 
         # relying on the side-effect of setting up self.fake_partitioner
@@ -371,16 +367,14 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         """
         eff = self._converge_all_groups(['00_g1', '01_g2'])
 
-        def perform_gs_effect(tid, gid, intent):
+        def get_bound_sequence(tid, gid):
             tscope = TenantScope(Effect(('converge', tid, gid, 1)), tid)
-            _s = SequenceDispatcher([
+            return [
                 (GetStat(path='/groups/divergent/{}_{}'.format(tid, gid)),
                  lambda i: ZNodeStatStub(version=1)),
                 (tscope, lambda i: i.effect),
                 (('converge', tid, gid, 1),
-                 lambda i: 'converged {}!'.format(tid))])
-            with _s.consume():
-                return sync_perform(_s, intent.effect)
+                 lambda i: 'converged {}!'.format(tid))]
 
         sequence = SequenceDispatcher([
             (ReadReference(ref=self.currently_converging),
@@ -388,12 +382,14 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             (Log('converge-all-groups',
                  dict(group_infos=self.group_infos, currently_converging=[])),
              lambda i: None),
-            (BoundFields(mock.ANY, dict(tenant_id='00',
-                                        scaling_group_id='g1')),
-             partial(perform_gs_effect, '00', 'g1')),
-            (BoundFields(mock.ANY, dict(tenant_id='01',
-                                        scaling_group_id='g2')),
-             partial(perform_gs_effect, '01', 'g2'))
+            unwrap_wrapped_effect(
+                BoundFields, dict(fields={'tenant_id': '00',
+                                          'scaling_group_id': 'g1'}),
+                get_bound_sequence('00', 'g1')),
+            unwrap_wrapped_effect(
+                BoundFields, dict(fields={'tenant_id': '01',
+                                          'scaling_group_id': 'g2'}),
+                get_bound_sequence('01', 'g2')),
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
 
