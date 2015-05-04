@@ -33,7 +33,7 @@ from otter.convergence.service import (
     determine_active, execute_convergence, get_my_divergent_groups,
     non_concurrently)
 from otter.convergence.steps import ConvergeLater
-from otter.log.intent import BoundFields, Log, LogErr, get_log_dispatcher
+from otter.log.intents import BoundFields, Log, LogErr, get_log_dispatcher
 from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,

@@ -31,7 +31,7 @@ from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
-from otter.log.intent import err, msg, with_log
+from otter.log.intents import err, msg, with_log
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, ModifyGroupState)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus

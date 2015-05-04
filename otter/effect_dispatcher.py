@@ -16,7 +16,7 @@ from .auth import (
     perform_invalidate_token,
 )
 from .cloud_client import TenantScope, perform_tenant_scope
-from .log.intent import get_log_dispatcher
+from .log.intents import get_log_dispatcher
 from .models.cass import CQLQueryExecute, perform_cql_query
 from .models.intents import get_model_dispatcher
 from .util.pure_http import Request, perform_request

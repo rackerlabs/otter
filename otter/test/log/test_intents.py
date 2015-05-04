@@ -13,7 +13,7 @@ import mock
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.log.intent import (
+from otter.log.intents import (
     err,
     get_log_dispatcher,
     msg,

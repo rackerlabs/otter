@@ -16,7 +16,7 @@ from otter.effect_dispatcher import (
     get_full_dispatcher,
     get_legacy_dispatcher,
     get_simple_dispatcher)
-from otter.log.intent import BoundFields, Log, LogErr
+from otter.log.intents import BoundFields, Log, LogErr
 from otter.models.cass import CQLQueryExecute
 from otter.models.intents import GetScalingGroupInfo
 from otter.util.pure_http import Request
