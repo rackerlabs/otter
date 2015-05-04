@@ -319,12 +319,13 @@ class SerializeAndDelayTests(SynchronousTestCase):
 class MakeDefaultThrottleTests(SynchronousTestCase):
     """Tests for :func:`_make_default_throttler`."""
 
-    def test_make_default_throttler_mismatch(self):
+    def test_mismatch(self):
         """policy doesn't have a throttler for random junk."""
         throttler = _make_default_throttler(None)
         self.assertIs(throttler("foo", "get"), None)
 
-    def test_make_default_throttler_post_cloud_servers(self):
+    def test_post_cloud_servers(self):
+        """POSTs to cloud servers get throttled by a second."""
         clock = Clock()
         throttler = _make_default_throttler(clock)
         bracket = throttler(ServiceType.CLOUD_SERVERS, 'post')
@@ -332,6 +333,26 @@ class MakeDefaultThrottleTests(SynchronousTestCase):
         self.assertNoResult(d)
         clock.advance(1)
         self.assertEqual(self.successResultOf(d), 'foo')
+
+    def test_delete_cloud_servers(self):
+        """DELETEs to cloud servers get throttled by a second."""
+        clock = Clock()
+        throttler = _make_default_throttler(clock)
+        bracket = throttler(ServiceType.CLOUD_SERVERS, 'delete')
+        d = bracket(lambda: 'foo')
+        self.assertNoResult(d)
+        clock.advance(1)
+        self.assertEqual(self.successResultOf(d), 'foo')
+
+    def test_post_and_delete_not_the_same(self):
+        """
+        The throttlers for POST and DELETE to cloud servers are different.
+        """
+        clock = Clock()
+        throttler = _make_default_throttler(clock)
+        deleter = throttler(ServiceType.CLOUD_SERVERS, 'delete')
+        poster = throttler(ServiceType.CLOUD_SERVERS, 'post')
+        self.assertIsNot(deleter, poster)
 
 
 class PerformTenantScopeTests(SynchronousTestCase):

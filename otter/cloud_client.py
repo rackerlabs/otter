@@ -292,8 +292,8 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
     Get a dispatcher suitable for running :obj:`ServiceRequest` and
     :obj:`TenantScope` intents.
     """
-    # ideally this throttler would be parameterized but for now it's basically
-    # a hack that we want to keep private to this module
+    # this throttler could be parameterized but for now it's basically a hack
+    # that we want to keep private to this module
     throttler = _make_default_throttler(reactor)
     return TypeDispatcher({
         TenantScope: partial(perform_tenant_scope, authenticator, log,
