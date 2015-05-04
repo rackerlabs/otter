@@ -6,7 +6,6 @@ from effect import (
     ComposedDispatcher,
     Constant,
     Effect,
-    TypeDispatcher,
     base_dispatcher,
     sync_perform)
 
@@ -15,16 +14,18 @@ import mock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.log.intent import (
-    Log,
-    LogErr,
+    err,
     get_log_dispatcher,
     msg,
-    err,
     with_log)
 from otter.test.utils import mock_log
 
 
 class LogDispatcherTests(SynchronousTestCase):
+    """
+    Tests to verify dispatcher returned from `get_log_dispatcher`
+    performs logging
+    """
 
     def setUp(self):
         self.log = mock_log()
