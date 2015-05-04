@@ -48,7 +48,8 @@ from otter.test.utils import (
     mock_group, mock_log,
     raise_,
     test_dispatcher,
-    transform_eq)
+    transform_eq,
+    unwrap_wrapped_effect)
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 
@@ -114,27 +115,25 @@ class ConvergerTests(SynchronousTestCase):
                 ('converge-all', currently_converging, _my_buckets,
                  all_buckets, divergent_flags))
 
-        def perform_ca_eff(bound_fields):
-            _sequence = SequenceDispatcher([
-                (GetChildren(CONVERGENCE_DIRTY_DIR),
-                 lambda i: ['flag1', 'flag2']),
-                (('converge-all',
-                  transform_eq(lambda cc: cc is converger.currently_converging,
-                               True),
-                  my_buckets,
-                  self.buckets,
-                  ['flag1', 'flag2']),
-                 lambda i: 'foo')
-            ])
-            with _sequence.consume():
-                return sync_perform(_sequence, bound_fields.effect)
-
         my_buckets = [0, 5]
+        bound_sequence = [
+            (GetChildren(CONVERGENCE_DIRTY_DIR),
+                lambda i: ['flag1', 'flag2']),
+            (('converge-all',
+                transform_eq(lambda cc: cc is converger.currently_converging,
+                             True),
+                my_buckets,
+                self.buckets,
+                ['flag1', 'flag2']),
+                lambda i: 'foo')
+        ]
+
         sequence = SequenceDispatcher([
             (Func(uuid.uuid1), lambda i: 'uid'),
-            (BoundFields(
-                mock.ANY, {'system': 'converger', 'converger_run_id': 'uid'}),
-             perform_ca_eff)
+            unwrap_wrapped_effect(
+                BoundFields, dict(fields={'system': 'converger',
+                                          'converger_run_id': 'uid'}),
+                bound_sequence)
         ])
 
         converger = self._converger(converge_all_groups, dispatcher=sequence)
