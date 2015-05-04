@@ -79,10 +79,10 @@ class LimitStepCount(SynchronousTestCase):
 
     def test_default_step_limit(self):
         """
-        The default limit limits server creation to up to 3 steps.
+        The default limit limits server creation to up to 10 steps.
         """
         limits = limit_steps_by_count.keywords["step_limits"]
-        self.assertEqual(limits, pmap({CreateServer: 3}))
+        self.assertEqual(limits, pmap({CreateServer: 10}))
 
 
 class OptimizerTests(SynchronousTestCase):
