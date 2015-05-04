@@ -17,15 +17,12 @@ import mock
 
 import six
 
-from twisted.trial.unittest import SynchronousTestCase
 from twisted.internet.defer import succeed
 from twisted.internet.task import Clock
+from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import Authenticate, InvalidateToken
 from otter.cloud_client import (
-    _Throttle,
-    _perform_throttle,
-    _serialize_and_delay,
     CLBDeletedError,
     CLBPendingUpdateError,
     CLBRateLimitError,
@@ -42,7 +39,10 @@ from otter.cloud_client import (
     get_server_details,
     perform_tenant_scope,
     service_request,
-    set_nova_metadata_item)
+    set_nova_metadata_item,
+    _Throttle,
+    _perform_throttle,
+    _serialize_and_delay)
 from otter.constants import ServiceType
 from otter.test.utils import (
     StubResponse,
@@ -295,6 +295,11 @@ class SerializeAndDelayTests(SynchronousTestCase):
 
     @mock.patch('otter.cloud_client.DeferredLock')
     def test_serialize_and_delay(self, deferred_lock):
+        """
+        :func:`_serialize_and_delay` returns a function that, when given a
+        function and arguments, calls it inside of a lock and after a specified
+        delay.
+        """
         class DeferredLock(object):
             def run(self, f, *args, **kwargs):
                 return f(*args, **kwargs).addCallback(lambda r: ('locked', r))
@@ -305,7 +310,7 @@ class SerializeAndDelayTests(SynchronousTestCase):
 
         result = bracket(lambda: succeed('foo'))
         clock.advance(14)
-        self.assertEqual(result.called, False)
+        self.assertNoResult(result)
         clock.advance(15)
         self.assertEqual(self.successResultOf(result), ('locked', 'foo'))
 
