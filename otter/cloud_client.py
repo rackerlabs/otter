@@ -22,6 +22,7 @@ from twisted.internet.task import deferLater
 
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType
+from otter.util.config import config_value
 from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (
@@ -259,11 +260,19 @@ def _default_throttler(clock, stype, method):
     # Compute suggested 300 deletion req/min. A delay of 0.2 should guarantee
     # no more than that are executed by a node, plus serialization of requests
     # will make it quite a bit lower than that.
+
+    cloud_client_config = config_value('cloud_client')
+    if cloud_client_config is None:
+        cloud_client_config = {}
+    throttling_config = cloud_client_config.get('throttling', {})
+    create_server_delay = throttling_config.get('create_server_delay', 1)
+    delete_server_delay = throttling_config.get('delete_server_delay', 0.2)
+
     policy = {
         (ServiceType.CLOUD_SERVERS, 'post'):
-            _serialize_and_delay(clock, 1),
+            _serialize_and_delay(clock, create_server_delay),
         (ServiceType.CLOUD_SERVERS, 'delete'):
-            _serialize_and_delay(clock, 0.2),
+            _serialize_and_delay(clock, delete_server_delay),
     }
     return policy.get((stype, method))
 

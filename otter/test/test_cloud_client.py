@@ -55,6 +55,7 @@ from otter.test.utils import (
     stub_pure_response,
     unwrap_wrapped_effect)
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
+from otter.util.config import set_config_data
 from otter.util.http import APIError, headers
 from otter.util.pure_http import Request, has_code
 
@@ -379,6 +380,33 @@ class DefaultThrottlerTests(SynchronousTestCase):
                                      'delete')
         poster = _default_throttler(clock, ServiceType.CLOUD_SERVERS, 'post')
         self.assertIsNot(deleter, poster)
+
+    def test_post_delay_configurable(self):
+        """The delay for creating servers is configurable."""
+        set_config_data(
+            {'cloud_client': {'throttling': {'create_server_delay': 500}}})
+        self.addCleanup(set_config_data, {})
+        clock = Clock()
+        bracket = _default_throttler(clock, ServiceType.CLOUD_SERVERS, 'post')
+        d = bracket(lambda: 'foo')
+        clock.advance(499)
+        self.assertNoResult(d)
+        clock.advance(500)
+        self.assertEqual(self.successResultOf(d), 'foo')
+
+    def test_delete_delay_configurable(self):
+        """The delay for deleting servers is configurable."""
+        set_config_data(
+            {'cloud_client': {'throttling': {'delete_server_delay': 500}}})
+        self.addCleanup(set_config_data, {})
+        clock = Clock()
+        bracket = _default_throttler(clock,
+                                     ServiceType.CLOUD_SERVERS, 'delete')
+        d = bracket(lambda: 'foo')
+        clock.advance(499)
+        self.assertNoResult(d)
+        clock.advance(500)
+        self.assertEqual(self.successResultOf(d), 'foo')
 
 
 class GetCloudClientDispatcherTests(SynchronousTestCase):
