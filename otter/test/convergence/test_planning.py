@@ -997,7 +997,7 @@ class PlanTests(SynchronousTestCase):
         desc = CLBDescription(lb_id='5', port=80)
         desired_lbs = s(desc)
         desired_group_state = DesiredGroupState(
-            server_config={}, capacity=8, desired_lbs=desired_lbs)
+            server_config={}, capacity=20, desired_lbs=desired_lbs)
 
         result = plan(
             desired_group_state,
@@ -1016,4 +1016,4 @@ class PlanTests(SynchronousTestCase):
                 AddNodesToCLB(
                     lb_id='5',
                     address_configs=s(('1.1.1.1', desc), ('1.2.3.4', desc))
-                )] + [CreateServer(server_config=pmap({}))] * 3))
+                )] + [CreateServer(server_config=pmap({}))] * 10))
