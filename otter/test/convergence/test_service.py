@@ -1,4 +1,6 @@
 import time
+import uuid
+from functools import partial
 
 from effect import (
     ComposedDispatcher, Constant, Effect, Error, Func, ParallelEffects,
@@ -9,6 +11,8 @@ from effect.testing import EQDispatcher, EQFDispatcher, SequenceDispatcher
 
 from kazoo.exceptions import BadVersionError
 from kazoo.recipe.partitioner import PartitionState
+
+import mock
 
 from pyrsistent import freeze, pbag, pmap, pset, s
 
@@ -29,6 +33,7 @@ from otter.convergence.service import (
     determine_active, execute_convergence, get_my_divergent_groups,
     non_concurrently)
 from otter.convergence.steps import ConvergeLater
+from otter.log.intents import BoundFields, Log, LogErr, get_log_dispatcher
 from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,
@@ -38,9 +43,8 @@ from otter.models.interface import GroupState, NoSuchScalingGroupError
 from otter.test.convergence.test_planning import server
 from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
-    CheckFailureValue, FakePartitioner, IsBoundWith,
+    CheckFailureValue, FakePartitioner,
     TestStep,
-    matches,
     mock_group, mock_log,
     raise_,
     test_dispatcher,
@@ -104,24 +108,33 @@ class ConvergerTests(SynchronousTestCase):
         When buckets are allocated, the result of converge_all_groups is
         performed.
         """
-        def converge_all_groups(log, currently_converging, _my_buckets,
+        def converge_all_groups(currently_converging, _my_buckets,
                                 all_buckets, divergent_flags):
             return Effect(
-                ('converge-all', log, currently_converging, _my_buckets,
+                ('converge-all', currently_converging, _my_buckets,
                  all_buckets, divergent_flags))
+
+        def perform_ca_eff(bound_fields):
+            _sequence = SequenceDispatcher([
+                (GetChildren(CONVERGENCE_DIRTY_DIR),
+                 lambda i: ['flag1', 'flag2']),
+                (('converge-all',
+                  transform_eq(lambda cc: cc is converger.currently_converging,
+                               True),
+                  my_buckets,
+                  self.buckets,
+                  ['flag1', 'flag2']),
+                 lambda i: 'foo')
+            ])
+            with _sequence.consume():
+                return sync_perform(_sequence, bound_fields.effect)
 
         my_buckets = [0, 5]
         sequence = SequenceDispatcher([
-            (GetChildren(CONVERGENCE_DIRTY_DIR), lambda i: ['flag1', 'flag2']),
-
-            (('converge-all',
-              matches(IsBoundWith(otter_service='converger')),
-              transform_eq(lambda cc: cc is converger.currently_converging,
-                           True),
-              my_buckets,
-              self.buckets,
-              ['flag1', 'flag2']),
-             lambda i: 'foo')
+            (Func(uuid.uuid1), lambda i: 'uid'),
+            (BoundFields(
+                mock.ANY, {'system': 'converger', 'converger_run_id': 'uid'}),
+             perform_ca_eff)
         ])
 
         converger = self._converger(converge_all_groups, dispatcher=sequence)
@@ -135,23 +148,35 @@ class ConvergerTests(SynchronousTestCase):
         Errors raised from performing the converge_all_groups effect are
         logged, and None is the ultimate result.
         """
-        def converge_all_groups(log, currently_converging, _my_buckets,
+        def converge_all_groups(currently_converging, _my_buckets,
                                 all_buckets, divergent_flags):
             return Effect('converge-all')
 
+        def perform_ca_eff(bound_fields):
+            _sequence = SequenceDispatcher([
+                (GetChildren(CONVERGENCE_DIRTY_DIR),
+                 lambda i: ['flag1', 'flag2']),
+                ('converge-all', lambda i: raise_(RuntimeError('foo'))),
+                (LogErr(
+                    CheckFailureValue(RuntimeError('foo')),
+                    'converge-all-groups-error', {}), lambda i: None)
+            ])
+            with _sequence.consume():
+                return sync_perform(_sequence, bound_fields.effect)
+
         sequence = SequenceDispatcher([
-            (GetChildren(CONVERGENCE_DIRTY_DIR), lambda i: ['flag1', 'flag2']),
-            ('converge-all', lambda i: raise_(RuntimeError('foo')))
+            (Func(uuid.uuid1), lambda i: 'uid'),
+            (BoundFields(
+                mock.ANY, {'system': 'converger', 'converger_run_id': 'uid'}),
+             perform_ca_eff)
         ])
+
         # relying on the side-effect of setting up self.fake_partitioner
         self._converger(converge_all_groups, dispatcher=sequence)
 
         with sequence.consume():
             result = self.fake_partitioner.got_buckets([0])
         self.assertEqual(self.successResultOf(result), None)
-        self.log.err.assert_called_once_with(
-            CheckFailureValue(RuntimeError('foo')),
-            'converge-all-groups-error', otter_service='converger')
 
     def test_divergent_changed_not_acquired(self):
         """
@@ -183,7 +208,7 @@ class ConvergerTests(SynchronousTestCase):
         and the list of child nodes is passed on to
         :func:`converge_all_groups`.
         """
-        def converge_all_groups(log, currently_converging, _my_buckets,
+        def converge_all_groups(currently_converging, _my_buckets,
                                 all_buckets, divergent_flags):
             return Effect(('converge-all-groups', divergent_flags))
         dispatcher = SequenceDispatcher([
@@ -203,113 +228,72 @@ class ConvergeOneGroupTests(SynchronousTestCase):
     """Tests for :func:`converge_one_group`."""
 
     def setUp(self):
-        self.log = mock_log()
         self.tenant_id = 'tenant-id'
         self.group_id = 'g1'
         self.version = 5
-        self.deletions = []
-        self.dispatcher = ComposedDispatcher([
-            EQFDispatcher([
-                (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                            version=self.version),
-                 lambda i: self.deletions.append(True))
-            ]),
-            _get_dispatcher(),
-        ])
+
+    def _execute_convergence(self, tenant_id, group_id):
+        return Effect(('ec', tenant_id, group_id))
+
+    def _verify_sequence(self, sequence, converging=Reference(pset())):
+        """
+        Verify that sequence is executed
+        """
+        dispatcher = ComposedDispatcher([sequence, _get_dispatcher()])
+        eff = converge_one_group(
+            converging, self.tenant_id, self.group_id, self.version,
+            execute_convergence=self._execute_convergence)
+        with sequence.consume():
+            self.assertIsNone(sync_perform(dispatcher, eff))
 
     def test_success(self):
         """
         runs execute_convergence and returns None, then deletes the dirty flag.
         """
-        calls = []
-
-        def execute_convergence(tenant_id, group_id, log):
-            def p():
-                calls.append((tenant_id, group_id, log))
-                return StepResult.SUCCESS
-            return Effect(Func(p))
-
-        eff = converge_one_group(
-            self.log, Reference(pset()), self.tenant_id, self.group_id,
-            self.version,
-            execute_convergence=execute_convergence)
-        result = sync_perform(self.dispatcher, eff)
-        self.assertEqual(result, None)
-        self.assertEqual(
-            calls,
-            [(self.tenant_id, self.group_id,
-              matches(IsBoundWith(tenant_id=self.tenant_id,
-                                  scaling_group_id=self.group_id)))])
-        self.assertEqual(self.deletions, [True])
-        self.log.msg.assert_any_call(
-            'mark-clean-success',
-            tenant_id=self.tenant_id, scaling_group_id=self.group_id)
+        sequence = SequenceDispatcher([
+            (('ec', self.tenant_id, self.group_id),
+             lambda i: StepResult.SUCCESS),
+            (DeleteNode(path='/groups/divergent/tenant-id_g1',
+                        version=self.version), lambda i: None),
+            (Log('mark-clean-success', {}), lambda i: None)
+        ])
+        self._verify_sequence(sequence)
 
     def test_non_concurrent(self):
         """
         Won't run execute_convergence if it's already running for the same
         group ID.
         """
-        calls = []
-
-        def execute_convergence(tenant_id, group_id, log):
-            return Effect(Func(lambda: calls.append('should not be run')))
-
-        currently_converging = Reference(pset([self.group_id]))
-        eff = converge_one_group(
-            self.log, currently_converging, self.tenant_id,
-            self.group_id, self.version,
-            execute_convergence=execute_convergence)
-        result = sync_perform(self.dispatcher, eff)
-        self.assertEqual(result, None)
-        self.assertEqual(calls, [])
-        self.assertEqual(self.log.err.mock_calls, [])
-        self.assertEqual(self.deletions, [])
+        self._verify_sequence(
+            SequenceDispatcher([]), Reference(pset([self.group_id])))
 
     def test_no_scaling_group(self):
         """
         When the scaling group disappears, a fatal error is logged and the
         dirty flag is cleaned up.
         """
-        def execute_convergence(tenant_id, group_id, log):
-            return Effect(Error(NoSuchScalingGroupError(tenant_id, group_id)))
-
-        eff = converge_one_group(
-            self.log, Reference(pset()), self.tenant_id, self.group_id,
-            self.version,
-            execute_convergence=execute_convergence)
-        result = sync_perform(self.dispatcher, eff)
-        self.assertEqual(result, None)
-
-        self.log.err.assert_any_call(
-            None,
-            'converge-fatal-error',
-            tenant_id=self.tenant_id, scaling_group_id=self.group_id)
-
-        self.assertEqual(self.deletions, [True])
-        self.log.msg.assert_any_call(
-            'mark-clean-success',
-            tenant_id=self.tenant_id, scaling_group_id=self.group_id)
+        sequence = SequenceDispatcher([
+            (('ec', self.tenant_id, self.group_id),
+             lambda i: raise_(NoSuchScalingGroupError(self.tenant_id,
+                                                      self.group_id))),
+            (LogErr(None, 'converge-fatal-error', {}), lambda i: None),
+            (DeleteNode(path='/groups/divergent/tenant-id_g1',
+                        version=self.version), lambda i: None),
+            (Log('mark-clean-success', {}), lambda i: None)
+        ])
+        self._verify_sequence(sequence)
 
     def test_unexpected_errors(self):
         """
         Unexpected exceptions log a non-fatal error and don't clean up the
         dirty flag.
         """
-        def execute_convergence(tenant_id, group_id, log):
-            return Effect(Error(RuntimeError('uh oh!')))
-
-        eff = converge_one_group(
-            self.log, Reference(pset()), self.tenant_id, self.group_id,
-            self.version,
-            execute_convergence=execute_convergence)
-        result = sync_perform(self.dispatcher, eff)
-        self.assertEqual(result, None)
-        self.log.err.assert_any_call(
-            None,
-            'converge-non-fatal-error',
-            tenant_id=self.tenant_id, scaling_group_id=self.group_id)
-        self.assertEqual(self.deletions, [])
+        sequence = SequenceDispatcher([
+            (('ec', self.tenant_id, self.group_id),
+             lambda i: raise_(RuntimeError('oh no!'))),
+            (LogErr(None, 'converge-non-fatal-error', {}), lambda i: None)
+        ])
+        self._verify_sequence(sequence)
 
     def test_delete_node_version_mismatch(self):
         """
@@ -317,67 +301,48 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         converge_one_group, and DeleteNode raises a BadVersionError, the error
         is logged and nothing else is cleaned up.
         """
-        dispatcher = ComposedDispatcher([
-            EQFDispatcher([
-                (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                            version=self.version),
-                 lambda i: raise_(BadVersionError()))
-            ]),
-            _get_dispatcher(),
-            ])
-
-        def execute_convergence(tenant_id, group_id, log):
-            return Effect(Constant(StepResult.SUCCESS))
-
-        eff = converge_one_group(
-            self.log, Reference(pset()), self.tenant_id, self.group_id,
-            self.version,
-            execute_convergence=execute_convergence)
-        result = sync_perform(dispatcher, eff)
-        self.assertEqual(result, None)
-        self.log.err.assert_any_call(
-            CheckFailureValue(BadVersionError()),
-            'mark-clean-failure',
-            tenant_id=self.tenant_id, scaling_group_id=self.group_id,
-            dirty_version=5,
-            path='/groups/divergent/tenant-id_g1')
+        sequence = SequenceDispatcher([
+            (('ec', self.tenant_id, self.group_id),
+             lambda i: StepResult.SUCCESS),
+            (DeleteNode(path='/groups/divergent/tenant-id_g1',
+                        version=self.version),
+             lambda i: raise_(BadVersionError())),
+            (LogErr(CheckFailureValue(BadVersionError()), 'mark-clean-failure',
+                    dict(path='/groups/divergent/tenant-id_g1',
+                         dirty_version=self.version)), lambda i: None)
+        ])
+        self._verify_sequence(sequence)
 
     def test_retry(self):
         """
         When execute_convergence returns RETRY, the divergent flag is not
         deleted.
         """
-        def execute_convergence(tenant_id, group_id, log):
-            return Effect(Constant(StepResult.RETRY))
-        eff = converge_one_group(
-            self.log, Reference(pset()), self.tenant_id, self.group_id,
-            self.version,
-            execute_convergence=execute_convergence)
-        result = sync_perform(self.dispatcher, eff)
-        self.assertEqual(result, None)
-        self.assertEqual(self.deletions, [])
+        sequence = SequenceDispatcher([
+            (('ec', self.tenant_id, self.group_id),
+             lambda i: StepResult.RETRY)
+        ])
+        self._verify_sequence(sequence)
 
     def test_failure(self):
         """
         When execute_convergence returns FAILURE, the divergent flag is
         deleted.
         """
-        def execute_convergence(tenant_id, group_id, log):
-            return Effect(Constant(StepResult.FAILURE))
-        eff = converge_one_group(
-            self.log, Reference(pset()), self.tenant_id, self.group_id,
-            self.version,
-            execute_convergence=execute_convergence)
-        result = sync_perform(self.dispatcher, eff)
-        self.assertEqual(result, None)
-        self.assertEqual(self.deletions, [True])
+        sequence = SequenceDispatcher([
+            (('ec', self.tenant_id, self.group_id),
+             lambda i: StepResult.FAILURE),
+            (DeleteNode(path='/groups/divergent/tenant-id_g1',
+                        version=self.version), lambda i: None),
+            (Log('mark-clean-success', {}), lambda i: None)
+        ])
+        self._verify_sequence(sequence)
 
 
 class ConvergeAllGroupsTests(SynchronousTestCase):
     """Tests for :func:`converge_all_groups`."""
 
     def setUp(self):
-        self.log = mock_log()
         self.currently_converging = Reference(pset())
         self.my_buckets = [1, 6]
         self.all_buckets = range(10)
@@ -390,12 +355,12 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
     def _converge_all_groups(self, flags):
         return converge_all_groups(
-            self.log, self.currently_converging, self.my_buckets,
+            self.currently_converging, self.my_buckets,
             self.all_buckets,
             flags,
             converge_one_group=self._converge_one_group)
 
-    def _converge_one_group(self, log, currently_converging, tenant_id,
+    def _converge_one_group(self, currently_converging, tenant_id,
                             group_id, version):
         return Effect(('converge', tenant_id, group_id, version))
 
@@ -406,38 +371,36 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         """
         eff = self._converge_all_groups(['00_g1', '01_g2'])
 
+        def perform_gs_effect(tid, gid, intent):
+            tscope = TenantScope(Effect(('converge', tid, gid, 1)), tid)
+            _s = SequenceDispatcher([
+                (GetStat(path='/groups/divergent/{}_{}'.format(tid, gid)),
+                 lambda i: ZNodeStatStub(version=1)),
+                (tscope, lambda i: i.effect),
+                (('converge', tid, gid, 1),
+                 lambda i: 'converged {}!'.format(tid))])
+            with _s.consume():
+                return sync_perform(_s, intent.effect)
+
         sequence = SequenceDispatcher([
             (ReadReference(ref=self.currently_converging),
              lambda i: pset()),
-
-            (GetStat(path='/groups/divergent/00_g1'),
-             lambda i: ZNodeStatStub(version=1)),
-            (TenantScope(
-                Effect(('converge', '00', 'g1', 1)),
-                '00'),
-             lambda tscope: tscope.effect),
-            (('converge', '00', 'g1', 1),
-             lambda i: 'converged one!'),
-
-            (GetStat(path='/groups/divergent/01_g2'),
-             lambda i: ZNodeStatStub(version=5)),
-            (TenantScope(
-                Effect(('converge', '01', 'g2', 5)),
-                '01'),
-             lambda tscope: tscope.effect),
-            (('converge', '01', 'g2', 5),
-             lambda i: 'converged two!'),
+            (Log('converge-all-groups',
+                 dict(group_infos=self.group_infos, currently_converging=[])),
+             lambda i: None),
+            (BoundFields(mock.ANY, dict(tenant_id='00',
+                                        scaling_group_id='g1')),
+             partial(perform_gs_effect, '00', 'g1')),
+            (BoundFields(mock.ANY, dict(tenant_id='01',
+                                        scaling_group_id='g2')),
+             partial(perform_gs_effect, '01', 'g2'))
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
 
         with sequence.consume():
             self.assertEqual(
                 sync_perform(dispatcher, eff),
-                ['converged one!', 'converged two!'])
-        self.log.msg.assert_called_once_with(
-            'converge-all-groups',
-            group_infos=self.group_infos,
-            currently_converging=[])
+                ['converged 00!', 'converged 01!'])
 
     def test_filter_out_currently_converging(self):
         """
@@ -448,7 +411,14 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         sequence = SequenceDispatcher([
             (ReadReference(ref=self.currently_converging),
              lambda i: pset(['g1'])),
+            (Log('converge-all-groups',
+                 dict(group_infos=[self.group_infos[1]],
+                      currently_converging=['g1'])),
+             lambda i: None),
 
+            (BoundFields(mock.ANY, dict(tenant_id='01',
+                                        scaling_group_id='g2')),
+             lambda i: i.effect),
             (GetStat(path='/groups/divergent/01_g2'),
              lambda i: ZNodeStatStub(version=5)),
             (TenantScope(
@@ -462,10 +432,6 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
         with sequence.consume():
             self.assertEqual(sync_perform(dispatcher, eff), ['converged two!'])
-        self.log.msg.assert_called_once_with(
-            'converge-all-groups',
-            group_infos=[self.group_infos[1]],
-            currently_converging=['g1'])
 
     def test_no_log_on_no_groups(self):
         """When there's no work, no log message is emitted."""
@@ -474,12 +440,9 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             1 / 0
 
         result = converge_all_groups(
-            self.log, self.currently_converging, self.my_buckets,
-            self.all_buckets,
-            [],
+            self.currently_converging, self.my_buckets, self.all_buckets, [],
             converge_one_group=converge_one_group)
         self.assertEqual(sync_perform(_get_dispatcher(), result), None)
-        self.assertEqual(self.log.msg.mock_calls, [])
 
 
 class GetMyDivergentGroupsTests(SynchronousTestCase):
@@ -609,6 +572,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         }
         gsgi_result = (self.group, self.manifest)
         self.expected_intents = [(gsgi, gsgi_result)]
+        self.log = mock_log()
 
     def _get_dispatcher(self, expected_intents=None):
         if expected_intents is None:
@@ -619,6 +583,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 ParallelEffects: perform_parallel_async,
                 ModifyGroupState: perform_modify_group_state,
             }),
+            get_log_dispatcher(self.log, {}),
             base_dispatcher,
         ])
 
@@ -633,11 +598,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         If state of world matches desired, no steps are executed, but the
         `active` servers are still updated, and SUCCESS is the return value.
         """
-        log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
         for serv in self.servers:
             serv.desired_lbs = pset()
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   get_all_convergence_data=gacd)
         expected_active = {
             'a': {'id': 'a', 'links': [{'href': 'link1', 'rel': 'self'}]},
@@ -653,30 +617,37 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         Executes the plan and returns SUCCESS when that's the most severe
         result.
         """
-        log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
+        dgs = get_desired_group_state(self.group_id, self.lc, 2)
+        steps = [
+            TestStep(
+                Effect(
+                    {'dgs': dgs,
+                     'servers': tuple(self.servers),
+                     'lb_nodes': (),
+                     'now': 500})
+                .on(lambda _: (StepResult.SUCCESS, [])))]
 
         def plan(dgs, servers, lb_nodes, now):
-            return [
-                TestStep(
-                    Effect(
-                        {'dgs': dgs,
-                         'servers': servers,
-                         'lb_nodes': lb_nodes,
-                         'now': now})
-                    .on(lambda _: (StepResult.SUCCESS, [])))]
+            return steps
 
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   get_all_convergence_data=gacd,
                                   plan=plan)
 
         sequence = SequenceDispatcher([
             (Func(time.time), lambda i: 500),
+            (Log('execute-convergence',
+                 dict(servers=tuple(self.servers), lb_nodes=(), steps=steps,
+                      now=500, desired=dgs, active=[])), lambda i: None),
             ({'dgs': get_desired_group_state(self.group_id, self.lc, 2),
               'servers': tuple(self.servers),
               'lb_nodes': (),
               'now': 500},
-             lambda i: None)
+             lambda i: None),
+            (Log('execute-convergence-results',
+                 {'results': [(steps[0], (StepResult.SUCCESS, []))],
+                  'worst_status': StepResult.SUCCESS}), lambda i: None)
         ])
         dispatcher = ComposedDispatcher([sequence, self._get_dispatcher()])
         with sequence.consume():
@@ -689,12 +660,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         If the GetScalingGroupInfo effect fails, its exception is raised
         directly, without the FirstError wrapper.
         """
-        log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
         for srv in self.servers:
             srv.desired_lbs = pmap()
 
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   get_all_convergence_data=gacd)
 
         # Perform the GetScalingGroupInfo by raising an exception
@@ -716,14 +686,13 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         all servers and group is deleted if the steps return SUCCESS. The
         group is not deleted is the step do not succeed
         """
-        log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
 
         def _plan(dsg, *a):
             self.dsg = dsg
             return [TestStep(Effect(Constant((StepResult.SUCCESS, []))))]
 
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   get_all_convergence_data=gacd, plan=_plan)
 
         # setup intents for DeleteGroup and GetScalingGroupInfo
@@ -737,7 +706,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             TypeDispatcher({
                 ParallelEffects: perform_parallel_async,
             }),
-            base_dispatcher,
+            get_log_dispatcher(self.log, {}),
+            base_dispatcher
         ])
         # This succeeded without `ModifyGroupState` dispatcher in it
         # ensuring that it was not called
@@ -750,7 +720,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         def fplan(*a):
             return [TestStep(Effect(Constant((StepResult.RETRY, []))))]
 
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   get_all_convergence_data=gacd, plan=fplan)
         disp = self._get_dispatcher([(self.gsgi, (self.group, self.manifest))])
         # This succeeded without DeleteGroup performer being there ensuring
@@ -762,7 +732,6 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         If a step that results in RETRY is returned, and there are no FAILUREs,
         then the ultimate result of executing convergence will be a RETRY.
         """
-        log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
 
         def plan(*args, **kwargs):
@@ -771,7 +740,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 ConvergeLater(reasons=['mywish']),
                 TestStep(Effect(Constant((StepResult.SUCCESS, []))))])
 
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   plan=plan,
                                   get_all_convergence_data=gacd)
         dispatcher = self._get_dispatcher()
@@ -783,7 +752,6 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         of executing convergence will be a FAILURE, regardless of the other
         step results.
         """
-        log = mock_log()
         gacd = self._get_gacd_func(self.group.uuid)
 
         def plan(*args, **kwargs):
@@ -795,7 +763,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
             ])
 
-        eff = execute_convergence(self.tenant_id, self.group_id, log,
+        eff = execute_convergence(self.tenant_id, self.group_id,
                                   plan=plan,
                                   get_all_convergence_data=gacd)
         dispatcher = self._get_dispatcher()
