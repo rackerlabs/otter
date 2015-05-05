@@ -202,7 +202,7 @@ def concretize_service_request(
 
     eff = auth_eff.on(got_auth)
     bracket = throttler(service_request.service_type,
-                     service_request.method.lower())
+                        service_request.method.lower())
     if bracket is not None:
         return Effect(_Throttle(bracket=bracket, effect=eff))
     else:

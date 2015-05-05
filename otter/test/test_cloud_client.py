@@ -11,7 +11,7 @@ from effect import (
     TypeDispatcher,
     base_dispatcher,
     sync_perform)
-from effect.testing import EQFDispatcher
+from effect.testing import EQFDispatcher, SequenceDispatcher
 
 import mock
 
@@ -49,7 +49,8 @@ from otter.constants import ServiceType
 from otter.test.utils import (
     StubResponse,
     resolve_effect,
-    stub_pure_response)
+    stub_pure_response,
+    unwrap_wrapped_effect)
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.http import APIError, headers
 from otter.util.pure_http import Request, has_code
@@ -274,17 +275,29 @@ class PerformServiceRequestTests(SynchronousTestCase):
         When the throttler function returns a bracketing function, it's used to
         throttle the request.
         """
-        bracket = object()
         def throttler(stype, method):
             if stype == ServiceType.CLOUD_SERVERS and method == 'get':
                 return bracket
+        bracket = object()
         svcreq = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers'
-                                ).intent
+                                 ).intent
+
+        response = stub_pure_response(json.dumps({}), 200)
+        seq = SequenceDispatcher([
+            unwrap_wrapped_effect(_Throttle, dict(bracket=bracket), [
+                (Authenticate(authenticator=self.authenticator,
+                              tenant_id=1,
+                              log=self.log),
+                 lambda i: ('token', fake_service_catalog)),
+                (Request(method='GET', url='http://dfw.openstack/servers',
+                         headers=headers('token'), log=self.log),
+                 lambda i: response),
+            ])])
+
         eff = self._concrete(svcreq, throttler=throttler)
-        self.assertIsInstance(eff.intent, _Throttle)
-        self.assertIs(eff.intent.bracket, bracket)
-        self.assertEqual(eff.callbacks, [])
-        result = resolve_authenticate(eff.intent.effect)
+        with seq.consume():
+            result = sync_perform(seq, eff)
+        self.assertEqual(result, (response[0], {}))
 
 
 class ThrottleTests(SynchronousTestCase):
