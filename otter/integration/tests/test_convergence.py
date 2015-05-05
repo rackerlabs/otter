@@ -20,7 +20,7 @@ from otter.integration.lib.autoscale import (
     extract_active_ids,
 )
 from otter.integration.lib.cloud_load_balancer import (
-    CloudLoadBalancer, ExcludesAllIPs)
+    CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs)
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.nova import NovaServer, delete_servers
 from otter.integration.lib.resources import TestResources
@@ -43,22 +43,36 @@ clb_key = os.environ.get('AS_CLB_SC_KEY', 'cloudLoadBalancers')
 
 class TestHelper(object):
     """
-    A helper class that contains useful functions for actual test cases.
+    A helper class that contains useful functions for actual test cases.  This
+    also creates a number of CLB that are required.
     """
-    def __init__(self, test_case):
+    def __init__(self, test_case, num_clbs=0):
         """
         Set up the test case, HTTP pool, identity, and cleanup.
         """
         self.test_case = test_case
-
         self.pool = HTTPConnectionPool(reactor, False)
         self.test_case.addCleanup(self.pool.closeCachedConnections)
 
-    def oob_delete_then(self, rcs, scaling_group, num, clbs=None):
+        self.clbs = [CloudLoadBalancer(pool=self.pool)
+                     for _ in range(num_clbs)]
+
+    def create_group(self, **kwargs):
+        """
+        Return a scaling group with the helper's pool.
+        """
+        if self.clbs:
+            kwargs['use_lbs'] = [clb.scaling_group_spec() for clb in self.clbs]
+
+        return ScalingGroup(
+            group_config=create_scaling_group_dict(**kwargs),
+            pool=self.pool)
+
+    def oob_delete_then(self, rcs, scaling_group, num):
         """
         Return a decorator that wraps a function call with logic to out-of-band
         delete (not disown) some number of servers, and verifies that the
-        servers are deleted and cleaned up.
+        servers are deleted and cleaned up from CLBs.
         """
         def decorated(function):
             @wraps(function)
@@ -66,10 +80,15 @@ class TestHelper(object):
             def wrapper(*args, **kwargs):
                 chosen = yield scaling_group.choose_random_servers(rcs, num)
 
-                # get ips for chosen servers if CLBs are provided, becase we
-                # will need to verify that the CLBs are cleaned up.
-                if clbs is not None:
+                # Get ips for chosen servers if CLBs are provided, because we
+                # will need to verify that the CLBs are cleaned up.  Ensure
+                # that they are on the CLB first though.
+                if self.clbs is not None:
                     ips = yield scaling_group.get_servicenet_ips(rcs, chosen)
+                    yield gatherResults([
+                        clb.wait_for_nodes(
+                            rcs, ContainsAllIPs(ips.values()), timeout=600)
+                        for clb in self.clbs])
 
                 yield delete_servers(chosen, rcs, pool=self.pool)
                 yield function(*args, **kwargs)
@@ -77,11 +96,11 @@ class TestHelper(object):
                 checks = [
                     scaling_group.wait_for_deleted_id_removal(chosen, rcs)]
 
-                if clbs is not None:
+                if self.clbs is not None:
                     checks += [
                         clb.wait_for_nodes(rcs, ExcludesAllIPs(ips.values()),
-                                           timeout=1800)
-                        for clb in clbs]
+                                           timeout=600)
+                        for clb in self.clbs]
 
                 yield gatherResults(checks)
                 returnValue(rcs)
@@ -384,7 +403,6 @@ class ConvergenceSet1(unittest.TestCase):
         clean Twisted reactor.
         """
         self.helper = TestHelper(self)
-        self.clbs = []
         self.rcs = TestResources()
         self.identity = IdentityV2(
             auth=auth, username=username, password=password,
@@ -425,21 +443,15 @@ class ConvergenceSet1(unittest.TestCase):
         """
         N_SERVERS = 4
 
-        scaling_group_body = create_scaling_group_dict(
+        self.scaling_group = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=N_SERVERS, use_lbs=self.use_clb_arg()
-        )
-
-        self.scaling_group = ScalingGroup(
-            group_config=scaling_group_body,
-            pool=self.helper.pool
-        )
+            min_entities=N_SERVERS)
 
         return (
             self.scaling_group.start(self.rcs, self)
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
-                N_SERVERS, timeout=1800
+                N_SERVERS, timeout=600
             )
             .addCallback(self.helper.oob_delete_then(
                 self.rcs, self.scaling_group, N_SERVERS / 2)(
@@ -463,14 +475,9 @@ class ConvergenceSet1(unittest.TestCase):
         by, say, two servers.  If convergence is working as expected, we expect
         five servers at the end.
         """
-        scaling_group_body = create_scaling_group_dict(
+        self.scaling_group = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=3, use_lbs=self.use_clb_arg()
-        )
-
-        self.scaling_group = ScalingGroup(
-            group_config=scaling_group_body,
-            pool=self.helper.pool
+            min_entities=3
         )
 
         self.scaling_policy = ScalingPolicy(
@@ -482,11 +489,11 @@ class ConvergenceSet1(unittest.TestCase):
             self.scaling_group.start(self.rcs, self)
             .addCallback(self.scaling_policy.start, self)
             .addCallback(
-                self.scaling_group.wait_for_N_servers, 3, timeout=1800)
+                self.scaling_group.wait_for_N_servers, 3, timeout=600)
             .addCallback(self.helper.oob_delete_then(
                 self.rcs, self.scaling_group, 1)(self.scaling_policy.execute))
             .addCallback(
-                self.scaling_group.wait_for_N_servers, 5, timeout=1800
+                self.scaling_group.wait_for_N_servers, 5, timeout=600
             )
         )
 
@@ -583,15 +590,9 @@ class ConvergenceSet1(unittest.TestCase):
         # This only applies if not constrained by max/min
         converged_servers = set_to_servers + scale_servers
 
-        scaling_group_body = create_scaling_group_dict(
+        self.scaling_group = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=min_servers, max_entities=max_servers,
-            use_lbs=self.use_clb_arg()
-        )
-
-        self.scaling_group = ScalingGroup(
-            group_config=scaling_group_body,
-            pool=self.helper.pool
+            min_entities=min_servers, max_entities=max_servers
         )
 
         self.policy_set = ScalingPolicy(
@@ -610,12 +611,12 @@ class ConvergenceSet1(unittest.TestCase):
             .addCallback(self.policy_set.execute)
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
-                set_to_servers, timeout=1800)
+                set_to_servers, timeout=600)
             .addCallback(self.helper.oob_delete_then(
                 rcs, self.scaling_group, oobd_servers)(
                 self.policy_scale.execute))
             .addCallback(self.scaling_group.wait_for_expected_state, rcs,
-                         timeout=1800, active=converged_servers, pending=0)
+                         timeout=600, active=converged_servers, pending=0)
         )
 
     def test_scale_up_after_oobd_at_group_max(self):
@@ -678,14 +679,9 @@ class ConvergenceSet1(unittest.TestCase):
         set_to_servers = 5
         max_servers = 10
 
-        scaling_group_body = create_scaling_group_dict(
+        self.scaling_group = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref,
-            max_entities=max_servers, use_lbs=self.use_clb_arg()
-        )
-
-        self.scaling_group = ScalingGroup(
-            group_config=scaling_group_body,
-            pool=self.helper.pool
+            max_entities=max_servers
         )
 
         self.policy_set = ScalingPolicy(
@@ -699,7 +695,7 @@ class ConvergenceSet1(unittest.TestCase):
             .addCallback(self.policy_set.execute)
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
-                set_to_servers, timeout=1800
+                set_to_servers, timeout=600
             )
             .addCallback(
                 self.helper.oob_delete_then(
@@ -714,15 +710,9 @@ class ConvergenceSet1(unittest.TestCase):
 
         converged_servers = set_to_servers
 
-        scaling_group_body = create_scaling_group_dict(
+        self.scaling_group = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=min_servers, max_entities=max_servers,
-            use_lbs=self.use_clb_arg()
-        )
-
-        self.scaling_group = ScalingGroup(
-            group_config=scaling_group_body,
-            pool=self.helper.pool
+            min_entities=min_servers, max_entities=max_servers
         )
 
         self.policy_scale = ScalingPolicy(
@@ -730,7 +720,8 @@ class ConvergenceSet1(unittest.TestCase):
             scaling_group=self.scaling_group
         )
 
-        d = self.scaling_group.start(rcs, self)
+        d = (self.scaling_group.start(rcs, self)
+             .addCallback(self.policy_scale.start, self))
 
         if set_to_servers is not None:
             self.policy_set = ScalingPolicy(
@@ -741,22 +732,16 @@ class ConvergenceSet1(unittest.TestCase):
             (d.addCallback(self.policy_set.start, self)
              .addCallback(self.policy_set.execute))
 
-        def fail_to_execute_over_max(_):
-            # Execute a scaling policy, which should return 403 because it
-            # would bring the desired over the max.  But convergence is
-            # triggered
-            return self.policy_scale.start(rcs, self).addCallback(
-                self.policy_scale.execute, success_codes=[403])
-
         (d.addCallback(
             self.scaling_group.wait_for_N_servers,
             min_servers if set_to_servers is None else set_to_servers,
             timeout=120)
-         .addCallback(self.helper.oob_delete_then(
-             rcs, self.scaling_group, oobd_servers)(
-             fail_to_execute_over_max))
+         .addCallback(
+            self.helper.oob_delete_then(rcs, self.scaling_group, oobd_servers)(
+                self.policy_scale.execute),
+            success_codes=[403])
          .addCallback(self.scaling_group.wait_for_expected_state, rcs,
-                      timeout=1800, active=converged_servers, pending=0))
+                      timeout=600, active=converged_servers, pending=0))
 
         return d
 
@@ -766,14 +751,14 @@ class ConvergenceSet1WithCLB(ConvergenceSet1):
     Class for CATC 4-12 that run with CLB.
     """
     timeout = 1800
+    skip = "Autoscale does not clean up servers deleted OOB yet.  See #881."
 
     def setUp(self):
         """Establish an HTTP connection pool and commonly used resources for
         each test.  The HTTP connection pool is important for maintaining a
         clean Twisted reactor.
         """
-        self.helper = TestHelper(self)
-        self.clbs = [CloudLoadBalancer(pool=self.helper.pool)]
+        self.helper = TestHelper(self, num_clbs=1)
         self.rcs = TestResources()
         self.identity = IdentityV2(
             auth=auth, username=username, password=password,
@@ -791,5 +776,5 @@ class ConvergenceSet1WithCLB(ConvergenceSet1):
         ).addCallback(lambda _: gatherResults([
             clb.start(self.rcs, self)
             .addCallback(clb.wait_for_state, "ACTIVE", 600)
-            for clb in self.clbs])
+            for clb in self.helper.clbs])
         )
