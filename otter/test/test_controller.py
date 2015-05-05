@@ -39,7 +39,8 @@ from otter.test.utils import (
     mock_log,
     patch,
     raise_,
-    test_dispatcher)
+    test_dispatcher,
+    unwrap_wrapped_effect)
 from otter.util.config import set_config_data
 from otter.util.fp import assoc_obj
 from otter.util.retry import (
@@ -1433,31 +1434,16 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             self.assertEqual(getattr(state1, attribute),
                              getattr(state2, attribute))
 
-    def _unwrap_wrapped_effect(self, intent_class, kwargs,
-                               wrapee_intent_and_performer):
-        """
-        Helper function to perform an intent that wraps another effect.  This
-        produces an intent-function tuple, to be used in a
-        :class:`SequenceDispatcher`, that expects that the wrapped effect
-        has an intent provided by `wrapee_intent_and_performer`.
-        """
-        def function(wrapper_intent):
-            seq_dispatcher = SequenceDispatcher([wrapee_intent_and_performer])
-            with seq_dispatcher.consume():
-                return sync_perform(seq_dispatcher, wrapper_intent.effect)
-
-        return (intent_class(effect=mock.ANY, **kwargs), function)
-
     def _tenant_retry(self, intent, performer):
         """
         Return a :class:`SequenceDispatcher` tuple such that a TenantScope
         is wrapped over a Retry which is wrapped over the given intent.
         """
-        return self._unwrap_wrapped_effect(
+        return unwrap_wrapped_effect(
             TenantScope, {'tenant_id': self.group.tenant_id},
-            self._unwrap_wrapped_effect(
+            [unwrap_wrapped_effect(
                 Retry, {'should_retry': _should_retry_params},
-                (intent, performer)))
+                [(intent, performer)])])
 
     def _remove(self, replace, purge, seq_dispatcher):
         eff = controller.convergence_remove_server_from_group(
