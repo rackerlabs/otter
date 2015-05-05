@@ -251,15 +251,21 @@ def _serialize_and_delay(clock, delay):
     return partial(lock.run, deferLater, clock, delay)
 
 
-def _make_default_throttler(clock):
+def _default_throttler(clock, stype, method):
     """Get a throttler function with default throttling policies."""
     # Serialize creation and deletion of cloud servers because the Compute team
     # has suggested we do this.
+
+    # Compute suggested 300 deletion req/min. A delay of 0.2 should guarantee
+    # no more than that are executed by a node, plus serialization of requests
+    # will make it quite a bit lower than that.
     policy = {
-        (ServiceType.CLOUD_SERVERS, 'post'): _serialize_and_delay(clock, 1),
-        (ServiceType.CLOUD_SERVERS, 'delete'): _serialize_and_delay(clock, 1),
+        (ServiceType.CLOUD_SERVERS, 'post'):
+            _serialize_and_delay(clock, 1),
+        (ServiceType.CLOUD_SERVERS, 'delete'):
+            _serialize_and_delay(clock, 0.2),
     }
-    return lambda stype, meth: policy.get((stype, meth))
+    return policy.get((stype, method))
 
 
 def perform_tenant_scope(
@@ -294,7 +300,7 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
     """
     # this throttler could be parameterized but for now it's basically a hack
     # that we want to keep private to this module
-    throttler = _make_default_throttler(reactor)
+    throttler = partial(_default_throttler, reactor)
     return TypeDispatcher({
         TenantScope: partial(perform_tenant_scope, authenticator, log,
                              service_configs, throttler),
