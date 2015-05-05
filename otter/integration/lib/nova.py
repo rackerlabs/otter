@@ -10,8 +10,7 @@ from twisted.internet.defer import gatherResults
 from otter.util.http import check_success, headers
 
 
-@attributes(["id",
-             Attribute("pool", default_value=None),
+@attributes(["id", "pool",
              Attribute("treq", default_value=treq)])
 class NovaServer(object):
     """

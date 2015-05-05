@@ -8,9 +8,6 @@ import os
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults
-from twisted.internet.task import deferLater
-from twisted.internet.tcp import Client
-from twisted.python.failure import Failure
 from twisted.trial import unittest
 from twisted.web.client import HTTPConnectionPool
 
@@ -25,8 +22,6 @@ from otter.integration.lib.cloud_load_balancer import CloudLoadBalancer
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.nova import NovaServer, delete_servers
 from otter.integration.lib.resources import TestResources
-
-from otter.util.http import APIError
 
 
 username = os.environ['AS_USERNAME']
@@ -65,17 +60,11 @@ class TestConvergence(unittest.TestCase):
         """Destroy the HTTP connection pool, so that we close the reactor
         cleanly.
         """
-
-        def _check_fds(_):
-            fds = set(reactor.getReaders() + reactor.getWriters())
-            if not [fd for fd in fds if isinstance(fd, Client)]:
-                return
-            return deferLater(reactor, 0, _check_fds, None)
-        return self.pool.closeCachedConnections().addBoth(_check_fds)
+        return self.pool.closeCachedConnections()
 
     def test_scale_over_group_max_after_metadata_removal_reduced_grp_max(self):
         """
-        CATC: 17
+        CATC-017-a
 
         Attempt to scale over the group max, but only after metadata removal on
         some random sampling of servers.  Note that this version exercises the
@@ -149,8 +138,7 @@ class TestConvergence(unittest.TestCase):
             ).addCallback(self.scaling_group.choose_random_servers, 3)
             .addCallback(self._remove_metadata, rcs)
             .addCallback(lambda _: rcs)
-            .addCallback(self.scale_beyond_max.execute)
-            .addBoth(self._assert_error_status_code, 403, rcs)
+            .addCallback(self.scale_beyond_max.execute, success_codes=[403])
             .addCallback(lambda _: self.removed_ids)
             .addCallback(
                 self.scaling_group.wait_for_deleted_id_removal,
@@ -165,7 +153,7 @@ class TestConvergence(unittest.TestCase):
 
     def test_scale_over_group_max_after_metadata_removal(self):
         """
-        CATC- 18?
+        CATC-018-a
 
         Attempt to scale over the group max, but only after metadata removal on
         some random sampling of servers.
@@ -192,14 +180,6 @@ class TestConvergence(unittest.TestCase):
             scaling_group=self.scaling_group
         )
 
-        def expect_403(failure):
-            if not isinstance(failure, Failure):
-                raise Exception("Failure expected")
-            failure.trap(APIError)
-            if failure.value.code != 403:
-                failure.raiseException()
-            return rcs
-
         return (
             self.identity.authenticate_user(
                 rcs,
@@ -217,8 +197,7 @@ class TestConvergence(unittest.TestCase):
             ).addCallback(self.scaling_group.choose_random_servers, 3)
             .addCallback(self._remove_metadata, rcs)
             .addCallback(lambda _: rcs)
-            .addCallback(self.scale_beyond_max.execute)
-            .addBoth(expect_403)
+            .addCallback(self.scale_beyond_max.execute, success_codes=[403])
             .addCallback(lambda _: self.removed_ids)
             .addCallback(
                 self.scaling_group.wait_for_deleted_id_removal,
@@ -231,13 +210,13 @@ class TestConvergence(unittest.TestCase):
 
     def test_scaling_to_clb_max_after_oob_delete_type1(self):
         """
-        CATC: 15.1
+        CATC-015-a
 
         This test starts with a scaling group with no servers.  We scale up
         to 24 servers, but after that's done, we delete 2 directly through
         Nova.  After that, we scale up once more by 1 server, thus max'ing out
         the CLB's ports.  We expect that the group will return to 25 servers,
-        and does not overshoot in the process.
+        and does not overshoot or enter error state in the process.
 
         Further, we want to make sure the deleted servers are removed from the
         CLB.
@@ -249,21 +228,21 @@ class TestConvergence(unittest.TestCase):
 
     def test_scaling_to_clb_max_after_oob_delete_type2(self):
         """
-        CATC: 15.2
+        CATC-015-b
 
         This test starts with a scaling group with no servers.  We scale up
         to 24 servers, but after that's done, we delete 2 directly through
         Nova.  After that, we scale up once more by 1 server, thus max'ing out
         the CLB's ports.  We expect that the group will return to 25 servers,
-        and does not overshoot in the process.
+        and does not overshoot or error in the process.
 
         Further, we want to make sure the deleted servers are removed from the
         CLB.
 
         This variant assumes a scaling group's max_entities field exceeds that
-        for a CLB (as of this writing).  We use max of CLB + 25.
+        for a CLB (as of this writing).  We use max of CLB + 10.
         """
-        return self._perform_oobd_clb_test(50)
+        return self._perform_oobd_clb_test(35)
 
     def _perform_oobd_clb_test(self, scaling_group_max_entities):
         rcs = TestResources()
@@ -327,25 +306,6 @@ class TestConvergence(unittest.TestCase):
 
         return create_clb_first().addCallback(then_test)
 
-    def _assert_error_status_code(self, result, code, rcs):
-        """
-        FACTOR_OUT
-
-        Validate that the returned value was a failure with the specified
-        status code.
-        """
-        if not isinstance(result, Failure):
-            self.fail('Unexpectedly, this succeeded when it was '
-                      'expected to fail')
-        elif not result.check(APIError):
-            self.fail('Received {0} instead of expected APIError'.format(
-                      result.type))
-        elif result.value.code != code:
-            self.fail('Expected status code {0} but received {1}'.format(
-                      code, result.value.code))
-        else:
-            return rcs
-
     def _delete_those_servers(self, ids, rcs):
         """
         Delete each of the servers selected, and save a list of the
@@ -361,8 +321,9 @@ class TestConvergence(unittest.TestCase):
         This will strip them of their association with Autoscale.
         """
         self.removed_ids = ids
-        return gatherResults([NovaServer(id=_id).update_metadata({}, rcs)
-                              for _id in ids]).addCallback(lambda _: rcs)
+        return gatherResults([
+            NovaServer(id=_id, pool=self.pool).update_metadata({}, rcs)
+            for _id in ids]).addCallback(lambda _: rcs)
 
 
 class ConvergenceSet1(unittest.TestCase):
@@ -388,17 +349,12 @@ class ConvergenceSet1(unittest.TestCase):
         """Destroy the HTTP connection pool, so that we close the reactor
         cleanly.
         """
-
-        def _check_fds(_):
-            fds = set(reactor.getReaders() + reactor.getWriters())
-            if not [fd for fd in fds if isinstance(fd, Client)]:
-                return
-            return deferLater(reactor, 0, _check_fds, None)
-        return self.pool.closeCachedConnections().addBoth(_check_fds)
+        return self.pool.closeCachedConnections()
 
     def test_reaction_to_oob_server_deletion_below_min(self):
         """
-        CATC:4
+        CATC-004-a
+
         CLB_NEEDED
 
         Validate the following edge case:
@@ -452,7 +408,10 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_reaction_to_oob_deletion_then_scale_up(self):
         """
-        CATC: 5
+        CATC-005-a
+
+        CLB_NEEDED
+
         Validate the following edge case:
         - When out of band deletions bring the number of active servers below
           the group min, the servers are replaced in addition to adding the
@@ -509,7 +468,7 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_scale_down_after_oobd_non_constrained_z_lessthan_y(self):
         """
-        CATC: 6.1
+        CATC-006-a
         CLB_NEEDED
 
         Validate the following edge case:
@@ -540,7 +499,7 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_scale_down_after_oobd_non_constrained_z_greaterthan_y(self):
         """
-        CATC:6.2
+        CATC-006-b
         CLB_NEEDED
 
         Validate the following edge case:
@@ -572,7 +531,7 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_scale_down_after_oobd_non_constrained_z_equal_y(self):
         """
-        CATC:6.3
+        CATC-006-c
         CLB_NEEDED
 
         Validate the following edge case:
@@ -605,7 +564,7 @@ class ConvergenceSet1(unittest.TestCase):
             self, rcs, min_servers=0, max_servers=25, set_to_servers=0,
             oobd_servers=0, scale_servers=1):
         """
-        Used by CATC: 5
+        Helper for CATC-006
         """
         # This only applies if not constrained by max/min
         converged_servers = set_to_servers + scale_servers
@@ -656,12 +615,12 @@ class ConvergenceSet1(unittest.TestCase):
                 total_servers=set_to_servers,
             )
             .addCallback(self.scaling_group.wait_for_expected_state, rcs,
-                         active=converged_servers, pending=0)
+                         timeout=1800, active=converged_servers, pending=0)
         )
 
     def test_scale_up_after_oobd_at_group_max(self):
         """
-        CATC: 7.1
+        CATC-007-a
         CLB_NEEDED
 
         Validate the following edge case:
@@ -688,7 +647,7 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_scale_down_past_group_min_after_oobd(self):
         """
-        CATC: 7.2
+        CATC-007-b
         CLB_NEEDED
 
         Validate the following edge case:
@@ -715,7 +674,7 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_group_config_update_triggers_convergence(self):
         """
-        CATC: 8
+        CATC-008-a
         CLB_NEEDED
 
         Validate the following edge case:
@@ -770,25 +729,6 @@ class ConvergenceSet1(unittest.TestCase):
             )
         )
 
-    def _assert_error_status_code(self, result, code, rcs):
-        """
-        FACTOR_OUT
-
-        Validate that the returned value was a failure with the specified
-        status code.
-        """
-        if not isinstance(result, Failure):
-            self.fail('Unexpectedly, this succeeded when it was '
-                      'expected to fail')
-        elif not result.check(APIError):
-            self.fail('Received {0} instead of expected APIError'.format(
-                      result.type))
-        elif result.value.code != code:
-            self.fail('Expected status code {0} but received {1}'.format(
-                      code, result.value.code))
-        else:
-            return rcs
-
     def _scale_down_after_oobd_hitting_constraints(
             self, rcs, min_servers=0, max_servers=25, set_to_servers=None,
             oobd_servers=0, scale_servers=1, converged_servers=0):
@@ -835,16 +775,14 @@ class ConvergenceSet1(unittest.TestCase):
          .addCallback(self._delete_those_servers, rcs)
          # The execution of the policy triggers convergence
          .addCallback(self.policy_scale.start, self)
-         .addCallback(self.policy_scale.execute)
-         .addBoth(self._assert_error_status_code, 403, rcs)
-         # Need to add a check for the expected 403
+         .addCallback(self.policy_scale.execute, success_codes=[403])
          .addCallback(lambda _: self.removed_ids)
          .addCallback(
             self.scaling_group.wait_for_deleted_id_removal,
             rcs,
             total_servers=set_to_servers,)
          .addCallback(self.scaling_group.wait_for_expected_state, rcs,
-                      active=converged_servers, pending=0))
+                      timeout=1800, active=converged_servers, pending=0))
 
         return d
 
@@ -863,5 +801,6 @@ class ConvergenceSet1(unittest.TestCase):
         This will strip them of their association with Autoscale.
         """
         self.removed_ids = ids
-        return gatherResults([NovaServer(id=_id).update_metadata({}, rcs)
-                              for _id in ids]).addCallback(lambda _: rcs)
+        return gatherResults([
+            NovaServer(id=_id, pool=self.pool).update_metadata({}, rcs)
+            for _id in ids]).addCallback(lambda _: rcs)
