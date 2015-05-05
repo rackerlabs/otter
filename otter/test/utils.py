@@ -771,7 +771,7 @@ def get_fake_service_request_performer(stub_response):
             authenticator=mock.MagicMock(),
             log=mock.MagicMock(),
             service_configs=service_configs,
-            throttler=lambda stype, url: None,
+            throttler=lambda stype, method: None,
             tenant_id='000000',
             service_request=service_request_intent)
 

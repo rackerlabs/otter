@@ -80,7 +80,7 @@ def service_request_eqf(stub_response):
             authenticator=object(),
             log=object(),
             service_configs=fake_service_configs,
-            throttler=lambda stype, url: None,
+            throttler=lambda stype, method: None,
             tenant_id='000000',
             service_request=service_request_intent)
 
@@ -159,13 +159,15 @@ class PerformServiceRequestTests(SynchronousTestCase):
         eff = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
         self.svcreq = eff.intent
 
-    def _concrete(self, svcreq, **kwargs):
+    def _concrete(self, svcreq, throttler=None, **kwargs):
         """
         Call :func:`concretize_service_request` with premade test objects.
         """
+        if throttler is None:
+            throttler = lambda stype, method: None
         return concretize_service_request(
             self.authenticator, self.log, self.service_configs,
-            lambda stype, url: None,
+            throttler,
             1, svcreq,
             **kwargs)
 
@@ -272,6 +274,17 @@ class PerformServiceRequestTests(SynchronousTestCase):
         When the throttler function returns a bracketing function, it's used to
         throttle the request.
         """
+        bracket = object()
+        def throttler(stype, method):
+            if stype == ServiceType.CLOUD_SERVERS and method == 'get':
+                return bracket
+        svcreq = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers'
+                                ).intent
+        eff = self._concrete(svcreq, throttler=throttler)
+        self.assertIsInstance(eff.intent, _Throttle)
+        self.assertIs(eff.intent.bracket, bracket)
+        self.assertEqual(eff.callbacks, [])
+        result = resolve_authenticate(eff.intent.effect)
 
 
 class ThrottleTests(SynchronousTestCase):
@@ -384,7 +397,7 @@ class PerformTenantScopeTests(SynchronousTestCase):
                 'region': 'DFW'}
         }
 
-        self.throttler = lambda stype, url: None
+        self.throttler = lambda stype, method: None
 
         def concretize(au, lo, smap, throttler, tenid, srvreq):
             return Effect(Constant(('concretized', au, lo, smap, throttler,
