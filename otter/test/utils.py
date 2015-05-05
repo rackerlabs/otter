@@ -8,9 +8,10 @@ from inspect import getargspec
 
 from effect import (
     ComposedDispatcher, ParallelEffects, TypeDispatcher,
-    base_dispatcher, sync_performer)
+    base_dispatcher, sync_perform, sync_performer)
 from effect.async import perform_parallel_async
 from effect.testing import (
+    SequenceDispatcher,
     resolve_effect as eff_resolve_effect,
     resolve_stubs as eff_resolve_stubs)
 
@@ -687,6 +688,27 @@ def resolve_stubs(eff):
     dispatchers from Effect.
     """
     return eff_resolve_stubs(base_dispatcher, eff)
+
+
+def unwrap_wrapped_effect(intent_class, kwargs,
+                          wrapee_intents_and_performers):
+    """
+    Helper function to perform an intent that wraps another effect.  This
+    produces an intent-function tuple, to be used in a
+    :class:`SequenceDispatcher`, that expects that the wrapped effect
+    has an intents and its performers provided by
+    `wrapee_intents_and_performers`.
+
+    :param list wrapee_intents_and_performers: List of tuple of intent and
+        its performers
+    :return: Tuple of (outer intent, internal effect performer)
+    """
+    def function(wrapper_intent):
+        seq_dispatcher = SequenceDispatcher(wrapee_intents_and_performers)
+        with seq_dispatcher.consume():
+            return sync_perform(seq_dispatcher, wrapper_intent.effect)
+
+    return (intent_class(effect=mock.ANY, **kwargs), function)
 
 
 def test_dispatcher():
