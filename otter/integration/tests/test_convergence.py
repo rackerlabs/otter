@@ -62,13 +62,7 @@ class TestConvergence(unittest.TestCase):
         """Destroy the HTTP connection pool, so that we close the reactor
         cleanly.
         """
-
-        def _check_fds(_):
-            fds = set(reactor.getReaders() + reactor.getWriters())
-            if not [fd for fd in fds if isinstance(fd, Client)]:
-                return
-            return deferLater(reactor, 0, _check_fds, None)
-        return self.pool.closeCachedConnections().addBoth(_check_fds)
+        return self.pool.closeCachedConnections()
 
     def test_scale_over_group_max_after_metadata_removal_reduced_grp_max(self):
         """
@@ -357,13 +351,7 @@ class ConvergenceSet1(unittest.TestCase):
         """Destroy the HTTP connection pool, so that we close the reactor
         cleanly.
         """
-
-        def _check_fds(_):
-            fds = set(reactor.getReaders() + reactor.getWriters())
-            if not [fd for fd in fds if isinstance(fd, Client)]:
-                return
-            return deferLater(reactor, 0, _check_fds, None)
-        return self.pool.closeCachedConnections().addBoth(_check_fds)
+        return self.pool.closeCachedConnections()
 
     def test_reaction_to_oob_server_deletion_below_min(self):
         """
