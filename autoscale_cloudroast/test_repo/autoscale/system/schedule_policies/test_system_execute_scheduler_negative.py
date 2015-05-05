@@ -2,7 +2,6 @@
 Test negative scenarios for execution of at style and
 cron style scheduler policies
 """
-import unittest
 from time import sleep
 
 from cafe.drivers.unittest.decorators import tags
@@ -55,7 +54,20 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, self.gc_min_entities)
 
-    @unittest.skip("Skipping until CRON timing test issues are addressed")
+    def check_cooldown_over_trigger(self, group):
+        self.wait_for_expected_group_state(
+            group.id, self.sp_change,
+            60 + self.scheduler_interval, 1, time_scale=False)
+        # This is sometime between 0 to scheduler_interval of minute.
+        # Sleeping for another minute + interval + 30s should be time after
+        # next execution which must have same state
+        sleep(60 + self.scheduler_interval + 30)
+        self.verify_group_state(group.id, self.sp_change)
+        # next minute should trigger execution
+        self.wait_for_expected_group_state(
+            group.id, self.sp_change * 2,
+            30 + self.scheduler_interval, 2, time_scale=False)
+
     @tags(speed='slow', convergence='yes')
     def test_cron_style_when_policy_cooldown_over_trigger_period(self):
         """
@@ -69,14 +81,8 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             sp_cooldown=65,
             sp_change=self.sp_change,
             schedule_cron='* * * * *')
-        sleep(60 + self.scheduler_interval)
-        self.verify_group_state(group.id, self.sp_change)
-        sleep(60 + self.scheduler_interval)
-        self.verify_group_state(group.id, self.sp_change)
-        sleep(60 + self.scheduler_interval)
-        self.verify_group_state(group.id, self.sp_change * 2)
+        self.check_cooldown_over_trigger(group)
 
-    @unittest.skip("Skipping until CRON timing test issues are addressed")
     @tags(speed='slow', convergence='yes')
     def test_cron_style_when_group_cooldown_over_trigger_period(self):
         """
@@ -90,12 +96,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             sp_cooldown=0,
             sp_change=self.sp_change,
             schedule_cron='* * * * *')
-        sleep(60 + self.scheduler_interval)
-        self.verify_group_state(group.id, self.sp_change)
-        sleep(60 + self.scheduler_interval)
-        self.verify_group_state(group.id, self.sp_change)
-        sleep(70 + self.scheduler_interval)
-        self.verify_group_state(group.id, self.sp_change * 2)
+        self.check_cooldown_over_trigger(group)
 
     @tags(speed='slow', convergence='yes')
     def test_at_cron_style_execution_after_delete(self):
@@ -118,8 +119,9 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             group.id, at_policy['id'])
         self.autoscale_client.delete_scaling_policy(
             group.id, cron_policy['id'])
-        sleep(60 + self.scheduler_interval)
-        self.verify_group_state(group.id, self.gc_min_entities)
+        self.wait_for_expected_group_state(
+            group.id, self.gc_min_entities,
+            60 + self.scheduler_interval, 2, time_scale=False)
 
     def test_system_scheduler_down(self):
         """
@@ -139,7 +141,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         at_style_policies_list = []
         size = 1
         at_style_time = self.autoscale_behaviors.get_time_in_utc(10)
-        for policy in (range(self.scheduler_batch * size)):
+        for policy in range(self.scheduler_batch * size):
             policy = {
                 'args': {'at': at_style_time},
                 'cooldown': 0,
@@ -152,7 +154,9 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             sp_list=at_style_policies_list)
         group = response.entity
         self.resources.add(group, self.empty_scaling_group)
-        sleep(self.scheduler_interval * 2)
+        # An extra 1 second to let scheduler processing take place due to
+        # excess events
+        sleep(10 + self.scheduler_interval + 1)
         self.check_for_expected_number_of_building_servers(
             group.id, self.scheduler_batch * size)
         self.verify_group_state(group.id, self.scheduler_batch * size)

@@ -62,8 +62,9 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             1, 201, self.wb_policy, self.at_style_policy,
             self.cron_style_policy)
         self._execute_webhook_policies_within_group(group)
-        sleep(60 + self.scheduler_interval)
-        self.verify_group_state(group.id, 3 * self.change)
+        self.wait_for_expected_group_state(
+            group.id, 3 * self.change,
+            60 + self.scheduler_interval, 2, time_scale=False)
 
     @tags(speed='slow', convergence='yes')
     def test_system_webhook_and_scheduler_policies_different_groups(self):
