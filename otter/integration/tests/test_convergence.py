@@ -64,7 +64,7 @@ class TestConvergence(unittest.TestCase):
 
     def test_scale_over_group_max_after_metadata_removal_reduced_grp_max(self):
         """
-        CATC: 17
+        CATC-017-a
 
         Attempt to scale over the group max, but only after metadata removal on
         some random sampling of servers.  Note that this version exercises the
@@ -153,7 +153,7 @@ class TestConvergence(unittest.TestCase):
 
     def test_scale_over_group_max_after_metadata_removal(self):
         """
-        CATC- 18?
+        CATC-018-a
 
         Attempt to scale over the group max, but only after metadata removal on
         some random sampling of servers.
@@ -210,13 +210,13 @@ class TestConvergence(unittest.TestCase):
 
     def test_scaling_to_clb_max_after_oob_delete_type1(self):
         """
-        CATC: 15.1
+        CATC-015-a
 
         This test starts with a scaling group with no servers.  We scale up
         to 24 servers, but after that's done, we delete 2 directly through
         Nova.  After that, we scale up once more by 1 server, thus max'ing out
         the CLB's ports.  We expect that the group will return to 25 servers,
-        and does not overshoot in the process.
+        and does not overshoot or enter error state in the process.
 
         Further, we want to make sure the deleted servers are removed from the
         CLB.
@@ -228,21 +228,21 @@ class TestConvergence(unittest.TestCase):
 
     def test_scaling_to_clb_max_after_oob_delete_type2(self):
         """
-        CATC: 15.2
+        CATC-015-b
 
         This test starts with a scaling group with no servers.  We scale up
         to 24 servers, but after that's done, we delete 2 directly through
         Nova.  After that, we scale up once more by 1 server, thus max'ing out
         the CLB's ports.  We expect that the group will return to 25 servers,
-        and does not overshoot in the process.
+        and does not overshoot or error in the process.
 
         Further, we want to make sure the deleted servers are removed from the
         CLB.
 
         This variant assumes a scaling group's max_entities field exceeds that
-        for a CLB (as of this writing).  We use max of CLB + 25.
+        for a CLB (as of this writing).  We use max of CLB + 10.
         """
-        return self._perform_oobd_clb_test(50)
+        return self._perform_oobd_clb_test(35)
 
     def _perform_oobd_clb_test(self, scaling_group_max_entities):
         rcs = TestResources()
@@ -353,7 +353,8 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_reaction_to_oob_server_deletion_below_min(self):
         """
-        CATC:4
+        CATC-004-a
+
         CLB_NEEDED
 
         Validate the following edge case:
@@ -407,7 +408,10 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_reaction_to_oob_deletion_then_scale_up(self):
         """
-        CATC: 5
+        CATC-005-a
+
+        CLB_NEEDED
+
         Validate the following edge case:
         - When out of band deletions bring the number of active servers below
           the group min, the servers are replaced in addition to adding the
@@ -464,7 +468,7 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_scale_down_after_oobd_non_constrained_z_lessthan_y(self):
         """
-        CATC: 6.1
+        CATC-006-a
         CLB_NEEDED
 
         Validate the following edge case:
@@ -495,7 +499,7 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_scale_down_after_oobd_non_constrained_z_greaterthan_y(self):
         """
-        CATC:6.2
+        CATC-006-b
         CLB_NEEDED
 
         Validate the following edge case:
@@ -527,7 +531,7 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_scale_down_after_oobd_non_constrained_z_equal_y(self):
         """
-        CATC:6.3
+        CATC-006-c
         CLB_NEEDED
 
         Validate the following edge case:
@@ -560,7 +564,7 @@ class ConvergenceSet1(unittest.TestCase):
             self, rcs, min_servers=0, max_servers=25, set_to_servers=0,
             oobd_servers=0, scale_servers=1):
         """
-        Used by CATC: 5
+        Helper for CATC-006
         """
         # This only applies if not constrained by max/min
         converged_servers = set_to_servers + scale_servers
@@ -616,7 +620,7 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_scale_up_after_oobd_at_group_max(self):
         """
-        CATC: 7.1
+        CATC-007-a
         CLB_NEEDED
 
         Validate the following edge case:
@@ -643,7 +647,7 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_scale_down_past_group_min_after_oobd(self):
         """
-        CATC: 7.2
+        CATC-007-b
         CLB_NEEDED
 
         Validate the following edge case:
@@ -670,7 +674,7 @@ class ConvergenceSet1(unittest.TestCase):
 
     def test_group_config_update_triggers_convergence(self):
         """
-        CATC: 8
+        CATC-008-a
         CLB_NEEDED
 
         Validate the following edge case:
