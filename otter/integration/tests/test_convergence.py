@@ -4,8 +4,8 @@ Tests covering self-healing should be placed in a separate test file.
 
 from __future__ import print_function
 
-from functools import wraps
 import os
+from functools import wraps
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
@@ -413,8 +413,6 @@ class ConvergenceSet1(unittest.TestCase):
         """
         CATC-004-a
 
-        CLB_NEEDED
-
         Validate the following edge case:
         - When out of band deletions bring the number of active servers below
           the group min, the servers are replaced up to the group min when
@@ -495,7 +493,6 @@ class ConvergenceSet1(unittest.TestCase):
     def test_scale_down_after_oobd_non_constrained_z_lessthan_y(self):
         """
         CATC-006-a
-        CLB_NEEDED
 
         Validate the following edge case:
         - When scaling down after an out of band delete (OOBD) that is
@@ -524,7 +521,6 @@ class ConvergenceSet1(unittest.TestCase):
     def test_scale_down_after_oobd_non_constrained_z_greaterthan_y(self):
         """
         CATC-006-b
-        CLB_NEEDED
 
         Validate the following edge case:
         - When scaling down after an out of band delete (OOBD) that is
@@ -553,7 +549,6 @@ class ConvergenceSet1(unittest.TestCase):
     def test_scale_down_after_oobd_non_constrained_z_equal_y(self):
         """
         CATC-006-c
-        CLB_NEEDED
 
         Validate the following edge case:
         - When scaling down after an out of band delete (OOBD) that is
@@ -626,7 +621,6 @@ class ConvergenceSet1(unittest.TestCase):
     def test_scale_up_after_oobd_at_group_max(self):
         """
         CATC-007-a
-        CLB_NEEDED
 
         Validate the following edge case:
         - Scaling up when already at the max returns a 403 even after an out
@@ -652,7 +646,6 @@ class ConvergenceSet1(unittest.TestCase):
     def test_scale_down_past_group_min_after_oobd(self):
         """
         CATC-007-b
-        CLB_NEEDED
 
         Validate the following edge case:
         - Scaling down when already at the min returns a 403 after an out
@@ -677,7 +670,6 @@ class ConvergenceSet1(unittest.TestCase):
     def test_group_config_update_triggers_convergence(self):
         """
         CATC-008-a
-        CLB_NEEDED
 
         Validate the following edge case:
         - On a group that has experienced and out of band delete,
