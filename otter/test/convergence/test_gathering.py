@@ -121,7 +121,8 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         """
         fake_response = object()
         body = {'servers': self.servers,
-                'server_links': [{'href': 'meh?bleh=1', 'rel': 'prev'}]}
+                'server_links': [{
+                    'href': 'https://ignoreme/path?bleh=1', 'rel': 'prev'}]}
         eff = get_all_server_details(batch_size=10)
         svcreq = resolve_retry_stubs(eff)
         result = resolve_svcreq(svcreq, (fake_response, body), *self.req())
@@ -137,16 +138,18 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
         fake_response = object()
         body = {'servers': servers[:10],
-                'servers_links': [{'href': 'url?limit=10&marker=9',
-                                   'rel': 'next'}]}
+                'servers_links': [{
+                    'href': 'https://ignoreme/path?limit=10&marker=9',
+                    'rel': 'next'}]}
         result = resolve_svcreq(svcreq, (fake_response, body), *self.req())
         self.assertIsInstance(result, Effect)
 
         # next request, because previous had a next link
         next_req = resolve_retry_stubs(result)
         body = {'servers': servers[10:],
-                'servers_links': [{'href': 'url?limit=10&marker=19',
-                                   'rel': 'next'}]}
+                'servers_links': [{
+                    'href': 'https://ignoreme/path?limit=10&marker=19',
+                    'rel': 'next'}]}
         result = resolve_svcreq(next_req, (fake_response, body),
                                 *self.req({'limit': 10, 'marker': 9}))
         self.assertIsInstance(result, Effect)
@@ -170,14 +173,18 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
         fake_response = object()
         body = {'servers': servers[:10],
-                'servers_links': [{'href': 'url?anything=1', 'rel': 'next'}]}
+                'servers_links': [{
+                    'href': 'https://ignoreme/path?anything=1',
+                    'rel': 'next'}]}
         result = resolve_svcreq(svcreq, (fake_response, body), *self.req())
         self.assertIsInstance(result, Effect)
 
         # next request, because previous had a next link
         next_req = resolve_retry_stubs(result)
         body = {'servers': servers[10:],
-                'servers_links': [{'href': 'url?anything=1', 'rel': 'next'}]}
+                'servers_links': [{
+                    'href': 'https://ignoreme/path?anything=1',
+                    'rel': 'next'}]}
         self.assertRaises(UnexpectedBehaviorError,
                           resolve_svcreq, next_req, (fake_response, body),
                           *self.req({'anything': 1}))
