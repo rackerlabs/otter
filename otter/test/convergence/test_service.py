@@ -130,7 +130,7 @@ class ConvergerTests(SynchronousTestCase):
         sequence = SequenceDispatcher([
             (Func(uuid.uuid1), lambda i: 'uid'),
             unwrap_wrapped_effect(
-                BoundFields, dict(fields={'system': 'converger',
+                BoundFields, dict(fields={'otter_service': 'converger',
                                           'converger_run_id': 'uid'}),
                 bound_sequence)
         ])
@@ -162,7 +162,7 @@ class ConvergerTests(SynchronousTestCase):
         sequence = SequenceDispatcher([
             (Func(uuid.uuid1), lambda i: 'uid'),
             unwrap_wrapped_effect(
-                BoundFields, dict(fields={'system': 'converger',
+                BoundFields, dict(fields={'otter_service': 'converger',
                                           'converger_run_id': 'uid'}),
                 bound_sequence)
         ])

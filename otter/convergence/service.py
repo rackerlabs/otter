@@ -419,7 +419,7 @@ class Converger(MultiService):
             create an :obj:`Partitioner` to distribute the buckets.
         """
         MultiService.__init__(self)
-        self.log = log.bind(system='converger')
+        self.log = log.bind(otter_service='converger')
         self._dispatcher = dispatcher
         self._buckets = buckets
         self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
@@ -445,7 +445,7 @@ class Converger(MultiService):
         ceff = Effect(GetChildren(CONVERGENCE_DIRTY_DIR)).on(
             partial(self._converge_all, my_buckets))
         eff = Effect(Func(uuid.uuid1)).on(
-            lambda uid: with_log(ceff, system='converger',
+            lambda uid: with_log(ceff, otter_service='converger',
                                  converger_run_id=uid))
         return perform(self._dispatcher, eff)
 
