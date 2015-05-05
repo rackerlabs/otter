@@ -9,8 +9,6 @@ import os
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
-from twisted.internet.task import deferLater
-from twisted.internet.tcp import Client
 from twisted.trial import unittest
 from twisted.web.client import HTTPConnectionPool
 
@@ -102,7 +100,7 @@ class TestConvergence(unittest.TestCase):
         clean Twisted reactor.
         """
         self.helper = TestHelper(self)
-        self.test_case.identity = IdentityV2(
+        self.identity = IdentityV2(
             auth=auth, username=username, password=password,
             endpoint=endpoint, pool=self.helper.pool,
             convergence_tenant_override=convergence_tenant,
@@ -368,13 +366,15 @@ class TestConvergence(unittest.TestCase):
         """
         self.removed_ids = ids
         return gatherResults([
-            NovaServer(id=_id, pool=self.pool).update_metadata({}, rcs)
+            NovaServer(id=_id, pool=self.helper.pool).update_metadata({}, rcs)
             for _id in ids]).addCallback(lambda _: rcs)
 
 
 class ConvergenceSet1(unittest.TestCase):
     """
-    Class for CATC 4-12 that run both with and without CLB.
+    Class for CATC 4-12 that run without CLB, but can be run with CLB (
+    so the CLB versions of these tests can be run by just subclassing this
+    test case)
     """
     timeout = 1800
 
@@ -384,11 +384,30 @@ class ConvergenceSet1(unittest.TestCase):
         clean Twisted reactor.
         """
         self.helper = TestHelper(self)
+        self.clbs = []
+        self.rcs = TestResources()
         self.identity = IdentityV2(
             auth=auth, username=username, password=password,
             endpoint=endpoint, pool=self.helper.pool,
             convergence_tenant_override=convergence_tenant,
         )
+        return self.identity.authenticate_user(
+            self.rcs,
+            resources={
+                "otter": (otter_key, otter_url),
+                "nova": (nova_key,),
+            },
+            region=region
+        )
+
+    def use_clb_arg(self):
+        """
+        Get the CLB arguments with which to create a scaling group, if
+        ``clbs`` is set on the test case.
+        """
+        if self.clbs is not None:
+            return [clb.scaling_group_spec() for clb in self.clbs]
+        return None
 
     def test_reaction_to_oob_server_deletion_below_min(self):
         """
@@ -408,11 +427,9 @@ class ConvergenceSet1(unittest.TestCase):
         """
         N_SERVERS = 4
 
-        rcs = TestResources()
-
         scaling_group_body = create_scaling_group_dict(
             image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=N_SERVERS
+            min_entities=N_SERVERS, use_lbs=self.use_clb_arg()
         )
 
         self.scaling_group = ScalingGroup(
@@ -421,20 +438,13 @@ class ConvergenceSet1(unittest.TestCase):
         )
 
         return (
-            self.identity.authenticate_user(
-                rcs,
-                resources={
-                    "otter": (otter_key, otter_url),
-                    "nova": (nova_key,),
-                },
-                region=region
-            ).addCallback(self.scaling_group.start, self)
+            self.scaling_group.start(self.rcs, self)
             .addCallback(
                 self.scaling_group.wait_for_N_servers,
                 N_SERVERS, timeout=1800
             )
             .addCallback(self.helper.oob_delete_then(
-                rcs, self.scaling_group, N_SERVERS / 2)(
+                self.rcs, self.scaling_group, N_SERVERS / 2)(
                 self.scaling_group.trigger_convergence))
         )
 
@@ -455,12 +465,9 @@ class ConvergenceSet1(unittest.TestCase):
         by, say, two servers.  If convergence is working as expected, we expect
         five servers at the end.
         """
-
-        rcs = TestResources()
-
         scaling_group_body = create_scaling_group_dict(
             image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=3
+            min_entities=3, use_lbs=self.use_clb_arg()
         )
 
         self.scaling_group = ScalingGroup(
@@ -474,19 +481,12 @@ class ConvergenceSet1(unittest.TestCase):
         )
 
         return (
-            self.identity.authenticate_user(
-                rcs,
-                resources={
-                    "otter": (otter_key, otter_url),
-                    "nova": (nova_key,),
-                },
-                region=region
-            ).addCallback(self.scaling_group.start, self)
+            self.scaling_group.start(self.rcs, self)
             .addCallback(self.scaling_policy.start, self)
             .addCallback(
                 self.scaling_group.wait_for_N_servers, 3, timeout=1800)
             .addCallback(self.helper.oob_delete_then(
-                rcs, self.scaling_group, 1)(self.scaling_policy.execute))
+                self.rcs, self.scaling_group, 1)(self.scaling_policy.execute))
             .addCallback(
                 self.scaling_group.wait_for_N_servers, 5, timeout=1800
             )
@@ -512,15 +512,13 @@ class ConvergenceSet1(unittest.TestCase):
                 - z < |y|
 
         """
-        rcs = TestResources()
-
         N = 2
         x = 7
         z = 2
         y = -3
 
         return self._scale_down_after_oobd_non_constrained_param(
-            rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
+            self.rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
             scale_servers=y)
 
     def test_scale_down_after_oobd_non_constrained_z_greaterthan_y(self):
@@ -543,16 +541,13 @@ class ConvergenceSet1(unittest.TestCase):
                 - z > |y|
 
         """
-
-        rcs = TestResources()
-
         N = 2
         x = 7
         z = 3
         y = -2
 
         return self._scale_down_after_oobd_non_constrained_param(
-            rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
+            self.rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
             scale_servers=y)
 
     def test_scale_down_after_oobd_non_constrained_z_equal_y(self):
@@ -575,15 +570,13 @@ class ConvergenceSet1(unittest.TestCase):
                 - z == |y|
 
         """
-        rcs = TestResources()
-
         N = 2
         x = 7
         z = 3
         y = -3
 
         return self._scale_down_after_oobd_non_constrained_param(
-            rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
+            self.rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
             scale_servers=y)
 
     def _scale_down_after_oobd_non_constrained_param(
@@ -597,7 +590,8 @@ class ConvergenceSet1(unittest.TestCase):
 
         scaling_group_body = create_scaling_group_dict(
             image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=min_servers, max_entities=max_servers
+            min_entities=min_servers, max_entities=max_servers,
+            use_lbs=self.use_clb_arg()
         )
 
         self.scaling_group = ScalingGroup(
@@ -615,14 +609,7 @@ class ConvergenceSet1(unittest.TestCase):
             scaling_group=self.scaling_group
         )
         return (
-            self.identity.authenticate_user(
-                rcs,
-                resources={
-                    "otter": (otter_key, otter_url),
-                    "nova": (nova_key,),
-                },
-                region=region
-            ).addCallback(self.scaling_group.start, self)
+            self.scaling_group.start(rcs, self)
             .addCallback(self.policy_set.start, self)
             .addCallback(self.policy_scale.start, self)
             .addCallback(self.policy_set.execute)
@@ -652,16 +639,15 @@ class ConvergenceSet1(unittest.TestCase):
             Attempt to scale up by (y) servers
             Validate end state max_servers
         """
-        rcs = TestResources()
-
         max_servers = 10
         x = max_servers
         z = 2
         y = 5
 
         return self._scale_down_after_oobd_hitting_constraints(
-            rcs, set_to_servers=x, oobd_servers=z, max_servers=max_servers,
-            scale_servers=y, converged_servers=max_servers)
+            self.rcs, set_to_servers=x, oobd_servers=z,
+            max_servers=max_servers, scale_servers=y,
+            converged_servers=max_servers)
 
     def test_scale_down_past_group_min_after_oobd(self):
         """
@@ -679,14 +665,12 @@ class ConvergenceSet1(unittest.TestCase):
             Attempt to scale down by (y) servers
             Validate end state min_servers
         """
-        rcs = TestResources()
-
         min_servers = 5
         z = 2
         y = -2
 
         return self._scale_down_after_oobd_hitting_constraints(
-            rcs, oobd_servers=z, min_servers=min_servers,
+            self.rcs, oobd_servers=z, min_servers=min_servers,
             scale_servers=y,
             converged_servers=min_servers)
 
@@ -702,11 +686,9 @@ class ConvergenceSet1(unittest.TestCase):
         set_to_servers = 5
         max_servers = 10
 
-        rcs = TestResources()
-
         scaling_group_body = create_scaling_group_dict(
             image_ref=image_ref, flavor_ref=flavor_ref,
-            max_entities=max_servers
+            max_entities=max_servers, use_lbs=self.use_clb_arg()
         )
 
         self.scaling_group = ScalingGroup(
@@ -720,14 +702,7 @@ class ConvergenceSet1(unittest.TestCase):
         )
 
         return (
-            self.identity.authenticate_user(
-                rcs,
-                resources={
-                    "otter": (otter_key, otter_url),
-                    "nova": (nova_key,),
-                },
-                region=region
-            ).addCallback(self.scaling_group.start, self)
+            self.scaling_group.start(self.rcs, self)
             .addCallback(self.policy_set.start, self)
             .addCallback(self.policy_set.execute)
             .addCallback(
@@ -736,7 +711,7 @@ class ConvergenceSet1(unittest.TestCase):
             )
             .addCallback(
                 self.helper.oob_delete_then(
-                    rcs, self.scaling_group, set_to_servers / 2)(
+                    self.rcs, self.scaling_group, set_to_servers / 2)(
                     self.scaling_group.update_group_config),
                 maxEntities=max_servers + 2)
         )
@@ -749,7 +724,8 @@ class ConvergenceSet1(unittest.TestCase):
 
         scaling_group_body = create_scaling_group_dict(
             image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=min_servers, max_entities=max_servers
+            min_entities=min_servers, max_entities=max_servers,
+            use_lbs=self.use_clb_arg()
         )
 
         self.scaling_group = ScalingGroup(
@@ -761,20 +737,15 @@ class ConvergenceSet1(unittest.TestCase):
             scale_by=scale_servers,
             scaling_group=self.scaling_group
         )
-        d = self.identity.authenticate_user(
-            rcs,
-            resources={
-                "otter": (otter_key, otter_url),
-                "nova": (nova_key,),
-            },
-            region=region
-        ).addCallback(self.scaling_group.start, self)
+
+        d = self.scaling_group.start(rcs, self)
 
         if set_to_servers is not None:
             self.policy_set = ScalingPolicy(
                 set_to=set_to_servers,
                 scaling_group=self.scaling_group
             )
+
             (d.addCallback(self.policy_set.start, self)
              .addCallback(self.policy_set.execute))
 
@@ -796,3 +767,37 @@ class ConvergenceSet1(unittest.TestCase):
                       timeout=1800, active=converged_servers, pending=0))
 
         return d
+
+
+class ConvergenceSet1WithCLB(ConvergenceSet1):
+    """
+    Class for CATC 4-12 that run with CLB.
+    """
+    timeout = 1800
+
+    def setUp(self):
+        """Establish an HTTP connection pool and commonly used resources for
+        each test.  The HTTP connection pool is important for maintaining a
+        clean Twisted reactor.
+        """
+        self.helper = TestHelper(self)
+        self.clbs = [CloudLoadBalancer(pool=self.helper.pool)]
+        self.rcs = TestResources()
+        self.identity = IdentityV2(
+            auth=auth, username=username, password=password,
+            endpoint=endpoint, pool=self.helper.pool,
+            convergence_tenant_override=convergence_tenant,
+        )
+        return self.identity.authenticate_user(
+            self.rcs,
+            resources={
+                "otter": (otter_key, otter_url),
+                "nova": (nova_key,),
+                "loadbalancers": (clb_key,)
+            },
+            region=region
+        ).addCallback(lambda _: gatherResults([
+            clb.start(self.rcs, self)
+            .addCallback(clb.wait_for_state, "ACTIVE", 600)
+            for clb in self.clbs])
+        )
