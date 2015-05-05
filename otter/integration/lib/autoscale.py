@@ -21,7 +21,7 @@ from otter.util.http import check_success, headers
 from otter.util.retry import (
     TransientRetryError,
     repeating_interval,
-    transient_errors_except,
+    terminal_errors_except
 )
 
 pp = pprint.PrettyPrinter(indent=4)
@@ -348,7 +348,7 @@ class ScalingGroup(object):
 
         return retry_and_timeout(
             poll, timeout,
-            can_retry=transient_errors_except(BreakLoopException),
+            can_retry=terminal_errors_except(TransientRetryError),
             next_interval=repeating_interval(period),
             clock=clock or reactor,
             deferred_description=(
@@ -482,7 +482,7 @@ class ScalingGroup(object):
 
         return retry_and_timeout(
             poll, timeout,
-            can_retry=transient_errors_except(BreakLoopException),
+            can_retry=terminal_errors_except(TransientRetryError),
             next_interval=repeating_interval(period),
             clock=reactor,
             deferred_description=report,
@@ -527,7 +527,7 @@ class ScalingGroup(object):
             )
         return retry_and_timeout(
             poll, timeout,
-            can_retry=transient_errors_except(BreakLoopException),
+            can_retry=terminal_errors_except(TransientRetryError),
             next_interval=repeating_interval(period),
             clock=reactor,
             deferred_description=report
@@ -666,12 +666,15 @@ class ScalingPolicy(object):
             .addCallback(check_success, [204, 404])
         ).addCallback(lambda _: rcs)
 
-    def execute(self, rcs):
+    def execute(self, rcs, success_codes=None):
         """Executes the scaling policy.
 
         :param TestResources rcs: The integration test resources instance.
             This provides useful information to complete the request, like
             which endpoint to use to make the API request.
+
+        :param iterable success_codes: An iterable of HTTP status codes to
+            expect in the success case.  Defaults to 202.
 
         :return: A :class:`Deferred` which, when triggered, removes the scaling
             policy.  It returns the test resources supplied, easing continuity
@@ -682,7 +685,8 @@ class ScalingPolicy(object):
                 "%sexecute" % self.link,
                 headers=headers(str(rcs.token)),
                 pool=self.scaling_group.pool,
-            ).addCallback(check_success, [202])
+            ).addCallback(check_success,
+                          [202] if success_codes is None else success_codes)
             # Policy execution does not return anything meaningful,
             # per http://tinyurl.com/ndds6ap (link to docs.rackspace).
             # So, we forcefully return our resources here.

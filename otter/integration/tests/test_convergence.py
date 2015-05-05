@@ -8,9 +8,6 @@ import os
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults
-from twisted.internet.task import deferLater
-from twisted.internet.tcp import Client
-from twisted.python.failure import Failure
 from twisted.trial import unittest
 from twisted.web.client import HTTPConnectionPool
 
@@ -25,8 +22,6 @@ from otter.integration.lib.cloud_load_balancer import CloudLoadBalancer
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.nova import NovaServer, delete_servers
 from otter.integration.lib.resources import TestResources
-
-from otter.util.http import APIError
 
 
 username = os.environ['AS_USERNAME']
@@ -65,13 +60,7 @@ class TestConvergence(unittest.TestCase):
         """Destroy the HTTP connection pool, so that we close the reactor
         cleanly.
         """
-
-        def _check_fds(_):
-            fds = set(reactor.getReaders() + reactor.getWriters())
-            if not [fd for fd in fds if isinstance(fd, Client)]:
-                return
-            return deferLater(reactor, 0, _check_fds, None)
-        return self.pool.closeCachedConnections().addBoth(_check_fds)
+        return self.pool.closeCachedConnections()
 
     def test_scale_over_group_max_after_metadata_removal_reduced_grp_max(self):
         """
@@ -149,8 +138,7 @@ class TestConvergence(unittest.TestCase):
             ).addCallback(self.scaling_group.choose_random_servers, 3)
             .addCallback(self._remove_metadata, rcs)
             .addCallback(lambda _: rcs)
-            .addCallback(self.scale_beyond_max.execute)
-            .addBoth(self._assert_error_status_code, 403, rcs)
+            .addCallback(self.scale_beyond_max.execute, success_codes=[403])
             .addCallback(lambda _: self.removed_ids)
             .addCallback(
                 self.scaling_group.wait_for_deleted_id_removal,
@@ -192,14 +180,6 @@ class TestConvergence(unittest.TestCase):
             scaling_group=self.scaling_group
         )
 
-        def expect_403(failure):
-            if not isinstance(failure, Failure):
-                raise Exception("Failure expected")
-            failure.trap(APIError)
-            if failure.value.code != 403:
-                failure.raiseException()
-            return rcs
-
         return (
             self.identity.authenticate_user(
                 rcs,
@@ -217,8 +197,7 @@ class TestConvergence(unittest.TestCase):
             ).addCallback(self.scaling_group.choose_random_servers, 3)
             .addCallback(self._remove_metadata, rcs)
             .addCallback(lambda _: rcs)
-            .addCallback(self.scale_beyond_max.execute)
-            .addBoth(expect_403)
+            .addCallback(self.scale_beyond_max.execute, success_codes=[403])
             .addCallback(lambda _: self.removed_ids)
             .addCallback(
                 self.scaling_group.wait_for_deleted_id_removal,
@@ -327,25 +306,6 @@ class TestConvergence(unittest.TestCase):
 
         return create_clb_first().addCallback(then_test)
 
-    def _assert_error_status_code(self, result, code, rcs):
-        """
-        FACTOR_OUT
-
-        Validate that the returned value was a failure with the specified
-        status code.
-        """
-        if not isinstance(result, Failure):
-            self.fail('Unexpectedly, this succeeded when it was '
-                      'expected to fail')
-        elif not result.check(APIError):
-            self.fail('Received {0} instead of expected APIError'.format(
-                      result.type))
-        elif result.value.code != code:
-            self.fail('Expected status code {0} but received {1}'.format(
-                      code, result.value.code))
-        else:
-            return rcs
-
     def _delete_those_servers(self, ids, rcs):
         """
         Delete each of the servers selected, and save a list of the
@@ -361,8 +321,9 @@ class TestConvergence(unittest.TestCase):
         This will strip them of their association with Autoscale.
         """
         self.removed_ids = ids
-        return gatherResults([NovaServer(id=_id).update_metadata({}, rcs)
-                              for _id in ids]).addCallback(lambda _: rcs)
+        return gatherResults([
+            NovaServer(id=_id, pool=self.pool).update_metadata({}, rcs)
+            for _id in ids]).addCallback(lambda _: rcs)
 
 
 class ConvergenceSet1(unittest.TestCase):
@@ -388,13 +349,7 @@ class ConvergenceSet1(unittest.TestCase):
         """Destroy the HTTP connection pool, so that we close the reactor
         cleanly.
         """
-
-        def _check_fds(_):
-            fds = set(reactor.getReaders() + reactor.getWriters())
-            if not [fd for fd in fds if isinstance(fd, Client)]:
-                return
-            return deferLater(reactor, 0, _check_fds, None)
-        return self.pool.closeCachedConnections().addBoth(_check_fds)
+        return self.pool.closeCachedConnections()
 
     def test_reaction_to_oob_server_deletion_below_min(self):
         """
@@ -656,7 +611,7 @@ class ConvergenceSet1(unittest.TestCase):
                 total_servers=set_to_servers,
             )
             .addCallback(self.scaling_group.wait_for_expected_state, rcs,
-                         active=converged_servers, pending=0)
+                         timeout=1800, active=converged_servers, pending=0)
         )
 
     def test_scale_up_after_oobd_at_group_max(self):
@@ -770,25 +725,6 @@ class ConvergenceSet1(unittest.TestCase):
             )
         )
 
-    def _assert_error_status_code(self, result, code, rcs):
-        """
-        FACTOR_OUT
-
-        Validate that the returned value was a failure with the specified
-        status code.
-        """
-        if not isinstance(result, Failure):
-            self.fail('Unexpectedly, this succeeded when it was '
-                      'expected to fail')
-        elif not result.check(APIError):
-            self.fail('Received {0} instead of expected APIError'.format(
-                      result.type))
-        elif result.value.code != code:
-            self.fail('Expected status code {0} but received {1}'.format(
-                      code, result.value.code))
-        else:
-            return rcs
-
     def _scale_down_after_oobd_hitting_constraints(
             self, rcs, min_servers=0, max_servers=25, set_to_servers=None,
             oobd_servers=0, scale_servers=1, converged_servers=0):
@@ -835,16 +771,14 @@ class ConvergenceSet1(unittest.TestCase):
          .addCallback(self._delete_those_servers, rcs)
          # The execution of the policy triggers convergence
          .addCallback(self.policy_scale.start, self)
-         .addCallback(self.policy_scale.execute)
-         .addBoth(self._assert_error_status_code, 403, rcs)
-         # Need to add a check for the expected 403
+         .addCallback(self.policy_scale.execute, success_codes=[403])
          .addCallback(lambda _: self.removed_ids)
          .addCallback(
             self.scaling_group.wait_for_deleted_id_removal,
             rcs,
             total_servers=set_to_servers,)
          .addCallback(self.scaling_group.wait_for_expected_state, rcs,
-                      active=converged_servers, pending=0))
+                      timeout=1800, active=converged_servers, pending=0))
 
         return d
 
@@ -863,5 +797,6 @@ class ConvergenceSet1(unittest.TestCase):
         This will strip them of their association with Autoscale.
         """
         self.removed_ids = ids
-        return gatherResults([NovaServer(id=_id).update_metadata({}, rcs)
-                              for _id in ids]).addCallback(lambda _: rcs)
+        return gatherResults([
+            NovaServer(id=_id, pool=self.pool).update_metadata({}, rcs)
+            for _id in ids]).addCallback(lambda _: rcs)
