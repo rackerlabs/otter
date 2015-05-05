@@ -8,8 +8,6 @@ import os
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults
-from twisted.internet.task import deferLater
-from twisted.internet.tcp import Client
 from twisted.trial import unittest
 from twisted.web.client import HTTPConnectionPool
 
