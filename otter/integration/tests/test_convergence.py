@@ -329,8 +329,9 @@ class TestConvergence(unittest.TestCase):
         This will strip them of their association with Autoscale.
         """
         self.removed_ids = ids
-        return gatherResults([NovaServer(id=_id).update_metadata({}, rcs)
-                              for _id in ids]).addCallback(lambda _: rcs)
+        return gatherResults([
+            NovaServer(id=_id, pool=self.pool).update_metadata({}, rcs)
+            for _id in ids]).addCallback(lambda _: rcs)
 
 
 class ConvergenceSet1(unittest.TestCase):
@@ -810,5 +811,6 @@ class ConvergenceSet1(unittest.TestCase):
         This will strip them of their association with Autoscale.
         """
         self.removed_ids = ids
-        return gatherResults([NovaServer(id=_id).update_metadata({}, rcs)
-                              for _id in ids]).addCallback(lambda _: rcs)
+        return gatherResults([
+            NovaServer(id=_id, pool=self.pool).update_metadata({}, rcs)
+            for _id in ids]).addCallback(lambda _: rcs)
