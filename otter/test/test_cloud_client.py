@@ -36,6 +36,7 @@ from otter.cloud_client import (
     add_bind_service,
     change_clb_node,
     concretize_service_request,
+    get_cloud_client_dispatcher,
     get_server_details,
     perform_tenant_scope,
     service_request,
@@ -353,6 +354,21 @@ class MakeDefaultThrottleTests(SynchronousTestCase):
         deleter = throttler(ServiceType.CLOUD_SERVERS, 'delete')
         poster = throttler(ServiceType.CLOUD_SERVERS, 'post')
         self.assertIsNot(deleter, poster)
+
+
+class GetCloudClientDispatcherTests(SynchronousTestCase):
+    """Tests for :func:`get_cloud_client_dispatcher`."""
+
+    def test_performs_throttle(self):
+        """:func:`_perform_throttle` performs :obj:`_Throttle`."""
+        dispatcher = get_cloud_client_dispatcher(None, None, None, None)
+        throttle = _Throttle(bracket=lambda f, *a, **kw: f(*a, **kw),
+                             effect=Effect(Constant('foo')))
+        self.assertIs(dispatcher(throttle), _perform_throttle)
+
+    def test_performs_tenant_scope(self):
+        """:func:`perform_tenant_scope` performs :obj:`TenantScope`"""
+        1 / 0
 
 
 class PerformTenantScopeTests(SynchronousTestCase):

@@ -298,7 +298,7 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
     return TypeDispatcher({
         TenantScope: partial(perform_tenant_scope, authenticator, log,
                              service_configs, throttler),
-        _Throttle: partial(_perform_throttle),
+        _Throttle: _perform_throttle,
     })
 
 
