@@ -35,7 +35,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             cooldown=self.gc_cooldown, type='schedule', name='multi_at_style',
             change=self.change)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_group_multiple_webhook_policies_with_same_attributes(self):
         """
         Creating a group with a list of multiple webhook policies,
@@ -43,47 +43,50 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         """
         self._create_multi_policy_group(2, 201, self.wb_policy)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_create_multiple_scheduler_policies_same_payload(self):
         """
-        Creating a group with a list of multiple scheduler policies, (at style and
-        cron style) with the same attributes, is succcessful
+        Creating a group with a list of multiple scheduler policies,
+        (at style and cron style) with the same attributes, is succcessful
         """
         self._create_multi_policy_group(
             2, 201, self.at_style_policy, self.cron_style_policy)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_webhook_and_scheduler_policies_same_group(self):
         """
         Create a group with scheduler and webhook policies and verify the
         servers after their executions are as exepected
         """
         group = self._create_multi_policy_group(
-            1, 201, self.wb_policy, self.at_style_policy, self.cron_style_policy)
+            1, 201, self.wb_policy, self.at_style_policy,
+            self.cron_style_policy)
         self._execute_webhook_policies_within_group(group)
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, 3 * self.change)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_system_webhook_and_scheduler_policies_different_groups(self):
         """
-        Create 2 groups each with the same type of scheduler and webhook policies and
-        verify the servers after each of their executions
+        Create 2 groups each with the same type of scheduler and webhook
+        policies and verify the servers after each of their executions
         """
         group1 = self._create_multi_policy_group(
-            1, 201, self.wb_policy, self.at_style_policy, self.cron_style_policy)
+            1, 201, self.wb_policy, self.at_style_policy,
+            self.cron_style_policy)
         group2 = self._create_multi_policy_group(
-            1, 201, self.wb_policy, self.at_style_policy, self.cron_style_policy)
+            1, 201, self.wb_policy, self.at_style_policy,
+            self.cron_style_policy)
         self._execute_webhook_policies_within_group(group1, group2)
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group1.id, 3 * self.change)
         self.verify_group_state(group2.id, 3 * self.change)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_all_types_webhook_and_scheduler_policies(self):
         """
-        Creating a group with scheduler and webhook policies for all types of changes
-        is successful.
+        Creating a group with scheduler and webhook policies for all types
+        of changes is successful.
         """
         wb_policy_cp = self._unchanged_policy(self.wb_policy)
         wb_policy_cp['changePercent'] = 100
@@ -98,16 +101,17 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         cron_style_policy_dc = self._unchanged_policy(self.cron_style_policy)
         cron_style_policy_dc['desiredCapacity'] = 1
         self._create_multi_policy_group(
-            1, 201, self.wb_policy, self.at_style_policy, self.cron_style_policy,
-            wb_policy_cp, at_style_policy_cp, cron_style_policy_cp,
-            wb_policy_dc, at_style_policy_dc, cron_style_policy_dc)
+            1, 201, self.wb_policy, self.at_style_policy,
+            self.cron_style_policy, wb_policy_cp, at_style_policy_cp,
+            cron_style_policy_cp, wb_policy_dc, at_style_policy_dc,
+            cron_style_policy_dc)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_all_types_webhook_and_scheduler_policies_negative(self):
         """
-        Creating a group with scheduler and webhook policies for all types of changes
-        with invalid inputs for the chnge type and at style time, and verify reponse code
-        400 is returned.
+        Creating a group with scheduler and webhook policies for all types
+        of changes with invalid inputs for the chnge type and at style time,
+        and verify reponse code 400 is returned.
         """
         invalid_item = 0.0001
         wb_policy_cp = self._unchanged_policy(self.wb_policy)
@@ -124,11 +128,12 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         cron_style_policy_dc = self._unchanged_policy(self.cron_style_policy)
         cron_style_policy_dc['desiredCapacity'] = invalid_item
         self._create_multi_policy_group(
-            1, 400, self.wb_policy, self.at_style_policy, self.cron_style_policy,
-            wb_policy_cp, at_style_policy_cp, cron_style_policy_cp,
-            wb_policy_dc, at_style_policy_dc, cron_style_policy_dc)
+            1, 400, self.wb_policy, self.at_style_policy,
+            self.cron_style_policy, wb_policy_cp, at_style_policy_cp,
+            cron_style_policy_cp, wb_policy_dc, at_style_policy_dc,
+            cron_style_policy_dc)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_webhook_and_scheduler_policies_many_different_groups(self):
         """
         Create many groups each with the same type of scheduler and webhook
@@ -155,14 +160,15 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         policy_list = []
         for each_policy in args:
             policy_list.extend([each_policy] * multi_num)
-        create_group_reponse = self.autoscale_behaviors.create_scaling_group_given(
+        response = self.autoscale_behaviors.create_scaling_group_given(
             lc_name='multi_scheduling',
             sp_list=policy_list,
             gc_cooldown=0)
-        self.assertEquals(create_group_reponse.status_code, response,
-                          msg='Creating multiple scaling policies within a group failed with '
-                          'response code: {0}'.format(create_group_reponse.status_code))
-        group = create_group_reponse.entity
+        self.assertEquals(
+            response.status_code, response,
+            msg=('Creating multiple scaling policies within a group failed '
+                 'with response code: {0}'.format(response.status_code)))
+        group = response.entity
         self.resources.add(group, self.empty_scaling_group)
         return group
 
@@ -176,6 +182,8 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
                 if not hasattr(each_policy, 'args'):
                     execute_policy = self.autoscale_client.execute_policy(
                         each_group.id, each_policy.id)
-                    self.assertEquals(execute_policy.status_code, 202,
-                                      msg='Executing the scaling policies within a group failed with '
-                                      'response code: {0}'.format(execute_policy.status_code))
+                    self.assertEquals(
+                        execute_policy.status_code, 202,
+                        msg=('Executing the scaling policies within a group '
+                             'failed with response code: {0}'.format(
+                                 execute_policy.status_code)))

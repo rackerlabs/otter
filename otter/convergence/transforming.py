@@ -91,7 +91,7 @@ def optimize_steps(steps):
 
 
 _DEFAULT_STEP_LIMITS = pmap({
-    CreateServer: 3
+    CreateServer: 10
 })
 
 
