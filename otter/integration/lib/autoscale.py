@@ -302,7 +302,9 @@ class ScalingGroup(object):
             if resp.code == 200:
                 return self.treq.json_content(resp).addCallback(
                     lambda x: (200, x))
-            return (404, None)
+
+            return self.treq.content(resp).addCallback(
+                lambda _: (resp.code, None))
 
         return (
             self.treq.get(
@@ -507,21 +509,24 @@ class ScalingGroup(object):
         ..wait_for_state(rcs, matchers, timeout=60)
         ```
         """
-        def check(group_state):
+        def check(result):
+            response, group_state = result
             mismatch = matcher.match(group_state['group'])
             if mismatch:
                 raise TransientRetryError(mismatch.describe())
+            return rcs
 
         def poll():
-            return self.get_scaling_group_state(rcs).addCallback(check)
+            return self.get_scaling_group_state(rcs, [200]).addCallback(check)
 
         return retry_and_timeout(
             poll, timeout,
             can_retry=terminal_errors_except(TransientRetryError),
             next_interval=repeating_interval(period),
             clock=clock or reactor,
-            deferred_description="Waiting for nodes to reach state {0}".format(
-                str(matcher))
+            deferred_description=(
+                "Waiting for scaling group to reach state {0}"
+                .format(str(matcher)))
         )
 
 HasActive = MatchesPredicateWithParams(

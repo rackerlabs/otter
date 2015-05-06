@@ -46,7 +46,7 @@ class WaitForNServersTestCase(SynchronousTestCase):
         self.sg = ScalingGroup(group_config={}, pool=None, reactor=self.clock)
         self.counter = 0
 
-    def get_scaling_group_state_happy(self, rcs):
+    def get_scaling_group_state_happy(self, rcs, success_codes=None):
         """This method implements a synchronous simulation of what we'd expect
         to see over the wire on an HTTP API transaction.  This method replaces
         the actual ScalingGroup method on instances.  (See setUp for an example
@@ -54,14 +54,14 @@ class WaitForNServersTestCase(SynchronousTestCase):
 
         This version emulates completion after a period of time.
         """
-
+        self.assertEquals([200], success_codes)
         if self.counter == self.threshold:
             return defer.succeed((200, self.group_state_w_2_servers))
         else:
             self.counter = self.counter + 1
             return defer.succeed((200, self.empty_group_state))
 
-    def get_scaling_group_state_timeout(self, rcs):
+    def get_scaling_group_state_timeout(self, rcs, success_codes=None):
         """This method implements a synchronous simulation of what we'd expect
         to see over the wire on an HTTP API transaction.  This method replaces
         the actual ScalingGroup method on instances.  (See setUp for an example
@@ -69,7 +69,7 @@ class WaitForNServersTestCase(SynchronousTestCase):
 
         This version never yields the desired number of servers.
         """
-
+        self.assertEquals([200], success_codes)
         return defer.succeed((200, self.empty_group_state))
 
     def test_poll_until_happy(self):
