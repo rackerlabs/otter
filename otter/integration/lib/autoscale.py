@@ -10,6 +10,9 @@ import random
 
 from characteristic import Attribute, attributes
 
+from testtools.matchers import (
+    ContainsDict, Equals, MatchesAll, MatchesPredicateWithParams)
+
 import treq
 
 from twisted.internet import reactor
@@ -333,30 +336,8 @@ class ScalingGroup(object):
         :return: If the operation succeeds, the same instance of TestResources.
             Otherwise, an exception is raised.
         """
-        def check(state):
-            code, response = state
-            if code == 404:
-                raise BreakLoopException("Scaling group not found.")
-            servers_active = len(response["group"]["active"])
-            if servers_active == servers_desired:
-                return rcs
-
-            raise TransientRetryError()
-
-        def poll():
-            return self.get_scaling_group_state(rcs).addCallback(check)
-
-        return retry_and_timeout(
-            poll, timeout,
-            can_retry=terminal_errors_except(TransientRetryError),
-            next_interval=repeating_interval(period),
-            clock=clock or reactor,
-            deferred_description=(
-                "Waiting for {} servers to go active.".format(
-                    servers_desired
-                )
-            )
-        )
+        return self.wait_for_state(rcs, HasActive(servers_desired),
+                                   timeout=timeout, period=period, clock=clock)
 
     def start(self, rcs, test):
         """Create a scaling group.
@@ -451,42 +432,9 @@ class ScalingGroup(object):
         :return: It'll return the value of ``rcs`` if successful.  An exception
             will be raised otherwise, including timeout.
         """
-
-        def check(state):
-            code, response = state
-            if code == 404:
-                raise BreakLoopException(
-                    "Scaling group appears to have disappeared"
-                )
-
-            active_ids = extract_active_ids(response)
-            for deleted_id in removed_ids:
-                if deleted_id in active_ids:
-                    raise TransientRetryError()
-
-            return rcs
-
-        def poll():
-            return self.get_scaling_group_state(rcs).addCallback(check)
-
-        if total_servers:
-            report = (
-                "Scaling group failed to reflect {} of {} servers removed."
-                .format(len(removed_ids), total_servers)
-            )
-        else:
-            report = (
-                "Scaling group failed to reflect {} servers removed."
-                .format(len(removed_ids))
-            )
-
-        return retry_and_timeout(
-            poll, timeout,
-            can_retry=terminal_errors_except(TransientRetryError),
-            next_interval=repeating_interval(period),
-            clock=reactor,
-            deferred_description=report,
-        )
+        return self.wait_for_state(
+            rcs, ExcludesServers(removed_ids), timeout=timeout,
+            period=period)
 
     def wait_for_expected_state(self, _, rcs, timeout=60, period=1,
                                 active=None, pending=None, desired=None):
@@ -496,42 +444,21 @@ class ScalingGroup(object):
         servers is observed. Unspecifed quantities default to None and are
         treated as don't cares.
         """
+        matchers = []
+        contains_dict = {}
 
-        def check((code, response)):
-            if code != 200:
-                raise BreakLoopException(
-                    "Could not get the scaling group state"
-                )
+        if active is not None:
+            matchers.append(HasActive(active))
+        if pending is not None:
+            contains_dict['pending'] = Equals(pending)
+        if desired is not None:
+            contains_dict['desired'] = Equals(desired)
 
-            n_active = len(response["group"]["active"])
-            n_pending = response["group"]["pendingCapacity"]
-            n_desired = response["group"]["desiredCapacity"]
+        if contains_dict:
+            matchers.append(ContainsDict(contains_dict))
 
-            if ((active is None or active == n_active) and
-                    (pending is None or pending == n_pending) and
-                    (desired is None or desired == n_desired)):
-                return rcs
-
-            raise TransientRetryError()
-
-        def poll():
-            return self.get_scaling_group_state(rcs).addCallback(check)
-
-        if active or pending or desired:
-            report = (
-                "Scaling group failed to reflect (active, pending, desired) "
-                "= ({0}, {1}, {2} servers.".format(active, pending, desired))
-        else:
-            report = (
-                "No expected capcity was specified"
-            )
-        return retry_and_timeout(
-            poll, timeout,
-            can_retry=terminal_errors_except(TransientRetryError),
-            next_interval=repeating_interval(period),
-            clock=reactor,
-            deferred_description=report
-        )
+        return self.wait_for_state(rcs, MatchesAll(*matchers), timeout=timeout,
+                                   period=period)
 
     @inlineCallbacks
     def choose_random_servers(self, rcs, n):
@@ -543,6 +470,78 @@ class ScalingGroup(object):
 
         ids = extract_active_ids(body)
         returnValue(random.sample(ids, n))
+
+    def wait_for_state(self, rcs, matcher, timeout, period=10, clock=None):
+        """
+        Wait for the state on the scaling group to match the provided matchers,
+        specified by matcher.
+
+        :param rcs: a :class:`otter.integration.lib.resources.TestResources`
+            instance
+        :param matcher: A :mod:`testtool.matcher`, as specified in
+            module: testtools.matchers in
+            http://testtools.readthedocs.org/en/latest/api.html.
+        :param timeout: The amount of time to wait until this step is
+            considered failed.
+        :param period: How long to wait before polling again.
+        :param clock: a :class:`twisted.internet.interfaces.IReactorTime`
+            provider
+
+        :return: None, if the state is reached
+        :raises: :class:`TimedOutError` if the state is never reached within
+            the requisite amount of time.
+
+        Example usage:
+
+        ```
+        matcher = MatchesAll(
+            IncludesServers(included_server_ids),
+            ExcludesServers(exclude_server_ids),
+            ContainsDict({
+                'pending': Equals(0),
+                'desired': Equals(5),
+                'status': Equals('ACTIVE')
+            })
+        )
+
+        ..wait_for_state(rcs, matchers, timeout=60)
+        ```
+        """
+        def check(group_state):
+            mismatch = matcher.match(group_state['group'])
+            if mismatch:
+                raise TransientRetryError(mismatch.describe())
+
+        def poll():
+            return self.get_scaling_group_state(rcs).addCallback(check)
+
+        return retry_and_timeout(
+            poll, timeout,
+            can_retry=terminal_errors_except(TransientRetryError),
+            next_interval=repeating_interval(period),
+            clock=clock or reactor,
+            deferred_description="Waiting for nodes to reach state {0}".format(
+                str(matcher))
+        )
+
+HasActive = MatchesPredicateWithParams(
+    lambda state, length: len(state['active']) == length,
+    "State {0} does not have {1} active servers."
+)
+"""
+Matcher that asserts something about the number of active servers on the group.
+"""
+
+ExcludesServers = MatchesPredicateWithParams(
+    lambda state, server_ids:
+        not set(server['id'] for server in state['active']).intersection(
+            set(server_ids)),
+    "State {0} should not contain any of the following server IDs: {1}"
+)
+"""
+Matcher that asserts that all the given server IDs are no longer members of
+the scaling group.
+"""
 
 
 @attributes([
