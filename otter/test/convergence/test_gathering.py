@@ -1,6 +1,5 @@
 """Tests for convergence gathering."""
 
-import calendar
 from datetime import datetime
 from functools import partial
 from urllib import urlencode
@@ -49,7 +48,7 @@ from otter.test.utils import (
 )
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
-from otter.util.timestamp import from_timestamp
+from otter.util.timestamp import timestamp_to_epoch
 
 
 def _request(requests):
@@ -88,9 +87,19 @@ class GetAllServerDetailsTests(SynchronousTestCase):
 
     def setUp(self):
         """Save basic reused data."""
-        self.req = (ServiceType.CLOUD_SERVERS, 'GET',
-                    'servers/detail?limit=10')
         self.servers = [{'id': i} for i in range(9)]
+
+    def req(self, query_params=None):
+        """
+        Return the service request with the given query parameters
+        """
+        if query_params is None:
+            query_params = {'limit': 10}
+
+        url = "servers/detail?{}".format(
+            "&".join(["{}={}".format(k, v) for k, v in
+                      query_params.items()]))
+        return (ServiceType.CLOUD_SERVERS, 'GET', url)
 
     def test_get_all_without_link_to_next_page(self):
         """
@@ -102,7 +111,7 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         body = {'servers': self.servers}
         eff = get_all_server_details(batch_size=10)
         svcreq = resolve_retry_stubs(eff)
-        result = resolve_svcreq(svcreq, (fake_response, body), *self.req)
+        result = resolve_svcreq(svcreq, (fake_response, body), *self.req())
         self.assertEqual(result, self.servers)
 
     def test_get_all_ignores_non_next_links(self):
@@ -112,10 +121,11 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         """
         fake_response = object()
         body = {'servers': self.servers,
-                'server_links': [{'href': 'meh', 'rel': 'prev'}]}
+                'server_links': [{
+                    'href': 'https://ignoreme/path?bleh=1', 'rel': 'prev'}]}
         eff = get_all_server_details(batch_size=10)
         svcreq = resolve_retry_stubs(eff)
-        result = resolve_svcreq(svcreq, (fake_response, body), *self.req)
+        result = resolve_svcreq(svcreq, (fake_response, body), *self.req())
         self.assertEqual(result, self.servers)
 
     def test_get_all_with_link_to_next_page(self):
@@ -128,23 +138,27 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
         fake_response = object()
         body = {'servers': servers[:10],
-                'servers_links': [{'href': 'nexturl1', 'rel': 'next'}]}
-        result = resolve_svcreq(svcreq, (fake_response, body), *self.req)
+                'servers_links': [{
+                    'href': 'https://ignoreme/path?limit=10&marker=9',
+                    'rel': 'next'}]}
+        result = resolve_svcreq(svcreq, (fake_response, body), *self.req())
         self.assertIsInstance(result, Effect)
 
         # next request, because previous had a next link
         next_req = resolve_retry_stubs(result)
         body = {'servers': servers[10:],
-                'servers_links': [{'href': 'nexturl2', 'rel': 'next'}]}
+                'servers_links': [{
+                    'href': 'https://ignoreme/path?limit=10&marker=19',
+                    'rel': 'next'}]}
         result = resolve_svcreq(next_req, (fake_response, body),
-                                ServiceType.CLOUD_SERVERS, 'GET', 'nexturl1')
+                                *self.req({'limit': 10, 'marker': 9}))
         self.assertIsInstance(result, Effect)
 
         # third request, because previous had a next link
         next_req = resolve_retry_stubs(result)
         body = {'servers': []}
         result = resolve_svcreq(next_req, (fake_response, body),
-                                ServiceType.CLOUD_SERVERS, 'GET', 'nexturl2')
+                                *self.req({'limit': 10, 'marker': 19}))
 
         self.assertEqual(result, servers)
 
@@ -159,17 +173,21 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
         fake_response = object()
         body = {'servers': servers[:10],
-                'servers_links': [{'href': 'nexturl1', 'rel': 'next'}]}
-        result = resolve_svcreq(svcreq, (fake_response, body), *self.req)
+                'servers_links': [{
+                    'href': 'https://ignoreme/path?anything=1',
+                    'rel': 'next'}]}
+        result = resolve_svcreq(svcreq, (fake_response, body), *self.req())
         self.assertIsInstance(result, Effect)
 
         # next request, because previous had a next link
         next_req = resolve_retry_stubs(result)
         body = {'servers': servers[10:],
-                'servers_links': [{'href': 'nexturl1', 'rel': 'next'}]}
+                'servers_links': [{
+                    'href': 'https://ignoreme/path?anything=1',
+                    'rel': 'next'}]}
         self.assertRaises(UnexpectedBehaviorError,
                           resolve_svcreq, next_req, (fake_response, body),
-                          ServiceType.CLOUD_SERVERS, 'GET', 'nexturl1')
+                          *self.req({'anything': 1}))
 
     def test_with_changes_since(self):
         """
@@ -287,11 +305,12 @@ class ExtractDrainedTests(SynchronousTestCase):
     summary = ("Node successfully updated with address: "
                "'10.23.45.6', port: '8080', weight: '1', "
                "condition: 'DRAINING'")
-    updated = '2014-10-23T18:10:48.000Z'
-    feed = ('<feed xmlns="http://www.w3.org/2005/Atom">' +
-            '<entry><summary>{}</summary><updated>{}</updated></entry>' +
-            '<entry><summary>else</summary><updated>badtime</updated></entry>' +
-            '</feed>')
+    updated = '2014-10-23T18:10:48.001Z'
+    feed = (
+        '<feed xmlns="http://www.w3.org/2005/Atom">' +
+        '<entry><summary>{}</summary><updated>{}</updated></entry>' +
+        '<entry><summary>else</summary><updated>badtime</updated></entry>' +
+        '</feed>')
 
     def test_first_entry(self):
         """
@@ -299,8 +318,7 @@ class ExtractDrainedTests(SynchronousTestCase):
         """
         feed = self.feed.format(self.summary, self.updated)
         self.assertEqual(extract_CLB_drained_at(feed),
-                         calendar.timegm(
-                             from_timestamp(self.updated).utctimetuple()))
+                         timestamp_to_epoch(self.updated))
 
     def test_invalid_first_entry(self):
         """

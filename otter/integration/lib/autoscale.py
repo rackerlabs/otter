@@ -6,20 +6,22 @@ import datetime
 import json
 import os
 import pprint
+import random
 
 from characteristic import Attribute, attributes
 
 import treq
 
 from twisted.internet import reactor
-from twisted.internet.defer import gatherResults
+from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 
+from otter.integration.lib.nova import NovaServer
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import check_success, headers
 from otter.util.retry import (
     TransientRetryError,
     repeating_interval,
-    transient_errors_except,
+    terminal_errors_except
 )
 
 pp = pprint.PrettyPrinter(indent=4)
@@ -108,7 +110,8 @@ def create_scaling_group_dict(
     Attribute('group_config', instance_of=dict),
     Attribute('pool', default_value=None),
     Attribute('reactor', default_value=None),
-    Attribute('treq', default_value=treq)
+    Attribute('treq', default_value=treq),
+    Attribute('server_client', default_value=NovaServer)
 ])
 class ScalingGroup(object):
     """This class encapsulates a scaling group resource.  It provides a means
@@ -276,8 +279,7 @@ class ScalingGroup(object):
             ),
             headers=headers(str(rcs.token)),
             pool=self.pool
-        ).addCallback(check_success, [204, 404, 403]))  # HACKITY HACK - Set to
-        # 403 until force delete is fixed in convergence
+        ).addCallback(check_success, [204, 404]))
 
     def get_scaling_group_state(self, rcs, success_codes=None):
         """Retrieve the state of the scaling group.
@@ -346,7 +348,7 @@ class ScalingGroup(object):
 
         return retry_and_timeout(
             poll, timeout,
-            can_retry=transient_errors_except(BreakLoopException),
+            can_retry=terminal_errors_except(TransientRetryError),
             next_interval=repeating_interval(period),
             clock=clock or reactor,
             deferred_description=(
@@ -404,7 +406,7 @@ class ScalingGroup(object):
         :rtype: ``dict``
         """
         def _extract_servicenet_id(server_info):
-            private = server_info['server']['addresses'].get('private')
+            private = server_info['addresses'].get('private')
             if private is not None:
                 return [addr['addr'] for addr in private
                         if addr['version'] == 4][0]
@@ -413,13 +415,9 @@ class ScalingGroup(object):
         def _get_the_ips(the_server_ids):
             the_server_ids = set(the_server_ids)
             return gatherResults([
-                self.treq.get(
-                    "{0}/servers/{1}".format(rcs.endpoints["nova"], server_id),
-                    headers=headers(str(rcs.token)),
-                    pool=self.pool)
-                .addCallback(check_success, [200])
-                .addCallback(self.treq.json_content)
-                .addCallback(_extract_servicenet_id)
+                self.server_client(
+                    id=server_id, pool=self.pool, treq=self.treq)
+                .get_addresses(rcs).addCallback(_extract_servicenet_id)
 
                 for server_id in the_server_ids
             ]).addCallback(lambda results: dict(zip(the_server_ids, results)))
@@ -484,7 +482,7 @@ class ScalingGroup(object):
 
         return retry_and_timeout(
             poll, timeout,
-            can_retry=transient_errors_except(BreakLoopException),
+            can_retry=terminal_errors_except(TransientRetryError),
             next_interval=repeating_interval(period),
             clock=reactor,
             deferred_description=report,
@@ -529,11 +527,22 @@ class ScalingGroup(object):
             )
         return retry_and_timeout(
             poll, timeout,
-            can_retry=transient_errors_except(BreakLoopException),
+            can_retry=terminal_errors_except(TransientRetryError),
             next_interval=repeating_interval(period),
             clock=reactor,
             deferred_description=report
         )
+
+    @inlineCallbacks
+    def choose_random_servers(self, rcs, n):
+        """
+        Choose n servers from the active servers on the scaling
+        group.
+        """
+        code, body = yield self.get_scaling_group_state(rcs, [200])
+
+        ids = extract_active_ids(body)
+        returnValue(random.sample(ids, n))
 
 
 @attributes([
@@ -657,12 +666,15 @@ class ScalingPolicy(object):
             .addCallback(check_success, [204, 404])
         ).addCallback(lambda _: rcs)
 
-    def execute(self, rcs):
+    def execute(self, rcs, success_codes=None):
         """Executes the scaling policy.
 
         :param TestResources rcs: The integration test resources instance.
             This provides useful information to complete the request, like
             which endpoint to use to make the API request.
+
+        :param iterable success_codes: An iterable of HTTP status codes to
+            expect in the success case.  Defaults to 202.
 
         :return: A :class:`Deferred` which, when triggered, removes the scaling
             policy.  It returns the test resources supplied, easing continuity
@@ -673,7 +685,8 @@ class ScalingPolicy(object):
                 "%sexecute" % self.link,
                 headers=headers(str(rcs.token)),
                 pool=self.scaling_group.pool,
-            ).addCallback(check_success, [202])
+            ).addCallback(check_success,
+                          [202] if success_codes is None else success_codes)
             # Policy execution does not return anything meaningful,
             # per http://tinyurl.com/ndds6ap (link to docs.rackspace).
             # So, we forcefully return our resources here.

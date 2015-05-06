@@ -34,7 +34,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             execute_policy=False)
         self.resources.add(self.group, self.empty_scaling_group)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_execute_policy_when_maxentities_equals_minentities(self):
         """
         Update minentities=maxentities and execution of a scale up policy
@@ -52,7 +52,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             'for group {1}'.format(
                 execute_policy_up.status_code, self.group.id))
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_execute_scale_down_on_newly_created_group_with_minentities(self):
         """
         Update minentities=maxentities and execution of a scale down policy
@@ -70,7 +70,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             ' on the group {0} with response code {1}'
             .format(self.group.id, execute_policy_down.status_code))
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_delete_policy_during_execution(self):
         """
         Policy execution is not affected/paused when the policy is deleted
@@ -98,7 +98,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             expected_servers=self.group.groupConfiguration.minEntities +
             self.policy_up_data['change'])
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_execute_scale_up_after_maxentities_met(self):
         """
         Update max entities of the scaling group to be 3 and execute scale up
@@ -129,7 +129,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             ' has maxentities, response code: {1}'
             .format(self.group.id, reexecute_scale_up.status_code))
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_scaleup_update_min_max_0_delete_group(self):
         """
         Create a scaling group and update min and max entities to be 0 and
@@ -137,6 +137,10 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
         building).  The user will be able to delete the group and autoscaling
         will delete the servers on the group (AUTO-339)
         """
+        # wait for them to be building or done first
+        self.check_for_expected_number_of_building_servers(
+            group_id=self.group.id,
+            expected_servers=self.group.groupConfiguration.minEntities)
         server_name = self.group.launchConfiguration.server.name
         self._update_group_min_max_entities(group=self.group,
                                             maxentities=0, minentities=0)
@@ -149,7 +153,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             .format(self.group.id, delete_group.status_code))
         self.assert_servers_deleted_successfully(server_name)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_scaleup_update_min_scale_down(self):
         """
         Create a scaling group and execute a scale up policy, update min =
@@ -177,7 +181,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             ' on the group {0} with response code {1}'
             .format(self.group.id, execute_policy_down.status_code))
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_update_webhook_policy_to_at_style_scheduler(self):
         """
         Policy update fails when a webhook type policy is updated to be of type
@@ -196,7 +200,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           ' on the group {0} with response code {1}'.format(
                               self.group.id, upd_policy_response.status_code))
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_update_webhook_policy_to_cron_style_scheduler(self):
         """
         Policy update fails when a webhook type policy is updated to be of type

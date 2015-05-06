@@ -45,3 +45,7 @@ export AS_AUTOSCALE_LOCAL_URL=http://localhost:9000/v1.0/{0}
 # Adjust this if your Openstack implementation registers your cloud computing
 # service under a different key in the service catalog.
 export AS_NOVA_SC_KEY=cloudServersOpenStack
+
+# Adjust this if your your cloud load balancer service is registered under a
+# different key in the service catalog.
+export AS_CLB_SC_KEY=cloudLoadBalancers

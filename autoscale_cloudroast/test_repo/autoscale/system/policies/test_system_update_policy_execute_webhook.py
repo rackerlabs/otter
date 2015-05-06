@@ -34,7 +34,7 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
         sleep(10)  # time for the webhook to execute
         self.resources.add(self.group, self.empty_scaling_group)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence="yes")
     def test_scale_up_execute_webhook(self):
         """
         Update a scale up policy and verify execution of such a policy using
@@ -55,7 +55,7 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
             expected_servers=self.group.groupConfiguration.minEntities +
             self.policy_up['change'] + change)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence="yes")
     def test_scale_up_to_scale_down_execute_webhook(self):
         """
         Update a scale up policy to scale down by the same change value and
@@ -80,7 +80,7 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
             self.group.launchConfiguration.server.name,
             self.group.groupConfiguration.minEntities)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence="yes")
     def test_from_change_to_change_percent_scale_down_execute_webhook(self):
         """
         Update the existing scale up policy from change to change percent,such

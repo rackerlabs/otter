@@ -1,6 +1,7 @@
 """Code related to gathering data to inform convergence."""
 from functools import partial
 from urllib import urlencode
+from urlparse import parse_qs, urlparse
 
 from effect import catch, parallel
 
@@ -48,14 +49,14 @@ def get_all_server_details(changes_since=None, batch_size=100):
     query = {'limit': batch_size}
     if changes_since is not None:
         query['changes_since'] = '{0}Z'.format(changes_since.isoformat())
-    url = "{0}?{1}".format(url, urlencode(query))
 
     last_link = []
 
-    def get_server_details(url_with_query):
+    def get_server_details(query_params):
         eff = retry_effect(
             service_request(ServiceType.CLOUD_SERVERS, 'GET',
-                            url_with_query),
+                            "{}?{}".format(url,
+                                           urlencode(query_params, True))),
             retry_times(5), exponential_backoff_interval(2))
         return eff.on(continue_)
 
@@ -73,11 +74,12 @@ def get_all_server_details(changes_since=None, batch_size=100):
                     "twice from Nova: {0}".format(last_link[-1]))
 
             last_link[:] = [continuation[0]]
-            more_eff = get_server_details(continuation[0])
+            parsed = urlparse(continuation[0])
+            more_eff = get_server_details(parse_qs(parsed.query))
             return more_eff.on(lambda more_servers: servers + more_servers)
         return servers
 
-    return get_server_details(url)
+    return get_server_details(query)
 
 
 def _discard_response((response, body)):
