@@ -2218,12 +2218,17 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.remove_from_load_balancer.return_value = succeed(None)
 
         self.clock = Clock()
+        self.url = 'http://url'
+        self.server_id = 'serverId'
 
     def _delete_server(self, instance_details):
         """
         Helper method to call :func:`delete_server`.
         """
-        return delete_server(self.log, self.request_bag, instance_details)
+        d = delete_server(self.log, self.request_bag, instance_details,
+                          clock=self.clock)
+        self.clock.advance(0.2)
+        return d
 
     def test_delete_server_no_lbs(self):
         """
@@ -2374,14 +2379,19 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self._test_delete_server_propagates_verified_delete_failures(
             instance_details)
 
+    def _delete_and_verify(self):
+        d = delete_and_verify(self.log, self.url, self.request_bag,
+                              self.server_id, self.clock)
+        self.clock.advance(0.2)
+        return d
+
     def test_delete_and_verify_does_not_verify_if_404(self):
         """
         :func:`delete_and_verify` does not verify if the deletion response
         code is a 404.
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 0)
@@ -2395,12 +2405,49 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.delete.return_value = succeed(mock.Mock(code=204))
         self.treq.get.return_value = succeed(mock.Mock(code=404))
 
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
         self.successResultOf(d)
+
+    def test_delete_and_verify_limits(self):
+        """
+        :func:`delete_and_verify` limits the number of delete server requests
+        to 1. It also delays response by 1 second
+        """
+        deferreds = [Deferred() for i in range(3)]
+        delete_ds = deferreds[:]
+        self.treq.delete.side_effect = lambda *a, **kw: deferreds.pop(0)
+
+        ret_ds = [delete_and_verify(self.log, 'http://url/',
+                                    self.request_bag, 'serverId', self.clock)
+                  for i in range(3)]
+
+        # no result in any of them and only 1 treq.delete is called
+        for d in ret_ds:
+            self.assertNoResult(d)
+        self.assertEqual(self.treq.delete.call_count, 1)
+
+        # fire first deferred and notice that next treq.delete is still not
+        # called due to delay
+        delete_ds[0].callback(mock.Mock(code=404))
+        self.assertEqual(self.treq.delete.call_count, 1)
+
+        # advance clock and notice next delete called
+        self.clock.advance(1)
+        self.assertEqual(self.treq.delete.call_count, 2)
+        self.successResultOf(ret_ds[0])
+        self.assertNoResult(ret_ds[1])
+        self.assertNoResult(ret_ds[2])
+
+        # fire others
+        delete_ds[1].callback(mock.Mock(code=404))
+        self.clock.advance(1)
+        delete_ds[2].callback(mock.Mock(code=404))
+        self.clock.advance(1)
+        self.successResultOf(ret_ds[1])
+        self.successResultOf(ret_ds[2])
 
     def test_delete_and_verify_succeeds_if_task_state_is_deleting(self):
         """
@@ -2412,8 +2459,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.json_content.return_value = succeed(
             {'server': {'OS-EXT-STS:task_state': 'deleting'}})
 
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
@@ -2429,8 +2475,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.json_content.return_value = succeed(
             {'server': {'OS-EXT-STS:task_state': 'build'}})
 
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
@@ -2445,8 +2490,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({'server': {}})
 
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
@@ -2459,8 +2503,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=500))
 
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 0)
@@ -2474,8 +2517,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.delete.return_value = succeed(mock.Mock(code=204))
         self.treq.get.return_value = succeed(mock.Mock(code=500))
 
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
@@ -2506,7 +2548,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
             delete_and_verify.mock_calls,
             [mock.call(matches(IsBoundWith(server_id='serverId')),
                        'http://url/',
-                       self.request_bag, 'serverId')] * 2)
+                       self.request_bag, 'serverId', self.clock)] * 2)
         self.successResultOf(d)
 
         # the loop has stopped
@@ -2542,7 +2584,8 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.assertEqual(
             delete_and_verify.mock_calls,
             [mock.call(matches(IsBoundWith(server_id='serverId')),
-                       'http://url/', self.request_bag, 'serverId')] * 3)
+                       'http://url/', self.request_bag, 'serverId',
+                       self.clock)] * 3)
 
         # the loop has stopped
         self.clock.pump([16, 32])
