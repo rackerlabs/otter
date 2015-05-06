@@ -744,11 +744,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         dispatcher = self._get_dispatcher()
         self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
 
-    def test_returns_failure(self):
+    def test_returns_failure_set_error_state(self):
         """
-        If a step that results in FAILURE is returned, then the ultimate result
-        of executing convergence will be a FAILURE, regardless of the other
-        step results.
+        The group is put into ERROR state if any step returns FAILURE, and
+        FAILURE is the final result of convergence.
         """
         gacd = self._get_gacd_func(self.group.uuid)
 
@@ -761,30 +760,18 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
             ])
 
-        eff = execute_convergence(self.tenant_id, self.group_id,
-                                  plan=plan,
-                                  get_all_convergence_data=gacd)
-        dispatcher = self._get_dispatcher()
-        self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
-
-    def test_set_error_state(self):
-        """The group is put into ERROR state if any step returns FAILURE."""
-        gacd = self._get_gacd_func(self.group.uuid)
-
-        def plan(*args, **kwargs):
-            return pbag([
-                TestStep(Effect(Constant((StepResult.FAILURE, []))))
-            ])
+        def noop(i):
+            pass
 
         eff = execute_convergence(self.tenant_id, self.group_id,
                                   plan=plan,
                                   get_all_convergence_data=gacd)
-        noop = lambda i: None
+
         sequence = SequenceDispatcher([
             (self.gsgi, lambda i: self.gsgi_result),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
-                 noop),
+             noop),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ERROR),
@@ -793,7 +780,6 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
         with sequence.consume():
             self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
-        
 
 
 class DetermineActiveTests(SynchronousTestCase):
