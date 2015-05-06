@@ -312,6 +312,50 @@ class ScalingGroup(object):
             .addCallback(decide)
         )
 
+    def wait_for_state(
+        self, rcs, state_desired, timeout, period=1, clock=None
+    ):
+        """Waits for the scaling group to reach a certain state.  After
+        a timeout, a `TimeoutError` exception will occur.
+
+        :param TestResources rcs: The resources used to make appropriate API
+            calls with.
+        :param str state_desired: The state you expect the cloud load balancer
+            to eventually reach.
+        :param int timeout: The number of seconds to wait before timing out.
+        :param int period: The number of seconds between polls to the cloud
+            load balancer.  If left unspecified, it defaults to 1 second.
+        :param twisted.internet.interfaces.IReactorTime clock: If provided,
+            the clock to use for scheduling things.  Defaults to `reactor`
+            if not specified.
+        :result: A `Deferred` which if fired, returns the same test resources
+            as provided this method.  This signifies the state has been
+            reached.  If the state has not been attained in the timeout period,
+            an exception will be raised, which can be caught in an Errback.
+        """
+        def check(state):
+            print(state)
+            sg_state = state["scalingGroup"]["status"]
+            if sg_state == state_desired:
+                return rcs
+
+            raise TransientRetryError()
+
+        def poll():
+            return self.get_scaling_group_state(rcs).addCallback(check)
+
+        return retry_and_timeout(
+            poll, timeout,
+            can_retry=terminal_errors_except(TransientRetryError),
+            next_interval=repeating_interval(period),
+            clock=clock or reactor,
+            deferred_description=(
+                "Waiting for cloud load balancer to reach state {}".format(
+                    state_desired
+                )
+            )
+        )
+
     def wait_for_N_servers(
         self, rcs, servers_desired, period=10, timeout=600, clock=None
     ):

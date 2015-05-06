@@ -388,30 +388,80 @@ class TestConvergence(unittest.TestCase):
             NovaServer(id=_id, pool=self.helper.pool).update_metadata({}, rcs)
             for _id in ids]).addCallback(lambda _: rcs)
 
+    def test_a(self):
+        return self.test_clb_pending_delete_on_scale_up()
+
     def test_clb_pending_delete_on_scale_up(self):
         """
         Simulate getting a 422 on scale up from CLB when in PENDING_DELETE
-            which should cause the group to error
+        which should cause the group to error.
         - Create a group with non-zero min servers and a CLB (or more)
         - Set mimic to return 422 and state PENDING_DELETE on addition to CLB
         - Attempt to scale up
         - Group goes into error state since it cannot take action
 
         Prereq: MUST be able to use Mimic to simulate incorrect CLB behavior
+
+        Implements: https://github.com/rackerlabs/otter/issues/1331
         """
-        # create a lb
-        # create group with lb and min servers
-        # wait for active servers and on load balancer
+        rcs = TestResources()
 
-        # Set LB to PENDING_DELETE (which will cause it to return a 422)
+        def create_clb_first():
+            self.clb = CloudLoadBalancer(pool=self.helper.pool)
+            return (
+                self.identity.authenticate_user(
+                    rcs,
+                    resources={
+                        "otter": (otter_key, otter_url),
+                        "nova": (nova_key,),
+                        "loadbalancers": (clb_key,)
+                    },
+                    region=region,
+                ).addCallback(self.clb.start, self)
+                .addCallback(self.clb.wait_for_state, "ACTIVE", 600)
+            )
 
-        # scale up
-        # wait for state to be in error
+        def create_group_with_lb(_):
+            self.scaling_group = ScalingGroup(
+                group_config=create_scaling_group_dict(
+                    image_ref=image_ref, flavor_ref=flavor_ref,
+                    use_lbs=[self.clb.scaling_group_spec()],
+                    min_entities=3,
+                ),
+                pool=self.helper.pool
+            )
 
+            return (
+                self.scaling_group.start(rcs, self)
+                .addCallback(
+                    self.scaling_group.wait_for_N_servers, 3, timeout=1800
+                )
+            )
 
+        def force_lb_into_pending_delete(_):
+            return Deferred.success(rcs)   # XXX Waiting on mimic changes.
 
+    
+        def scale_up(_):
+            self.scaling_policy = ScalingPolicy(
+                scale_by=1, scaling_group=self.scaling_group
+            )
 
+            return (
+                self.scaling_policy.start(rcs, self)
+                .addCallback(self.scaling_policy.execute)
+            )
 
+        def expect_error_state(_):
+            return self.scaling_group.wait_for_state(rcs, "ERROR")
+
+        return (
+            create_clb_first()
+            .addCallback(create_group_with_lb)
+            .addCallback(force_lb_into_pending_delete)
+            .addCallback(scale_up)
+            .addCallback(expect_error_state)
+        )
 
 
 class ConvergenceSet1(unittest.TestCase):
