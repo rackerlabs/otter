@@ -160,12 +160,12 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         policy_list = []
         for each_policy in args:
             policy_list.extend([each_policy] * multi_num)
-        response = self.autoscale_behaviors.create_scaling_group_given(
+        create_response = self.autoscale_behaviors.create_scaling_group_given(
             lc_name='multi_scheduling',
             sp_list=policy_list,
             gc_cooldown=0)
         self.assertEquals(
-            response.status_code, response,
+            create_response.status_code, response,
             msg=('Creating multiple scaling policies within a group failed '
                  'with response code: {0}'.format(response.status_code)))
         group = response.entity
