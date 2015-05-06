@@ -884,8 +884,8 @@ def delete_and_verify(log, server_endpoint, request_bag, server_id, clock):
 
     def delete_with_delay(_bag):
         d = treq.delete(path, headers=headers(_bag.auth_token), log=log)
-        # Add 1 second delay to space 1 second between delete server requests
-        return d.addCallback(delay, clock, 1)
+        # Add 0.2 seconds delay to allow 300 requests per minute
+        return d.addCallback(delay, clock, 0.2)
 
     def delete(_bag):
         del_d = delete_server_sem.run(delete_with_delay, _bag)

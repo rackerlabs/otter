@@ -2227,7 +2227,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         """
         d = delete_server(self.log, self.request_bag, instance_details,
                           clock=self.clock)
-        self.clock.advance(1)
+        self.clock.advance(0.2)
         return d
 
     def test_delete_server_no_lbs(self):
@@ -2382,7 +2382,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
     def _delete_and_verify(self):
         d = delete_and_verify(self.log, self.url, self.request_bag,
                               self.server_id, self.clock)
-        self.clock.advance(1)
+        self.clock.advance(0.2)
         return d
 
     def test_delete_and_verify_does_not_verify_if_404(self):
