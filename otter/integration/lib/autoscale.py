@@ -317,30 +317,6 @@ class ScalingGroup(object):
             .addCallback(decide)
         )
 
-    def wait_for_N_servers(
-        self, rcs, servers_desired, period=10, timeout=600, clock=None
-    ):
-        """Waits for the desired number of servers.
-
-        :param TestResources rcs: The integration test resources instance.
-            This provides useful information to complete the request, like
-            which endpoint to use to make the API request.
-        :param int servers_desired: The number of servers to wait for.
-            It must be greater than or equal to one.
-        :param int period: The number of seconds between poll attempts.
-            If unspecified, defaults to 10 seconds.
-        :param int timeout: The number of seconds to wait before giving up.
-            Defaults to 600 seconds (10 minutes).
-        :param twisted.internet.interfaces.IReactorTime clock: If provided,
-            the clock to use for scheduling things.  Defaults to `reactor`
-            if not specified.
-
-        :return: If the operation succeeds, the same instance of TestResources.
-            Otherwise, an exception is raised.
-        """
-        return self.wait_for_state(rcs, HasActive(servers_desired),
-                                   timeout=timeout, period=period, clock=clock)
-
     def start(self, rcs, test):
         """Create a scaling group.
 
@@ -413,55 +389,6 @@ class ScalingGroup(object):
             .addCallback(extract_active_ids)
             .addCallback(_get_the_ips))
 
-    def wait_for_deleted_id_removal(
-        self, removed_ids, rcs, timeout=60, period=1, total_servers=None
-    ):
-        """Wait for the scaling group to reflect the true state of the tenant's
-        server states.  Out-of-band server deletions or servers which
-        transition to an ERROR state should eventually be removed from the
-        scaling group's list of active servers.
-
-        :param list removed_ids: A list of server IDs that we should expect
-            the scaling group to realize are gone eventually.
-        :param TestResources rcs: The test resources necessary to invoke API
-            calls and manage state.
-        :param int timeout: The number of seconds to wait before giving up.
-        :param int period: The number of seconds between each check for ID
-            removal.
-        :param int total_servers: If provided, the total number of servers in
-            your scaling group.  This parameter is used for error reporting
-            purposes only.
-        :return: It'll return the value of ``rcs`` if successful.  An exception
-            will be raised otherwise, including timeout.
-        """
-        return self.wait_for_state(
-            rcs, ExcludesServers(removed_ids), timeout=timeout,
-            period=period)
-
-    def wait_for_expected_state(self, _, rcs, timeout=60, period=1,
-                                active=None, pending=None, desired=None):
-        """
-        Repeatedly get the group state until either the specified timeout has
-        occurred or the specified number of active, pending, and desired
-        servers is observed. Unspecifed quantities default to None and are
-        treated as don't cares.
-        """
-        matchers = []
-        contains_dict = {}
-
-        if active is not None:
-            matchers.append(HasActive(active))
-        if pending is not None:
-            contains_dict['pending'] = Equals(pending)
-        if desired is not None:
-            contains_dict['desired'] = Equals(desired)
-
-        if contains_dict:
-            matchers.append(ContainsDict(contains_dict))
-
-        return self.wait_for_state(rcs, MatchesAll(*matchers), timeout=timeout,
-                                   period=period)
-
     @inlineCallbacks
     def choose_random_servers(self, rcs, n):
         """
@@ -473,7 +400,7 @@ class ScalingGroup(object):
         ids = extract_active_ids(body)
         returnValue(random.sample(ids, n))
 
-    def wait_for_state(self, rcs, matcher, timeout, period=10, clock=None):
+    def wait_for_state(self, rcs, matcher, timeout=600, period=10, clock=None):
         """
         Wait for the state on the scaling group to match the provided matchers,
         specified by matcher.

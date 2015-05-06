@@ -8,12 +8,13 @@ from twisted.internet import defer
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.integration.lib.autoscale import ScalingGroup
+from otter.integration.lib.autoscale import (
+    HasActive, ExcludesServers, ScalingGroup)
 
 from otter.util.deferredutils import TimedOutError
 
 
-class WaitForNServersTestCase(SynchronousTestCase):
+class WaitForStateTestCase(SynchronousTestCase):
     empty_group_state = {
         "group": {
             "paused": False,
@@ -73,14 +74,14 @@ class WaitForNServersTestCase(SynchronousTestCase):
         return defer.succeed((200, self.empty_group_state))
 
     def test_poll_until_happy(self):
-        """When wait_for_N_servers completes before timeout, we expect our
+        """When wait_for_state completes before timeout, we expect our
         deferred to fire successfully.
         """
 
         self.sg.get_scaling_group_state = self.get_scaling_group_state_happy
         self.threshold = 25
 
-        d = self.sg.wait_for_N_servers(None, 2, clock=self.clock)
+        d = self.sg.wait_for_state(None, HasActive(2), clock=self.clock)
         for _ in range(24):
             self.clock.advance(10)
             self.assertNoResult(d)
@@ -88,18 +89,68 @@ class WaitForNServersTestCase(SynchronousTestCase):
         self.successResultOf(d)
 
     def test_poll_until_timeout(self):
-        """When wait_for_N_servers exceeds a maximum time threshold, we expect
+        """When wait_for_state exceeds a maximum time threshold, we expect
         it to raise an exception.
         """
 
         self.sg.get_scaling_group_state = self.get_scaling_group_state_timeout
 
-        d = self.sg.wait_for_N_servers(None, 2, clock=self.clock)
+        d = self.sg.wait_for_state(None, HasActive(2), clock=self.clock)
         for _ in range(59):
             self.clock.advance(10)
             self.assertNoResult(d)
         self.clock.advance(10)
         self.failureResultOf(d, TimedOutError)
+
+
+class MatcherTestCase(SynchronousTestCase):
+    """
+    Tests for the CLB matchers.
+    """
+    def test_exclude_servers_success(self):
+        """
+        :class:`ExcludesServers` succeeds when the active list does not contain
+        any servers with the given server IDS
+        """
+        matcher = ExcludesServers(['id1', 'id2'])
+        mismatch = matcher.match(
+            {'active': [{'id': "id{0}".format(i)} for i in (3, 4)]}
+        )
+        self.assertEqual(None, mismatch)
+
+    def test_excludes_servers_failure(self):
+        """
+        :class:`ExcludesServers` fails when the active list contain any or all
+        of servers with the given IDs.
+        """
+        matcher = ExcludesServers(['id1', 'id2'])
+        self.assertNotEqual(
+            None,
+            matcher.match(
+                {'active': [{'id': "id{0}".format(i)} for i in (1, 2)]}),
+            "Complete match succeeds when none should be present."
+        )
+        self.assertNotEqual(
+            None,
+            matcher.match({'active': [{'id': "id1"}]}),
+            "Partial match succeeds when none should be present."
+        )
+
+    def test_has_active(self):
+        """
+        :class:`HasActive` only succeeds when the number of active servers
+        matches the length given.
+        """
+        matcher = HasActive(2)
+        self.assertNotEqual(
+            None,
+            matcher.match({'active': [{'id': "id1"}]})
+        )
+        self.assertNotEqual(None, matcher.match({'active': []}))
+        self.assertEqual(
+            None,
+            matcher.match(
+                {'active': [{'id': "id{0}".format(i)} for i in (1, 2)]}))
 
 
 class GetServicenetIPs(SynchronousTestCase):
