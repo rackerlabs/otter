@@ -57,7 +57,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
     def check_cooldown_over_trigger(self, group):
         self.wait_for_expected_group_state(
             group.id, self.sp_change,
-            60 + self.scheduler_interval, 1, time_scale=False)
+            self.cron_wait_timeout, 1, time_scale=False)
         # This is sometime between 0 to scheduler_interval of minute.
         # Sleeping for another minute + interval + 30s should be time after
         # next execution which must have same state
@@ -121,7 +121,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             group.id, cron_policy['id'])
         self.wait_for_expected_group_state(
             group.id, self.gc_min_entities,
-            60 + self.scheduler_interval, 2, time_scale=False)
+            self.cron_wait_timeout, 2, time_scale=False)
 
     def test_system_scheduler_down(self):
         """

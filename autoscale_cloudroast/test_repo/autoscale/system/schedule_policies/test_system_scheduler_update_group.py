@@ -68,7 +68,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
             schedule_cron='* * * * *')
         self.wait_for_expected_group_state(
             group.id, group.groupConfiguration.maxEntities,
-            60 + self.scheduler_interval, 2, time_scale=False)
+            self.cron_wait_timeout, 2, time_scale=False)
         self.autoscale_client.delete_scaling_policy(
             group.id, policy_dict['id'])
         self.autoscale_behaviors.create_schedule_policy_given(
@@ -78,7 +78,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
             schedule_cron='* * * * *')
         self.wait_for_expected_group_state(
             group.id, group.groupConfiguration.minEntities,
-            60 + self.scheduler_interval, 2, time_scale=False)
+            self.cron_wait_timeout, 2, time_scale=False)
 
     @tags(speed='slow', convergence='yes')
     def test_system_group_cooldown_at_style(self):
@@ -148,7 +148,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         active_servers = self.sp_change + group.groupConfiguration.minEntities
         active_after_scaleup = self.wait_for_expected_number_of_active_servers(
             group_id=group.id, expected_servers=active_servers,
-            timeout=(60 + self.scheduler_interval), interval_time=2,
+            timeout=self.cron_wait_timeout, interval_time=2,
             time_scale=False)
         upd_lc_server = set(active_after_scaleup) - set(active_list_b4_upd)
         self._verify_server_list_for_launch_config(upd_lc_server)
@@ -160,7 +160,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         active_on_scale_down = self.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities,
-            timeout=(60 + self.scheduler_interval), interval_time=2,
+            timeout=self.cron_wait_timeout, interval_time=2,
             time_scale=False)
         self._verify_server_list_for_launch_config(active_on_scale_down)
 

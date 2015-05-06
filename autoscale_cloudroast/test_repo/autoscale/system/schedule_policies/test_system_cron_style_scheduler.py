@@ -40,7 +40,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
             schedule_cron='* * * * *')
         self.wait_for_expected_group_state(
             self.group.id, self.sp_change,
-            60 + self.scheduler_interval, 2, time_scale=False)
+            self.cron_wait_timeout, 2, time_scale=False)
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             sp_cooldown=360,
@@ -48,7 +48,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
             schedule_cron='* * * * *')
         self.wait_for_expected_group_state(
             self.group.id, self.group.groupConfiguration.minEntities,
-            60 + self.scheduler_interval, 2, time_scale=False)
+            self.cron_wait_timeout, 2, time_scale=False)
 
     @tags(speed='slow', convergence='yes')
     def test_system_cron_style_desired_capacity_policy_up_down(self):
@@ -65,7 +65,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
             schedule_cron='* * * * *')
         self.wait_for_expected_group_state(
             self.group.id, self.sp_desired_capacity,
-            60 + self.scheduler_interval, 2, time_scale=False)
+            self.cron_wait_timeout, 2, time_scale=False)
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             sp_cooldown=360,
@@ -73,7 +73,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
             schedule_cron='* * * * *')
         self.wait_for_expected_group_state(
             self.group.id, self.group.groupConfiguration.minEntities,
-            60 + self.scheduler_interval, 2, time_scale=False)
+            self.cron_wait_timeout, 2, time_scale=False)
 
     @tags(speed='slow', convergence='yes')
     def test_system_cron_style_policy_cooldown(self):
@@ -89,7 +89,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
             schedule_cron='* * * * *')
         self.wait_for_expected_group_state(
             self.group.id, self.sp_change,
-            60 + self.scheduler_interval, 2, time_scale=False)
+            self.cron_wait_timeout, 2, time_scale=False)
         execute_scheduled_policy = self.autoscale_client.execute_policy(
             group_id=self.group.id,
             policy_id=cron_policy['id'])
@@ -110,9 +110,9 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         self.wait_for_expected_group_state(
             self.group.id,
             self.group.groupConfiguration.minEntities + self.sp_change,
-            60 + self.scheduler_interval, 2, time_scale=False)
+            self.cron_wait_timeout, 2, time_scale=False)
         # Now wait for next execution
         self.wait_for_expected_group_state(
             self.group.id,
             self.group.groupConfiguration.minEntities + self.sp_change * 2,
-            60 + self.scheduler_interval, 2, time_scale=False)
+            self.cron_wait_timeout, 2, time_scale=False)
