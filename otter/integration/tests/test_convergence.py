@@ -388,6 +388,31 @@ class TestConvergence(unittest.TestCase):
             NovaServer(id=_id, pool=self.helper.pool).update_metadata({}, rcs)
             for _id in ids]).addCallback(lambda _: rcs)
 
+    def test_clb_pending_delete_on_scale_up(self):
+        """
+        Simulate getting a 422 on scale up from CLB when in PENDING_DELETE
+            which should cause the group to error
+        - Create a group with non-zero min servers and a CLB (or more)
+        - Set mimic to return 422 and state PENDING_DELETE on addition to CLB
+        - Attempt to scale up
+        - Group goes into error state since it cannot take action
+
+        Prereq: MUST be able to use Mimic to simulate incorrect CLB behavior
+        """
+        # create a lb
+        # create group with lb and min servers
+        # wait for active servers and on load balancer
+
+        # Set LB to PENDING_DELETE (which will cause it to return a 422)
+
+        # scale up
+        # wait for state to be in error
+
+
+
+
+
+
 
 class ConvergenceSet1(unittest.TestCase):
     """
