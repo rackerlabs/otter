@@ -2438,6 +2438,8 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.clock.advance(1)
         self.assertEqual(self.treq.delete.call_count, 2)
         self.successResultOf(ret_ds[0])
+        self.assertNoResult(ret_ds[1])
+        self.assertNoResult(ret_ds[2])
 
         # fire others
         delete_ds[1].callback(mock.Mock(code=404))
