@@ -37,8 +37,10 @@ from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,
     ModifyGroupState,
+    UpdateGroupStatus,
     perform_modify_group_state)
-from otter.models.interface import GroupState, NoSuchScalingGroupError
+from otter.models.interface import (
+    GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
 from otter.test.convergence.test_planning import server
 from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
@@ -566,8 +568,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             'launchConfiguration': self.lc,
             'status': 'ACTIVE'
         }
-        gsgi_result = (self.group, self.manifest)
-        self.expected_intents = [(gsgi, gsgi_result)]
+        self.gsgi_result = (self.group, self.manifest)
+        self.expected_intents = [(gsgi, self.gsgi_result)]
         self.log = mock_log()
 
     def _get_dispatcher(self, expected_intents=None):
@@ -764,6 +766,34 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                   get_all_convergence_data=gacd)
         dispatcher = self._get_dispatcher()
         self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
+
+    def test_set_error_state(self):
+        """The group is put into ERROR state if any step returns FAILURE."""
+        gacd = self._get_gacd_func(self.group.uuid)
+
+        def plan(*args, **kwargs):
+            return pbag([
+                TestStep(Effect(Constant((StepResult.FAILURE, []))))
+            ])
+
+        eff = execute_convergence(self.tenant_id, self.group_id,
+                                  plan=plan,
+                                  get_all_convergence_data=gacd)
+        noop = lambda i: None
+        sequence = SequenceDispatcher([
+            (self.gsgi, lambda i: self.gsgi_result),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
+                 noop),
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            (UpdateGroupStatus(scaling_group=self.group,
+                               status=ScalingGroupStatus.ERROR),
+             noop),
+        ])
+        dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
+        
 
 
 class DetermineActiveTests(SynchronousTestCase):
