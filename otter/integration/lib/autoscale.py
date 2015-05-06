@@ -10,8 +10,7 @@ import random
 
 from characteristic import Attribute, attributes
 
-from testtools.matchers import (
-    ContainsDict, Equals, MatchesAll, MatchesPredicateWithParams)
+from testtools.matchers import MatchesPredicateWithParams
 
 import treq
 

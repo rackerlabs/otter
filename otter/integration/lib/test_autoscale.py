@@ -9,7 +9,7 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.integration.lib.autoscale import (
-    HasActive, ExcludesServers, ScalingGroup)
+    ExcludesServers, HasActive, ScalingGroup)
 
 from otter.util.deferredutils import TimedOutError
 
