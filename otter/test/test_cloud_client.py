@@ -162,7 +162,8 @@ class PerformServiceRequestTests(SynchronousTestCase):
         Call :func:`concretize_service_request` with premade test objects.
         """
         if throttler is None:
-            throttler = lambda stype, method: None
+            def throttler(stype, method):
+                pass
         return concretize_service_request(
             self.authenticator, self.log, self.service_configs,
             throttler,
