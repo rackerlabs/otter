@@ -71,7 +71,7 @@ TRIAL_OPTIONS_UNIT=${TRIAL_OPTIONS} --jobs 4
 unit:
 ifneq ($(JENKINS_URL), )
 	trial ${TRIAL_OPTIONS_UNIT} --reporter=subunit ${UNITTESTS} \
-		| tee subunit-output.txt
+		| subunit-1to2 | tee subunit-output.txt
 	tail -n +4 subunit-output.txt | subunit2junitxml > test-report.xml
 else
 	trial ${TRIAL_OPTIONS_UNIT} ${UNITTESTS}
