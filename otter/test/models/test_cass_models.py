@@ -2121,12 +2121,14 @@ class ViewManifestTests(CassScalingGroupTestCase):
             'paused': False,
             'desired': 0,
             'created_at': 23,
-            'deleting': False
+            'deleting': False,
+            'status': 'ACTIVE',
         }
         self.manifest = {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch_config,
             'id': "12345678g",
+            'status': 'ACTIVE',
             'state': GroupState(
                 self.tenant_id,
                 self.group_id,
@@ -2166,6 +2168,17 @@ class ViewManifestTests(CassScalingGroupTestCase):
             exp_data, ConsistencyLevel.QUORUM,
             matches(IsInstance(NoSuchScalingGroupError)),
             self.mock_log)
+
+    def test_different_status(self):
+        """`status` is propagated to the manifest return value."""
+        self.verified_view.return_value = defer.succeed(self.vv_return)
+
+        self.vv_return['status'] = 'ERROR'
+        self.manifest['status'] = 'ERROR'
+
+        self.assertEqual(
+            self.validate_view_manifest_return_value(with_policies=False),
+            self.manifest)
 
     def test_with_webhooks(self):
         """

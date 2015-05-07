@@ -684,15 +684,14 @@ class CassScalingGroup(object):
                 group)
 
         def _generate_manifest_group_part(group):
+            status = self._group_status(group['status'], group['deleting'])
             m = {
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
                 'id': self.uuid,
-                'state': _unmarshal_state(group)
+                'state': _unmarshal_state(group),
+                'status': status.name,
             }
-            if get_deleting:
-                status = self._group_status(group['status'], group['deleting'])
-                m['status'] = status.name
             return m
 
         def check_deleting(group):
