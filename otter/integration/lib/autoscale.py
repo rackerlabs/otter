@@ -385,6 +385,7 @@ class ScalingGroup(object):
 
         return (
             self.get_scaling_group_state(rcs, success_codes=[200])
+            .addCallback(lambda resp_tuple: resp_tuple[-1])
             .addCallback(extract_active_ids)
             .addCallback(_get_the_ips))
 
