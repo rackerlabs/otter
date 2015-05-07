@@ -188,6 +188,7 @@ class AutoscaleFixture(BaseTestFixture):
         cls.interval_time = int(cls.autoscale_config.interval_time)
         cls.timeout = int(cls.autoscale_config.timeout)
         cls.scheduler_interval = OtterConstants.SCHEDULER_INTERVAL
+        cls.cron_wait_timeout = 60 + cls.scheduler_interval + 5
         cls.scheduler_batch = OtterConstants.SCHEDULER_BATCH
         cls.max_maxentities = OtterConstants.MAX_MAXENTITIES
         cls.max_cooldown = OtterConstants.MAX_COOLDOWN

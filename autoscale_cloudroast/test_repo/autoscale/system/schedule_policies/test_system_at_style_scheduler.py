@@ -10,7 +10,6 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
 class AtStyleSchedulerTests(AutoscaleFixture):
-
     """
     Verify at style scheduler policy executes for all policy change types
     """
