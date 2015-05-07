@@ -47,6 +47,7 @@ from otter.test.utils import (
     CheckFailureValue, FakePartitioner,
     TestStep,
     mock_group, mock_log,
+    noop,
     raise_,
     test_dispatcher,
     transform_eq,
@@ -759,9 +760,6 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 TestStep(Effect(Constant((StepResult.FAILURE, [])))),
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
             ])
-
-        def noop(i):
-            pass
 
         eff = execute_convergence(self.tenant_id, self.group_id,
                                   plan=plan,

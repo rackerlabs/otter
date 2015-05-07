@@ -816,3 +816,8 @@ class TestStep(object):
 
     def as_effect(self):
         return self.effect
+
+
+def noop(_):
+    """Ignore input and return None."""
+    pass
