@@ -39,7 +39,7 @@ def get_fake_treq(test_case, method, url, expected_args_and_kwargs, response):
 
     _treq = FakeTreq()
 
-    setattr(_treq, method, requester)
+    setattr(_treq, method.lower(), requester)
 
     return _treq
 
