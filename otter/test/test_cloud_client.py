@@ -18,7 +18,7 @@ import mock
 
 import six
 
-from toolz.dicttoolz import assoc, update_in
+from toolz.dicttoolz import assoc
 
 from twisted.internet.defer import succeed
 from twisted.internet.task import Clock
@@ -60,14 +60,15 @@ from otter.util.http import APIError, headers
 from otter.util.pure_http import Request, has_code
 
 
-fake_service_configs = {
-    ServiceType.CLOUD_SERVERS: {
-        'name': 'cloudServersOpenStack',
-        'region': 'DFW'},
-    ServiceType.CLOUD_LOAD_BALANCERS: {
-        'name': 'cloudLoadBalancers',
-        'region': 'DFW'}
-}
+def make_service_configs():
+    return {
+        ServiceType.CLOUD_SERVERS: {
+            'name': 'cloudServersOpenStack',
+            'region': 'DFW'},
+        ServiceType.CLOUD_LOAD_BALANCERS: {
+            'name': 'cloudLoadBalancers',
+            'region': 'DFW'}
+    }
 
 
 def resolve_authenticate(eff, token='token'):
@@ -84,7 +85,7 @@ def service_request_eqf(stub_response):
         eff = concretize_service_request(
             authenticator=object(),
             log=object(),
-            service_configs=fake_service_configs,
+            service_configs=make_service_configs(),
             throttler=lambda stype, method: None,
             tenant_id='000000',
             service_request=service_request_intent)
@@ -153,7 +154,7 @@ class PerformServiceRequestTests(SynchronousTestCase):
         """Save some common parameters."""
         self.log = object()
         self.authenticator = object()
-        self.service_configs = fake_service_configs.copy()
+        self.service_configs = make_service_configs()
         eff = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
         self.svcreq = eff.intent
 
@@ -201,11 +202,7 @@ class PerformServiceRequestTests(SynchronousTestCase):
         Binds a URL from service config if it has URL instead of binding
         URL from service catalog
         """
-        self.service_configs = update_in(
-            self.service_configs,
-            (ServiceType.CLOUD_SERVERS, 'url'),
-            lambda _: 'myurl'
-        )
+        self.service_configs[ServiceType.CLOUD_SERVERS]['url'] = 'myurl'
         eff = self._concrete(self.svcreq)
         next_eff = resolve_authenticate(eff)
         # URL in HTTP request is configured URL
@@ -435,7 +432,7 @@ class GetCloudClientDispatcherTests(SynchronousTestCase):
         authenticator = object()
         log = object()
         dispatcher = get_cloud_client_dispatcher(clock, authenticator, log,
-                                                 fake_service_configs)
+                                                 make_service_configs())
         svcreq = service_request(ServiceType.CLOUD_SERVERS, 'POST', 'servers')
         tscope = TenantScope(tenant_id='111', effect=svcreq)
 
@@ -473,7 +470,7 @@ class PerformTenantScopeTests(SynchronousTestCase):
         """Save some common parameters."""
         self.log = object()
         self.authenticator = object()
-        self.service_configs = fake_service_configs
+        self.service_configs = make_service_configs()
 
         self.throttler = lambda stype, method: None
 
