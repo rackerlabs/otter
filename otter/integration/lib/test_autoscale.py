@@ -55,7 +55,7 @@ class WaitForStateTestCase(SynchronousTestCase):
 
         This version emulates completion after a period of time.
         """
-        self.assertEquals([200], success_codes)
+        self.assertEquals(success_codes, [200])
         if self.counter == self.threshold:
             return defer.succeed((200, self.group_state_w_2_servers))
         else:
@@ -70,7 +70,7 @@ class WaitForStateTestCase(SynchronousTestCase):
 
         This version never yields the desired number of servers.
         """
-        self.assertEquals([200], success_codes)
+        self.assertEquals(success_codes, [200])
         return defer.succeed((200, self.empty_group_state))
 
     def test_poll_until_happy(self):
@@ -116,7 +116,7 @@ class MatcherTestCase(SynchronousTestCase):
         mismatch = matcher.match(
             {'active': [{'id': "id{0}".format(i)} for i in (3, 4)]}
         )
-        self.assertEqual(None, mismatch)
+        self.assertEqual(mismatch, None)
 
     def test_excludes_servers_failure(self):
         """
@@ -125,15 +125,15 @@ class MatcherTestCase(SynchronousTestCase):
         """
         matcher = ExcludesServers(['id1', 'id2'])
         self.assertNotEqual(
-            None,
             matcher.match(
                 {'active': [{'id': "id{0}".format(i)} for i in (1, 2)]}),
-            "Complete match succeeds when none should be present."
+            "Complete match succeeds when none should be present.",
+            None
         )
         self.assertNotEqual(
-            None,
             matcher.match({'active': [{'id': "id1"}]}),
-            "Partial match succeeds when none should be present."
+            "Partial match succeeds when none should be present.",
+            None
         )
 
     def test_has_active(self):
@@ -142,15 +142,12 @@ class MatcherTestCase(SynchronousTestCase):
         matches the length given.
         """
         matcher = HasActive(2)
-        self.assertNotEqual(
-            None,
-            matcher.match({'active': [{'id': "id1"}]})
-        )
-        self.assertNotEqual(None, matcher.match({'active': []}))
+        self.assertNotEqual(matcher.match({'active': [{'id': "id1"}]}), None)
+        self.assertNotEqual(matcher.match({'active': []}), None)
         self.assertEqual(
-            None,
             matcher.match(
-                {'active': [{'id': "id{0}".format(i)} for i in (1, 2)]}))
+                {'active': [{'id': "id{0}".format(i)} for i in (1, 2)]}),
+            None)
 
 
 class GetServicenetIPs(SynchronousTestCase):
