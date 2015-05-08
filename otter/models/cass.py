@@ -128,7 +128,7 @@ _cql_insert_group_state = (
     'USING TIMESTAMP :ts')
 _cql_view_group_state = (
     'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at '
+    '"groupTouched", "policyTouched", paused, desired, created_at, status '
     'FROM {cf} '
     'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND deleting=false;')
 
@@ -461,7 +461,8 @@ def _unmarshal_state(state_dict):
     if desired_capacity is None:
         desired_capacity = 0
 
-    status = _group_status(state_dict['status'], state_dict['deleting'])
+    status = _group_status(state_dict['status'],
+                           state_dict.get('deleting', False))
 
     return GroupState(
         state_dict["tenantId"], state_dict["groupId"],
