@@ -62,8 +62,9 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             1, 201, self.wb_policy, self.at_style_policy,
             self.cron_style_policy)
         self._execute_webhook_policies_within_group(group)
-        sleep(60 + self.scheduler_interval)
-        self.verify_group_state(group.id, 3 * self.change)
+        self.wait_for_expected_group_state(
+            group.id, 3 * self.change,
+            self.cron_wait_timeout, 2, time_scale=False)
 
     @tags(speed='slow', convergence='yes')
     def test_system_webhook_and_scheduler_policies_different_groups(self):
@@ -78,7 +79,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             1, 201, self.wb_policy, self.at_style_policy,
             self.cron_style_policy)
         self._execute_webhook_policies_within_group(group1, group2)
-        sleep(60 + self.scheduler_interval)
+        sleep(self.cron_wait_timeout)
         self.verify_group_state(group1.id, 3 * self.change)
         self.verify_group_state(group2.id, 3 * self.change)
 
@@ -143,7 +144,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         group_ids = [
             self._create_multi_policy_group(1, 201, self.at_style_policy).id
             for _ in range(4)]
-        sleep(self.scheduler_interval + 30)
+        sleep(2 + self.scheduler_interval + 30)
         for group_id in group_ids:
             self.verify_group_state(group_id, self.change)
             self.verify_server_count_using_server_metadata(group_id,
@@ -152,7 +153,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
     def _unchanged_policy(self, policy_list):
         return {i: policy_list[i] for i in policy_list if i != 'change'}
 
-    def _create_multi_policy_group(self, multi_num, response, *args):
+    def _create_multi_policy_group(self, multi_num, expected_code, *args):
         """
         Creates a group with the given list of policies and asserts the
         group creation was successful
@@ -165,7 +166,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             sp_list=policy_list,
             gc_cooldown=0)
         self.assertEquals(
-            response.status_code, response,
+            response.status_code, expected_code,
             msg=('Creating multiple scaling policies within a group failed '
                  'with response code: {0}'.format(response.status_code)))
         group = response.entity

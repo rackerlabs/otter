@@ -33,7 +33,7 @@ from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
 from otter.log.intents import err, msg, with_log
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, ModifyGroupState)
+    DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.fp import assoc_obj
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
@@ -145,6 +145,10 @@ def execute_convergence(tenant_id, group_id,
             group_status == ScalingGroupStatus.DELETING):
             # servers have been deleted. Delete the group for real
         yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
+
+    if worst_status == StepResult.FAILURE:
+        yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
+                                       status=ScalingGroupStatus.ERROR))
 
     yield do_return(worst_status)
 
@@ -334,8 +338,6 @@ def converge_one_group(currently_converging, tenant_id, group_id, version,
     else:
         if result in (StepResult.FAILURE, StepResult.SUCCESS):
             yield delete_divergent_flag(tenant_id, group_id, version)
-        # TODO: if result is FAILURE, put the group into ERROR state.
-        # https://github.com/rackerlabs/otter/issues/885
 
 
 @do

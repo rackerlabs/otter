@@ -72,6 +72,43 @@ class TestHelper(object):
             group_config=create_scaling_group_dict(**kwargs),
             pool=self.pool)
 
+    @inlineCallbacks
+    def start_group_and_wait(self, group, rcs, desired=None):
+        """
+        Start a group, and if desired is supplied, creates and executes a
+        policy that scales to that number.  This would be used for example
+        if we wanted to scale to the max of a group, but did not want the min
+        to be equal to the max.
+
+        This also waits for the desired number of servers to be reached - that
+        would be desired if provided, or the min if not provided.
+
+        :param TestResources rcs: An instance of
+            :class:`otter.integration.lib.resources.TestResources`
+        :param ScalingGroup group: An instance of
+            :class:`otter.integration.lib.autoscale.ScalingGroup` to start -
+            this group should not have been started already.
+        :param int desired: A desired number to scale to.
+        """
+        yield group.start(rcs, self.test_case)
+        if desired is not None:
+            p = ScalingPolicy(set_to=desired, scaling_group=group)
+            yield p.start(rcs, self.test_case)
+            yield p.execute(rcs)
+
+        if desired is None:
+            desired = group.group_config['groupConfiguration'].get(
+                'minEntities', 0)
+
+        yield group.wait_for_state(
+            rcs,
+            MatchesAll(HasActive(desired),
+                       ContainsDict({'pendingCapacity': Equals(0),
+                                     'desiredCapacity': Equals(desired)})),
+            timeout=600)
+
+        returnValue(rcs)
+
     def oob_delete_then(self, rcs, scaling_group, num):
         """
         Return a decorator that wraps a function call with logic to out-of-band
@@ -376,6 +413,46 @@ class TestConvergence(unittest.TestCase):
             for _id in ids]).addCallback(lambda _: rcs)
 
 
+def _test_scaling_after_oobd(
+        helper, rcs, min_servers=0, max_servers=25,
+        set_to_servers=None, oobd_servers=0, scale_servers=1,
+        converged_servers=0, scale_should_fail=False):
+    """
+    Helper function that creates a scaling group and sets the desired capacity
+    to a certain number.  Then OOB-deletes some number of servers and scales.
+    Then it waits for some number of servers to be active.
+    """
+    scaling_group = helper.create_group(
+        image_ref=image_ref, flavor_ref=flavor_ref,
+        min_entities=min_servers, max_entities=max_servers
+    )
+
+    policy_scale = ScalingPolicy(
+        scale_by=scale_servers,
+        scaling_group=scaling_group
+    )
+
+    return (
+        helper.start_group_and_wait(scaling_group, rcs,
+                                    desired=set_to_servers)
+        .addCallback(policy_scale.start, helper.test_case)
+        .addCallback(
+            helper.oob_delete_then(
+                rcs, scaling_group, oobd_servers)(policy_scale.execute),
+            success_codes=(
+                [403] if scale_should_fail else [202]))
+        .addCallback(lambda _: scaling_group.wait_for_state(
+            rcs, MatchesAll(
+                HasActive(converged_servers),
+                ContainsDict({
+                    'pendingCapacity': Equals(0),
+                    'desiredCapacity': Equals(converged_servers)
+                })
+            ), timeout=600)
+        )
+    )
+
+
 class ConvergenceSet1(unittest.TestCase):
     """
     Class for CATC 4-12 that run without CLB, but can be run with CLB (
@@ -405,15 +482,6 @@ class ConvergenceSet1(unittest.TestCase):
             region=region
         )
 
-    def use_clb_arg(self):
-        """
-        Get the CLB arguments with which to create a scaling group, if
-        ``clbs`` is set on the test case.
-        """
-        if self.clbs is not None:
-            return [clb.scaling_group_spec() for clb in self.clbs]
-        return None
-
     def test_reaction_to_oob_server_deletion_below_min(self):
         """
         CATC-004-a
@@ -435,11 +503,7 @@ class ConvergenceSet1(unittest.TestCase):
             min_entities=N_SERVERS)
 
         return (
-            self.scaling_group.start(self.rcs, self)
-            .addCallback(
-                self.scaling_group.wait_for_state,
-                HasActive(N_SERVERS), timeout=600
-            )
+            self.helper.start_group_and_wait(self.scaling_group, self.rcs)
             .addCallback(self.helper.oob_delete_then(
                 self.rcs, self.scaling_group, N_SERVERS / 2)(
                 self.scaling_group.trigger_convergence))
@@ -448,8 +512,6 @@ class ConvergenceSet1(unittest.TestCase):
     def test_reaction_to_oob_deletion_then_scale_up(self):
         """
         CATC-005-a
-
-        CLB_NEEDED
 
         Validate the following edge case:
         - When out of band deletions bring the number of active servers below
@@ -462,27 +524,9 @@ class ConvergenceSet1(unittest.TestCase):
         by, say, two servers.  If convergence is working as expected, we expect
         five servers at the end.
         """
-        self.scaling_group = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=3
-        )
-
-        self.scaling_policy = ScalingPolicy(
-            scale_by=2,
-            scaling_group=self.scaling_group
-        )
-
-        return (
-            self.scaling_group.start(self.rcs, self)
-            .addCallback(self.scaling_policy.start, self)
-            .addCallback(
-                self.scaling_group.wait_for_state, HasActive(3), timeout=600)
-            .addCallback(self.helper.oob_delete_then(
-                self.rcs, self.scaling_group, 1)(self.scaling_policy.execute))
-            .addCallback(
-                self.scaling_group.wait_for_state, HasActive(5), timeout=600
-            )
-        )
+        return _test_scaling_after_oobd(
+            self.helper, self.rcs, min_servers=3, oobd_servers=1,
+            scale_servers=2, converged_servers=5)
 
     def test_scale_down_after_oobd_non_constrained_z_lessthan_y(self):
         """
@@ -508,9 +552,9 @@ class ConvergenceSet1(unittest.TestCase):
         z = 2
         y = -3
 
-        return self._scale_down_after_oobd_non_constrained_param(
-            self.rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
-            scale_servers=y)
+        return _test_scaling_after_oobd(
+            self.helper, self.rcs, min_servers=N, set_to_servers=x,
+            oobd_servers=z, scale_servers=y, converged_servers=(x + y))
 
     def test_scale_down_after_oobd_non_constrained_z_greaterthan_y(self):
         """
@@ -536,9 +580,9 @@ class ConvergenceSet1(unittest.TestCase):
         z = 3
         y = -2
 
-        return self._scale_down_after_oobd_non_constrained_param(
-            self.rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
-            scale_servers=y)
+        return _test_scaling_after_oobd(
+            self.helper, self.rcs, min_servers=N, set_to_servers=x,
+            oobd_servers=z, scale_servers=y, converged_servers=(x + y))
 
     def test_scale_down_after_oobd_non_constrained_z_equal_y(self):
         """
@@ -564,54 +608,9 @@ class ConvergenceSet1(unittest.TestCase):
         z = 3
         y = -3
 
-        return self._scale_down_after_oobd_non_constrained_param(
-            self.rcs, min_servers=N, set_to_servers=x, oobd_servers=z,
-            scale_servers=y)
-
-    def _scale_down_after_oobd_non_constrained_param(
-            self, rcs, min_servers=0, max_servers=25, set_to_servers=0,
-            oobd_servers=0, scale_servers=1):
-        """
-        Helper for CATC-006
-        """
-        # This only applies if not constrained by max/min
-        converged_servers = set_to_servers + scale_servers
-
-        self.scaling_group = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=min_servers, max_entities=max_servers
-        )
-
-        self.policy_set = ScalingPolicy(
-            set_to=set_to_servers,
-            scaling_group=self.scaling_group
-        )
-
-        self.policy_scale = ScalingPolicy(
-            scale_by=scale_servers,
-            scaling_group=self.scaling_group
-        )
-        return (
-            self.scaling_group.start(rcs, self)
-            .addCallback(self.policy_set.start, self)
-            .addCallback(self.policy_scale.start, self)
-            .addCallback(self.policy_set.execute)
-            .addCallback(
-                self.scaling_group.wait_for_state,
-                HasActive(set_to_servers), timeout=600)
-            .addCallback(self.helper.oob_delete_then(
-                rcs, self.scaling_group, oobd_servers)(
-                self.policy_scale.execute))
-            .addCallback(lambda _: self.scaling_group.wait_for_state(
-                rcs, MatchesAll(
-                    ContainsDict({
-                        'pendingCapacity': Equals(0),
-                        'desiredCapacity': Equals(converged_servers)
-                    }),
-                    HasActive(converged_servers)),
-                timeout=600)
-            )
-        )
+        return _test_scaling_after_oobd(
+            self.helper, self.rcs, min_servers=N, set_to_servers=x,
+            oobd_servers=z, scale_servers=y, converged_servers=(x + y))
 
     def test_scale_up_after_oobd_at_group_max(self):
         """
@@ -633,10 +632,10 @@ class ConvergenceSet1(unittest.TestCase):
         z = 2
         y = 5
 
-        return self._scale_down_after_oobd_hitting_constraints(
-            self.rcs, set_to_servers=x, oobd_servers=z,
+        return _test_scaling_after_oobd(
+            self.helper, self.rcs, set_to_servers=x, oobd_servers=z,
             max_servers=max_servers, scale_servers=y,
-            converged_servers=max_servers)
+            converged_servers=max_servers, scale_should_fail=True)
 
     def test_scale_down_past_group_min_after_oobd(self):
         """
@@ -657,10 +656,10 @@ class ConvergenceSet1(unittest.TestCase):
         z = 2
         y = -2
 
-        return self._scale_down_after_oobd_hitting_constraints(
-            self.rcs, oobd_servers=z, min_servers=min_servers,
-            scale_servers=y,
-            converged_servers=min_servers)
+        return _test_scaling_after_oobd(
+            self.helper, self.rcs, oobd_servers=z, min_servers=min_servers,
+            scale_servers=y, converged_servers=min_servers,
+            scale_should_fail=True)
 
     def test_group_config_update_triggers_convergence(self):
         """
@@ -678,73 +677,16 @@ class ConvergenceSet1(unittest.TestCase):
             max_entities=max_servers
         )
 
-        self.policy_set = ScalingPolicy(
-            set_to=set_to_servers,
-            scaling_group=self.scaling_group
-        )
-
         return (
-            self.scaling_group.start(self.rcs, self)
-            .addCallback(self.policy_set.start, self)
-            .addCallback(self.policy_set.execute)
-            .addCallback(
-                self.scaling_group.wait_for_state,
-                HasActive(set_to_servers), timeout=600
-            )
+            self.helper.start_group_and_wait(self.scaling_group,
+                                             self.rcs,
+                                             desired=set_to_servers)
             .addCallback(
                 self.helper.oob_delete_then(
                     self.rcs, self.scaling_group, set_to_servers / 2)(
                     self.scaling_group.update_group_config),
                 maxEntities=max_servers + 2)
         )
-
-    def _scale_down_after_oobd_hitting_constraints(
-            self, rcs, min_servers=0, max_servers=25, set_to_servers=None,
-            oobd_servers=0, scale_servers=1, converged_servers=0):
-
-        converged_servers = (
-            min_servers if set_to_servers is None else set_to_servers)
-
-        self.scaling_group = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=min_servers, max_entities=max_servers
-        )
-
-        self.policy_scale = ScalingPolicy(
-            scale_by=scale_servers,
-            scaling_group=self.scaling_group
-        )
-
-        d = (self.scaling_group.start(rcs, self)
-             .addCallback(self.policy_scale.start, self))
-
-        if set_to_servers is not None:
-            self.policy_set = ScalingPolicy(
-                set_to=set_to_servers,
-                scaling_group=self.scaling_group
-            )
-
-            (d.addCallback(self.policy_set.start, self)
-             .addCallback(self.policy_set.execute))
-
-        (d.addCallback(
-            lambda _: self.scaling_group.wait_for_state(
-                self.rcs, HasActive(converged_servers),
-                timeout=120))
-         .addCallback(
-            self.helper.oob_delete_then(rcs, self.scaling_group, oobd_servers)(
-                self.policy_scale.execute),
-            success_codes=[403])
-         .addCallback(lambda _: self.scaling_group.wait_for_state(
-             self.rcs, MatchesAll(
-                 ContainsDict({
-                     'pendingCapacity': Equals(0),
-                     'desiredCapacity': Equals(converged_servers)
-                 }),
-                 HasActive(converged_servers)),
-             timeout=600))
-         )
-        return d
 
 
 class ConvergenceSet1WithCLB(ConvergenceSet1):

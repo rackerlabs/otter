@@ -87,10 +87,10 @@ class UpdateSchedulerTests(AutoscaleFixture):
         self.verify_group_state(
             self.group.id, self.group.groupConfiguration.minEntities)
         self._update_policy(self.group.id, cron_policy, upd_args)
-        sleep(60 + self.scheduler_interval)
-        self.verify_group_state(
+        self.wait_for_expected_group_state(
             self.group.id,
-            self.group.groupConfiguration.minEntities + cron_policy['change'])
+            self.group.groupConfiguration.minEntities + cron_policy['change'],
+            self.cron_wait_timeout, 2, time_scale=False)
 
     @tags(speed='slow', convergence='yes')
     def test_system_update_cron_style_scheduler_to_execute_in_the_future(self):
@@ -106,10 +106,10 @@ class UpdateSchedulerTests(AutoscaleFixture):
             group_id=self.group.id,
             schedule_cron='* * * * *',
             sp_cooldown=0)
-        sleep(60 + self.scheduler_interval)
-        self.verify_group_state(
+        self.wait_for_expected_group_state(
             self.group.id,
-            self.group.groupConfiguration.minEntities + cron_policy['change'])
+            self.group.groupConfiguration.minEntities + cron_policy['change'],
+            self.cron_wait_timeout, 1, time_scale=False)
         self._update_policy(
             self.group.id, cron_policy, upd_args, change_value=2)
         sleep(120 + self.scheduler_interval)
@@ -134,13 +134,13 @@ class UpdateSchedulerTests(AutoscaleFixture):
             sp_cooldown=0)
         self.wait_for_expected_group_state(
             self.group.id, self.group.groupConfiguration.minEntities + 1,
-            60 + self.scheduler_interval, 2, time_scale=False)
+            self.cron_wait_timeout, 2, time_scale=False)
         self._update_policy(
             self.group.id, cron_style_policy, self.cron_policy_args,
             change_value=2)
         self.wait_for_expected_group_state(
             self.group.id, self.group.groupConfiguration.minEntities + 3,
-            60 + self.scheduler_interval, time_scale=False)
+            self.cron_wait_timeout, time_scale=False)
 
     @tags(speed='slow', convergence='yes')
     def test_system_update_name_for_cron_style_scheduled_policy(self):
@@ -156,10 +156,10 @@ class UpdateSchedulerTests(AutoscaleFixture):
             self.group.id, self.group.groupConfiguration.minEntities)
         self._update_policy(self.group.id, cron_policy, self.cron_policy_args,
                             name='test-only-upd-name')
-        sleep(60 + self.scheduler_interval)
-        self.verify_group_state(
+        self.wait_for_expected_group_state(
             self.group.id,
-            self.group.groupConfiguration.minEntities + cron_policy['change'])
+            self.group.groupConfiguration.minEntities + cron_policy['change'],
+            self.cron_wait_timeout, 2, time_scale=False)
 
     @tags(speed='slow', convergence='yes')
     def test_system_update_cooldown_for_cron_style_scheduled_policy(self):
@@ -171,12 +171,12 @@ class UpdateSchedulerTests(AutoscaleFixture):
         cron_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             schedule_cron=self.cron_policy_args['cron'])
-        sleep(self.scheduler_interval)
-        self.verify_group_state(
-            self.group.id, self.group.groupConfiguration.minEntities)
+        self.wait_for_expected_group_state(
+            self.group.id, self.group.groupConfiguration.minEntities,
+            self.cron_wait_timeout, 1, time_scale=False)
         self._update_policy(self.group.id, cron_policy, self.cron_policy_args,
                             cooldown=100)
-        sleep(60 + self.scheduler_interval)
+        sleep(self.cron_wait_timeout)
         self.verify_group_state(
             self.group.id,
             self.group.groupConfiguration.minEntities + cron_policy['change'])

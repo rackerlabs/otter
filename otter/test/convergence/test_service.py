@@ -37,14 +37,17 @@ from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,
     ModifyGroupState,
+    UpdateGroupStatus,
     perform_modify_group_state)
-from otter.models.interface import GroupState, NoSuchScalingGroupError
+from otter.models.interface import (
+    GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
 from otter.test.convergence.test_planning import server
 from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
     CheckFailureValue, FakePartitioner,
     TestStep,
     mock_group, mock_log,
+    noop,
     raise_,
     test_dispatcher,
     transform_eq,
@@ -566,8 +569,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             'launchConfiguration': self.lc,
             'status': 'ACTIVE'
         }
-        gsgi_result = (self.group, self.manifest)
-        self.expected_intents = [(gsgi, gsgi_result)]
+        self.gsgi_result = (self.group, self.manifest)
+        self.expected_intents = [(gsgi, self.gsgi_result)]
         self.log = mock_log()
 
     def _get_dispatcher(self, expected_intents=None):
@@ -742,11 +745,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         dispatcher = self._get_dispatcher()
         self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
 
-    def test_returns_failure(self):
+    def test_returns_failure_set_error_state(self):
         """
-        If a step that results in FAILURE is returned, then the ultimate result
-        of executing convergence will be a FAILURE, regardless of the other
-        step results.
+        The group is put into ERROR state if any step returns FAILURE, and
+        FAILURE is the final result of convergence.
         """
         gacd = self._get_gacd_func(self.group.uuid)
 
@@ -762,8 +764,20 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         eff = execute_convergence(self.tenant_id, self.group_id,
                                   plan=plan,
                                   get_all_convergence_data=gacd)
-        dispatcher = self._get_dispatcher()
-        self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
+
+        sequence = SequenceDispatcher([
+            (self.gsgi, lambda i: self.gsgi_result),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
+             noop),
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            (UpdateGroupStatus(scaling_group=self.group,
+                               status=ScalingGroupStatus.ERROR),
+             noop),
+        ])
+        dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
 
 
 class DetermineActiveTests(SynchronousTestCase):

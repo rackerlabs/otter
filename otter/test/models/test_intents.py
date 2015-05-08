@@ -5,8 +5,9 @@ from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, ModifyGroupState, get_model_dispatcher)
-from otter.models.interface import IScalingGroupCollection
+    DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus,
+    get_model_dispatcher)
+from otter.models.interface import IScalingGroupCollection, ScalingGroupStatus
 from otter.test.utils import iMock, mock_group, mock_log
 
 
@@ -71,3 +72,12 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
                 self.dispatcher,
                 Effect(DeleteGroup(tenant_id='00', group_id='g1'))),
             'del')
+
+    def test_update_group_status(self):
+        """Performing :obj:`UpdateGroupStatus` invokes group.update_status."""
+        eff = Effect(UpdateGroupStatus(scaling_group=self.group,
+                                       status=ScalingGroupStatus.ERROR))
+        self.group.update_status.return_value = None
+        self.assertIs(sync_perform(self.dispatcher, eff), None)
+        self.group.update_status.assert_called_once_with(
+            ScalingGroupStatus.ERROR)

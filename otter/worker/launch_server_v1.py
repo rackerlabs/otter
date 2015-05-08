@@ -779,7 +779,7 @@ def _remove_from_clb(log, endpoint, auth_token, loadbalancer_id, node_id, clock=
     return d
 
 
-def delete_server(log, request_bag, instance_details):
+def delete_server(log, request_bag, instance_details, clock=None):
     """
     Delete the server specified by instance_details.
 
@@ -820,7 +820,8 @@ def delete_server(log, request_bag, instance_details):
         server_endpoint = public_endpoint_url(request_bag.service_catalog,
                                               cloudServersOpenStack,
                                               request_bag.region)
-        return verified_delete(log, server_endpoint, request_bag, server_id)
+        return verified_delete(log, server_endpoint, request_bag, server_id,
+                               clock=clock)
 
     d.addCallback(when_removed_from_loadbalancers)
     return d
@@ -864,7 +865,12 @@ def _as_new_style_instance_details(maybe_old_style):
     return server_id, updated_lb_specs
 
 
-def delete_and_verify(log, server_endpoint, request_bag, server_id):
+# Allow only 1 delete server request at a time
+MAX_DELETE_SERVER = 1
+delete_server_sem = DeferredSemaphore(MAX_DELETE_SERVER)
+
+
+def delete_and_verify(log, server_endpoint, request_bag, server_id, clock):
     """
     Check the status of the server to see if it's actually been deleted.
     Succeeds only if it has been either deleted (404) or acknowledged by Nova
@@ -876,9 +882,13 @@ def delete_and_verify(log, server_endpoint, request_bag, server_id):
     """
     path = append_segments(server_endpoint, 'servers', server_id)
 
-    def delete(request_bag):
-        del_d = treq.delete(path, headers=headers(request_bag.auth_token),
-                            log=log)
+    def delete_with_delay(_bag):
+        d = treq.delete(path, headers=headers(_bag.auth_token), log=log)
+        # Add 0.2 seconds delay to allow 300 requests per minute
+        return d.addCallback(delay, clock, 0.2)
+
+    def delete(_bag):
+        del_d = delete_server_sem.run(delete_with_delay, _bag)
         del_d.addCallback(check_success, [404])
         del_d.addCallback(treq.content)
         return del_d.addErrback(verify, request_bag.auth_token)
@@ -937,7 +947,7 @@ def verified_delete(log,
 
     d = retry(
         partial(delete_and_verify, serv_log, server_endpoint, request_bag,
-                server_id),
+                server_id, clock),
         can_retry=retry_times(max_retries),
         next_interval=exponential_backoff_interval(exp_start),
         clock=clock)
