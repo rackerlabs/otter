@@ -552,23 +552,33 @@ def _test_error_active_and_converge(
     if desired_servers is None:
         desired_servers = min_servers
 
-    end_state = [
-        scaling_group.wait_for_N_servers(rcs, desired_servers + scale_by),
-        scaling_group.wait_for_deleted_id_removal(to_error, rcs)
-    ]
+    end_state = [scaling_group.wait_for_state(
+        rcs,
+        MatchesAll(
+            HasActive(desired_servers + scale_by),
+            ContainsDict({
+                'pendingCapacity': Equals(0),
+                'desiredCapacity': Equals(desired_servers + scale_by)
+            }),
+            ExcludesServers(to_error)
+        ),
+        timeout=600
+    )]
+
     if helper.clbs:
         end_state += [clb.wait_for_nodes(rcs, ExcludesAllIPs(ips.values()),
                                          timeout=600)
                       for clb in helper.clbs]
 
     yield gatherResults(end_state)
+    returnValue(scaling_group)
 
 
 class ConvergenceSet1(unittest.TestCase):
     """
     Class for CATC 4-12 that run without CLB, but can be run with CLB (
     so the CLB versions of these tests can be run by just subclassing this
-    test case)
+    test case).
     """
     timeout = 1800
 
