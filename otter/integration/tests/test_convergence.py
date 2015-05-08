@@ -114,6 +114,13 @@ class TestHelper(object):
         Return a decorator that wraps a function call with logic to out-of-band
         delete (not disown) some number of servers, and verifies that the
         servers are deleted and cleaned up from CLBs.
+
+        :param TestResources rcs: An instance of
+            :class:`otter.integration.lib.resources.TestResources`
+        :param ScalingGroup group: An instance of
+            :class:`otter.integration.lib.autoscale.ScalingGroup` to start -
+            this group should not have been started already.
+        :param int num: The number of servers to delete out of band.
         """
         def decorated(function):
             @wraps(function)
