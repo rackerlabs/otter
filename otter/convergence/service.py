@@ -116,8 +116,7 @@ def execute_convergence(tenant_id, group_id,
     launch_config = manifest['launchConfiguration']
     now = yield Effect(Func(time.time))
 
-    group_status = ScalingGroupStatus.lookupByName(manifest['status'])
-    desired_capacity = (0 if group_status == ScalingGroupStatus.DELETING
+    desired_capacity = (0 if group_state.status == ScalingGroupStatus.DELETING
                         else group_state.desired)
     desired_group_state = get_desired_group_state(
         group_id, launch_config, desired_capacity)
@@ -127,7 +126,7 @@ def execute_convergence(tenant_id, group_id,
               servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
               desired=desired_group_state, active=active)
     # Since deleting groups are not publicly visible
-    if group_status != ScalingGroupStatus.DELETING:
+    if group_state.status != ScalingGroupStatus.DELETING:
         yield _update_active(scaling_group, active)
     if len(steps) == 0:
         yield do_return(StepResult.SUCCESS)
@@ -142,7 +141,7 @@ def execute_convergence(tenant_id, group_id,
               worst_status=worst_status)
 
     if (worst_status == StepResult.SUCCESS and
-            group_status == ScalingGroupStatus.DELETING):
+            group_state.status == ScalingGroupStatus.DELETING):
             # servers have been deleted. Delete the group for real
         yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
 
