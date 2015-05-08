@@ -63,5 +63,11 @@
                    "url": "http://cfurl.net/"},
     "converger": {
         "interval": 30
+    },
+    "cloud_client": {
+	"throttling": {
+	    "create_server_delay": 1,
+	    "delete_server_delay": 0.2
+	}
     }
 }

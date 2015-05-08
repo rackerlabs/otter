@@ -11,10 +11,17 @@ from effect import (
     TypeDispatcher,
     base_dispatcher,
     sync_perform)
-from effect.testing import EQFDispatcher
+from effect.testing import EQFDispatcher, SequenceDispatcher
+from effect.twisted import perform
+
+import mock
 
 import six
 
+from toolz.dicttoolz import assoc
+
+from twisted.internet.defer import succeed
+from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import Authenticate, InvalidateToken
@@ -32,28 +39,36 @@ from otter.cloud_client import (
     add_bind_service,
     change_clb_node,
     concretize_service_request,
+    get_cloud_client_dispatcher,
     get_server_details,
     perform_tenant_scope,
     service_request,
-    set_nova_metadata_item)
+    set_nova_metadata_item,
+    _Throttle,
+    _default_throttler,
+    _perform_throttle,
+    _serialize_and_delay)
 from otter.constants import ServiceType
 from otter.test.utils import (
     StubResponse,
     resolve_effect,
-    stub_pure_response)
+    stub_pure_response,
+    unwrap_wrapped_effect)
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
+from otter.util.config import set_config_data
 from otter.util.http import APIError, headers
 from otter.util.pure_http import Request, has_code
 
 
-fake_service_configs = {
-    ServiceType.CLOUD_SERVERS: {
-        'name': 'cloudServersOpenStack',
-        'region': 'DFW'},
-    ServiceType.CLOUD_LOAD_BALANCERS: {
-        'name': 'cloudLoadBalancers',
-        'region': 'DFW'}
-}
+def make_service_configs():
+    return {
+        ServiceType.CLOUD_SERVERS: {
+            'name': 'cloudServersOpenStack',
+            'region': 'DFW'},
+        ServiceType.CLOUD_LOAD_BALANCERS: {
+            'name': 'cloudLoadBalancers',
+            'region': 'DFW'}
+    }
 
 
 def resolve_authenticate(eff, token='token'):
@@ -70,7 +85,8 @@ def service_request_eqf(stub_response):
         eff = concretize_service_request(
             authenticator=object(),
             log=object(),
-            service_configs=fake_service_configs,
+            service_configs=make_service_configs(),
+            throttler=lambda stype, method: None,
             tenant_id='000000',
             service_request=service_request_intent)
 
@@ -138,23 +154,21 @@ class PerformServiceRequestTests(SynchronousTestCase):
         """Save some common parameters."""
         self.log = object()
         self.authenticator = object()
-        self.service_configs = {
-            ServiceType.CLOUD_SERVERS: {
-                'name': 'cloudServersOpenStack',
-                'region': 'DFW'},
-            ServiceType.CLOUD_LOAD_BALANCERS: {
-                'name': 'cloudLoadBalancers',
-                'region': 'DFW'}
-        }
+        self.service_configs = make_service_configs()
         eff = service_request(ServiceType.CLOUD_SERVERS, 'GET', 'servers')
         self.svcreq = eff.intent
 
-    def _concrete(self, svcreq, **kwargs):
+    def _concrete(self, svcreq, throttler=None, **kwargs):
         """
         Call :func:`concretize_service_request` with premade test objects.
         """
+        if throttler is None:
+            def throttler(stype, method):
+                pass
         return concretize_service_request(
-            self.authenticator, self.log, self.service_configs, 1, svcreq,
+            self.authenticator, self.log, self.service_configs,
+            throttler,
+            1, svcreq,
             **kwargs)
 
     def test_authenticates(self):
@@ -255,6 +269,199 @@ class PerformServiceRequestTests(SynchronousTestCase):
         pure_request_eff = resolve_authenticate(eff)
         self.assertEqual(pure_request_eff.intent.params, {"foo": ["bar"]})
 
+    def test_throttling(self):
+        """
+        When the throttler function returns a bracketing function, it's used to
+        throttle the request.
+        """
+        def throttler(stype, method):
+            if stype == ServiceType.CLOUD_SERVERS and method == 'get':
+                return bracket
+        bracket = object()
+        svcreq = service_request(
+            ServiceType.CLOUD_SERVERS, 'GET', 'servers').intent
+
+        response = stub_pure_response({}, 200)
+        seq = SequenceDispatcher([
+            unwrap_wrapped_effect(_Throttle, dict(bracket=bracket), [
+                (Authenticate(authenticator=self.authenticator,
+                              tenant_id=1,
+                              log=self.log),
+                 lambda i: ('token', fake_service_catalog)),
+                (Request(method='GET', url='http://dfw.openstack/servers',
+                         headers=headers('token'), log=self.log),
+                 lambda i: response),
+            ])])
+
+        eff = self._concrete(svcreq, throttler=throttler)
+        with seq.consume():
+            result = sync_perform(seq, eff)
+        self.assertEqual(result, (response[0], {}))
+
+
+class ThrottleTests(SynchronousTestCase):
+    """Tests for :obj:`_Throttle` and :func:`_perform_throttle`."""
+
+    def test_perform_throttle(self):
+        """
+        The bracket given to :obj:`_Throttle` is used to call the nested
+        performer.
+        """
+        def bracket(f, *args, **kwargs):
+            return f(*args, **kwargs).addCallback(lambda r: ('bracketed', r))
+        throttle = _Throttle(bracket=bracket, effect=Effect(Constant('foo')))
+        dispatcher = ComposedDispatcher([
+            TypeDispatcher({_Throttle: _perform_throttle}),
+            base_dispatcher])
+        result = sync_perform(dispatcher, Effect(throttle))
+        self.assertEqual(result, ('bracketed', 'foo'))
+
+
+class SerializeAndDelayTests(SynchronousTestCase):
+    """Tests for :func:`_serialize_and_delay`."""
+
+    @mock.patch('otter.cloud_client.DeferredLock')
+    def test_serialize_and_delay(self, deferred_lock):
+        """
+        :func:`_serialize_and_delay` returns a function that, when given a
+        function and arguments, calls it inside of a lock and after a specified
+        delay.
+        """
+        class DeferredLock(object):
+            def run(self, f, *args, **kwargs):
+                return f(*args, **kwargs).addCallback(lambda r: ('locked', r))
+        deferred_lock.side_effect = DeferredLock
+
+        clock = Clock()
+        bracket = _serialize_and_delay(clock, 15)
+
+        result = bracket(lambda: succeed('foo'))
+        clock.advance(14)
+        self.assertNoResult(result)
+        clock.advance(15)
+        self.assertEqual(self.successResultOf(result), ('locked', 'foo'))
+
+
+class DefaultThrottlerTests(SynchronousTestCase):
+    """Tests for :func:`_default_throttler`."""
+
+    def test_mismatch(self):
+        """policy doesn't have a throttler for random junk."""
+        bracket = _default_throttler(None, 'foo', 'get')
+        self.assertIs(bracket, None)
+
+    def test_post_cloud_servers(self):
+        """POSTs to cloud servers get throttled by a second."""
+        clock = Clock()
+        bracket = _default_throttler(clock, ServiceType.CLOUD_SERVERS, 'post')
+        d = bracket(lambda: 'foo')
+        self.assertNoResult(d)
+        clock.advance(1)
+        self.assertEqual(self.successResultOf(d), 'foo')
+
+    def test_delete_cloud_servers(self):
+        """DELETEs to cloud servers get throttled by a second."""
+        clock = Clock()
+        bracket = _default_throttler(clock,
+                                     ServiceType.CLOUD_SERVERS, 'delete')
+        d = bracket(lambda: 'foo')
+        self.assertNoResult(d)
+        clock.advance(1)
+        self.assertEqual(self.successResultOf(d), 'foo')
+
+    def test_post_and_delete_not_the_same(self):
+        """
+        The throttlers for POST and DELETE to cloud servers are different.
+        """
+        clock = Clock()
+        deleter = _default_throttler(clock, ServiceType.CLOUD_SERVERS,
+                                     'delete')
+        poster = _default_throttler(clock, ServiceType.CLOUD_SERVERS, 'post')
+        self.assertIsNot(deleter, poster)
+
+    def test_post_delay_configurable(self):
+        """The delay for creating servers is configurable."""
+        set_config_data(
+            {'cloud_client': {'throttling': {'create_server_delay': 500}}})
+        self.addCleanup(set_config_data, {})
+        clock = Clock()
+        bracket = _default_throttler(clock, ServiceType.CLOUD_SERVERS, 'post')
+        d = bracket(lambda: 'foo')
+        clock.advance(499)
+        self.assertNoResult(d)
+        clock.advance(500)
+        self.assertEqual(self.successResultOf(d), 'foo')
+
+    def test_delete_delay_configurable(self):
+        """The delay for deleting servers is configurable."""
+        set_config_data(
+            {'cloud_client': {'throttling': {'delete_server_delay': 500}}})
+        self.addCleanup(set_config_data, {})
+        clock = Clock()
+        bracket = _default_throttler(clock,
+                                     ServiceType.CLOUD_SERVERS, 'delete')
+        d = bracket(lambda: 'foo')
+        clock.advance(499)
+        self.assertNoResult(d)
+        clock.advance(500)
+        self.assertEqual(self.successResultOf(d), 'foo')
+
+
+class GetCloudClientDispatcherTests(SynchronousTestCase):
+    """Tests for :func:`get_cloud_client_dispatcher`."""
+
+    def test_performs_throttle(self):
+        """:func:`_perform_throttle` performs :obj:`_Throttle`."""
+        dispatcher = get_cloud_client_dispatcher(None, None, None, None)
+        throttle = _Throttle(bracket=lambda f, *a, **kw: f(*a, **kw),
+                             effect=Effect(Constant('foo')))
+        self.assertIs(dispatcher(throttle), _perform_throttle)
+
+    @mock.patch('otter.cloud_client.DeferredLock')
+    def test_performs_tenant_scope(self, deferred_lock):
+        """
+        :func:`perform_tenant_scope` performs :obj:`TenantScope`, and uses the
+        default throttler
+        """
+        # We want to ensure
+        # 1. the TenantScope can be performed
+        # 2. the ServiceRequest is run within a lock, since it matches the
+        #    default throttling policy
+
+        clock = Clock()
+        authenticator = object()
+        log = object()
+        dispatcher = get_cloud_client_dispatcher(clock, authenticator, log,
+                                                 make_service_configs())
+        svcreq = service_request(ServiceType.CLOUD_SERVERS, 'POST', 'servers')
+        tscope = TenantScope(tenant_id='111', effect=svcreq)
+
+        class DeferredLock(object):
+            def run(self, f, *args, **kwargs):
+                result = f(*args, **kwargs)
+                result.addCallback(
+                    lambda x: (x[0], assoc(x[1], 'locked', True)))
+                return result
+        deferred_lock.side_effect = DeferredLock
+
+        response = stub_pure_response({}, 200)
+        seq = SequenceDispatcher([
+            (Authenticate(authenticator=authenticator,
+                          tenant_id='111', log=log),
+             lambda i: ('token', fake_service_catalog)),
+            (Request(method='POST', url='http://dfw.openstack/servers',
+                     headers=headers('token'), log=log),
+             lambda i: response),
+        ])
+
+        disp = ComposedDispatcher([seq, dispatcher])
+        with seq.consume():
+            result = perform(disp, Effect(tscope))
+            self.assertNoResult(result)
+            clock.advance(1)
+            self.assertEqual(self.successResultOf(result),
+                             (response[0], {'locked': True}))
+
 
 class PerformTenantScopeTests(SynchronousTestCase):
     """Tests for :func:`perform_tenant_scope`."""
@@ -263,20 +470,19 @@ class PerformTenantScopeTests(SynchronousTestCase):
         """Save some common parameters."""
         self.log = object()
         self.authenticator = object()
-        self.service_configs = {
-            ServiceType.CLOUD_SERVERS: {
-                'name': 'cloudServersOpenStack',
-                'region': 'DFW'}
-        }
+        self.service_configs = make_service_configs()
 
-        def concretize(au, lo, smap, tenid, srvreq):
-            return Effect(Constant(('concretized', au, lo, smap, tenid,
-                                    srvreq)))
+        self.throttler = lambda stype, method: None
+
+        def concretize(au, lo, smap, throttler, tenid, srvreq):
+            return Effect(Constant(('concretized', au, lo, smap, throttler,
+                                    tenid, srvreq)))
 
         self.dispatcher = ComposedDispatcher([
             TypeDispatcher({
                 TenantScope: partial(perform_tenant_scope, self.authenticator,
                                      self.log, self.service_configs,
+                                     self.throttler,
                                      _concretize=concretize)}),
             base_dispatcher])
 
@@ -296,7 +502,7 @@ class PerformTenantScopeTests(SynchronousTestCase):
         self.assertEqual(
             sync_perform(self.dispatcher, Effect(tscope)),
             ('concretized', self.authenticator, self.log, self.service_configs,
-             1, ereq.intent))
+             self.throttler, 1, ereq.intent))
 
     def test_perform_srvreq_nested(self):
         """
@@ -310,7 +516,7 @@ class PerformTenantScopeTests(SynchronousTestCase):
         self.assertEqual(
             sync_perform(self.dispatcher, Effect(tscope)),
             ('concretized', self.authenticator, self.log, self.service_configs,
-             1, ereq.intent))
+             self.throttler, 1, ereq.intent))
 
 
 class CLBClientTests(SynchronousTestCase):

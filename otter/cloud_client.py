@@ -13,11 +13,16 @@ from effect import (
     catch,
     perform,
     sync_performer)
+from effect.twisted import deferred_performer, perform as twisted_perform
 
 import six
 
+from twisted.internet.defer import DeferredLock
+from twisted.internet.task import deferLater
+
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType
+from otter.util.config import config_value
 from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (
@@ -147,7 +152,7 @@ class TenantScope(object):
 
 
 def concretize_service_request(
-        authenticator, log, service_configs,
+        authenticator, log, service_configs, throttler,
         tenant_id,
         service_request):
     """
@@ -156,10 +161,13 @@ def concretize_service_request(
     performer interface, but it's intended to be used by a performer.
 
     :param ICachingAuthenticator authenticator: the caching authenticator
-    :param tenant_id: tenant ID.
     :param BoundLog log: info about requests will be logged to this.
     :param dict service_configs: As returned by
         :func:`otter.constants.get_service_configs`.
+    :param callable throttler: A function of ServiceType, HTTP method ->
+        Deferred bracketer or None, used to throttle requests. See
+        :obj:`_Throttle`.
+    :param tenant_id: tenant ID.
     """
     auth_eff = Effect(Authenticate(authenticator, tenant_id, log))
     invalidate_eff = Effect(InvalidateToken(authenticator, tenant_id))
@@ -192,11 +200,85 @@ def concretize_service_request(
             data=service_request.data,
             params=service_request.params,
             log=log)
-    return auth_eff.on(got_auth)
+
+    eff = auth_eff.on(got_auth)
+    bracket = throttler(service_request.service_type,
+                        service_request.method.lower())
+    if bracket is not None:
+        return Effect(_Throttle(bracket=bracket, effect=eff))
+    else:
+        return eff
+
+
+@attributes(['bracket', 'effect'])
+class _Throttle(object):
+    """
+    A grody hack to allow using a Deferred concurrency limiter in Effectful
+    code.
+
+    A "Deferred bracket" is some function of type
+    ``((f, *args, **kwargs) -> Deferred) -> Deferred``
+    basically, something that "brackets" a call to some Deferred-returning
+    function. This is the case for the ``run`` method of objects like
+    :obj:`.DeferredSemaphore` and :obj:`.DeferredLock`.
+
+    https://wiki.haskell.org/Bracket_pattern
+
+    Ideally Effect would just have built-in concurrency limiters/idioms without
+    relying on Twisted and Deferreds.
+
+    :param callable bracket: The bracket to run the effect in
+    :param Effect effect: The effect to perform inside the bracket
+    """
+
+
+@deferred_performer
+def _perform_throttle(dispatcher, throttle):
+    """
+    Perform :obj:`_Throttle` by performing the effect after acquiring a lock
+    and delaying but some period of time.
+    """
+    lock = throttle.bracket
+    eff = throttle.effect
+    return lock(twisted_perform, dispatcher, eff)
+
+
+def _serialize_and_delay(clock, delay):
+    """
+    Return a function that when invoked with another function will run it
+    serialized and after a delay.
+    """
+    lock = DeferredLock()
+    return partial(lock.run, deferLater, clock, delay)
+
+
+def _default_throttler(clock, stype, method):
+    """Get a throttler function with default throttling policies."""
+    # Serialize creation and deletion of cloud servers because the Compute team
+    # has suggested we do this.
+
+    # Compute suggested 300 deletion req/min. A delay of 0.2 should guarantee
+    # no more than that are executed by a node, plus serialization of requests
+    # will make it quite a bit lower than that.
+
+    cloud_client_config = config_value('cloud_client')
+    if cloud_client_config is None:
+        cloud_client_config = {}
+    throttling_config = cloud_client_config.get('throttling', {})
+    create_server_delay = throttling_config.get('create_server_delay', 1)
+    delete_server_delay = throttling_config.get('delete_server_delay', 0.2)
+
+    policy = {
+        (ServiceType.CLOUD_SERVERS, 'post'):
+            _serialize_and_delay(clock, create_server_delay),
+        (ServiceType.CLOUD_SERVERS, 'delete'):
+            _serialize_and_delay(clock, delete_server_delay),
+    }
+    return policy.get((stype, method))
 
 
 def perform_tenant_scope(
-        authenticator, log, service_configs,
+        authenticator, log, service_configs, throttler,
         dispatcher, tenant_scope, box,
         _concretize=concretize_service_request):
     """
@@ -212,12 +294,27 @@ def perform_tenant_scope(
     @sync_performer
     def scoped_performer(dispatcher, service_request):
         return _concretize(
-            authenticator, log, service_configs,
+            authenticator, log, service_configs, throttler,
             tenant_scope.tenant_id, service_request)
     new_disp = ComposedDispatcher([
         TypeDispatcher({ServiceRequest: scoped_performer}),
         dispatcher])
     perform(new_disp, tenant_scope.effect.on(box.succeed, box.fail))
+
+
+def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
+    """
+    Get a dispatcher suitable for running :obj:`ServiceRequest` and
+    :obj:`TenantScope` intents.
+    """
+    # this throttler could be parameterized but for now it's basically a hack
+    # that we want to keep private to this module
+    throttler = partial(_default_throttler, reactor)
+    return TypeDispatcher({
+        TenantScope: partial(perform_tenant_scope, authenticator, log,
+                             service_configs, throttler),
+        _Throttle: _perform_throttle,
+    })
 
 
 # ----- CLB requests and error parsing -----

@@ -15,7 +15,7 @@ from .auth import (
     perform_authenticate,
     perform_invalidate_token,
 )
-from .cloud_client import TenantScope, perform_tenant_scope
+from .cloud_client import get_cloud_client_dispatcher
 from .log.intents import get_log_dispatcher
 from .models.cass import CQLQueryExecute, perform_cql_query
 from .models.intents import get_model_dispatcher
@@ -68,9 +68,8 @@ def get_legacy_dispatcher(reactor, authenticator, log, service_configs):
     worker code.
     """
     return ComposedDispatcher([
-        TypeDispatcher({
-            TenantScope: partial(perform_tenant_scope, authenticator, log,
-                                 service_configs)}),
+        get_cloud_client_dispatcher(
+            reactor, authenticator, log, service_configs),
         get_simple_dispatcher(reactor),
     ])
 
