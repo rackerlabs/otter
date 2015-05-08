@@ -24,7 +24,7 @@ from otter.integration.lib.autoscale import (
     extract_active_ids,
 )
 from otter.integration.lib.cloud_load_balancer import (
-    CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs)
+    CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.nova import NovaServer, delete_servers
 from otter.integration.lib.resources import TestResources
@@ -723,18 +723,17 @@ class ConvergenceSet1WithCLB(unittest.TestCase):
         )
 
     @classmethod
-    def run_with_clbs(cls, function):
+    def _copy_methods(cls, name, method):
         """
-        Decorator that wraps a given test method so that when the test is
-        done, all the active servers on the group are on the CLBs.  Note
-        that test functions this decorates need to return the scaling group.
+        To be used to copy over methods from ConvergenceSet1 using
+        :func:`duplicate_test_methods`
         """
-        @wraps(function)
+        @wraps(method)
         @inlineCallbacks
         def wrapper(self, *args, **kwargs):
             # create CLBs first
             # run test
-            scaling_group = yield function(self, *args, **kwargs)
+            scaling_group = yield method(self, *args, **kwargs)
 
             # check that active servers are on the CLB
             ips = yield scaling_group.get_servicenet_ips(self.rcs)
@@ -746,15 +745,14 @@ class ConvergenceSet1WithCLB(unittest.TestCase):
                 clb.wait_for_nodes(self.rcs, checks, timeout=1800)
                 for clb in self.helper.clbs])
 
-        if "_oobd" in function.__name__ or "_oob_" in function.__name__:
+        if "_oobd" in name or "_oob_" in name:
             wrapper.skip = (
                 "Autoscale does not clean up servers deleted OOB yet. "
                 "See #881.")
-        return wrapper
+        return (name, wrapper)
 
 
-def duplicate_and_decorate_test_methods(from_class, to_class,
-                                        decorator=None):
+def duplicate_test_methods(from_class, to_class, filter_and_change=None):
     """
     Copy test methods (methods that start with `test_*`) from ``from_class`` to
     ``to_class``.  If a decorator is provided, the test method on the
@@ -762,16 +760,20 @@ def duplicate_and_decorate_test_methods(from_class, to_class,
 
     :param class from_class: The test case to copy from
     :param class to_class: The test case to copy to
-    :param callable decorator: A function that takes a function and returns a
-        wrapped function - basically perform extra set up and final checks on
-        existing test cases from ``from_class``
+    :param callable filter_and_change: A function that takes a test name
+        and test method, and returns a tuple of `(name, method)`
+        if the test method should be copied. None else.  This allows the
+        method name to change, the method to be decorated and/or skipped.
     """
     for name, attr in from_class.__dict__.items():
         if name.startswith('test_') and isinstance(attr, type(lambda: None)):
-            setattr(to_class, name,
-                    attr if decorator is None else decorator(attr))
+            if filter_and_change is not None:
+                filtered = filter_and_change(name, attr)
+                if filtered is not None:
+                    name, attr = filtered
+            setattr(to_class, name, attr)
 
 
-duplicate_and_decorate_test_methods(
+duplicate_test_methods(
     ConvergenceSet1, ConvergenceSet1WithCLB,
-    decorator=ConvergenceSet1WithCLB.run_with_clbs)
+    filter_and_change=ConvergenceSet1WithCLB._copy_methods)
