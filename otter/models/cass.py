@@ -456,7 +456,8 @@ def _unmarshal_state(state_dict):
         state_dict["groupTouched"],
         _jsonloads_data(state_dict["policyTouched"]),
         state_dict["paused"],
-        desired=desired_capacity
+        ScalingGroupStatus.ACTIVE,
+        desired=desired_capacity,
     )
 
 
@@ -1405,6 +1406,7 @@ class CassScalingGroupCollection:
                 data['created_at'],
                 {},
                 data['paused'],
+                ScalingGroupStatus.ACTIVE,
                 desired=data['desired']
             )
             outpolicies = _build_policies(
