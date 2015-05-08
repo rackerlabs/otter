@@ -443,10 +443,25 @@ def _jsonloads_data(raw_data):
     return data
 
 
+def _group_status(status, deleting):
+    if deleting:
+        return ScalingGroupStatus.DELETING
+    else:
+        # TODO: #1304
+        if status is None:
+            return ScalingGroupStatus.ACTIVE
+        elif status == 'DISABLED':
+            return ScalingGroupStatus.ERROR
+        else:
+            return ScalingGroupStatus.lookupByName(status)
+
+
 def _unmarshal_state(state_dict):
     desired_capacity = state_dict['desired']
     if desired_capacity is None:
         desired_capacity = 0
+
+    status = _group_status(state_dict['status'], state_dict['deleting'])
 
     return GroupState(
         state_dict["tenantId"], state_dict["groupId"],
@@ -456,6 +471,7 @@ def _unmarshal_state(state_dict):
         state_dict["groupTouched"],
         _jsonloads_data(state_dict["policyTouched"]),
         state_dict["paused"],
+        status,
         desired=desired_capacity
     )
 
@@ -646,18 +662,6 @@ class CassScalingGroup(object):
             return d
         return wrapper
 
-    def _group_status(self, status, deleting):
-        if deleting:
-            return ScalingGroupStatus.DELETING
-        else:
-            # TODO: #1304
-            if status is None:
-                return ScalingGroupStatus.ACTIVE
-            elif status == 'DISABLED':
-                return ScalingGroupStatus.ERROR
-            else:
-                return ScalingGroupStatus.lookupByName(status)
-
     def view_manifest(self, with_policies=True, with_webhooks=False,
                       get_deleting=False):
         """
@@ -684,13 +688,11 @@ class CassScalingGroup(object):
                 group)
 
         def _generate_manifest_group_part(group):
-            status = self._group_status(group['status'], group['deleting'])
             m = {
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
                 'id': self.uuid,
                 'state': _unmarshal_state(group),
-                'status': status.name,
             }
             return m
 
@@ -1404,6 +1406,7 @@ class CassScalingGroupCollection:
                 data['created_at'],
                 {},
                 data['paused'],
+                ScalingGroupStatus.ACTIVE,
                 desired=data['desired']
             )
             outpolicies = _build_policies(
