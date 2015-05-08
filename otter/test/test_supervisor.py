@@ -812,7 +812,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         """
         self.transaction_id = 'transaction_id'
         self.job_id = 'job_id'
-        patch(self, 'otter.supervisor.generate_job_id', return_value=self.job_id)
+        patch(self, 'otter.supervisor.generate_job_id',
+              return_value=self.job_id)
         self.state = GroupState('tenant', 'group', 'name', {}, {}, None, {},
                                 False, ScalingGroupStatus.ACTIVE)
         self.group = mock_group(self.state, 'tenant', 'group')
@@ -1095,7 +1096,8 @@ class RemoveServerTests(SynchronousTestCase):
                                 None, None, None, ScalingGroupStatus.ACTIVE,
                                 desired=1)
         self.group = mock_group(self.state)
-        self.gen_jobid = patch(self, 'otter.supervisor.generate_job_id', return_value='jid')
+        self.gen_jobid = patch(self, 'otter.supervisor.generate_job_id',
+                               return_value='jid')
         self.supervisor = FakeSupervisor()
         set_supervisor(self.supervisor)
         self.addCleanup(set_supervisor, None)
