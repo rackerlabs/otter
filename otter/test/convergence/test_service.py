@@ -539,7 +539,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.tenant_id = 'tenant-id'
         self.group_id = 'group-id'
         self.state = GroupState(self.tenant_id, self.group_id, 'group-name',
-                                {}, {}, None, {}, False, desired=2)
+                                {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE, desired=2)
         self.group = mock_group(self.state, self.tenant_id, self.group_id)
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
         self.desired_lbs = s(CLBDescription(lb_id='23', port=80))
