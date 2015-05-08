@@ -689,7 +689,7 @@ class ConvergenceSet1(unittest.TestCase):
         )
 
 
-class ConvergenceSet1WithCLB(ConvergenceSet1):
+class ConvergenceSet1WithCLB(unittest.TestCase):
     """
     Class for CATC 4-12 that run with CLB.
     """
@@ -721,3 +721,57 @@ class ConvergenceSet1WithCLB(ConvergenceSet1):
             .addCallback(clb.wait_for_state, "ACTIVE", 600)
             for clb in self.helper.clbs])
         )
+
+    @classmethod
+    def run_with_clbs(cls, function):
+        """
+        Decorator that wraps a given test method so that when the test is
+        done, all the active servers on the group are on the CLBs.  Note
+        that test functions this decorates need to return the scaling group.
+        """
+        @wraps(function)
+        @inlineCallbacks
+        def wrapper(self, *args, **kwargs):
+            # create CLBs first
+            # run test
+            scaling_group = yield function(self, *args, **kwargs)
+
+            # check that active servers are on the CLB
+            ips = yield scaling_group.get_servicenet_ips(self.rcs)
+
+            checks = MatchesAll(ContainsAllIPs(ips.values()),
+                                HasLength(len(ips)))
+
+            yield gatherResults([
+                clb.wait_for_nodes(self.rcs, checks, timeout=1800)
+                for clb in self.helper.clbs])
+
+        if "_oobd" in function.__name__ or "_oob_" in function.__name__:
+            wrapper.skip = (
+                "Autoscale does not clean up servers deleted OOB yet. "
+                "See #881.")
+        return wrapper
+
+
+def duplicate_and_decorate_test_methods(from_class, to_class,
+                                        decorator=None):
+    """
+    Copy test methods (methods that start with `test_*`) from ``from_class`` to
+    ``to_class``.  If a decorator is provided, the test method on the
+    ``to_class`` will first be decorated before being set.
+
+    :param class from_class: The test case to copy from
+    :param class to_class: The test case to copy to
+    :param callable decorator: A function that takes a function and returns a
+        wrapped function - basically perform extra set up and final checks on
+        existing test cases from ``from_class``
+    """
+    for name, attr in from_class.__dict__.items():
+        if name.startswith('test_') and isinstance(attr, type(lambda: None)):
+            setattr(to_class, name,
+                    attr if decorator is None else decorator(attr))
+
+
+duplicate_and_decorate_test_methods(
+    ConvergenceSet1, ConvergenceSet1WithCLB,
+    decorator=ConvergenceSet1WithCLB.run_with_clbs)
