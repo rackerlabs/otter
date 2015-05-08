@@ -536,6 +536,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                  group_touched='2014-01-01T00:00:05Z.1234',
                                  policy_touched={'PT': 'R'},
                                  paused=False,
+                                 status=ScalingGroupStatus.ACTIVE,
                                  desired=10)
         self.assertEqual(r, group_state)
 
@@ -563,6 +564,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                        '2014-01-01T00:00:05Z.1234',
                                        {'PT': 'R'},
                                        False,
+                                       ScalingGroupStatus.ACTIVE,
                                        desired=0))
 
     def test_view_respsects_consistency_argument(self):
@@ -657,6 +659,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                        '2014-01-01T00:00:05Z.1234',
                                        {'PT': 'R'},
                                        True,
+                                       ScalingGroupStatus.ACTIVE,
                                        desired=0))
 
     def test_modify_state_calls_modifier_with_group_and_state_and_others(self):
@@ -703,6 +706,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                      group_touched=None,
                                      policy_touched={},
                                      paused=True,
+                                     status=ScalingGroupStatus.ACTIVE,
                                      desired=5)
             return group_state
 
@@ -744,6 +748,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                      group_touched=None,
                                      policy_touched={},
                                      paused=True,
+                                     status=ScalingGroupStatus.ACTIVE,
                                      desired=5)
             return group_state
 
@@ -814,6 +819,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                      pending={},
                                      group_touched=None,
                                      policy_touched={},
+                                     status=ScalingGroupStatus.ACTIVE,
                                      paused=True)
             return group_state
 
@@ -857,6 +863,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                      pending={},
                                      group_touched=None,
                                      policy_touched={},
+                                     status=ScalingGroupStatus.ACTIVE,
                                      paused=True)
             return group_state
 
@@ -881,6 +888,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                      pending={},
                                      group_touched=None,
                                      policy_touched={},
+                                     status=ScalingGroupStatus.ACTIVE,
                                      paused=True)
             return group_state
 
@@ -1833,7 +1841,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         group state is not empty
         """
         mock_view_state.return_value = defer.succeed(GroupState(
-            self.tenant_id, self.group_id, '', {'1': {}}, {}, None, {}, False))
+            self.tenant_id, self.group_id, '', {'1': {}}, {}, None, {}, False,
+            ScalingGroupStatus.ACTIVE))
         self.failureResultOf(self.group.delete_group(), GroupNotEmptyError)
 
         # nothing else called except view
@@ -1852,7 +1861,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         policies and webhooks if the scaling group is empty.
         """
         mock_view_state.return_value = defer.succeed(GroupState(
-            self.tenant_id, self.group_id, '', {}, {}, None, {}, False))
+            self.tenant_id, self.group_id, '', {}, {}, None, {}, False,
+            ScalingGroupStatus.ACTIVE))
         mock_naive.return_value = defer.succeed(
             [{'webhookKey': 'w1'}, {'webhookKey': 'w2'}])
 
@@ -1905,7 +1915,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         has no policies.
         """
         mock_view_state.return_value = defer.succeed(GroupState(
-            self.tenant_id, self.group_id, '', {}, {}, None, {}, False))
+            self.tenant_id, self.group_id, '', {}, {}, None, {}, False,
+            ScalingGroupStatus.ACTIVE))
         mock_naive.return_value = defer.succeed([])
 
         self.returns = [None]
@@ -1949,7 +1960,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             lambda timeout: defer.fail(ValueError('a'))
 
         mock_view_state.return_value = defer.succeed(GroupState(
-            self.tenant_id, self.group_id, 'a', {}, {}, None, {}, False))
+            self.tenant_id, self.group_id, 'a', {}, {}, None, {}, False,
+            ScalingGroupStatus.ACTIVE))
 
         d = self.group.delete_group()
         self.failureResultOf(d, ValueError)
@@ -1985,7 +1997,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         the lock asynchronously.  If it never succeeds, an error is logged.
         """
         mock_view_state.return_value = defer.succeed(GroupState(
-            self.tenant_id, self.group_id, '', {}, {}, None, {}, False))
+            self.tenant_id, self.group_id, '', {}, {}, None, {}, False,
+            ScalingGroupStatus.ACTIVE))
         mock_naive.return_value = defer.succeed([])
         called = []
 
@@ -2132,7 +2145,8 @@ class ViewManifestTests(CassScalingGroupTestCase):
                 self.group_id,
                 'a', {'A': 'R'},
                 {'P': 'R'}, '2014-01-01T00:00:05Z.1234',
-                {'PT': 'R'}, False)
+                {'PT': 'R'}, False,
+                ScalingGroupStatus.ACTIVE)
         }
         self.group._naive_list_policies = mock.Mock()
         self.group._naive_list_all_webhooks = mock.Mock()
@@ -3199,7 +3213,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                      pending={},
                                      group_touched='0001-01-01T00:00:00Z',
                                      policy_touched={},
-                                     paused=False)
+                                     paused=False,
+                                     status=ScalingGroupStatus.ACTIVE)
             return group_state
 
         self.assertEqual(r, [group_state_with_id("group0"),
@@ -3288,7 +3303,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                         pending={},
                                         group_touched='0001-01-01T00:00:00Z',
                                         policy_touched={},
-                                        paused=False)])
+                                        paused=False,
+                                        status=ScalingGroupStatus.ACTIVE)])
         self.mock_log.msg.assert_called_once_with(
             'Resurrected rows',
             tenant_id='123',
@@ -3351,7 +3367,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                         pending={},
                                         group_touched='0001-01-01T00:00:00Z',
                                         policy_touched={},
-                                        paused=False)])
+                                        paused=False,
+                                        status=ScalingGroupStatus.ACTIVE)])
 
     def _extract_execute_query(self, call):
         args, _ = call

@@ -27,6 +27,7 @@ from otter.models.interface import (
     GroupNotEmptyError,
     GroupState,
     NoSuchScalingGroupError,
+    ScalingGroupStatus,
 )
 from otter.rest import groups
 from otter.rest.bobby import set_bobby
@@ -80,7 +81,8 @@ class FormatterHelpers(SynchronousTestCase):
                 pending,
                 None,
                 {},
-                True)
+                True,
+                ScalingGroupStatus.ACTIVE)
         )
 
         # sort so it can be compared
@@ -120,6 +122,7 @@ class FormatterHelpers(SynchronousTestCase):
             None,
             {},
             True,
+            ScalingGroupStatus.ACTIVE,
             desired=10)
         result = format_state_dict(state)
         self.assertEqual(result['desiredCapacity'], 10)
@@ -274,8 +277,10 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         list of states that are all formatted
         """
         states = [
-            GroupState('11111', '2', '', {}, {}, None, {}, False),
-            GroupState('11111', '2', '', {}, {}, None, {}, False)
+            GroupState('11111', '2', '', {}, {}, None, {}, False,
+                       ScalingGroupStatus.ACTIVE),
+            GroupState('11111', '2', '', {}, {}, None, {}, False,
+                       ScalingGroupStatus.ACTIVE)
         ]
 
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(
@@ -296,7 +301,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         so long as format returns the right value
         """
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(
-            [GroupState('11111', '1', '', {}, {1: {}}, None, {}, False)]
+            [GroupState('11111', '1', '', {}, {1: {}}, None, {}, False,
+                        ScalingGroupStatus.ACTIVE)]
         )
 
         body = self.assert_status_code(200)
@@ -356,7 +362,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         The "next" link should be formatted as link json with the rel 'next'
         """
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(
-            [GroupState('11111', 'one', 'test', {}, {}, None, {}, True)]
+            [GroupState('11111', 'one', 'test', {}, {}, None, {}, True,
+                        ScalingGroupStatus.ACTIVE)]
         )
         response_body = self.assert_status_code(
             200, endpoint="{0}?limit=1".format(self.endpoint))
@@ -377,7 +384,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'launchConfiguration': 'launch',
             'scalingPolicies': [],
             'id': '1',
-            'state': GroupState('11111', '2', '', {}, {}, None, {}, False)
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE)
         })
         self.assert_status_code(400, None, 'POST', '{')
         self.flushLoggedErrors(InvalidJsonError)
@@ -407,7 +415,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'launchConfiguration': 'launch',
             'scalingPolicies': [],
             'id': '1',
-            'state': GroupState('11111', '2', '', {}, {}, None, {}, False)
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE)
         })
         response_body = self.assert_status_code(400, None, 'POST', '{}')
         self.flushLoggedErrors(ValidationError)
@@ -454,7 +463,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'groupConfiguration': expected_config,
             'launchConfiguration': launch_examples()[0],
             'id': '1',
-            'state': GroupState('11111', '2', '', {}, {}, None, {}, False),
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE),
             'scalingPolicies': []
         }
 
@@ -481,7 +491,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         config = request_body['groupConfiguration']
         launch = request_body['launchConfiguration']
         policies = request_body.get('scalingPolicies', [])
-        state = GroupState('11111', '1', '', {}, {}, None, {}, False)
+        state = GroupState('11111', '1', '', {}, {}, None, {}, False,
+                           ScalingGroupStatus.ACTIVE)
 
         expected_config = config.copy()
         expected_config.setdefault('maxEntities', MAX_ENTITIES)
@@ -661,7 +672,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'groupConfiguration': config,
             'launchConfiguration': expected_launch,
             'id': '1',
-            'state': GroupState('11111', '2', '', {}, {}, None, {}, False),
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE),
             'scalingPolicies': []
         }
 
@@ -740,7 +752,8 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'launchConfiguration': launch,
             'scalingPolicies': policies,
             'id': '1',
-            'state': GroupState('11111', '1', '', {}, {}, None, {}, False)
+            'state': GroupState('11111', '1', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE)
         }
 
         self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
@@ -798,7 +811,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         policies = [dict(id="5", **policy_examples()[0])]
         manifest = {
             'id': 'one',
-            'state': GroupState('11111', '1', '', {}, {}, None, {}, False),
+            'state': GroupState('11111', '1', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE),
             'scalingPolicies': policies
         }
         self.mock_group.view_manifest.return_value = defer.succeed(manifest)
@@ -817,7 +831,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             'groupConfiguration': config_examples()[0],
             'launchConfiguration': launch_examples()[0],
             'id': 'one',
-            'state': GroupState('11111', '1', '', {}, {}, None, {}, False),
+            'state': GroupState('11111', '1', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE),
             'scalingPolicies': [dict(id="5", **policy_examples()[0])]
         }
         self.mock_group.view_manifest.return_value = defer.succeed(manifest)
@@ -866,7 +881,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             'groupConfiguration': config_examples()[0],
             'launchConfiguration': launch_examples()[0],
             'id': 'one',
-            'state': GroupState('11111', '1', '', {}, {}, None, {}, False),
+            'state': GroupState('11111', '1', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE),
             'scalingPolicies': [dict(id="5", **policy_examples()[0]),
                                 dict(id="6", **policy_examples()[1])]
         }
