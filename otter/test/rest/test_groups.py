@@ -98,7 +98,8 @@ class FormatterHelpers(SynchronousTestCase):
             'activeCapacity': 3,
             'pendingCapacity': 3,
             'desiredCapacity': 6,
-            'paused': True
+            'paused': True,
+            'status': 'ACTIVE',
         })
 
     @mock.patch('otter.rest.groups.config_value')
@@ -133,6 +134,37 @@ class FormatterHelpers(SynchronousTestCase):
         result = format_state_dict(state)
         self.assertEqual(result['desiredCapacity'], 3)
         self.assertEqual(result['pendingCapacity'], 0)
+
+    @mock.patch('otter.rest.groups.config_value')
+    def test_format_state_different_status(self, config_value):
+        """
+        When a group's status is something other than ACTIVE, it's reflected in
+        the output.
+        """
+        config_value.side_effect = {'convergence-tenants': ['11111']}.get
+        active = {
+            '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
+            '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
+            '3': {'name': 'n3', 'links': ['links3'], 'created': 't'}}
+        state = GroupState(
+            '11111',
+            'one',
+            'test',
+            active,
+            {},  # Ignored!
+            None,
+            {},
+            True,
+            ScalingGroupStatus.ERROR,
+            desired=10)
+        result = format_state_dict(state)
+        self.assertEqual(result['desiredCapacity'], 10)
+        self.assertEqual(result['pendingCapacity'], 7)
+
+        # And a non-convergence tenant still gets old-style data
+        state.tenant_id = '11112'
+        result = format_state_dict(state)
+        self.assertEqual(result['status'], 'ERROR')
 
 
 class ExtractBoolArgTests(SynchronousTestCase):
@@ -318,7 +350,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
                     'activeCapacity': 0,
                     'pendingCapacity': 1,
                     'desiredCapacity': 1,
-                    'paused': False
+                    'paused': False,
+                    'status': 'ACTIVE',
                 }
             }],
             "groups_links": []
