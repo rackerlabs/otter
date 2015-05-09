@@ -162,18 +162,6 @@ def tag(*tags):
     return decorate
 
 
-def skip(reason):
-    """
-    Decorator that sets the skip property on to a function.
-
-    This should be added upstream to Twisted's trial.
-    """
-    def decorate(function):
-        function.skip = reason
-        return function
-    return decorate
-
-
 class TestConvergence(unittest.TestCase):
     """This class contains test cases aimed at the Otter Converger."""
     timeout = 1800
@@ -783,9 +771,9 @@ class ConvergenceSet1WithCLB(unittest.TestCase):
 
         if any(tag in tags for tag in
                ["CATC-0{0:02d}".format(i) for i in range(4, 9)]):
-            wrapper = skip(
+            wrapper.skip = (
                 "Autoscale does not clean up servers deleted OOB yet. "
-                "See #881.")(wrapper)
+                "See #881.")
         return (name, wrapper)
 
 
