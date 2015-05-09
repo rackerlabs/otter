@@ -766,7 +766,7 @@ class ConvergenceSet1WithCLB(unittest.TestCase):
         return (name, wrapper)
 
 
-def duplicate_test_methods(from_class, to_class, filter_and_change=None):
+def copy_test_methods(from_class, to_class, filter_and_change=None):
     """
     Copy test methods (methods that start with `test_*`) from ``from_class`` to
     ``to_class``.  If a decorator is provided, the test method on the
@@ -788,6 +788,6 @@ def duplicate_test_methods(from_class, to_class, filter_and_change=None):
             setattr(to_class, name, attr)
 
 
-duplicate_test_methods(
+copy_test_methods(
     ConvergenceSet1, ConvergenceSet1WithCLB,
     filter_and_change=ConvergenceSet1WithCLB._copy_catc_4_to_12)
