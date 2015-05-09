@@ -834,6 +834,8 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 "See #881.")
         return (name, wrapper)
 
+    @skip_me("Autoscale does not support error status yet. See #885")
+    @tag("CATC-020")
     def test_delete_loadbalancer_and_scale_up(self, delete_command=None):
         """
         CATC-020-a
@@ -874,9 +876,6 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 HasActive(1)),
             timeout=600))
         return d
-
-    test_delete_loadbalancer_and_scale_up.skip = (
-        "Autoscale does not support error status yet. See #885")
 
     def test_delete_loadbalancer_and_scale_down(self, delete_command=None):
         """
