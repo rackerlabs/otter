@@ -834,6 +834,64 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 "See #881.")
         return (name, wrapper)
 
+    def test_delete_loadbalancer_and_scale_up(self, delete_command=None):
+        """
+        CATC-020-a
+
+        1. Creates a scaling group with a load balancer and 1 server.
+        2. Ensure that the server is active and added to the load balancer.
+        3. Delete the load balancer using the delete command (it may set
+           the load balancer to PENDING_DELETE instead, for example)
+        4. Attempt to scale up by 1.
+        5. Assert that the scaling group goes into error state, that there are
+           no more active servers added to the group, but the previous active
+           server is not deleted.
+
+        :param callable delete_command: function that takes a test resource
+            and a load balancer and deletes (or pending-deletes) the
+            load balancer.
+        """
+        group = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=1)
+
+        d = self.helper.start_group_and_wait(group, self.rcs)
+        if delete_command is not None:
+            d.addCallback(delete_command, self.helper.clbs[0])
+        else:
+            d.addCallback(self.helper.clbs[0].delete, success_codes=[202])
+
+        policy = ScalingPolicy(scale_by=1, scaling_group=group)
+        d.addCallback(lambda _: policy.start(self.rcs, self))
+        d.addCallback(policy.execute)
+        d.addCallback(lambda _: group.wait_for_state(
+            self.rcs, MatchesAll(
+                ContainsDict({
+                    'pendingCapacity': 1,
+                    'desiredCapacity': 2,
+                    'status': "ERROR"
+                }),
+                HasActive(1)),
+            timeout=600))
+        return d
+
+    test_delete_loadbalancer_and_scale_up.skip = (
+        "Autoscale does not support error status yet. See #885")
+
+    def test_delete_loadbalancer_and_scale_down(self, delete_command=None):
+        """
+        CATC-020-a
+
+        1. Creates a scaling group with a load balancer and 2 servers.
+        2. Ensure that the server is active and added to the load balancer.
+        3. Remove one server from its load balancer.
+        4. Delete the load balancer using the delete command (it may set
+           the load balancer to PENDING_DELETE instead, for example)
+        5. Attempt to scale down by 2.
+        6. Assert that the scaling group does not go into error state, and that
+           both servers are successfully deleted.
+        """
+
 
 copy_test_methods(
     ConvergenceSet1, ConvergenceTestsWith1CLB,
