@@ -162,7 +162,7 @@ def tag(*tags):
     return decorate
 
 
-def skip_me(*tags):
+def skip_me(reason):
     """
     Decorator that skips a test method or test class by setting the property
     "skip".  This decorator is not named "skip", because setting "skip" on a
@@ -171,7 +171,7 @@ def skip_me(*tags):
     This should be added upstream to Twisted trial.
     """
     def decorate(function):
-        function.tags = tags
+        function.skip = reason
         return function
     return decorate
 
