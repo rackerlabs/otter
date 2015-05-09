@@ -869,9 +869,9 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
         d.addCallback(lambda _: group.wait_for_state(
             self.rcs, MatchesAll(
                 ContainsDict({
-                    'pendingCapacity': 1,
-                    'desiredCapacity': 2,
-                    'status': "ERROR"
+                    'pendingCapacity': Equals(1),
+                    'desiredCapacity': Equals(2),
+                    'status': Equals("ERROR")
                 }),
                 HasActive(1)),
             timeout=600))
