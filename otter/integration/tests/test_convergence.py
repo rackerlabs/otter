@@ -509,6 +509,7 @@ class ConvergenceSet1(unittest.TestCase):
                 self.rcs, self.scaling_group, N_SERVERS / 2)(
                 self.scaling_group.trigger_convergence))
         )
+    test_reaction_to_oob_server_deletion_below_min.tags = ["CATC-004"]
 
     def test_reaction_to_oob_deletion_then_scale_up(self):
         """
@@ -528,6 +529,7 @@ class ConvergenceSet1(unittest.TestCase):
         return _test_scaling_after_oobd(
             self.helper, self.rcs, min_servers=3, oobd_servers=1,
             scale_servers=2, converged_servers=5)
+    test_reaction_to_oob_deletion_then_scale_up.tags = ["CATC-005"]
 
     def test_scale_down_after_oobd_non_constrained_z_lessthan_y(self):
         """
@@ -556,6 +558,7 @@ class ConvergenceSet1(unittest.TestCase):
         return _test_scaling_after_oobd(
             self.helper, self.rcs, min_servers=N, set_to_servers=x,
             oobd_servers=z, scale_servers=y, converged_servers=(x + y))
+    test_scale_down_after_oobd_non_constrained_z_lessthan_y.tags = ["CATC-006"]
 
     def test_scale_down_after_oobd_non_constrained_z_greaterthan_y(self):
         """
@@ -584,6 +587,8 @@ class ConvergenceSet1(unittest.TestCase):
         return _test_scaling_after_oobd(
             self.helper, self.rcs, min_servers=N, set_to_servers=x,
             oobd_servers=z, scale_servers=y, converged_servers=(x + y))
+    test_scale_down_after_oobd_non_constrained_z_greaterthan_y.tags = [
+        "CATC-006"]
 
     def test_scale_down_after_oobd_non_constrained_z_equal_y(self):
         """
@@ -612,6 +617,7 @@ class ConvergenceSet1(unittest.TestCase):
         return _test_scaling_after_oobd(
             self.helper, self.rcs, min_servers=N, set_to_servers=x,
             oobd_servers=z, scale_servers=y, converged_servers=(x + y))
+    test_scale_down_after_oobd_non_constrained_z_equal_y.tags = ["CATC-006"]
 
     def test_scale_up_after_oobd_at_group_max(self):
         """
@@ -637,6 +643,7 @@ class ConvergenceSet1(unittest.TestCase):
             self.helper, self.rcs, set_to_servers=x, oobd_servers=z,
             max_servers=max_servers, scale_servers=y,
             converged_servers=max_servers, scale_should_fail=True)
+    test_scale_up_after_oobd_at_group_max.tags = ["CATC-007"]
 
     def test_scale_down_past_group_min_after_oobd(self):
         """
@@ -661,6 +668,7 @@ class ConvergenceSet1(unittest.TestCase):
             self.helper, self.rcs, oobd_servers=z, min_servers=min_servers,
             scale_servers=y, converged_servers=min_servers,
             scale_should_fail=True)
+    test_scale_down_past_group_min_after_oobd.tags = ["CATC-007"]
 
     def test_group_config_update_triggers_convergence(self):
         """
@@ -688,6 +696,7 @@ class ConvergenceSet1(unittest.TestCase):
                     self.scaling_group.update_group_config),
                 maxEntities=max_servers + 2)
         )
+    test_group_config_update_triggers_convergence.tags = ["CATC-008"]
 
 
 class ConvergenceSet1WithCLB(unittest.TestCase):
@@ -723,13 +732,18 @@ class ConvergenceSet1WithCLB(unittest.TestCase):
         )
 
     @classmethod
-    def _copy_methods(cls, name, method):
+    def _copy_catc_4_to_12(cls, name, method):
         """
         To be used to copy over methods from ConvergenceSet1 using
         :func:`duplicate_test_methods`.  Note that the methods copied
         should all return the scaling group, so that the group's active
         servers can be checked against the CLB.
         """
+        tags = getattr(method, 'tags', ())
+        if not any(tag in tags for tag in
+                   ["CATC-0{0:02d}".format(i) for i in range(4, 13)]):
+            return None
+
         @wraps(method)
         @inlineCallbacks
         def wrapper(self, *args, **kwargs):
@@ -744,7 +758,8 @@ class ConvergenceSet1WithCLB(unittest.TestCase):
                 clb.wait_for_nodes(self.rcs, checks, timeout=1800)
                 for clb in self.helper.clbs])
 
-        if "_oobd" in name or "_oob_" in name:
+        if any(tag in tags for tag in
+               ["CATC-0{0:02d}".format(i) for i in range(4, 9)]):
             wrapper.skip = (
                 "Autoscale does not clean up servers deleted OOB yet. "
                 "See #881.")
@@ -775,4 +790,4 @@ def duplicate_test_methods(from_class, to_class, filter_and_change=None):
 
 duplicate_test_methods(
     ConvergenceSet1, ConvergenceSet1WithCLB,
-    filter_and_change=ConvergenceSet1WithCLB._copy_methods)
+    filter_and_change=ConvergenceSet1WithCLB._copy_catc_4_to_12)
