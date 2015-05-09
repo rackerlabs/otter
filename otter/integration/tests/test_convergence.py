@@ -450,6 +450,7 @@ def _test_scaling_after_oobd(
                 })
             ), timeout=600)
         )
+        .addCallback(lambda _: scaling_group)
     )
 
 
@@ -694,7 +695,6 @@ class ConvergenceSet1WithCLB(unittest.TestCase):
     Class for CATC 4-12 that run with CLB.
     """
     timeout = 1800
-    skip = "Autoscale does not clean up servers deleted OOB yet.  See #881."
 
     def setUp(self):
         """Establish an HTTP connection pool and commonly used resources for
@@ -726,16 +726,15 @@ class ConvergenceSet1WithCLB(unittest.TestCase):
     def _copy_methods(cls, name, method):
         """
         To be used to copy over methods from ConvergenceSet1 using
-        :func:`duplicate_test_methods`
+        :func:`duplicate_test_methods`.  Note that the methods copied
+        should all return the scaling group, so that the group's active
+        servers can be checked against the CLB.
         """
         @wraps(method)
         @inlineCallbacks
         def wrapper(self, *args, **kwargs):
-            # create CLBs first
-            # run test
             scaling_group = yield method(self, *args, **kwargs)
 
-            # check that active servers are on the CLB
             ips = yield scaling_group.get_servicenet_ips(self.rcs)
 
             checks = MatchesAll(ContainsAllIPs(ips.values()),
