@@ -150,6 +150,30 @@ class TestHelper(object):
         return decorated
 
 
+def tag(*tags):
+    """
+    Decorator that adds tags to a function by setting the property "tags".
+
+    This should be added upstream to Twisted trial.
+    """
+    def decorate(function):
+        function.tags = tags
+        return function
+    return decorate
+
+
+def skip(reason):
+    """
+    Decorator that sets the skip property on to a function.
+
+    This should be added upstream to Twisted's trial.
+    """
+    def decorate(function):
+        function.skip = reason
+        return function
+    return decorate
+
+
 class TestConvergence(unittest.TestCase):
     """This class contains test cases aimed at the Otter Converger."""
     timeout = 1800
@@ -483,6 +507,7 @@ class ConvergenceSet1(unittest.TestCase):
             region=region
         )
 
+    @tag("CATC-004")
     def test_reaction_to_oob_server_deletion_below_min(self):
         """
         CATC-004-a
@@ -509,8 +534,8 @@ class ConvergenceSet1(unittest.TestCase):
                 self.rcs, self.scaling_group, N_SERVERS / 2)(
                 self.scaling_group.trigger_convergence))
         )
-    test_reaction_to_oob_server_deletion_below_min.tags = ["CATC-004"]
 
+    @tag("CATC-005")
     def test_reaction_to_oob_deletion_then_scale_up(self):
         """
         CATC-005-a
@@ -529,8 +554,8 @@ class ConvergenceSet1(unittest.TestCase):
         return _test_scaling_after_oobd(
             self.helper, self.rcs, min_servers=3, oobd_servers=1,
             scale_servers=2, converged_servers=5)
-    test_reaction_to_oob_deletion_then_scale_up.tags = ["CATC-005"]
 
+    @tag("CATC-006")
     def test_scale_down_after_oobd_non_constrained_z_lessthan_y(self):
         """
         CATC-006-a
@@ -558,8 +583,8 @@ class ConvergenceSet1(unittest.TestCase):
         return _test_scaling_after_oobd(
             self.helper, self.rcs, min_servers=N, set_to_servers=x,
             oobd_servers=z, scale_servers=y, converged_servers=(x + y))
-    test_scale_down_after_oobd_non_constrained_z_lessthan_y.tags = ["CATC-006"]
 
+    @tag("CATC-006")
     def test_scale_down_after_oobd_non_constrained_z_greaterthan_y(self):
         """
         CATC-006-b
@@ -587,9 +612,8 @@ class ConvergenceSet1(unittest.TestCase):
         return _test_scaling_after_oobd(
             self.helper, self.rcs, min_servers=N, set_to_servers=x,
             oobd_servers=z, scale_servers=y, converged_servers=(x + y))
-    test_scale_down_after_oobd_non_constrained_z_greaterthan_y.tags = [
-        "CATC-006"]
 
+    @tag("CATC-006")
     def test_scale_down_after_oobd_non_constrained_z_equal_y(self):
         """
         CATC-006-c
@@ -617,8 +641,8 @@ class ConvergenceSet1(unittest.TestCase):
         return _test_scaling_after_oobd(
             self.helper, self.rcs, min_servers=N, set_to_servers=x,
             oobd_servers=z, scale_servers=y, converged_servers=(x + y))
-    test_scale_down_after_oobd_non_constrained_z_equal_y.tags = ["CATC-006"]
 
+    @tag("CATC-007")
     def test_scale_up_after_oobd_at_group_max(self):
         """
         CATC-007-a
@@ -643,8 +667,8 @@ class ConvergenceSet1(unittest.TestCase):
             self.helper, self.rcs, set_to_servers=x, oobd_servers=z,
             max_servers=max_servers, scale_servers=y,
             converged_servers=max_servers, scale_should_fail=True)
-    test_scale_up_after_oobd_at_group_max.tags = ["CATC-007"]
 
+    @tag("CATC-007")
     def test_scale_down_past_group_min_after_oobd(self):
         """
         CATC-007-b
@@ -668,8 +692,8 @@ class ConvergenceSet1(unittest.TestCase):
             self.helper, self.rcs, oobd_servers=z, min_servers=min_servers,
             scale_servers=y, converged_servers=min_servers,
             scale_should_fail=True)
-    test_scale_down_past_group_min_after_oobd.tags = ["CATC-007"]
 
+    @tag("CATC-008")
     def test_group_config_update_triggers_convergence(self):
         """
         CATC-008-a
@@ -696,7 +720,6 @@ class ConvergenceSet1(unittest.TestCase):
                     self.scaling_group.update_group_config),
                 maxEntities=max_servers + 2)
         )
-    test_group_config_update_triggers_convergence.tags = ["CATC-008"]
 
 
 class ConvergenceSet1WithCLB(unittest.TestCase):
@@ -760,9 +783,9 @@ class ConvergenceSet1WithCLB(unittest.TestCase):
 
         if any(tag in tags for tag in
                ["CATC-0{0:02d}".format(i) for i in range(4, 9)]):
-            wrapper.skip = (
+            wrapper = skip(
                 "Autoscale does not clean up servers deleted OOB yet. "
-                "See #881.")
+                "See #881.")(wrapper)
         return (name, wrapper)
 
 
