@@ -162,6 +162,43 @@ def tag(*tags):
     return decorate
 
 
+def skip_me(*tags):
+    """
+    Decorator that skips a test method or test class by setting the property
+    "skip".  This decorator is not named "skip", because setting "skip" on a
+    module skips the whole tes module.
+
+    This should be added upstream to Twisted trial.
+    """
+    def decorate(function):
+        function.tags = tags
+        return function
+    return decorate
+
+
+def copy_test_methods(from_class, to_class, filter_and_change=None):
+    """
+    Copy test methods (methods that start with `test_*`) from ``from_class`` to
+    ``to_class``.  If a decorator is provided, the test method on the
+    ``to_class`` will first be decorated before being set.
+
+    :param class from_class: The test case to copy from
+    :param class to_class: The test case to copy to
+    :param callable filter_and_change: A function that takes a test name
+        and test method, and returns a tuple of `(name, method)`
+        if the test method should be copied. None else.  This allows the
+        method name to change, the method to be decorated and/or skipped.
+    """
+    for name, attr in from_class.__dict__.items():
+        if name.startswith('test_') and isinstance(attr, type(lambda: None)):
+            if filter_and_change is not None:
+                filtered = filter_and_change(name, attr)
+                if filtered is not None:
+                    setattr(to_class, *filtered)
+            else:
+                setattr(to_class, name, attr)
+
+
 class TestConvergence(unittest.TestCase):
     """This class contains test cases aimed at the Otter Converger."""
     timeout = 1800
@@ -775,28 +812,6 @@ class ConvergenceSet1WithCLB(unittest.TestCase):
                 "Autoscale does not clean up servers deleted OOB yet. "
                 "See #881.")
         return (name, wrapper)
-
-
-def copy_test_methods(from_class, to_class, filter_and_change=None):
-    """
-    Copy test methods (methods that start with `test_*`) from ``from_class`` to
-    ``to_class``.  If a decorator is provided, the test method on the
-    ``to_class`` will first be decorated before being set.
-
-    :param class from_class: The test case to copy from
-    :param class to_class: The test case to copy to
-    :param callable filter_and_change: A function that takes a test name
-        and test method, and returns a tuple of `(name, method)`
-        if the test method should be copied. None else.  This allows the
-        method name to change, the method to be decorated and/or skipped.
-    """
-    for name, attr in from_class.__dict__.items():
-        if name.startswith('test_') and isinstance(attr, type(lambda: None)):
-            if filter_and_change is not None:
-                filtered = filter_and_change(name, attr)
-                if filtered is not None:
-                    name, attr = filtered
-            setattr(to_class, name, attr)
 
 
 copy_test_methods(
