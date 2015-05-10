@@ -13,7 +13,6 @@ from hashlib import sha1
 from effect import Effect, FirstError, Func, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
-from effect.twisted import exc_info_to_failure, perform
 
 from kazoo.recipe.partitioner import PartitionState
 
@@ -23,6 +22,8 @@ from pyrsistent import thaw
 import six
 
 from twisted.application.service import MultiService
+
+from txeffect import exc_info_to_failure, perform
 
 from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR

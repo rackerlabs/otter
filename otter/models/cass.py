@@ -13,7 +13,6 @@ from datetime import datetime
 from characteristic import attributes
 
 from effect import Effect, parallel
-from effect.twisted import deferred_performer
 
 from jsonschema import ValidationError
 
@@ -26,6 +25,8 @@ from silverberg.client import ConsistencyLevel
 from toolz.dicttoolz import keymap
 
 from twisted.internet import defer
+
+from txeffect import deferred_performer
 
 from zope.interface import implementer
 

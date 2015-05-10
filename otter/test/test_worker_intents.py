@@ -6,12 +6,13 @@ from functools import partial
 
 from effect import Effect, TypeDispatcher
 from effect import sync_perform
-from effect.twisted import deferred_performer
 
 import mock
 
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
+
+from txeffect import deferred_performer
 
 from otter.supervisor import set_supervisor
 from otter.test.utils import FakeSupervisor, mock_group
