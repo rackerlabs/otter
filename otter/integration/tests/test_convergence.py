@@ -190,7 +190,7 @@ def copy_test_methods(from_class, to_class, filter_and_change=None):
         method name to change, the method to be decorated and/or skipped.
     """
     for name, attr in from_class.__dict__.items():
-        if name.startswith('test_') and isinstance(attr, type(lambda: None)):
+        if name.startswith('test_') and callable(attr):
             if filter_and_change is not None:
                 filtered = filter_and_change(name, attr)
                 if filtered is not None:
