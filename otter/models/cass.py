@@ -188,7 +188,7 @@ _cql_delete_one_webhook = (
     '"webhookId" = :webhookId')
 _cql_list_states = (
     'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at, status'
+    '"groupTouched", "policyTouched", paused, desired, created_at, status '
     'FROM {cf} WHERE "tenantId"=:tenantId AND deleting=false;')
 _cql_list_policy = (
     'SELECT "policyId", data FROM {cf} WHERE '
