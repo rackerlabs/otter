@@ -12,7 +12,6 @@ from collections import namedtuple
 from functools import partial
 
 from effect import Effect
-from effect.twisted import exc_info_to_failure, perform
 
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
@@ -26,6 +25,8 @@ from twisted.application.service import Service
 from twisted.internet import defer, task
 from twisted.internet.endpoints import clientFromString
 from twisted.python import usage
+
+from txeffect import exc_info_to_failure, perform
 
 from otter.auth import generate_authenticator
 from otter.cloud_client import TenantScope, service_request

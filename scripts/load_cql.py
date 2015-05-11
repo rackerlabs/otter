@@ -12,13 +12,13 @@ import sys
 from cql.apivalues import ProgrammingError
 from cql.connection import connect
 
-from effect.twisted import perform
-
 from silverberg.client import CQLClient, ConsistencyLevel
 
 from twisted.internet import task
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.endpoints import clientFromString
+
+from txeffect import perform
 
 from otter.effect_dispatcher import get_cql_dispatcher
 from otter.metrics import get_scaling_groups

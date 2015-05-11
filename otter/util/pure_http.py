@@ -9,12 +9,13 @@ from functools import partial, wraps
 from characteristic import attributes
 
 from effect import Effect
-from effect.twisted import deferred_performer
 
 from toolz.dicttoolz import merge
 from toolz.functoolz import memoize
 
 from twisted.internet.defer import inlineCallbacks, returnValue
+
+from txeffect import deferred_performer
 
 from otter.util import logging_treq
 from otter.util.http import APIError

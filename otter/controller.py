@@ -30,7 +30,6 @@ from effect import (
     parallel_all_errors)
 
 from effect.do import do, do_return
-from effect.twisted import perform
 
 import iso8601
 
@@ -39,6 +38,8 @@ from six import reraise
 from toolz.dicttoolz import get_in
 
 from twisted.internet import defer
+
+from txeffect import perform
 
 from otter.cloud_client import (
     NoSuchServerError,

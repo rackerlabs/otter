@@ -7,7 +7,8 @@ from functools import partial
 from characteristic import attributes
 
 from effect import TypeDispatcher
-from effect.twisted import deferred_performer
+
+from txeffect import deferred_performer
 
 
 @attributes(['log', 'transaction_id', 'scaling_group', 'server_id'])

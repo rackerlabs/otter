@@ -12,7 +12,6 @@ from effect import (
     base_dispatcher,
     sync_perform)
 from effect.testing import EQFDispatcher, SequenceDispatcher
-from effect.twisted import perform
 
 import mock
 
@@ -23,6 +22,8 @@ from toolz.dicttoolz import assoc
 from twisted.internet.defer import succeed
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
+
+from txeffect import perform
 
 from otter.auth import Authenticate, InvalidateToken
 from otter.cloud_client import (
@@ -36,6 +37,10 @@ from otter.cloud_client import (
     ServerMetadataOverLimitError,
     ServiceRequest,
     TenantScope,
+    _Throttle,
+    _default_throttler,
+    _perform_throttle,
+    _serialize_and_delay,
     add_bind_service,
     change_clb_node,
     concretize_service_request,
@@ -43,11 +48,7 @@ from otter.cloud_client import (
     get_server_details,
     perform_tenant_scope,
     service_request,
-    set_nova_metadata_item,
-    _Throttle,
-    _default_throttler,
-    _perform_throttle,
-    _serialize_and_delay)
+    set_nova_metadata_item)
 from otter.constants import ServiceType
 from otter.test.utils import (
     StubResponse,
