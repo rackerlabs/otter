@@ -18,7 +18,7 @@ from otter.log.intents import (
     get_log_dispatcher,
     msg,
     with_log)
-from otter.test.utils import mock_log, transform_eq
+from otter.test.utils import CheckFailureValue, mock_log
 
 
 class LogDispatcherTests(SynchronousTestCase):
@@ -99,8 +99,7 @@ class LogDispatcherTests(SynchronousTestCase):
         except RuntimeError:
             sync_perform(self.disp, eff)
         self.log.err.assert_called_once_with(
-            transform_eq(lambda f: (f.type, str(f.value)),
-                         (RuntimeError, 'original')),
+            CheckFailureValue(RuntimeError('original')),
             'why', f1='v')
 
     def test_err_with_params(self):
