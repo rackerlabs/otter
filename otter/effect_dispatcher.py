@@ -7,7 +7,8 @@ from effect import (
     TypeDispatcher,
     base_dispatcher)
 from effect.ref import reference_dispatcher
-from effect.twisted import make_twisted_dispatcher
+
+from txeffect import make_twisted_dispatcher
 
 from .auth import (
     Authenticate,

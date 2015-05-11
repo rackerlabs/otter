@@ -5,11 +5,12 @@ from itertools import starmap
 
 from effect import Constant, Effect, Func
 from effect.testing import Stub
-from effect.twisted import perform
 
 from testtools import TestCase
 
 from twisted.trial.unittest import SynchronousTestCase
+
+from txeffect import perform
 
 from otter.effect_dispatcher import get_simple_dispatcher
 from otter.test.utils import (

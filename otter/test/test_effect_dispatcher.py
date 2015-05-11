@@ -2,12 +2,13 @@
 
 from effect import Constant, Delay, Effect, sync_perform
 from effect.ref import ReadReference, Reference
-from effect.twisted import deferred_performer
 
 import mock
 
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
+
+from txeffect import deferred_performer
 
 from otter.auth import Authenticate, InvalidateToken
 from otter.cloud_client import TenantScope

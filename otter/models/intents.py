@@ -3,9 +3,10 @@ from functools import partial
 from characteristic import attributes
 
 from effect import TypeDispatcher
-from effect.twisted import deferred_performer
 
 from twisted.internet.defer import inlineCallbacks, returnValue
+
+from txeffect import deferred_performer
 
 
 @attributes(['scaling_group', 'modifier'])

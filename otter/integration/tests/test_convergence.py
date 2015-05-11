@@ -7,6 +7,8 @@ from __future__ import print_function
 import os
 from functools import wraps
 
+from testtools.matchers import ContainsDict, Equals, MatchesAll
+
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 from twisted.trial import unittest
@@ -14,6 +16,8 @@ from twisted.web.client import HTTPConnectionPool
 
 from otter import auth
 from otter.integration.lib.autoscale import (
+    ExcludesServers,
+    HasActive,
     ScalingGroup,
     ScalingPolicy,
     create_scaling_group_dict,
@@ -96,9 +100,12 @@ class TestHelper(object):
             desired = group.group_config['groupConfiguration'].get(
                 'minEntities', 0)
 
-        yield group.wait_for_expected_state(
-            None, rcs, timeout=600, active=desired, pending=0,
-            desired=desired)
+        yield group.wait_for_state(
+            rcs,
+            MatchesAll(HasActive(desired),
+                       ContainsDict({'pendingCapacity': Equals(0),
+                                     'desiredCapacity': Equals(desired)})),
+            timeout=600)
 
         returnValue(rcs)
 
@@ -128,7 +135,7 @@ class TestHelper(object):
                 yield function(*args, **kwargs)
 
                 checks = [
-                    scaling_group.wait_for_deleted_id_removal(chosen, rcs)]
+                    scaling_group.wait_for_state(rcs, ExcludesServers(chosen))]
 
                 if self.clbs is not None:
                     checks += [
@@ -222,7 +229,7 @@ class TestConvergence(unittest.TestCase):
             ).addCallback(self.scaling_group.start, self)
             .addCallback(self.untouchable_scaling_group.start, self)
             .addCallback(
-                self.untouchable_scaling_group.wait_for_N_servers, 4,
+                self.untouchable_scaling_group.wait_for_state, HasActive(4),
                 timeout=1800
             ).addCallback(
                 self.untouchable_scaling_group.get_scaling_group_state
@@ -231,18 +238,17 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self.scale_beyond_max.start, self)
             .addCallback(self.scale_up_to_max.execute)
             .addCallback(
-                self.scaling_group.wait_for_N_servers, 12, timeout=1800
+                self.scaling_group.wait_for_state, HasActive(12), timeout=1800
             ).addCallback(self.scaling_group.choose_random_servers, 3)
             .addCallback(self._remove_metadata, rcs)
             .addCallback(lambda _: rcs)
             .addCallback(self.scale_beyond_max.execute, success_codes=[403])
-            .addCallback(lambda _: self.removed_ids)
             .addCallback(
-                self.scaling_group.wait_for_deleted_id_removal,
-                rcs,
-                total_servers=12,
-            ).addCallback(
-                self.scaling_group.wait_for_N_servers, 12, timeout=1800
+                lambda _: self.scaling_group.wait_for_state(
+                    rcs, MatchesAll(
+                        ExcludesServers(self.removed_ids),
+                        HasActive(12)),
+                    timeout=1800)
             ).addCallback(
                 self.untouchable_scaling_group.get_scaling_group_state
             ).addCallback(check_state, then=double_check_state)
@@ -290,18 +296,16 @@ class TestConvergence(unittest.TestCase):
             .addCallback(self.scale_beyond_max.start, self)
             .addCallback(self.scale_up_to_max.execute)
             .addCallback(
-                self.scaling_group.wait_for_N_servers, 25, timeout=1800
+                self.scaling_group.wait_for_state, HasActive(25), timeout=1800
             ).addCallback(self.scaling_group.choose_random_servers, 3)
             .addCallback(self._remove_metadata, rcs)
             .addCallback(lambda _: rcs)
             .addCallback(self.scale_beyond_max.execute, success_codes=[403])
-            .addCallback(lambda _: self.removed_ids)
-            .addCallback(
-                self.scaling_group.wait_for_deleted_id_removal,
-                rcs,
-                total_servers=25,
-            ).addCallback(
-                self.scaling_group.wait_for_N_servers, 25, timeout=1800
+            .addCallback(lambda _: self.scaling_group.wait_for_state(
+                rcs, MatchesAll(
+                    ExcludesServers(self.removed_ids),
+                    HasActive(25)),
+                timeout=1800)
             )
         )
 
@@ -387,31 +391,17 @@ class TestConvergence(unittest.TestCase):
                 .addCallback(self.second_scaling_policy.start, self)
                 .addCallback(self.first_scaling_policy.execute)
                 .addCallback(
-                    self.scaling_group.wait_for_N_servers, 24, timeout=1800
-                ).addCallback(self.scaling_group.choose_random_servers, 2)
-                .addCallback(self._delete_those_servers, rcs)
-                .addCallback(self.second_scaling_policy.execute)
-                .addCallback(lambda _: self.removed_ids)
-                .addCallback(
-                    self.scaling_group.wait_for_deleted_id_removal,
-                    rcs,
-                    total_servers=24,
-                ).addCallback(
-                    self.scaling_group.wait_for_N_servers, 25, timeout=1800
+                    self.scaling_group.wait_for_state, HasActive(24),
+                    timeout=1800)
+                .addCallback(self.helper.oob_delete_then(
+                    rcs, self.scaling_group, 2)(
+                    self.second_scaling_policy.execute))
+                .addCallback(lambda _: self.scaling_group.wait_for_state(
+                    rcs, HasActive(25), timeout=1800)
                 )
             )
 
         return create_clb_first().addCallback(then_test)
-
-    def _delete_those_servers(self, ids, rcs):
-        """
-        Delete each of the servers selected, and save a list of the
-        ids of the deleted servers."""
-        self.removed_ids = ids
-        return (
-            delete_servers(ids, rcs, pool=self.helper.pool)
-            .addCallback(lambda rslts: rcs)
-        )
 
     def _remove_metadata(self, ids, rcs):
         """Given a list of server IDs, use Nova to remove their metadata.
@@ -451,10 +441,15 @@ def _test_scaling_after_oobd(
                 rcs, scaling_group, oobd_servers)(policy_scale.execute),
             success_codes=(
                 [403] if scale_should_fail else [202]))
-        .addCallback(
-            scaling_group.wait_for_expected_state, rcs,
-            timeout=600, active=converged_servers, pending=0,
-            desired=converged_servers)
+        .addCallback(lambda _: scaling_group.wait_for_state(
+            rcs, MatchesAll(
+                HasActive(converged_servers),
+                ContainsDict({
+                    'pendingCapacity': Equals(0),
+                    'desiredCapacity': Equals(converged_servers)
+                })
+            ), timeout=600)
+        )
     )
 
 

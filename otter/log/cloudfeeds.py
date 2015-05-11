@@ -9,9 +9,10 @@ from functools import partial
 from characteristic import attributes
 
 from effect import Effect, Func
-from effect.twisted import perform
 
 from toolz.dicttoolz import keyfilter
+
+from txeffect import perform
 
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType
