@@ -3250,7 +3250,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'status '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
@@ -3272,6 +3273,33 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(r, [group_state_with_id("group0"),
                              group_state_with_id("group1")])
 
+    def test_list_states_different_status(self):
+        """The status from the response is honored."""
+        self.returns = [[assoc(self.group, 'status', 'ERROR')]]
+
+        expectedData = {'tenantId': '123', 'limit': 100}
+        expectedCql = (
+            'SELECT "tenantId", "groupId", group_config, active, pending, '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'status '
+            'FROM scaling_group '
+            'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
+        r = self.validate_list_states_return_value(self.mock_log, '123')
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
+        expected_group = GroupState(
+            tenant_id='123',
+            group_id='group',
+            group_name='test',
+            active={},
+            pending={},
+            group_touched='0001-01-01T00:00:00Z',
+            policy_touched={},
+            paused=False,
+            status=ScalingGroupStatus.ERROR)
+        self.assertEqual(r, [expected_group])
+
     def test_list_empty(self):
         """
         If there are no states in cassandra, ``list_scaling_group_states``
@@ -3283,7 +3311,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, '
-            'created_at FROM scaling_group '
+            'created_at, status FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
@@ -3299,7 +3327,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '123', 'limit': 5}
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'status '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false '
             'LIMIT :limit;')
@@ -3316,7 +3345,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '123', 'limit': 100, 'marker': '345'}
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'status '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false AND '
             '"groupId" > :marker LIMIT :limit;')
@@ -3341,7 +3371,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at '
+            '"groupTouched", "policyTouched", paused, desired, created_at, '
+            'status '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
