@@ -18,7 +18,7 @@ from otter.log.intents import (
     get_log_dispatcher,
     msg,
     with_log)
-from otter.test.utils import mock_log
+from otter.test.utils import CheckFailureValue, mock_log
 
 
 class LogDispatcherTests(SynchronousTestCase):
@@ -83,6 +83,24 @@ class LogDispatcherTests(SynchronousTestCase):
         r = sync_perform(self.disp, err(f, "yo!"))
         self.assertIsNone(r)
         self.log.err.assert_called_once_with(f, "yo!", f1='v')
+
+    def test_err_from_context(self):
+        """
+        When None is passed as the failure, the exception comes from the
+        context at the time of creating the intent, not the time at which the
+        intent is performed.
+        """
+        try:
+            raise RuntimeError('original')
+        except RuntimeError:
+            eff = err(None, "why")
+        try:
+            raise RuntimeError('performing')
+        except RuntimeError:
+            sync_perform(self.disp, eff)
+        self.log.err.assert_called_once_with(
+            CheckFailureValue(RuntimeError('original')),
+            'why', f1='v')
 
     def test_err_with_params(self):
         """
