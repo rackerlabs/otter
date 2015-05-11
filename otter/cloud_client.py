@@ -13,12 +13,13 @@ from effect import (
     catch,
     perform,
     sync_performer)
-from effect.twisted import deferred_performer, perform as twisted_perform
 
 import six
 
 from twisted.internet.defer import DeferredLock
 from twisted.internet.task import deferLater
+
+from txeffect import deferred_performer, perform as twisted_perform
 
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType

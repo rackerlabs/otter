@@ -6,12 +6,13 @@ import uuid
 from functools import partial
 
 from effect import Effect, TypeDispatcher
-from effect.twisted import deferred_performer
 
 import mock
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
+
+from txeffect import deferred_performer
 
 from otter.cloud_client import TenantScope, has_code, service_request
 from otter.constants import ServiceType

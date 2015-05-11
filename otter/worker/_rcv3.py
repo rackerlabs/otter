@@ -7,9 +7,10 @@ from functools import partial
 from operator import itemgetter
 
 from effect import Effect
-from effect.twisted import perform
 
 from pyrsistent import s
+
+from txeffect import perform
 
 from otter.cloud_client import TenantScope
 from otter.convergence.steps import BulkAddToRCv3, BulkRemoveFromRCv3

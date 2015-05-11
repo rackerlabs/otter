@@ -59,7 +59,7 @@ class RCv3Tests(SynchronousTestCase):
 
     def _fake_perform(self, dispatcher, effect):
         """
-        A test double for :func:`effect.twisted.perform`.
+        A test double for :func:`txeffect.perform`.
 
         :param dispatcher: The Effect dispatcher.
         :param effect: The effect to "execute".
