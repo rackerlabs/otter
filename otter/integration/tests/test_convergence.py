@@ -747,6 +747,15 @@ class ConvergenceSet1(unittest.TestCase):
         )
 
 
+def _catc_tags(start_num, end_num):
+    """
+    Return a list of CATC tags corresponding to the start test number and end
+    test number.  For example, start=1 and end=3 would return:
+    ["CATC-001", "CATC-002", "CATC-003"].
+    """
+    return ["CATC-0{0:02d}".format(i) for i in range(start_num, end_num + 1)]
+
+
 class ConvergenceTestsWith1CLB(unittest.TestCase):
     """
     Tests for convergence that require a single CLB.
@@ -795,8 +804,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
         corresponding to the OOB-delete/error test cases.
         """
         tags = getattr(method, 'tags', ())
-        if not any(tag in tags for tag in
-                   ["CATC-0{0:02d}".format(i) for i in range(4, 14)]):
+        if not any(tag in tags for tag in _catc_tags(4, 13)):
             return None
 
         @wraps(method)
@@ -813,8 +821,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 clb.wait_for_nodes(self.rcs, checks, timeout=1800)
                 for clb in self.helper.clbs])
 
-        if any(tag in tags for tag in
-               ["CATC-0{0:02d}".format(i) for i in range(4, 9)]):
+        if any(tag in tags for tag in _catc_tags(4, 8)):
             wrapper.skip = (
                 "Autoscale does not clean up servers deleted OOB yet. "
                 "See #881.")
