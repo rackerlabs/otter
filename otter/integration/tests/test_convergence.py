@@ -747,9 +747,9 @@ class ConvergenceSet1(unittest.TestCase):
         )
 
 
-class ConvergenceSet1WithCLB(unittest.TestCase):
+class ConvergenceTestsWith1CLB(unittest.TestCase):
     """
-    Class for CATC 4-12 that run with CLB.
+    Tests for convergence that require a single CLB.
     """
     timeout = 1800
 
@@ -780,16 +780,23 @@ class ConvergenceSet1WithCLB(unittest.TestCase):
         )
 
     @classmethod
-    def _copy_catc_4_to_12(cls, name, method):
+    def _only_oob_del_and_error_tests(cls, name, method):
         """
-        To be used to copy over methods from ConvergenceSet1 using
-        :func:`duplicate_test_methods`.  Note that the methods copied
-        should all return the scaling group, so that the group's active
-        servers can be checked against the CLB.
+        To be used by :func:`copy_test_methods` to filter only certain non-CLB
+        tests (the ones testing out of band deletions, servers going into
+        error, servers timing out from builds), and ensure that active servers
+        on the group, when the test has finished, are all properly on the CLB.
+
+        Note that the methods copied should all return the scaling group, so
+        that the group's active servers can be checked against the CLB.
+
+        Also note that this filters out only the tests tagged CATC-004 through
+        CATC-013, because those where the numbers in the original test plan
+        corresponding to the OOB-delete/error test cases.
         """
         tags = getattr(method, 'tags', ())
         if not any(tag in tags for tag in
-                   ["CATC-0{0:02d}".format(i) for i in range(4, 13)]):
+                   ["CATC-0{0:02d}".format(i) for i in range(4, 14)]):
             return None
 
         @wraps(method)
@@ -815,5 +822,5 @@ class ConvergenceSet1WithCLB(unittest.TestCase):
 
 
 copy_test_methods(
-    ConvergenceSet1, ConvergenceSet1WithCLB,
-    filter_and_change=ConvergenceSet1WithCLB._copy_catc_4_to_12)
+    ConvergenceSet1, ConvergenceTestsWith1CLB,
+    filter_and_change=ConvergenceTestsWith1CLB._only_oob_del_and_error_tests)
