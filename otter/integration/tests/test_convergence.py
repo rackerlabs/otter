@@ -24,7 +24,7 @@ from otter.integration.lib.autoscale import (
     extract_active_ids,
 )
 from otter.integration.lib.cloud_load_balancer import (
-    CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs)
+    CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.nova import NovaServer, delete_servers
 from otter.integration.lib.resources import TestResources
@@ -148,6 +148,55 @@ class TestHelper(object):
 
             return wrapper
         return decorated
+
+
+def tag(*tags):
+    """
+    Decorator that adds tags to a function by setting the property "tags".
+
+    This should be added upstream to Twisted trial.
+    """
+    def decorate(function):
+        function.tags = tags
+        return function
+    return decorate
+
+
+def skip_me(reason):
+    """
+    Decorator that skips a test method or test class by setting the property
+    "skip".  This decorator is not named "skip", because setting "skip" on a
+    module skips the whole tes module.
+
+    This should be added upstream to Twisted trial.
+    """
+    def decorate(function):
+        function.skip = reason
+        return function
+    return decorate
+
+
+def copy_test_methods(from_class, to_class, filter_and_change=None):
+    """
+    Copy test methods (methods that start with `test_*`) from ``from_class`` to
+    ``to_class``.  If a decorator is provided, the test method on the
+    ``to_class`` will first be decorated before being set.
+
+    :param class from_class: The test case to copy from
+    :param class to_class: The test case to copy to
+    :param callable filter_and_change: A function that takes a test name
+        and test method, and returns a tuple of `(name, method)`
+        if the test method should be copied. None else.  This allows the
+        method name to change, the method to be decorated and/or skipped.
+    """
+    for name, attr in from_class.__dict__.items():
+        if name.startswith('test_') and callable(attr):
+            if filter_and_change is not None:
+                filtered = filter_and_change(name, attr)
+                if filtered is not None:
+                    setattr(to_class, *filtered)
+            else:
+                setattr(to_class, name, attr)
 
 
 class TestConvergence(unittest.TestCase):
@@ -450,6 +499,7 @@ def _test_scaling_after_oobd(
                 })
             ), timeout=600)
         )
+        .addCallback(lambda _: scaling_group)
     )
 
 
@@ -482,6 +532,7 @@ class ConvergenceSet1(unittest.TestCase):
             region=region
         )
 
+    @tag("CATC-004")
     def test_reaction_to_oob_server_deletion_below_min(self):
         """
         CATC-004-a
@@ -509,6 +560,7 @@ class ConvergenceSet1(unittest.TestCase):
                 self.scaling_group.trigger_convergence))
         )
 
+    @tag("CATC-005")
     def test_reaction_to_oob_deletion_then_scale_up(self):
         """
         CATC-005-a
@@ -528,6 +580,7 @@ class ConvergenceSet1(unittest.TestCase):
             self.helper, self.rcs, min_servers=3, oobd_servers=1,
             scale_servers=2, converged_servers=5)
 
+    @tag("CATC-006")
     def test_scale_down_after_oobd_non_constrained_z_lessthan_y(self):
         """
         CATC-006-a
@@ -556,6 +609,7 @@ class ConvergenceSet1(unittest.TestCase):
             self.helper, self.rcs, min_servers=N, set_to_servers=x,
             oobd_servers=z, scale_servers=y, converged_servers=(x + y))
 
+    @tag("CATC-006")
     def test_scale_down_after_oobd_non_constrained_z_greaterthan_y(self):
         """
         CATC-006-b
@@ -584,6 +638,7 @@ class ConvergenceSet1(unittest.TestCase):
             self.helper, self.rcs, min_servers=N, set_to_servers=x,
             oobd_servers=z, scale_servers=y, converged_servers=(x + y))
 
+    @tag("CATC-006")
     def test_scale_down_after_oobd_non_constrained_z_equal_y(self):
         """
         CATC-006-c
@@ -612,6 +667,7 @@ class ConvergenceSet1(unittest.TestCase):
             self.helper, self.rcs, min_servers=N, set_to_servers=x,
             oobd_servers=z, scale_servers=y, converged_servers=(x + y))
 
+    @tag("CATC-007")
     def test_scale_up_after_oobd_at_group_max(self):
         """
         CATC-007-a
@@ -637,6 +693,7 @@ class ConvergenceSet1(unittest.TestCase):
             max_servers=max_servers, scale_servers=y,
             converged_servers=max_servers, scale_should_fail=True)
 
+    @tag("CATC-007")
     def test_scale_down_past_group_min_after_oobd(self):
         """
         CATC-007-b
@@ -661,6 +718,7 @@ class ConvergenceSet1(unittest.TestCase):
             scale_servers=y, converged_servers=min_servers,
             scale_should_fail=True)
 
+    @tag("CATC-008")
     def test_group_config_update_triggers_convergence(self):
         """
         CATC-008-a
@@ -689,12 +747,20 @@ class ConvergenceSet1(unittest.TestCase):
         )
 
 
-class ConvergenceSet1WithCLB(ConvergenceSet1):
+def _catc_tags(start_num, end_num):
     """
-    Class for CATC 4-12 that run with CLB.
+    Return a list of CATC tags corresponding to the start test number and end
+    test number.  For example, start=1 and end=3 would return:
+    ["CATC-001", "CATC-002", "CATC-003"].
+    """
+    return ["CATC-0{0:02d}".format(i) for i in range(start_num, end_num + 1)]
+
+
+class ConvergenceTestsWith1CLB(unittest.TestCase):
+    """
+    Tests for convergence that require a single CLB.
     """
     timeout = 1800
-    skip = "Autoscale does not clean up servers deleted OOB yet.  See #881."
 
     def setUp(self):
         """Establish an HTTP connection pool and commonly used resources for
@@ -721,3 +787,47 @@ class ConvergenceSet1WithCLB(ConvergenceSet1):
             .addCallback(clb.wait_for_state, "ACTIVE", 600)
             for clb in self.helper.clbs])
         )
+
+    @classmethod
+    def _only_oob_del_and_error_tests(cls, name, method):
+        """
+        To be used by :func:`copy_test_methods` to filter only certain non-CLB
+        tests (the ones testing out of band deletions, servers going into
+        error, servers timing out from builds), and ensure that active servers
+        on the group, when the test has finished, are all properly on the CLB.
+
+        Note that the methods copied should all return the scaling group, so
+        that the group's active servers can be checked against the CLB.
+
+        Also note that this filters out only the tests tagged CATC-004 through
+        CATC-013, because those where the numbers in the original test plan
+        corresponding to the OOB-delete/error test cases.
+        """
+        tags = getattr(method, 'tags', ())
+        if not any(tag in tags for tag in _catc_tags(4, 13)):
+            return None
+
+        @wraps(method)
+        @inlineCallbacks
+        def wrapper(self, *args, **kwargs):
+            scaling_group = yield method(self, *args, **kwargs)
+
+            ips = yield scaling_group.get_servicenet_ips(self.rcs)
+
+            checks = MatchesAll(ContainsAllIPs(ips.values()),
+                                HasLength(len(ips)))
+
+            yield gatherResults([
+                clb.wait_for_nodes(self.rcs, checks, timeout=1800)
+                for clb in self.helper.clbs])
+
+        if any(tag in tags for tag in _catc_tags(4, 8)):
+            wrapper.skip = (
+                "Autoscale does not clean up servers deleted OOB yet. "
+                "See #881.")
+        return (name, wrapper)
+
+
+copy_test_methods(
+    ConvergenceSet1, ConvergenceTestsWith1CLB,
+    filter_and_change=ConvergenceTestsWith1CLB._only_oob_del_and_error_tests)
