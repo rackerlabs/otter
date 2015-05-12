@@ -110,17 +110,25 @@ def list_servers(rcs, pool, _treq=treq):
 def wait_for_servers(rcs, pool, group, matcher, timeout=600, period=10,
                      clock=None, _treq=treq):
     """
-    Wait until Nova reaches a particular state with regards to the servers for
-    the given group.
+    Wait until Nova reaches a particular state (as described by the given
+    matcher)with regards to the servers for the given group.
+
+    :param rcs: an instance of
+        :class:`otter.integration.lib.resources.TestResources`
+    :param pool: a :class:`twisted.web.client.HTTPConnectionPool`
+    :param group: a :class:`otter.integration.lib.autoscale.ScalingGroup` that
+        specifies which autoscaling group's servers we are looking at.  This
+        group should already exist, and have a `group_id` attribute.
+    :param matcher: a :mod:`testtools.matcher` matcher that describes the
+        desired state of the servers belonging to the autoscaling group.
     """
     @inlineCallbacks
     def do_work():
         servers = yield list_servers(rcs, pool, _treq=_treq)
         servers_in_group = [
             server for server in servers['servers']
-            if group.group_id in (
-                server['metadata'].get("rax:autoscale:group:id", None),
-                server['metadata'].get("rax:auto_scaling_group_id", None))
+            if (group.group_id ==
+                server['metadata'].get("rax:autoscale:group:id", None))
         ]
         mismatch = matcher.match(servers_in_group)
         if mismatch:
