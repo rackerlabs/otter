@@ -71,10 +71,9 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
     @tags(speed='slow', convergence='yes')
     def test_cron_style_when_policy_cooldown_over_trigger_period(self):
         """
-        When policy cooldown is set to be greater than a minute by
-        seconds that is greater than scheduler interval
-        for a cron style policy that is set to trigger every minute, that
-        policy is executed every other time.
+        When policy cooldown is set to be greater than
+        (a minute + scheduler interval) by a few seconds for an every minute
+        cron style policy, then that policy is executed every other minute.
         """
         group = self._create_group(cooldown=0)
         self.autoscale_behaviors.create_schedule_policy_given(
@@ -87,10 +86,9 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
     @tags(speed='slow', convergence='yes')
     def test_cron_style_when_group_cooldown_over_trigger_period(self):
         """
-        When group cooldown is set to be greater than a minute by
-        seconds that is greater than scheduler interval
-        for a cron style policy that is set to trigger every minute, that
-        policy is executed every other time.
+        When group cooldown is set to be greater than
+        (a minute + scheduler interval) by a few seconds for an every minute
+        cron style policy, then that policy is executed every other minute.
         """
         group = self._create_group(cooldown=60 + self.scheduler_interval + 5)
         self.autoscale_behaviors.create_schedule_policy_given(
