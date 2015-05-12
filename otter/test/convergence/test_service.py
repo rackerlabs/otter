@@ -573,7 +573,6 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.manifest = {  # Many details elided!
             'state': self.state,
             'launchConfiguration': self.lc,
-            'status': 'ACTIVE'
         }
         self.gsgi_result = (self.group, self.manifest)
         self.expected_intents = [(gsgi, self.gsgi_result)]
@@ -703,7 +702,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         # setup intents for DeleteGroup and GetScalingGroupInfo
         del_group = DeleteGroup(tenant_id=self.tenant_id,
                                 group_id=self.group_id)
-        self.manifest['status'] = 'DELETING'
+        self.state.status = ScalingGroupStatus.DELETING
         exp_intents = [(del_group, None),
                        (self.gsgi, (self.group, self.manifest))]
         disp = ComposedDispatcher([
