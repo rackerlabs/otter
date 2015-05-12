@@ -367,7 +367,7 @@ class DefaultThrottlerTests(SynchronousTestCase):
                                      ServiceType.CLOUD_SERVERS, 'delete')
         d = bracket(lambda: 'foo')
         self.assertNoResult(d)
-        clock.advance(1)
+        clock.advance(0.4)
         self.assertEqual(self.successResultOf(d), 'foo')
 
     def test_post_and_delete_not_the_same(self):
