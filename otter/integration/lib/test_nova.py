@@ -163,7 +163,7 @@ class NovaWaitForServersTestCase(SynchronousTestCase):
         self.group = Group()
         self.servers = [
             {"metadata": {"rax:autoscale:group:id": "wrong_id"}},
-            {"metadata": {"rax:auto_scaling_group_id": "wrong_id"}},
+            {"metadata": {}},
         ]
 
         def _list_servers(rcs, pool, _treq):
@@ -175,8 +175,7 @@ class NovaWaitForServersTestCase(SynchronousTestCase):
         self.patch(nova, 'list_servers', _list_servers)
 
         self.wanted = [
-            {"metadata": {"rax:autoscale:group:id": "group_id"}},
-            {"metadata": {"rax:auto_scaling_group_id": "group_id"}},
+            {"metadata": {"rax:autoscale:group:id": "group_id"}}
         ]
 
     def test_wait_for_servers_retries_until_matcher_matches(self):
