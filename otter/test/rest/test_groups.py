@@ -158,12 +158,6 @@ class FormatterHelpers(SynchronousTestCase):
             ScalingGroupStatus.ERROR,
             desired=10)
         result = format_state_dict(state)
-        self.assertEqual(result['desiredCapacity'], 10)
-        self.assertEqual(result['pendingCapacity'], 7)
-
-        # And a non-convergence tenant still gets old-style data
-        state.tenant_id = '11112'
-        result = format_state_dict(state)
         self.assertEqual(result['status'], 'ERROR')
 
 
