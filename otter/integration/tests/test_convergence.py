@@ -982,7 +982,6 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 "See #881.")
         return (name, wrapper)
 
-    @skip_me("Autoscale does not support error status yet. See #885")
     @tag("CATC-020")
     def test_delete_all_loadbalancers_and_scale_up(self, delete_clb=None):
         """
@@ -993,9 +992,8 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
         3. Delete the load balancer using the delete command (it may set
            the load balancer to PENDING_DELETE instead, for example)
         4. Attempt to scale up by 1.
-        5. Assert that the scaling group goes into error state, that there are
-           no more active servers added to the group, but the previous active
-           server is not deleted.
+        5. Assert that the scaling group goes into error state, and that the
+            server that is now broken is no longer active.
 
         :param callable delete_clb: function that takes a test resource
             and a load balancer and deletes (or pending-deletes) the
@@ -1012,11 +1010,11 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 group.wait_for_state,
                 MatchesAll(
                     ContainsDict({
-                        'pendingCapacity': Equals(1),
+                        'pendingCapacity': Equals(2),
                         'desiredCapacity': Equals(2),
                         'status': Equals("ERROR")
                     }),
-                    HasActive(1)),
+                    HasActive(0)),
                 timeout=600
             )
         )
@@ -1050,7 +1048,8 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 MatchesAll(
                     ContainsDict({
                         'pendingCapacity': Equals(0),
-                        'desiredCapacity': Equals(0)
+                        'desiredCapacity': Equals(0),
+                        'status': Equals("ACTIVE")
                     }),
                     HasActive(0)),
                 timeout=600
