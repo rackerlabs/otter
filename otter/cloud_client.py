@@ -258,7 +258,7 @@ def _default_throttler(clock, stype, method):
     # Serialize creation and deletion of cloud servers because the Compute team
     # has suggested we do this.
 
-    # Compute suggested 300 deletion req/min. A delay of 0.2 should guarantee
+    # Compute suggested 150 deletion req/min. A delay of 0.4 should guarantee
     # no more than that are executed by a node, plus serialization of requests
     # will make it quite a bit lower than that.
 
@@ -267,7 +267,7 @@ def _default_throttler(clock, stype, method):
         cloud_client_config = {}
     throttling_config = cloud_client_config.get('throttling', {})
     create_server_delay = throttling_config.get('create_server_delay', 1)
-    delete_server_delay = throttling_config.get('delete_server_delay', 0.2)
+    delete_server_delay = throttling_config.get('delete_server_delay', 0.4)
 
     policy = {
         (ServiceType.CLOUD_SERVERS, 'post'):
