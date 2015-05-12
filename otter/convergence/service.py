@@ -141,12 +141,14 @@ def execute_convergence(tenant_id, group_id,
               results=zip(steps, results),
               worst_status=worst_status)
 
-    if (worst_status == StepResult.SUCCESS and
-            group_state.status == ScalingGroupStatus.DELETING):
+    if worst_status == StepResult.SUCCESS:
+        if group_state.status == ScalingGroupStatus.DELETING:
             # servers have been deleted. Delete the group for real
-        yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
-
-    if worst_status == StepResult.FAILURE:
+            yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
+        elif group_state.status == ScalingGroupStatus.ERROR:
+            yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
+                                           status=ScalingGroupStatus.ACTIVE))
+    elif worst_status == StepResult.FAILURE:
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))
 
