@@ -894,6 +894,14 @@ def _delete_a_clb_and_scale(rcs, helper, group, scale_by, delete_clb=None):
        the load balancer to PENDING_DELETE instead, for example)
     2. Scale.
 
+    :param TestResources rcs: An instance of
+        :class:`otter.integration.lib.resources.TestResources`
+    :param ScalingGroup group: An instance of
+        :class:`otter.integration.lib.autoscale.ScalingGroup` to start -
+        this group should not have been started already.
+    :param int scale_by: How much to scale by.  This is assumed to never be
+        zero.  If it is zero, this function will fail because autoscale
+        prevents the creation of a policy that scales by zero.
     :param callable delete_clb: function that takes a test resource
         and a load balancer and deletes (or pending-deletes) the
         load balancer.
