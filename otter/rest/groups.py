@@ -66,6 +66,7 @@ def format_state_dict(state):
         'desiredCapacity': desired,
         'name': state.group_name,
         'paused': state.paused,
+        'status': state.status.name,
         'active': [
             {
                 'id': key,

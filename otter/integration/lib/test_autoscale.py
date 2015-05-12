@@ -207,9 +207,9 @@ class GetServicenetIPs(SynchronousTestCase):
         """
         def get_scaling_group_state(_, success_codes):
             self.assertEqual(success_codes, [200])
-            return defer.succeed(
-                {'group': {'active': [{'id': '11'}, {'id': '12'}]}}
-            )
+            return defer.succeed((
+                200, {'group': {'active': [{'id': '11'}, {'id': '12'}]}}
+            ))
 
         self.sg.get_scaling_group_state = get_scaling_group_state
         d = self.sg.get_servicenet_ips(self.rcs)

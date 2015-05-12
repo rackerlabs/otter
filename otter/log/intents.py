@@ -10,6 +10,8 @@ from effect import ComposedDispatcher, Effect, TypeDispatcher, perform
 
 from toolz.dicttoolz import merge
 
+from twisted.python.failure import Failure
+
 
 @attr.s
 class Log(object):
@@ -20,7 +22,7 @@ class Log(object):
     fields = attr.ib()
 
 
-@attr.s
+@attr.s(init=False)
 class LogErr(object):
     """
     Intent to log error
@@ -28,6 +30,17 @@ class LogErr(object):
     failure = attr.ib()
     msg = attr.ib()
     fields = attr.ib()
+
+    def __init__(self, failure, msg, fields):
+        # `failure` being `None` means "get the exception from context".
+        # We can't wait until the intent is performed to do that, because the
+        # exception context will be lost, so we explicitly instantiate a new
+        # Failure here.
+        if failure is None:
+            failure = Failure()
+        self.failure = failure
+        self.msg = msg
+        self.fields = fields
 
 
 @attr.s

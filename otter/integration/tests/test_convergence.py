@@ -26,6 +26,7 @@ from otter.integration.lib.autoscale import (
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
 from otter.integration.lib.identity import IdentityV2
+from otter.integration.lib.mimic import MimicNova
 from otter.integration.lib.nova import NovaServer, delete_servers
 from otter.integration.lib.resources import TestResources
 
@@ -43,6 +44,9 @@ otter_key = os.environ.get('AS_AUTOSCALE_SC_KEY', 'autoscale')
 otter_url = os.environ.get('AS_AUTOSCALE_LOCAL_URL')
 nova_key = os.environ.get('AS_NOVA_SC_KEY', 'cloudServersOpenStack')
 clb_key = os.environ.get('AS_CLB_SC_KEY', 'cloudLoadBalancers')
+
+# these are the service names for mimic control planes
+mimic_nova_key = os.environ.get("MIMICNOVA_SC_KEY", 'cloudServersBehavior')
 
 
 class TestHelper(object):
@@ -107,6 +111,13 @@ class TestHelper(object):
                                      'desiredCapacity': Equals(desired)})),
             timeout=600)
 
+        if self.clbs:
+            ips = yield group.get_servicenet_ips(rcs)
+            yield gatherResults([
+                clb.wait_for_nodes(
+                    rcs, ContainsAllIPs(ips.values()), timeout=600)
+                for clb in self.clbs])
+
         returnValue(rcs)
 
     def oob_delete_then(self, rcs, scaling_group, num):
@@ -129,14 +140,11 @@ class TestHelper(object):
                 chosen = yield scaling_group.choose_random_servers(rcs, num)
 
                 # Get ips for chosen servers if CLBs are provided, because we
-                # will need to verify that the CLBs are cleaned up.  Ensure
-                # that they are on the CLB first though.
+                # will need to verify that the CLBs are cleaned up.  Assume
+                # that it's been verified that the nodes are already on the
+                # CLB.
                 if self.clbs is not None:
                     ips = yield scaling_group.get_servicenet_ips(rcs, chosen)
-                    yield gatherResults([
-                        clb.wait_for_nodes(
-                            rcs, ContainsAllIPs(ips.values()), timeout=600)
-                        for clb in self.clbs])
 
                 yield delete_servers(chosen, rcs, pool=self.pool)
                 yield function(*args, **kwargs)
@@ -510,11 +518,74 @@ def _test_scaling_after_oobd(
     )
 
 
+@inlineCallbacks
+def _test_error_active_and_converge(
+        helper, rcs, num_to_error, scale_by=0,
+        min_servers=0, max_servers=25, desired_servers=None):
+    """
+    Helper function that creates a scaling group and sets the desired capacity
+    to a certain number.  It waits for those servers to become active.  Once
+    active, uses Mimic to error those servers.
+
+    It then either scales up or down (or just triggers convergence, based on
+    the scale_by number), and waits for the final number of servers to
+    stabilize and for the errored servers to be deleted.
+    """
+    scaling_group = helper.create_group(
+        image_ref=image_ref, flavor_ref=flavor_ref,
+        min_entities=min_servers, max_entities=max_servers
+    )
+
+    yield helper.start_group_and_wait(scaling_group, rcs,
+                                      desired=desired_servers)
+
+    to_error = yield scaling_group.choose_random_servers(rcs, num_to_error)
+
+    ips = {}
+    if helper.clbs:
+        ips = yield scaling_group.get_servicenet_ips(rcs, to_error)
+
+    # cause mimic to error the chosen servers
+    yield MimicNova(pool=helper.pool).change_server_statuses(
+        rcs, {server_id: "ERROR" for server_id in to_error})
+
+    if scale_by == 0:
+        yield scaling_group.trigger_convergence(rcs)
+    else:
+        p = ScalingPolicy(scale_by=scale_by, scaling_group=scaling_group)
+        yield p.start(rcs, helper.test_case)
+        yield p.execute(rcs)
+
+    if desired_servers is None:
+        desired_servers = min_servers
+
+    end_state = [scaling_group.wait_for_state(
+        rcs,
+        MatchesAll(
+            HasActive(desired_servers + scale_by),
+            ContainsDict({
+                'pendingCapacity': Equals(0),
+                'desiredCapacity': Equals(desired_servers + scale_by)
+            }),
+            ExcludesServers(to_error)
+        ),
+        timeout=600
+    )]
+
+    if helper.clbs:
+        end_state += [clb.wait_for_nodes(rcs, ExcludesAllIPs(ips.values()),
+                                         timeout=600)
+                      for clb in helper.clbs]
+
+    yield gatherResults(end_state)
+    returnValue(scaling_group)
+
+
 class ConvergenceSet1(unittest.TestCase):
     """
     Class for CATC 4-12 that run without CLB, but can be run with CLB (
     so the CLB versions of these tests can be run by just subclassing this
-    test case)
+    test case).
     """
     timeout = 1800
 
@@ -535,6 +606,7 @@ class ConvergenceSet1(unittest.TestCase):
             resources={
                 "otter": (otter_key, otter_url),
                 "nova": (nova_key,),
+                "mimic_nova": (mimic_nova_key,)
             },
             region=region
         )
@@ -753,6 +825,59 @@ class ConvergenceSet1(unittest.TestCase):
                 maxEntities=max_servers + 2)
         )
 
+    @tag("CATC-011")
+    def test_scale_up_after_servers_error_from_active(self):
+        """
+        CATC-011
+
+        Requires Mimic for error injection.
+
+        1. Create a scaling group with N min servers and M max servers.
+        2. After the servers are active, E go into error state.
+        3. Scale up by (N-M).
+        4. Assert that there should be M active servers on the group, and
+           that the active servers do not include the ones that errored.
+        """
+        return _test_error_active_and_converge(
+            self.helper, self.rcs, num_to_error=1, scale_by=2,
+            min_servers=2, max_servers=4)
+
+    @tag("CATC-012")
+    def test_scale_down_after_servers_error_from_active(self):
+        """
+        CATC-012
+
+        Requires Mimic for error injection.
+
+        1. Create a scaling group with N min servers and M max servers.
+        2. Set the number of servers to be X (N<X<M)
+        2. After the servers are active, E go into error state (E>(X-N))
+        3. Scale down to N servers on the group.
+        4. Assert that there should be N active servers on the group, and
+           that the active servers do not include the ones that errored.
+        """
+        return _test_error_active_and_converge(
+            self.helper, self.rcs, num_to_error=2, scale_by=-1,
+            min_servers=2, max_servers=4, desired_servers=3)
+
+    @tag("CATC-013")
+    def test_trigger_convergence_after_servers_error_from_active(self):
+        """
+        CATC-013
+
+        Requires Mimic for error injection.
+
+        1. Create a scaling group with N min servers and M max servers.
+        2. Set the number of servers to be X (N<X<M)
+        2. After the servers are active, E go into error state (E<(X-N))
+        3. Trigger a convergence cycle.
+        4. Assert that there should be X active servers on the group, and
+           that the active servers do not include the ones that errored.
+        """
+        return _test_error_active_and_converge(
+            self.helper, self.rcs, num_to_error=2, scale_by=0,
+            min_servers=2, max_servers=4, desired_servers=3)
+
 
 def _catc_tags(start_num, end_num):
     """
@@ -808,7 +933,8 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             resources={
                 "otter": (otter_key, otter_url),
                 "nova": (nova_key,),
-                "loadbalancers": (clb_key,)
+                "loadbalancers": (clb_key,),
+                "mimic_nova": (mimic_nova_key,)
             },
             region=region
         ).addCallback(lambda _: gatherResults([
