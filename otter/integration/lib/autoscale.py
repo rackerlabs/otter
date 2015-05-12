@@ -49,7 +49,7 @@ def extract_active_ids(group_status):
 
 def create_scaling_group_dict(
     image_ref=None, flavor_ref=None, min_entities=0, name=None,
-    max_entities=25, use_lbs=None
+    max_entities=25, use_lbs=None, server_name=None
 ):
     """This function returns a dictionary containing a scaling group's JSON
     payload.  Note: this function does NOT create a scaling group.
@@ -71,6 +71,9 @@ def create_scaling_group_dict(
         ``otter.lib.CloudLoadBalancer``.  However, you can get the dicts by
         invoking the o.l.CLB.scaling_group_spec() method on such objects.  If
         not given, no load balancers will be used.
+    :param str server_name: Specifies a server name to autoscale - autoscale
+        will use this as the prefix of all server names created by the group.
+
     :return: A dictionary containing a scaling group JSON descriptor.  Inside,
         it will contain a default launch config with the provided (or assumed)
         flavor and image IDs.
@@ -102,8 +105,12 @@ def create_scaling_group_dict(
         "scalingPolicies": [],
     }
 
+    launch_config_args = obj["launchConfiguration"]["args"]
     if use_lbs:
-        obj["launchConfiguration"]["args"]["loadBalancers"] = use_lbs
+        launch_config_args["loadBalancers"] = use_lbs
+
+    if server_name is not None:
+        launch_config_args["server"]["name"] = server_name
 
     return obj
 
