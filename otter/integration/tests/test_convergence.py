@@ -27,7 +27,8 @@ from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.mimic import MimicNova
-from otter.integration.lib.nova import NovaServer, delete_servers
+from otter.integration.lib.nova import (
+    NovaServer, delete_servers, wait_for_servers)
 from otter.integration.lib.resources import TestResources
 
 
@@ -581,11 +582,9 @@ def _test_error_active_and_converge(
     returnValue(scaling_group)
 
 
-class ConvergenceSet1(unittest.TestCase):
+class ConvergenceTestsNoLBs(unittest.TestCase):
     """
-    Class for CATC 4-12 that run without CLB, but can be run with CLB (
-    so the CLB versions of these tests can be run by just subclassing this
-    test case).
+    Class for convergence tests that do not require any load balancers.
     """
     timeout = 1800
 
@@ -878,6 +877,35 @@ class ConvergenceSet1(unittest.TestCase):
             self.helper, self.rcs, num_to_error=2, scale_by=0,
             min_servers=2, max_servers=4, desired_servers=3)
 
+    @tag("CATC-029")
+    def test_false_negative_on_server_create_from_nova_no_overshoot(self):
+        """
+        CATC-029
+
+        Nova returns 500 on server create, but creates the server anyway.
+        Convergence does not overprovision servers as a result.
+
+        Checks nova to make sure that convergence has not overprovisioned.
+        """
+        group = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=2, max_entities=10, server_name="false-negative"
+        )
+        d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": "false-negative.*"}],
+            behaviors=[
+                {"name": "false-negative",
+                 "parameters": {"code": 500,
+                                "message": "Server creation failed."}},
+                {"name": "default"}
+            ])
+        d.addCallback(
+            lambda _: self.helper.start_group_and_wait(group, self.rcs))
+        d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
+                      matcher=HasLength(2), timeout=600)
+        return d
+
 
 def _catc_tags(start_num, end_num):
     """
@@ -1066,7 +1094,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
 
 
 copy_test_methods(
-    ConvergenceSet1, ConvergenceTestsWith1CLB,
+    ConvergenceTestsNoLBs, ConvergenceTestsWith1CLB,
     filter_and_change=ConvergenceTestsWith1CLB._only_oob_del_and_error_tests)
 
 
