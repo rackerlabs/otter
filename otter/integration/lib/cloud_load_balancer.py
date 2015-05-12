@@ -161,7 +161,8 @@ class CloudLoadBalancer(object):
         :param TestResources rcs: The resources used to make appropriate API
             calls with.
         :param list success_codes: A list of HTTP status codes to count as
-            a successful call.
+            a successful call.  If not provided, defaults to ``[202, 404]``
+            (404 is a successful result because deletes should be idempotent).
         """
         return (
             self.treq.delete(
