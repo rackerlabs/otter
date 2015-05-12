@@ -787,7 +787,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
     def test_reactivate_group_on_success(self):
         """
         When the group started in ERROR state, and convergence succeeds, the
-        group is put back into SUCCESS.
+        group is put back into ACTIVE.
         """
         gacd = self._get_gacd_func(self.group.uuid)
         self.manifest['state'].status = ScalingGroupStatus.ERROR
