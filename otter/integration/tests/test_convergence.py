@@ -824,6 +824,34 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                 maxEntities=max_servers + 2)
         )
 
+    @tag("CATC-009")
+    def test_convergence_fixes_errored_building_servers(self):
+        """
+        CATC-009
+
+        If a server transitions into ERROR status from BUILD status,
+        convergence will clean it up and create a new server to replace it.
+
+        Checks nova to make sure that convergence has not overprovisioned.
+        """
+        group = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=2, max_entities=10, server_name="build-to-error"
+        )
+        d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": "build-to-error.*"}],
+            behaviors=[
+                {"name": "error", "parameters": {}},
+                {"name": "default"}
+            ])
+        d.addCallback(
+            lambda _: self.helper.start_group_and_wait(group, self.rcs))
+        d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
+                      matcher=HasLength(2), timeout=600)
+        d.addCallback(lambda _: group)
+        return d
+
     @tag("CATC-011")
     def test_scale_up_after_servers_error_from_active(self):
         """
