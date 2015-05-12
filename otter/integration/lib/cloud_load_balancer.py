@@ -155,11 +155,14 @@ class CloudLoadBalancer(object):
                 .addCallback(self.treq.json_content)
                 .addCallback(record_results))
 
-    def delete(self, rcs):
+    def delete(self, rcs, success_codes=None):
         """Stops and deletes the cloud load balancer.
 
         :param TestResources rcs: The resources used to make appropriate API
             calls with.
+        :param list success_codes: A list of HTTP status codes to count as
+            a successful call.  If not provided, defaults to ``[202, 404]``
+            (404 is a successful result because deletes should be idempotent).
         """
         return (
             self.treq.delete(
@@ -169,7 +172,9 @@ class CloudLoadBalancer(object):
                 ),
                 headers=headers(str(rcs.token)),
                 pool=self.pool
-            ).addCallback(check_success, [202, 404])
+            ).addCallback(
+                check_success,
+                [202, 404] if success_codes is None else success_codes)
         ).addCallback(lambda _: rcs)
 
     def wait_for_nodes(self, rcs, matcher, timeout, period=10, clock=None):

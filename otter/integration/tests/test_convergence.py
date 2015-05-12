@@ -125,6 +125,13 @@ class TestHelper(object):
         Return a decorator that wraps a function call with logic to out-of-band
         delete (not disown) some number of servers, and verifies that the
         servers are deleted and cleaned up from CLBs.
+
+        :param TestResources rcs: An instance of
+            :class:`otter.integration.lib.resources.TestResources`
+        :param ScalingGroup group: An instance of
+            :class:`otter.integration.lib.autoscale.ScalingGroup` to start -
+            this group should have been started already.
+        :param int num: The number of servers to delete out of band.
         """
         def decorated(function):
             @wraps(function)
@@ -881,6 +888,36 @@ def _catc_tags(start_num, end_num):
     return ["CATC-0{0:02d}".format(i) for i in range(start_num, end_num + 1)]
 
 
+def _delete_a_clb_and_scale(rcs, helper, group, scale_by, delete_clb=None):
+    """
+    1. Delete the first load balancer using the provided function (it may set
+       the load balancer to PENDING_DELETE instead, for example)
+    2. Scale.
+
+    :param TestResources rcs: An instance of
+        :class:`otter.integration.lib.resources.TestResources`
+    :param ScalingGroup group: An instance of
+        :class:`otter.integration.lib.autoscale.ScalingGroup` to start -
+        this group should not have been started already.
+    :param int scale_by: How much to scale by.  This is assumed to never be
+        zero.  If it is zero, this function will fail because autoscale
+        prevents the creation of a policy that scales by zero.
+    :param callable delete_clb: function that takes a test resource
+        and a load balancer and deletes (or pending-deletes) the
+        load balancer.
+    """
+    if delete_clb is not None:
+        d = delete_clb(helper.clbs[0](rcs))
+    else:
+        d = helper.clbs[0].delete(rcs, success_codes=[202])
+
+    policy = ScalingPolicy(scale_by=scale_by, scaling_group=group)
+    d.addCallback(lambda _: policy.start(rcs, helper.test_case))
+    d.addCallback(policy.execute)
+    d.addCallback(lambda _: rcs)
+    return d
+
+
 class ConvergenceTestsWith1CLB(unittest.TestCase):
     """
     Tests for convergence that require a single CLB.
@@ -953,7 +990,133 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 "See #881.")
         return (name, wrapper)
 
+    @tag("CATC-020")
+    def test_delete_all_loadbalancers_and_scale_up(self, delete_clb=None):
+        """
+        CATC-020-a. This will also be tested with 2 load balancers.
+
+        1. Creates a scaling group with a load balancer and 1 server.
+        2. Ensure that the server is active and added to the load balancer.
+        3. Delete the load balancer using the delete command (it may set
+           the load balancer to PENDING_DELETE instead, for example)
+        4. Attempt to scale up by 1.
+        5. Assert that the scaling group goes into error state, and that the
+            server that is now broken is no longer active.
+
+        :param callable delete_clb: function that takes a test resource
+            and a load balancer and deletes (or pending-deletes) the
+            load balancer.
+        """
+        group = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=1)
+
+        return (
+            self.helper.start_group_and_wait(group, self.rcs)
+            .addCallback(_delete_a_clb_and_scale, self.helper, group,
+                         scale_by=1, delete_clb=delete_clb)
+            .addCallback(
+                group.wait_for_state,
+                MatchesAll(
+                    ContainsDict({
+                        'pendingCapacity': Equals(2),
+                        'desiredCapacity': Equals(2),
+                        'status': Equals("ERROR")
+                    }),
+                    HasActive(0)),
+                timeout=600
+            )
+        )
+
+    @tag("CATC-020")
+    def test_delete_all_loadbalancers_and_scale_down(self, delete_clb=None):
+        """
+        CATC-020-b.  This will also be tested with 2 load balancers.
+
+        1. Creates a scaling group with a load balancer, and scale to 1 server.
+        2. Ensure that the servers are active and added to the load balancer.
+        3. Delete the load balancer using the delete command (it may set
+           the load balancer to PENDING_DELETE instead, for example)
+        4. Scale down by 1.
+        5. Assert that the scaling group does not go into error state, and that
+           the server is successfully deleted.
+
+        :param callable delete_clb: function that takes a test resource
+            and a load balancer and deletes (or pending-deletes) the
+            load balancer.
+        """
+        group = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref)
+
+        return (
+            self.helper.start_group_and_wait(group, self.rcs, desired=1)
+            .addCallback(_delete_a_clb_and_scale, self.helper, group,
+                         scale_by=-1, delete_clb=delete_clb)
+            .addCallback(
+                group.wait_for_state,
+                MatchesAll(
+                    ContainsDict({
+                        'pendingCapacity': Equals(0),
+                        'desiredCapacity': Equals(0),
+                        'status': Equals("ACTIVE")
+                    }),
+                    HasActive(0)),
+                timeout=600
+            )
+        )
+
 
 copy_test_methods(
     ConvergenceSet1, ConvergenceTestsWith1CLB,
     filter_and_change=ConvergenceTestsWith1CLB._only_oob_del_and_error_tests)
+
+
+class ConvergenceTestsWith2CLBs(unittest.TestCase):
+    """
+    Tests that require a two load balancers.
+    """
+    timeout = 1800
+
+    def setUp(self):
+        """Establish an HTTP connection pool and commonly used resources for
+        each test.  The HTTP connection pool is important for maintaining a
+        clean Twisted reactor.
+        """
+        self.helper = TestHelper(self, num_clbs=2)
+        self.rcs = TestResources()
+        self.identity = IdentityV2(
+            auth=auth, username=username, password=password,
+            endpoint=endpoint, pool=self.helper.pool,
+            convergence_tenant_override=convergence_tenant,
+        )
+        return self.identity.authenticate_user(
+            self.rcs,
+            resources={
+                "otter": (otter_key, otter_url),
+                "nova": (nova_key,),
+                "loadbalancers": (clb_key,)
+            },
+            region=region
+        ).addCallback(lambda _: gatherResults([
+            clb.start(self.rcs, self)
+            .addCallback(clb.wait_for_state, "ACTIVE", 600)
+            for clb in self.helper.clbs])
+        )
+
+    @classmethod
+    def _only_delete_clb_while_scaling(cls, name, method):
+        """
+        To be used by :func:`copy_test_methods` to filter only certain
+        single-CLB tests (the where the CLB is deleted before scaling)
+
+        This filters out only the tests tagged CATC-020, because that is the
+        number in the original test plan corresponding to the CLB deletion test
+        case.
+        """
+        if "CATC-020" in getattr(method, 'tags', ()):
+            return (name.replace("all_loadbalancers", "one_loadbalancer"),
+                    method)
+
+
+copy_test_methods(
+    ConvergenceTestsWith1CLB, ConvergenceTestsWith2CLBs,
+    filter_and_change=ConvergenceTestsWith2CLBs._only_delete_clb_while_scaling)
