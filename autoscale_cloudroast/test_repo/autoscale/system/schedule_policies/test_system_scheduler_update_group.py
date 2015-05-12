@@ -146,10 +146,13 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
             sp_change=self.sp_change,
             schedule_cron='* * * * *')
         active_servers = self.sp_change + group.groupConfiguration.minEntities
-        active_after_scaleup = self.wait_for_expected_number_of_active_servers(
-            group_id=group.id, expected_servers=active_servers,
-            timeout=self.cron_wait_timeout, interval_time=2,
+        # wait for policy to get triggered
+        self.wait_for_expected_group_state(
+            group.id, active_servers, self.cron_wait_timeout, interval=2,
             time_scale=False)
+        # Now wait for server to become active
+        active_after_scaleup = self.wait_for_expected_number_of_active_servers(
+            group_id=group.id, expected_servers=active_servers)
         upd_lc_server = set(active_after_scaleup) - set(active_list_b4_upd)
         self._verify_server_list_for_launch_config(upd_lc_server)
         self.autoscale_behaviors.create_schedule_policy_given(
@@ -157,11 +160,14 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
             sp_cooldown=3600,
             sp_change=-self.sp_change,
             schedule_cron='* * * * *')
+        # wait for policy to get triggered
+        self.wait_for_expected_group_state(
+            group.id, group.groupConfiguration.minEntities,
+            self.cron_wait_timeout, interval=2, time_scale=False)
+        # Now, wait for server to become active
         active_on_scale_down = self.wait_for_expected_number_of_active_servers(
             group_id=group.id,
-            expected_servers=group.groupConfiguration.minEntities,
-            timeout=self.cron_wait_timeout, interval_time=2,
-            time_scale=False)
+            expected_servers=group.groupConfiguration.minEntities)
         self._verify_server_list_for_launch_config(active_on_scale_down)
 
     def _create_group(self, cooldown=None, minentities=None, maxentities=None):
