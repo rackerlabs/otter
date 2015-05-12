@@ -993,7 +993,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
     @tag("CATC-020")
     def test_delete_all_loadbalancers_and_scale_up(self, delete_clb=None):
         """
-        CATC-020-a. This will also tested with starting with 2 load balancers.
+        CATC-020-a. This will also be tested with 2 load balancers.
 
         1. Creates a scaling group with a load balancer and 1 server.
         2. Ensure that the server is active and added to the load balancer.
@@ -1030,7 +1030,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
     @tag("CATC-020")
     def test_delete_all_loadbalancers_and_scale_down(self, delete_clb=None):
         """
-        CATC-020-b.  This will also tested with starting with 2 load balancers.
+        CATC-020-b.  This will also be tested with 2 load balancers.
 
         1. Creates a scaling group with a load balancer, and scale to 1 server.
         2. Ensure that the servers are active and added to the load balancer.
