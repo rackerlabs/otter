@@ -130,7 +130,7 @@ class TestHelper(object):
             :class:`otter.integration.lib.resources.TestResources`
         :param ScalingGroup group: An instance of
             :class:`otter.integration.lib.autoscale.ScalingGroup` to start -
-            this group should not have been started already.
+            this group should have been started already.
         :param int num: The number of servers to delete out of band.
         """
         def decorated(function):
