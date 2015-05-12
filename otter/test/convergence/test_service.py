@@ -271,11 +271,13 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         When the scaling group disappears, a fatal error is logged and the
         dirty flag is cleaned up.
         """
+        expected_error = NoSuchScalingGroupError(self.tenant_id, self.group_id)
         sequence = SequenceDispatcher([
             (('ec', self.tenant_id, self.group_id),
-             lambda i: raise_(NoSuchScalingGroupError(self.tenant_id,
-                                                      self.group_id))),
-            (LogErr(None, 'converge-fatal-error', {}), lambda i: None),
+             lambda i: raise_(expected_error)),
+            (LogErr(CheckFailureValue(expected_error),
+                    'converge-fatal-error', {}),
+             lambda i: None),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version), lambda i: None),
             (Log('mark-clean-success', {}), lambda i: None)
@@ -287,10 +289,13 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         Unexpected exceptions log a non-fatal error and don't clean up the
         dirty flag.
         """
+        expected_error = RuntimeError('oh no!')
         sequence = SequenceDispatcher([
             (('ec', self.tenant_id, self.group_id),
-             lambda i: raise_(RuntimeError('oh no!'))),
-            (LogErr(None, 'converge-non-fatal-error', {}), lambda i: None)
+             lambda i: raise_(expected_error)),
+            (LogErr(CheckFailureValue(expected_error),
+                    'converge-non-fatal-error', {}),
+             lambda i: None)
         ])
         self._verify_sequence(sequence)
 
