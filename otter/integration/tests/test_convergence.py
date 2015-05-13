@@ -120,50 +120,6 @@ class TestHelper(object):
 
         returnValue(rcs)
 
-    def oob_delete_then(self, rcs, scaling_group, num):
-        """
-        Return a decorator that wraps a function call with logic to out-of-band
-        delete (not disown) some number of servers, and verifies that the
-        servers are deleted and cleaned up from CLBs.
-
-        :param TestResources rcs: An instance of
-            :class:`otter.integration.lib.resources.TestResources`
-        :param ScalingGroup group: An instance of
-            :class:`otter.integration.lib.autoscale.ScalingGroup` to start -
-            this group should have been started already.
-        :param int num: The number of servers to delete out of band.
-        """
-        def decorated(function):
-            @wraps(function)
-            @inlineCallbacks
-            def wrapper(*args, **kwargs):
-                chosen = yield scaling_group.choose_random_servers(rcs, num)
-
-                # Get ips for chosen servers if CLBs are provided, because we
-                # will need to verify that the CLBs are cleaned up.  Assume
-                # that it's been verified that the nodes are already on the
-                # CLB.
-                if self.clbs is not None:
-                    ips = yield scaling_group.get_servicenet_ips(rcs, chosen)
-
-                yield delete_servers(chosen, rcs, pool=self.pool)
-                yield function(*args, **kwargs)
-
-                checks = [
-                    scaling_group.wait_for_state(rcs, ExcludesServers(chosen))]
-
-                if self.clbs is not None:
-                    checks += [
-                        clb.wait_for_nodes(rcs, ExcludesAllIPs(ips.values()),
-                                           timeout=600)
-                        for clb in self.clbs]
-
-                yield gatherResults(checks)
-                returnValue(rcs)
-
-            return wrapper
-        return decorated
-
 
 def tag(*tags):
     """
@@ -428,42 +384,10 @@ class TestConvergence(unittest.TestCase):
             )
 
         def then_test(_):
-            scaling_group_body = create_scaling_group_dict(
-                image_ref=image_ref, flavor_ref=flavor_ref,
-                use_lbs=[self.clb.scaling_group_spec()],
-                max_entities=scaling_group_max_entities,
-            )
-
-            self.scaling_group = ScalingGroup(
-                group_config=scaling_group_body,
-                pool=self.helper.pool
-            )
-
-            self.first_scaling_policy = ScalingPolicy(
-                scale_by=24,
-                scaling_group=self.scaling_group
-            )
-
-            self.second_scaling_policy = ScalingPolicy(
-                scale_by=1,
-                scaling_group=self.scaling_group
-            )
-
-            return (
-                self.scaling_group.start(rcs, self)
-                .addCallback(self.first_scaling_policy.start, self)
-                .addCallback(self.second_scaling_policy.start, self)
-                .addCallback(self.first_scaling_policy.execute)
-                .addCallback(
-                    self.scaling_group.wait_for_state, HasActive(24),
-                    timeout=1800)
-                .addCallback(self.helper.oob_delete_then(
-                    rcs, self.scaling_group, 2)(
-                    self.second_scaling_policy.execute))
-                .addCallback(lambda _: self.scaling_group.wait_for_state(
-                    rcs, HasActive(25), timeout=1800)
-                )
-            )
+            return _oob_disable_then(
+                self.helper, rcs, num_to_disable=2, disabler=_deleter,
+                then=_scale_by(1), max_servers=scaling_group_max_entities,
+                desired_servers=24, final_servers=25)
 
         return create_clb_first().addCallback(then_test)
 
@@ -653,18 +577,10 @@ class ConvergenceSet1(unittest.TestCase):
         to see, over time, more servers coming into existence to replace those
         deleted.
         """
-        N_SERVERS = 4
-
-        self.scaling_group = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=N_SERVERS)
-
-        return (
-            self.helper.start_group_and_wait(self.scaling_group, self.rcs)
-            .addCallback(self.helper.oob_delete_then(
-                self.rcs, self.scaling_group, N_SERVERS / 2)(
-                self.scaling_group.trigger_convergence))
-        )
+        return _oob_disable_then(
+            self.helper, self.rcs, num_to_disable=2,
+            disabler=_deleter, then=_converge, min_servers=4,
+            final_servers=4)
 
     @tag("CATC-005")
     def test_reaction_to_oob_deletion_then_scale_up(self):
@@ -840,21 +756,13 @@ class ConvergenceSet1(unittest.TestCase):
         set_to_servers = 5
         max_servers = 10
 
-        self.scaling_group = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref,
-            max_entities=max_servers
-        )
-
-        return (
-            self.helper.start_group_and_wait(self.scaling_group,
-                                             self.rcs,
-                                             desired=set_to_servers)
-            .addCallback(
-                self.helper.oob_delete_then(
-                    self.rcs, self.scaling_group, set_to_servers / 2)(
-                    self.scaling_group.update_group_config),
-                maxEntities=max_servers + 2)
-        )
+        return _oob_disable_then(
+            self.helper, self.rcs, num_to_disable=set_to_servers / 2,
+            disabler=_deleter,
+            then=lambda helper, rcs, group: group.update_group_config(
+                rcs, maxEntities=max_servers + 2),
+            max_servers=max_servers, desired_servers=set_to_servers,
+            final_servers=set_to_servers)
 
     @tag("CATC-011")
     def test_scale_up_after_servers_error_from_active(self):
