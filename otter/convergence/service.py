@@ -155,22 +155,9 @@ def execute_convergence(tenant_id, group_id,
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))
         yield cf_msg(
-            'group-status-error', status=ScalingGroupStatus.ERROR.name,
-            reasons=','.join(worst_reasons_from_sorted_results(priority)))
+            'group-status-error', status=ScalingGroupStatus.ERROR.name)
 
     yield do_return(worst_status)
-
-
-def worst_reasons_from_sorted_results(results):
-    """
-    Return worst reasons from list of results sorted based on severity of
-    StepResults
-    """
-    for result, reasons in results:
-        if result == StepResult.FAILURE:
-            yield ','.join(reasons)
-        else:
-            return
 
 
 def format_dirty_flag(tenant_id, group_id):
