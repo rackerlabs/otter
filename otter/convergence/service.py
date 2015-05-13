@@ -32,6 +32,7 @@ from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
+from otter.log.cloudfeeds import cf_msg
 from otter.log.intents import err, msg, with_log
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus)
@@ -148,11 +149,28 @@ def execute_convergence(tenant_id, group_id,
         elif group_state.status == ScalingGroupStatus.ERROR:
             yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                            status=ScalingGroupStatus.ACTIVE))
+            yield cf_msg('group-status-active',
+                         status=ScalingGroupStatus.ACTIVE.name)
     elif worst_status == StepResult.FAILURE:
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))
+        yield cf_msg(
+            'group-status-error', status=ScalingGroupStatus.ERROR.name,
+            reasons=','.join(worst_reasons_from_sorted_results(priority)))
 
     yield do_return(worst_status)
+
+
+def worst_reasons_from_sorted_results(results):
+    """
+    Return worst reasons from list of results sorted based on severity of
+    StepResults
+    """
+    for result, reasons in results:
+        if result == StepResult.FAILURE:
+            yield ','.join(reasons)
+        else:
+            return
 
 
 def format_dirty_flag(tenant_id, group_id):

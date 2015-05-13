@@ -20,6 +20,9 @@ msg_types = {
     "execute-convergence": "Executing convergence",
     "execute-convergence-results": (
         "Got result of {worst_status} after executing convergence"),
+    "group-status-active": "Group has become ACTIVE",
+    "group-status-error": ("Group's status is changed to ERROR "
+                           "due to {reasons}"),
     "launch-servers": "Launching {num_servers} servers",
     "mark-clean-success": "Marked group {scaling_group_id} clean",
     "mark-clean-failure": "Failed to mark group {scaling_group_id} clean",
