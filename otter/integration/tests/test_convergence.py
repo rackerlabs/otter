@@ -329,6 +329,7 @@ class TestConvergence(unittest.TestCase):
             )
         )
 
+    @skip_me("Autoscale does not clean up servers deleted OOB yet. See #881.")
     def test_scaling_to_clb_max_after_oob_delete_type1(self):
         """
         CATC-015-a
@@ -347,6 +348,7 @@ class TestConvergence(unittest.TestCase):
         """
         return self._perform_oobd_clb_test(25)
 
+    @skip_me("Autoscale does not clean up servers deleted OOB yet. See #881.")
     def test_scaling_to_clb_max_after_oob_delete_type2(self):
         """
         CATC-015-b
@@ -370,6 +372,7 @@ class TestConvergence(unittest.TestCase):
 
         def create_clb_first():
             self.clb = CloudLoadBalancer(pool=self.helper.pool)
+            self.helper.clbs = [self.clb]
             return (
                 self.identity.authenticate_user(
                     rcs,
