@@ -19,6 +19,7 @@ from otter.constants import ServiceType
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log as otter_log
 from otter.log.formatters import PEP3101FormattingWrapper
+from otter.log.intents import msg as msg_effect
 from otter.util.http import append_segments
 from otter.util.pure_http import has_code
 from otter.util.retry import (
@@ -46,6 +47,13 @@ log_cf_mapping = {
     "current_capacity": "currentCapacity",
     "message": "message"
 }
+
+
+def cf_msg(msg, **fields):
+    """
+    Helper function to log cloud feeds event
+    """
+    return msg_effect(msg, cloud_feed=True, **fields)
 
 
 def sanitize_event(event):
