@@ -12,13 +12,17 @@ from effect import Effect, Func
 
 from toolz.dicttoolz import keyfilter
 
+from twisted.python.log import addObserver
+
 from txeffect import perform
 
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log as otter_log
-from otter.log.formatters import PEP3101FormattingWrapper
+from otter.log.formatters import (
+    ErrorFormattingWrapper, LogLevel, PEP3101FormattingWrapper,
+    SpecificationObserverWrapper)
 from otter.util.http import append_segments
 from otter.util.pure_http import has_code
 from otter.util.retry import (
@@ -60,18 +64,15 @@ def sanitize_event(event):
     cf_event = {}
     error = False
 
-    # format message
-    event_copy = deepcopy(event)
-    PEP3101FormattingWrapper(lambda e: None)(event_copy)
-    msg = event_copy["message"]
-    event["message"] = msg[0]
+    # Get message
+    cf_event["message"] = event["message"][0]
 
     # map keys in event to CF keys
     for log_key, cf_key in log_cf_mapping.iteritems():
-        if log_key in event:
+        if log_key in event and log_key != 'message':
             cf_event[cf_key] = event[log_key]
 
-    if event.get('isError', False):
+    if event["level"] == LogLevel.ERROR:
         error = True
         if ('traceback' in cf_event['message'] or
            'exception' in cf_event['message']):
@@ -166,13 +167,24 @@ class CloudFeedsObserver(object):
         try:
             eff = self.add_event(event_dict, self.tenant_id, self.region, log)
         except UnsuitableMessage as me:
-            log.err(None, ('Tried to add unsuitable message in cloud feeds: '
-                           '{unsuitable_message}'),
-                    otter_msg_type='cf-unsuitable-message',
+            log.err(None, 'cf-unsuitable-message',
                     unsuitable_message=me.unsuitable_message)
         else:
             return perform(
                 self.get_disp(self.reactor, self.authenticator, log,
                               self.service_configs),
-                eff).addErrback(log.err, "Failed to add event",
-                                otter_msg_type='cf-add-failure')
+                eff).addErrback(log.err, 'cf-add-failure')
+
+
+def add_cf_observer(reactor, authenticator, tenant_id, region,
+                    service_configs):
+    """
+    Add cloud feeds observer after setting up some intial formatting
+    """
+    cf_observer = CloudFeedsObserver(
+        reactor=reactor, authenticator=authenticator, tenant_id=tenant_id,
+        region=region, service_configs=service_configs)
+    addObserver(
+        SpecificationObserverWrapper(
+            PEP3101FormattingWrapper(
+                ErrorFormattingWrapper(cf_observer))))

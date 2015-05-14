@@ -19,7 +19,6 @@ from twisted.internet.defer import gatherResults, maybeDeferred
 from twisted.internet.endpoints import clientFromString
 from twisted.internet.task import coiterate
 from twisted.python import usage
-from twisted.python.log import addObserver
 from twisted.python.threadpool import ThreadPool
 from twisted.web.server import Site
 
@@ -37,7 +36,7 @@ from otter.convergence.service import (
     ConvergenceStarter, Converger, set_convergence_starter)
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log
-from otter.log.cloudfeeds import CloudFeedsObserver
+from otter.log.cloudfeeds import add_cf_observer
 from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.rest.admin import OtterAdmin
 from otter.rest.application import Otter
@@ -246,12 +245,8 @@ def makeService(config):
     if cf_conf is not None:
         id_conf = deepcopy(config['identity'])
         id_conf['strategy'] = 'single_tenant'
-        addObserver(
-            CloudFeedsObserver(
-                reactor=reactor,
-                authenticator=generate_authenticator(reactor, id_conf),
-                region=region, tenant_id=cf_conf['tenant_id'],
-                service_configs=service_configs))
+        add_cf_observer(reactor, generate_authenticator(reactor, id_conf),
+                        cf_conf['tenant_id'], region, service_configs)
 
     # Setup Kazoo client
     if config_value('zookeeper'):
