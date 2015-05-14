@@ -836,7 +836,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         """
         group = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=2, max_entities=10, server_name="build-to-error"
+            min_entities=2, max_entities=10,
+            server_name_prefix="build-to-error"
         )
         d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
             self.rcs,
@@ -917,7 +918,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         """
         group = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref,
-            min_entities=2, max_entities=10, server_name="false-negative"
+            min_entities=2, max_entities=10,
+            server_name_prefix="false-negative"
         )
         d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
             self.rcs,
