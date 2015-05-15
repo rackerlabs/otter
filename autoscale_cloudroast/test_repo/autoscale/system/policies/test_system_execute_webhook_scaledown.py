@@ -33,6 +33,11 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             self.group.id,
             self.servers_before_scaledown)
 
+    def _wait_for_group_and_servers(self, servers):
+        self.wait_for_expected_group_state(self.group.id, servers)
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name, servers)
+
     @tags(speed='slow', convergence='yes')
     def test_system_execute_webhook_scale_down_change(self):
         """
@@ -48,8 +53,7 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
                 execute_webhook=True)
         self.assertEquals(execute_scale_down_webhook[
                           'execute_response'], 202)
-        self.assert_servers_deleted_successfully(
-            self.group.launchConfiguration.server.name,
+        self._wait_for_group_and_servers(
             self.group.groupConfiguration.minEntities)
 
     @tags(speed='slow', convergence='yes')
@@ -69,9 +73,7 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             current=self.group.groupConfiguration.minEntities +
             self.policy_up['change'],
             percentage=policy_down['change_percent'])
-        self.assert_servers_deleted_successfully(
-            self.group.launchConfiguration.server.name,
-            servers_from_scale_down)
+        self._wait_for_group_and_servers(servers_from_scale_down)
 
     @tags(speed='slow', convergence='yes')
     def test_system_execute_webhook_scale_down_desired_capacity(self):
@@ -88,6 +90,4 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
                 execute_webhook=True)
         self.assertEquals(execute_webhook_desired_capacity[
                           'execute_response'], 202)
-        self.assert_servers_deleted_successfully(
-            self.group.launchConfiguration.server.name,
-            policy_down['desired_capacity'])
+        self._wait_for_group_and_servers(policy_down['desired_capacity'])
