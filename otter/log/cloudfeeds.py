@@ -21,8 +21,8 @@ from otter.constants import ServiceType
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log as otter_log
 from otter.log.formatters import (
-    ErrorFormattingWrapper, LogLevel, PEP3101FormattingWrapper,
-    SpecificationObserverWrapper)
+    ErrorFormattingWrapper, LogLevel, PEP3101FormattingWrapper)
+from otter.log.spec import SpecificationObserverWrapper
 from otter.util.http import append_segments
 from otter.util.pure_http import has_code
 from otter.util.retry import (

@@ -24,6 +24,7 @@ from otter.log.cloudfeeds import (
     request_format,
     sanitize_event
 )
+from otter.log.formatters import LogLevel
 from otter.test.utils import CheckFailure, mock_log, resolve_effect
 from otter.util.retry import (
     ShouldDelayAndRetry,
@@ -45,7 +46,8 @@ def sample_event_pair():
         "desired_capacity": 5,
         "current_capacity": 3,
         "message": ("human", ),
-        "time": 0
+        "time": 0,
+        "level": LogLevel.INFO
     }, {
         "scalingGroupId": "gid",
         "policyId": "pid",
@@ -97,32 +99,22 @@ class SanitizeEventTests(SynchronousTestCase):
 
     def test_error(self):
         """
-        returns error=True if event has isError=True
+        returns error=True if event has level is ERROR
         """
-        self.event['isError'] = True
+        self.event['level'] = LogLevel.ERROR
         self._check_santized_event(True)
 
     def test_unsuitable_msg(self):
         """
         Raises UnsuitableMessage if message contains traceback or exception
         """
-        self.event['isError'] = True
+        self.event['level'] = LogLevel.ERROR
 
         self.event['message'] = ('some traceback', )
         self.assertRaises(UnsuitableMessage, sanitize_event, self.event)
 
         self.event['message'] = ('some exception', )
         self.assertRaises(UnsuitableMessage, sanitize_event, self.event)
-
-    def test_formats_message(self):
-        """
-        message in event dict is formatted
-        """
-        self.event['message'] = ('abc {a},{b}', )
-        self.event['a'] = 'a1'
-        self.event['b'] = 'b1'
-        self.exp_cf_event['message'] = 'abc a1,b1'
-        self._check_santized_event(False)
 
 
 class EventTests(SynchronousTestCase):
@@ -284,9 +276,9 @@ class CloudFeedsObserverTests(SynchronousTestCase):
         self.successResultOf(d)
         # log doesn't have cloud_feed in it
         self.log.err.assert_called_once_with(
-            CheckFailure(ValueError), "Failed to add event",
+            CheckFailure(ValueError), 'cf-add-failure',
             event_data={'event': 'dict'}, system='otter.cloud_feed',
-            cf_msg='m', otter_msg_type='cf-add-failure')
+            cf_msg='m')
 
     def test_unsuitable_msg_logs(self):
         """
@@ -299,8 +291,6 @@ class CloudFeedsObserverTests(SynchronousTestCase):
         cf = self.make_cf(add_event=add_event, get_disp=lambda *a: 1 / 0)
         cf({'event': 'dict', 'cloud_feed': True, 'message': ('m', )})
         self.log.err.assert_called_once_with(
-            None, ('Tried to add unsuitable message in cloud feeds: '
-                   '{unsuitable_message}'),
-            unsuitable_message='bad', event_data={'event': 'dict'},
-            system='otter.cloud_feed', cf_msg='m',
-            otter_msg_type='cf-unsuitable-message')
+            None, 'cf-unsuitable-message', unsuitable_message='bad',
+            event_data={'event': 'dict'}, system='otter.cloud_feed',
+            cf_msg='m')
