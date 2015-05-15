@@ -190,7 +190,7 @@ class NovaWaitForServersTestCase(SynchronousTestCase):
 
         self.servers.extend(self.wanted)
         self.clock.pump([1])
-        self.assertEqual(self.rcs, self.successResultOf(d))
+        self.assertEqual(self.wanted, self.successResultOf(d))
 
     def test_wait_for_servers_retries_until_timeout(self):
         """
