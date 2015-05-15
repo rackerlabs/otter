@@ -7,7 +7,8 @@ from __future__ import print_function
 import os
 from functools import wraps
 
-from testtools.matchers import ContainsDict, Equals, MatchesAll
+from testtools.matchers import (
+    AllMatch, ContainsDict, Equals, MatchesAll, MatchesSetwise, NotEquals)
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
@@ -27,7 +28,8 @@ from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.mimic import MimicNova
-from otter.integration.lib.nova import NovaServer, delete_servers
+from otter.integration.lib.nova import (
+    NovaServer, delete_servers, wait_for_servers)
 from otter.integration.lib.resources import TestResources
 
 
@@ -47,6 +49,9 @@ clb_key = os.environ.get('AS_CLB_SC_KEY', 'cloudLoadBalancers')
 
 # these are the service names for mimic control planes
 mimic_nova_key = os.environ.get("MIMICNOVA_SC_KEY", 'cloudServersBehavior')
+
+# otter configuration options for testing
+otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
 
 
 class TestHelper(object):
@@ -824,6 +829,74 @@ class ConvergenceSet1(unittest.TestCase):
                     self.scaling_group.update_group_config),
                 maxEntities=max_servers + 2)
         )
+
+    @skip_me("Autoscale has not implemented server building timeout yet as "
+             "a config option, and hence this test would take too long. "
+             "See #1368.")
+    @tag("CATC-010")
+    @inlineCallbacks
+    def test_servers_that_build_for_too_long_time_out_and_are_replaced(self):
+        """
+        CATC-010
+
+        Requires Mimic for error injection.
+
+        1. Mimic should cause a single server to remain in building too
+           long.
+        2. Create group with 2 servers.  (One of them will time out building.)
+        3. Check with Nova that 2 servers are built - wait for one to be
+           active.  The other is the one that should remain in build.
+        4. Wait for autoscale to show 2 servers being active.
+        5. Check with Nova to ensure that there are only 2 active servers on
+           the account.  The one that was building forever should be deleted.
+        """
+        group = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=2, max_entities=10,
+            server_name="build-timeout"
+        )
+
+        yield MimicNova(pool=self.helper.pool).sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": "build-timeout.*"}],
+            behaviors=[
+                {"name": "build",
+                 "parameters": {"duration": otter_build_timeout * 2}},
+                {"name": "default"}
+            ])
+        yield group.start(self.rcs, self)
+
+        initial_servers = yield wait_for_servers(
+            self.rcs, pool=self.helper.pool, group=group,
+            timeout=otter_build_timeout,
+            matcher=MatchesSetwise(
+                ContainsDict({'status': Equals('ACTIVE')}),
+                ContainsDict({'status': Equals('BUILD')}),
+            ))
+        building_server_id = [s['id'] for s in initial_servers
+                              if s['status'] == 'BUILD'][0]
+
+        yield group.wait_for_state(
+            self.rcs,
+            MatchesAll(
+                ContainsDict({
+                    'pendingCapacity': Equals(0),
+                    'desiredCapacity': Equals(2),
+                    'status': Equals("ACTIVE")
+                }),
+                HasActive(2),
+                ExcludesServers([building_server_id])),
+            timeout=600)
+
+        yield wait_for_servers(
+            self.rcs, pool=self.helper.pool, group=group,
+            timeout=600,
+            matcher=MatchesAll(
+                AllMatch(ContainsDict({'status': Equals('ACTIVE'),
+                                       'id': NotEquals(building_server_id)})),
+                HasLength(2)
+            ))
+        returnValue(group)
 
     @tag("CATC-011")
     def test_scale_up_after_servers_error_from_active(self):
