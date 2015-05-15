@@ -476,7 +476,7 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.assertEqual(get_supervisor(), supervisor_service)
 
-    @mock.patch('otter.tap.api.addObserver')
+    @mock.patch('otter.tap.api.add_cf_observer')
     def test_cloudfeeds_setup(self, mock_addobserver):
         """
         Cloud feeds observer is setup if it is there in config
@@ -488,20 +488,17 @@ class APIMakeServiceTests(SynchronousTestCase):
         serv_confs = get_service_configs(conf)
         serv_confs[ServiceType.CLOUD_FEEDS] = {
             'name': 'cloudFeeds', 'region': 'ord', 'url': 'url'}
-        cf = CloudFeedsObserver(
-            reactor=self.reactor,
-            authenticator=matches(IsInstance(CachingAuthenticator)),
-            region='ord', tenant_id='tid',
-            service_configs=serv_confs)
-        mock_addobserver.assert_called_once_with(cf)
+        mock_addobserver.assert_called_once_with(
+            self.reactor, matches(IsInstance(CachingAuthenticator)), 'tid',
+            'ord', serv_confs)
 
-        # Observer has single tenant auth
-        real_cf = mock_addobserver.call_args[0][0]
+        # single tenant authenticator is created
+        real_auth = mock_addobserver.call_args[0][1]
         self.assertIsInstance(
-            real_cf.authenticator._authenticator._authenticator._authenticator,
+            real_auth._authenticator._authenticator._authenticator,
             SingleTenantAuthenticator)
 
-    @mock.patch('otter.tap.api.addObserver')
+    @mock.patch('otter.tap.api.add_cf_observer')
     def test_cloudfeeds_no_setup(self, mock_addobserver):
         """
         Cloud feeds observer is not setup if it is not there in config
