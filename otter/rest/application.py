@@ -3,6 +3,7 @@ Contains the actual Klein app and base route handlers for the REST service.
 """
 import json
 
+from twisted.internet.defer import maybeDeferred
 from twisted.web.server import Request
 
 from otter.rest.otterapp import OtterApp
@@ -118,4 +119,5 @@ class Otter(object):
         Stop the scheduler
         """
         request.setHeader('X-Response-Id', 'scheduler_stop')
-        return self.scheduler.stopService()
+        d = maybeDeferred(self.scheduler.stopService)
+        return d.addCallback(lambda _: '')
