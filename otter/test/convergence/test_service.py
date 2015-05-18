@@ -364,11 +364,13 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             self.currently_converging, self.my_buckets,
             self.all_buckets,
             flags,
+            3600,
             converge_one_group=self._converge_one_group)
 
     def _converge_one_group(self, currently_converging, tenant_id,
-                            group_id, version):
-        return Effect(('converge', tenant_id, group_id, version))
+                            group_id, version, build_timeout):
+        return Effect(
+            ('converge', tenant_id, group_id, version, build_timeout))
 
     def test_converge_all_groups(self):
         """
@@ -378,12 +380,12 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         eff = self._converge_all_groups(['00_g1', '01_g2'])
 
         def get_bound_sequence(tid, gid):
-            tscope = TenantScope(Effect(('converge', tid, gid, 1)), tid)
+            tscope = TenantScope(Effect(('converge', tid, gid, 1, 3600)), tid)
             return [
                 (GetStat(path='/groups/divergent/{}_{}'.format(tid, gid)),
                  lambda i: ZNodeStatStub(version=1)),
                 (tscope, lambda i: i.effect),
-                (('converge', tid, gid, 1),
+                (('converge', tid, gid, 1, 3600),
                  lambda i: 'converged {}!'.format(tid))]
 
         sequence = SequenceDispatcher([
@@ -428,10 +430,10 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             (GetStat(path='/groups/divergent/01_g2'),
              lambda i: ZNodeStatStub(version=5)),
             (TenantScope(
-                Effect(('converge', '01', 'g2', 5)),
+                Effect(('converge', '01', 'g2', 5, 3600)),
                 '01'),
              lambda tscope: tscope.effect),
-            (('converge', '01', 'g2', 5),
+            (('converge', '01', 'g2', 5, 3600),
              lambda i: 'converged two!'),
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
@@ -442,12 +444,12 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
     def test_no_log_on_no_groups(self):
         """When there's no work, no log message is emitted."""
         def converge_one_group(log, currently_converging, tenant_id, group_id,
-                               version):
+                               version, build_timeout):
             1 / 0
 
         result = converge_all_groups(
             self.currently_converging, self.my_buckets, self.all_buckets, [],
-            converge_one_group=converge_one_group)
+            3600, converge_one_group=converge_one_group)
         self.assertEqual(sync_perform(_get_dispatcher(), result), None)
 
 

@@ -315,15 +315,21 @@ def get_my_divergent_groups(my_buckets, all_buckets, divergent_flags):
 
 @do
 def converge_one_group(currently_converging, tenant_id, group_id, version,
-                       execute_convergence=execute_convergence):
+                       build_timeout, execute_convergence=execute_convergence):
     """
     Converge one group, non-concurrently, and clean up the dirty flag when
     done.
 
     :param Reference currently_converging: pset of currently converging groups
+    :param str tenant_id: the tenant ID of the group that is converging
+    :param str group_id: the ID of the group that is converging
     :param version: version number of ZNode of the group's dirty flag
+    :param number build_timeout: number of seconds to wait for servers to be in
+        building before it's is timed out and deleted
+    :param callable execute_convergence: like :func`execute_convergence`, to
+        be used for test injection only
     """
-    eff = execute_convergence(tenant_id, group_id)
+    eff = execute_convergence(tenant_id, group_id, build_timeout)
     try:
         result = yield non_concurrently(currently_converging, group_id, eff)
     except ConcurrentError:
