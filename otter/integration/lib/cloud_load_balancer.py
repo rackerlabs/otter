@@ -264,3 +264,13 @@ ContainsAllIPs = MatchesPredicateWithParams(
 """
 Matcher that asserts that all the given IPs are on the load balancer.
 """
+
+
+@attributes([
+    Attribute('clb', instance_of=CloudLoadBalancer)
+])
+class CloudLoadBalancerController(object):
+    """
+    The CloudLoadBalancerController class provides an interface that allows
+    out-of-band control over a cloud load balancer through Mimic's API.
+    """
