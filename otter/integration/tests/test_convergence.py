@@ -26,7 +26,9 @@ from otter.integration.lib.autoscale import (
     extract_active_ids,
 )
 from otter.integration.lib.cloud_load_balancer import (
-    CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
+    CloudLoadBalancer, CloudLoadBalancerController,
+    ContainsAllIPs, ExcludesAllIPs, HasLength
+)
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.mimic import MimicNova
 from otter.integration.lib.nova import NovaServer, delete_servers
@@ -500,6 +502,7 @@ class TestConvergence(unittest.TestCase):
 
         def create_clb_first():
             self.clb = CloudLoadBalancer(pool=self.helper.pool)
+            self.clbController = CloudLoadBalancerController(clb=self.clb)
             return (
                 self.identity.authenticate_user(
                     rcs,
