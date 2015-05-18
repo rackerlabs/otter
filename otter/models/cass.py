@@ -13,7 +13,6 @@ from datetime import datetime
 from characteristic import attributes
 
 from effect import Effect, parallel
-from effect.twisted import deferred_performer
 
 from jsonschema import ValidationError
 
@@ -26,6 +25,8 @@ from silverberg.client import ConsistencyLevel
 from toolz.dicttoolz import keymap
 
 from twisted.internet import defer
+
+from txeffect import deferred_performer
 
 from zope.interface import implementer
 
@@ -91,6 +92,10 @@ def serialize_json_data(data, ver):
 # Otherwise it won't.
 #
 # Thus, selects have a semicolon, everything else doesn't.
+
+# NOTE about deleted groups: Make sure every query involving groups *either*
+# filters out deleting=false, *or* includes the `deleting` query so that
+# _unmarshal_state can parse the status correctly.
 _cql_view = ('SELECT {column}, created_at FROM {cf} '
              'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
              'AND deleting=false;')
@@ -128,7 +133,7 @@ _cql_insert_group_state = (
     'USING TIMESTAMP :ts')
 _cql_view_group_state = (
     'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at '
+    '"groupTouched", "policyTouched", paused, desired, created_at, status '
     'FROM {cf} '
     'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND deleting=false;')
 
@@ -183,7 +188,7 @@ _cql_delete_one_webhook = (
     '"webhookId" = :webhookId')
 _cql_list_states = (
     'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at '
+    '"groupTouched", "policyTouched", paused, desired, created_at, status '
     'FROM {cf} WHERE "tenantId"=:tenantId AND deleting=false;')
 _cql_list_policy = (
     'SELECT "policyId", data FROM {cf} WHERE '
@@ -443,10 +448,26 @@ def _jsonloads_data(raw_data):
     return data
 
 
+def _group_status(status, deleting):
+    if deleting:
+        return ScalingGroupStatus.DELETING
+    else:
+        # TODO: #1304
+        if status is None:
+            return ScalingGroupStatus.ACTIVE
+        elif status == 'DISABLED':
+            return ScalingGroupStatus.ERROR
+        else:
+            return ScalingGroupStatus.lookupByName(status)
+
+
 def _unmarshal_state(state_dict):
     desired_capacity = state_dict['desired']
     if desired_capacity is None:
         desired_capacity = 0
+
+    status = _group_status(state_dict['status'],
+                           state_dict.get('deleting', False))
 
     return GroupState(
         state_dict["tenantId"], state_dict["groupId"],
@@ -456,7 +477,8 @@ def _unmarshal_state(state_dict):
         state_dict["groupTouched"],
         _jsonloads_data(state_dict["policyTouched"]),
         state_dict["paused"],
-        desired=desired_capacity
+        status,
+        desired=desired_capacity,
     )
 
 
@@ -646,18 +668,6 @@ class CassScalingGroup(object):
             return d
         return wrapper
 
-    def _group_status(self, status, deleting):
-        if deleting:
-            return ScalingGroupStatus.DELETING
-        else:
-            # TODO: #1304
-            if status is None:
-                return ScalingGroupStatus.ACTIVE
-            elif status == 'DISABLED':
-                return ScalingGroupStatus.ERROR
-            else:
-                return ScalingGroupStatus.lookupByName(status)
-
     def view_manifest(self, with_policies=True, with_webhooks=False,
                       get_deleting=False):
         """
@@ -688,11 +698,8 @@ class CassScalingGroup(object):
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
                 'id': self.uuid,
-                'state': _unmarshal_state(group)
+                'state': _unmarshal_state(group),
             }
-            if get_deleting:
-                status = self._group_status(group['status'], group['deleting'])
-                m['status'] = status.name
             return m
 
         def check_deleting(group):
@@ -1405,6 +1412,7 @@ class CassScalingGroupCollection:
                 data['created_at'],
                 {},
                 data['paused'],
+                ScalingGroupStatus.ACTIVE,
                 desired=data['desired']
             )
             outpolicies = _build_policies(

@@ -37,14 +37,17 @@ from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,
     ModifyGroupState,
+    UpdateGroupStatus,
     perform_modify_group_state)
-from otter.models.interface import GroupState, NoSuchScalingGroupError
+from otter.models.interface import (
+    GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
 from otter.test.convergence.test_planning import server
 from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
     CheckFailureValue, FakePartitioner,
     TestStep,
     mock_group, mock_log,
+    noop,
     raise_,
     test_dispatcher,
     transform_eq,
@@ -268,11 +271,13 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         When the scaling group disappears, a fatal error is logged and the
         dirty flag is cleaned up.
         """
+        expected_error = NoSuchScalingGroupError(self.tenant_id, self.group_id)
         sequence = SequenceDispatcher([
             (('ec', self.tenant_id, self.group_id),
-             lambda i: raise_(NoSuchScalingGroupError(self.tenant_id,
-                                                      self.group_id))),
-            (LogErr(None, 'converge-fatal-error', {}), lambda i: None),
+             lambda i: raise_(expected_error)),
+            (LogErr(CheckFailureValue(expected_error),
+                    'converge-fatal-error', {}),
+             lambda i: None),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version), lambda i: None),
             (Log('mark-clean-success', {}), lambda i: None)
@@ -284,10 +289,13 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         Unexpected exceptions log a non-fatal error and don't clean up the
         dirty flag.
         """
+        expected_error = RuntimeError('oh no!')
         sequence = SequenceDispatcher([
             (('ec', self.tenant_id, self.group_id),
-             lambda i: raise_(RuntimeError('oh no!'))),
-            (LogErr(None, 'converge-non-fatal-error', {}), lambda i: None)
+             lambda i: raise_(expected_error)),
+            (LogErr(CheckFailureValue(expected_error),
+                    'converge-non-fatal-error', {}),
+             lambda i: None)
         ])
         self._verify_sequence(sequence)
 
@@ -536,7 +544,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.tenant_id = 'tenant-id'
         self.group_id = 'group-id'
         self.state = GroupState(self.tenant_id, self.group_id, 'group-name',
-                                {}, {}, None, {}, False, desired=2)
+                                {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE, desired=2)
         self.group = mock_group(self.state, self.tenant_id, self.group_id)
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
         self.desired_lbs = s(CLBDescription(lb_id='23', port=80))
@@ -564,10 +573,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.manifest = {  # Many details elided!
             'state': self.state,
             'launchConfiguration': self.lc,
-            'status': 'ACTIVE'
         }
-        gsgi_result = (self.group, self.manifest)
-        self.expected_intents = [(gsgi, gsgi_result)]
+        self.gsgi_result = (self.group, self.manifest)
+        self.expected_intents = [(gsgi, self.gsgi_result)]
         self.log = mock_log()
 
     def _get_dispatcher(self, expected_intents=None):
@@ -694,7 +702,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         # setup intents for DeleteGroup and GetScalingGroupInfo
         del_group = DeleteGroup(tenant_id=self.tenant_id,
                                 group_id=self.group_id)
-        self.manifest['status'] = 'DELETING'
+        self.state.status = ScalingGroupStatus.DELETING
         exp_intents = [(del_group, None),
                        (self.gsgi, (self.group, self.manifest))]
         disp = ComposedDispatcher([
@@ -742,11 +750,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         dispatcher = self._get_dispatcher()
         self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
 
-    def test_returns_failure(self):
+    def test_returns_failure_set_error_state(self):
         """
-        If a step that results in FAILURE is returned, then the ultimate result
-        of executing convergence will be a FAILURE, regardless of the other
-        step results.
+        The group is put into ERROR state if any step returns FAILURE, and
+        FAILURE is the final result of convergence.
         """
         gacd = self._get_gacd_func(self.group.uuid)
 
@@ -762,8 +769,49 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         eff = execute_convergence(self.tenant_id, self.group_id,
                                   plan=plan,
                                   get_all_convergence_data=gacd)
-        dispatcher = self._get_dispatcher()
-        self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
+
+        sequence = SequenceDispatcher([
+            (self.gsgi, lambda i: self.gsgi_result),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
+             noop),
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            (UpdateGroupStatus(scaling_group=self.group,
+                               status=ScalingGroupStatus.ERROR),
+             noop),
+        ])
+        dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
+
+    def test_reactivate_group_on_success(self):
+        """
+        When the group started in ERROR state, and convergence succeeds, the
+        group is put back into ACTIVE.
+        """
+        gacd = self._get_gacd_func(self.group.uuid)
+        self.manifest['state'].status = ScalingGroupStatus.ERROR
+
+        def plan(*args, **kwargs):
+            return pbag([TestStep(Effect(Constant((StepResult.SUCCESS, []))))])
+
+        eff = execute_convergence(self.tenant_id, self.group_id,
+                                  plan=plan,
+                                  get_all_convergence_data=gacd)
+
+        sequence = SequenceDispatcher([
+            (self.gsgi, lambda i: self.gsgi_result),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
+             noop),
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            (UpdateGroupStatus(scaling_group=self.group,
+                               status=ScalingGroupStatus.ACTIVE),
+             noop),
+        ])
+        dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), StepResult.SUCCESS)
 
 
 class DetermineActiveTests(SynchronousTestCase):

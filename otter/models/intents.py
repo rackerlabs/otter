@@ -3,9 +3,10 @@ from functools import partial
 from characteristic import attributes
 
 from effect import TypeDispatcher
-from effect.twisted import deferred_performer
 
 from twisted.internet.defer import inlineCallbacks, returnValue
+
+from txeffect import deferred_performer
 
 
 @attributes(['scaling_group', 'modifier'])
@@ -60,11 +61,23 @@ def perform_delete_group(log, store, dispatcher, intent):
     return group.delete_group()
 
 
+@attributes(['scaling_group', 'status'])
+class UpdateGroupStatus(object):
+    """An Effect intent which updates the status of a scaling group."""
+
+
+@deferred_performer
+def perform_update_group_status(dispatcher, ugs_intent):
+    """Perform an :obj:`UpdateGroupStatus`."""
+    return ugs_intent.scaling_group.update_status(ugs_intent.status)
+
+
 def get_model_dispatcher(log, store):
     """Get a dispatcher that can handle all the model-related intents."""
     return TypeDispatcher({
         ModifyGroupState: perform_modify_group_state,
         GetScalingGroupInfo:
             partial(perform_get_scaling_group_info, log, store),
-        DeleteGroup: partial(perform_delete_group, log, store)
+        DeleteGroup: partial(perform_delete_group, log, store),
+        UpdateGroupStatus: perform_update_group_status,
     })

@@ -32,6 +32,7 @@ class GroupState(object):
         they were executed, if ever. The time is stored as ISO860 format str
     :ivar bool paused: whether the scaling group is paused in
         scaling activities
+    :ivar GroupStatus status: status of the group.
     :ivar int desired: the desired capacity of the scaling group
     :ivar callable now: callable that returns a :class:`bytes` timestamp
         used for testing purposes. Defaults to :func:`timestamp.now`
@@ -39,7 +40,7 @@ class GroupState(object):
     TODO: ``remove_active``, ``pause`` and ``resume`` ?
     """
     def __init__(self, tenant_id, group_id, group_name, active, pending,
-                 group_touched, policy_touched, paused, desired=0,
+                 group_touched, policy_touched, paused, status, desired=0,
                  now=timestamp.now):
         self.tenant_id = tenant_id
         self.group_id = group_id
@@ -50,6 +51,7 @@ class GroupState(object):
         self.paused = paused
         self.policy_touched = policy_touched
         self.group_touched = group_touched
+        self.status = status
 
         if self.group_touched is None:
             self.group_touched = timestamp.MIN
@@ -58,7 +60,7 @@ class GroupState(object):
 
         self._attributes = (
             'tenant_id', 'group_id', 'group_name', 'desired', 'active',
-            'pending', 'group_touched', 'policy_touched', 'paused')
+            'pending', 'group_touched', 'policy_touched', 'paused', 'status')
 
     def __eq__(self, other):
         """

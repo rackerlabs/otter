@@ -13,7 +13,6 @@ from hashlib import sha1
 from effect import Effect, FirstError, Func, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
-from effect.twisted import exc_info_to_failure, perform
 
 from kazoo.recipe.partitioner import PartitionState
 
@@ -24,6 +23,8 @@ import six
 
 from twisted.application.service import MultiService
 
+from txeffect import exc_info_to_failure, perform
+
 from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
@@ -33,7 +34,7 @@ from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
 from otter.log.intents import err, msg, with_log
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, ModifyGroupState)
+    DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.fp import assoc_obj
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
@@ -116,8 +117,7 @@ def execute_convergence(tenant_id, group_id,
     launch_config = manifest['launchConfiguration']
     now = yield Effect(Func(time.time))
 
-    group_status = ScalingGroupStatus.lookupByName(manifest['status'])
-    desired_capacity = (0 if group_status == ScalingGroupStatus.DELETING
+    desired_capacity = (0 if group_state.status == ScalingGroupStatus.DELETING
                         else group_state.desired)
     desired_group_state = get_desired_group_state(
         group_id, launch_config, desired_capacity)
@@ -127,7 +127,7 @@ def execute_convergence(tenant_id, group_id,
               servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
               desired=desired_group_state, active=active)
     # Since deleting groups are not publicly visible
-    if group_status != ScalingGroupStatus.DELETING:
+    if group_state.status != ScalingGroupStatus.DELETING:
         yield _update_active(scaling_group, active)
     if len(steps) == 0:
         yield do_return(StepResult.SUCCESS)
@@ -141,10 +141,16 @@ def execute_convergence(tenant_id, group_id,
               results=zip(steps, results),
               worst_status=worst_status)
 
-    if (worst_status == StepResult.SUCCESS and
-            group_status == ScalingGroupStatus.DELETING):
+    if worst_status == StepResult.SUCCESS:
+        if group_state.status == ScalingGroupStatus.DELETING:
             # servers have been deleted. Delete the group for real
-        yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
+            yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
+        elif group_state.status == ScalingGroupStatus.ERROR:
+            yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
+                                           status=ScalingGroupStatus.ACTIVE))
+    elif worst_status == StepResult.FAILURE:
+        yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
+                                       status=ScalingGroupStatus.ERROR))
 
     yield do_return(worst_status)
 
@@ -334,8 +340,6 @@ def converge_one_group(currently_converging, tenant_id, group_id, version,
     else:
         if result in (StepResult.FAILURE, StepResult.SUCCESS):
             yield delete_divergent_flag(tenant_id, group_id, version)
-        # TODO: if result is FAILURE, put the group into ERROR state.
-        # https://github.com/rackerlabs/otter/issues/885
 
 
 @do

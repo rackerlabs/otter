@@ -751,19 +751,32 @@ def transform_eq(transformer, rhs):
     Return an object that can be compared to another object after transforming
     that other object.
 
+    The returned object will keep a log of equality checks done to it, and when
+    formatted as a string (with ``repr``), will show the history of transformed
+    objects and the ``rhs``.
+
     :param transformer: a function that takes the compared objects and returns
         a transformed version
     :param rhs: the actual data that should be compared with the result of
         transforming the compared object
     """
-    class Foo(object):
+    class TransformedEq(object):
+        def __init__(self):
+            self.comparisons = []
+
         def __eq__(self, other):
-            return transformer(other) == rhs
+            transformed = transformer(other)
+            self.comparisons.append(transformed)
+            return transformed == rhs
 
         def __ne__(self, other):
             return not self == other
 
-    return Foo()
+        def __repr__(self):
+            return "<TransformedEq comparisons=%r, operand=%r>" % (
+                self.comparisons, rhs)
+
+    return TransformedEq()
 
 
 def get_fake_service_request_performer(stub_response):
@@ -793,6 +806,7 @@ def get_fake_service_request_performer(stub_response):
             authenticator=mock.MagicMock(),
             log=mock.MagicMock(),
             service_configs=service_configs,
+            throttler=lambda stype, method: None,
             tenant_id='000000',
             service_request=service_request_intent)
 
@@ -816,3 +830,8 @@ class TestStep(object):
 
     def as_effect(self):
         return self.effect
+
+
+def noop(_):
+    """Ignore input and return None."""
+    pass

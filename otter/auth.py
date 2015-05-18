@@ -42,9 +42,9 @@ from functools import partial
 
 from characteristic import attributes
 
-from effect.twisted import deferred_performer
-
 from twisted.internet.defer import succeed
+
+from txeffect import deferred_performer
 
 from zope.interface import Interface, implementer
 
