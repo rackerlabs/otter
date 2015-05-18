@@ -344,11 +344,22 @@ def converge_one_group(currently_converging, tenant_id, group_id, version,
 
 @do
 def converge_all_groups(currently_converging, my_buckets, all_buckets,
-                        divergent_flags,
+                        divergent_flags, build_timeout,
                         converge_one_group=converge_one_group):
     """
     Check for groups that need convergence and which match up to the
     buckets we've been allocated.
+
+    :param Reference currently_converging: pset of currently converging groups
+    :param my_buckets: The buckets that should be checked for group IDs to
+        converge on.
+    :param all_buckets: The set of all buckets that can be checked for group
+        IDs to converge on.  ``my_buckets`` should be a subset of this.
+    :param divergent_flags: divergent flags that were found in zookeeper.
+    :param number build_timeout: number of seconds to wait for servers to be in
+        building before it's is timed out and deleted
+    :param callable converge_one_group: function to use to converge a single
+        group - to be used for test injection only
     """
     group_infos = get_my_divergent_groups(
         my_buckets, all_buckets, divergent_flags)
@@ -364,7 +375,8 @@ def converge_all_groups(currently_converging, my_buckets, all_buckets,
         return Effect(GetStat(dirty_flag)).on(
             lambda stat: Effect(TenantScope(
                 converge_one_group(currently_converging,
-                                   tenant_id, group_id, stat.version),
+                                   tenant_id, group_id, stat.version,
+                                   build_timeout),
                 tenant_id)))
 
     effs = []
@@ -411,7 +423,7 @@ class Converger(MultiService):
     """
 
     def __init__(self, log, dispatcher, buckets, partitioner_factory,
-                 converge_all_groups=converge_all_groups):
+                 build_timeout, converge_all_groups=converge_all_groups):
         """
         :param log: a bound log
         :param dispatcher: The dispatcher to use to perform effects.
@@ -421,6 +433,10 @@ class Converger(MultiService):
             groups.
         :param partitioner_factory: Callable of (log, callback) which should
             create an :obj:`Partitioner` to distribute the buckets.
+        :param number build_timeout: number of seconds to wait for servers to
+            be in building before it's is timed out and deleted
+        :param callable converge_all_groups: like :func:`converge_all_groups`,
+            to be used for test injection only
         """
         MultiService.__init__(self)
         self.log = log.bind(otter_service='converger')
@@ -429,13 +445,14 @@ class Converger(MultiService):
         self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
         self.partitioner.setServiceParent(self)
         self.currently_converging = Reference(pset())
+        self.build_timeout = build_timeout
         self._converge_all_groups = converge_all_groups
 
     def _converge_all(self, my_buckets, divergent_flags):
         """Run :func:`converge_all_groups` and log errors."""
         eff = self._converge_all_groups(self.currently_converging,
                                         my_buckets, self._buckets,
-                                        divergent_flags)
+                                        divergent_flags, self.build_timeout)
         return eff.on(
             error=lambda e: err(
                 exc_info_to_failure(e), 'converge-all-groups-error'))

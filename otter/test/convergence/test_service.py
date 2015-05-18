@@ -100,7 +100,8 @@ class ConvergerTests(SynchronousTestCase):
             dispatcher = _get_dispatcher()
         return Converger(
             self.log, dispatcher, self.buckets,
-            self._pfactory, converge_all_groups=converge_all_groups)
+            self._pfactory, build_timeout=3600,
+            converge_all_groups=converge_all_groups)
 
     def _pfactory(self, log, callable):
         self.fake_partitioner = FakePartitioner(log, callable)
@@ -112,10 +113,10 @@ class ConvergerTests(SynchronousTestCase):
         performed.
         """
         def converge_all_groups(currently_converging, _my_buckets,
-                                all_buckets, divergent_flags):
+                                all_buckets, divergent_flags, build_timeout):
             return Effect(
                 ('converge-all', currently_converging, _my_buckets,
-                 all_buckets, divergent_flags))
+                 all_buckets, divergent_flags, build_timeout))
 
         my_buckets = [0, 5]
         bound_sequence = [
@@ -126,7 +127,8 @@ class ConvergerTests(SynchronousTestCase):
                              True),
                 my_buckets,
                 self.buckets,
-                ['flag1', 'flag2']),
+                ['flag1', 'flag2'],
+                3600),
                 lambda i: 'foo')
         ]
 
@@ -150,7 +152,7 @@ class ConvergerTests(SynchronousTestCase):
         logged, and None is the ultimate result.
         """
         def converge_all_groups(currently_converging, _my_buckets,
-                                all_buckets, divergent_flags):
+                                all_buckets, divergent_flags, build_timeout):
             return Effect('converge-all')
 
         bound_sequence = [
@@ -208,7 +210,7 @@ class ConvergerTests(SynchronousTestCase):
         :func:`converge_all_groups`.
         """
         def converge_all_groups(currently_converging, _my_buckets,
-                                all_buckets, divergent_flags):
+                                all_buckets, divergent_flags, build_timeout):
             return Effect(('converge-all-groups', divergent_flags))
         dispatcher = SequenceDispatcher([
             (('converge-all-groups', ['group1', 'group2']),
