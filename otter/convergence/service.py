@@ -88,16 +88,20 @@ def _update_active(scaling_group, active):
 
 
 @do
-def execute_convergence(tenant_id, group_id,
+def execute_convergence(tenant_id, group_id, build_timeout,
                         get_all_convergence_data=get_all_convergence_data,
                         plan=plan):
     """
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
 
-    :param group_id: group id
-    :param get_all_convergence_data: like :func`get_all_convergence_data`, used
-        for testing.
+    :param str tenant_id: the tenant ID for the group to converge
+    :param str group_id: the ID of the group to be converged
+    :param number build_timeout: number of seconds to wait for servers to be in
+        building before it's is timed out and deleted
+    :param callable get_all_convergence_data: like
+        :func`get_all_convergence_data`, used for testing.
+    :param callable plan: like :func:`plan`, to be used for test injection only
 
     :return: Effect of most severe StepResult
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
@@ -121,7 +125,7 @@ def execute_convergence(tenant_id, group_id,
                         else group_state.desired)
     desired_group_state = get_desired_group_state(
         group_id, launch_config, desired_capacity)
-    steps = plan(desired_group_state, servers, lb_nodes, now)
+    steps = plan(desired_group_state, servers, lb_nodes, now, build_timeout)
     active = determine_active(servers, lb_nodes)
     yield msg('execute-convergence',
               servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
