@@ -897,8 +897,10 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                 ContainsDict({'status': Equals('ACTIVE')}),
                 ContainsDict({'status': Equals('BUILD')}),
             ))
-        building_server_id = [s['id'] for s in initial_servers
-                              if s['status'] == 'BUILD'][0]
+
+        # the above ensures that there is one server with status BUILD
+        building_server_id = next(s['id'] for s in initial_servers
+                                  if s['status'] == 'BUILD')
 
         yield group.wait_for_state(
             self.rcs,
