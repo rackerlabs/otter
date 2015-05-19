@@ -20,16 +20,54 @@ from otter.log.cloudfeeds import (
     CloudFeedsObserver,
     UnsuitableMessage,
     add_event,
+    cf_err, cf_fail, cf_msg,
     prepare_request,
     request_format,
     sanitize_event
 )
+from otter.log.intents import Log, LogErr
 from otter.test.utils import CheckFailure, mock_log, resolve_effect
 from otter.util.retry import (
     ShouldDelayAndRetry,
     exponential_backoff_interval,
     retry_times
 )
+
+
+class CFHelperTests(SynchronousTestCase):
+    """
+    Tests for cf_* functions
+    """
+
+    def test_cf_msg(self):
+        """
+        `cf_msg` returns Effect with `Log` intent with cloud_feed=True
+        """
+        self.assertEqual(
+            cf_msg('message', a=2, b=3),
+            Effect(Log('message', dict(cloud_feed=True, a=2, b=3)))
+        )
+
+    def test_cf_err(self):
+        """
+        `cf_err` returns Effect with `Log` intent with cloud_feed=True
+        and isError=True
+        """
+        self.assertEqual(
+            cf_err('message', a=2, b=3),
+            Effect(Log('message', dict(isError=True, cloud_feed=True,
+                                       a=2, b=3)))
+        )
+
+    def test_cf_fail(self):
+        """
+        `cf_err` returns Effect with `LogErr` intent with cloud_feed=True
+        """
+        f = object()
+        self.assertEqual(
+            cf_fail(f, 'message', a=2, b=3),
+            Effect(LogErr(f, 'message', dict(cloud_feed=True, a=2, b=3)))
+        )
 
 
 def sample_event_pair():

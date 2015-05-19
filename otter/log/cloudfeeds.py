@@ -19,7 +19,7 @@ from otter.constants import ServiceType
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log as otter_log
 from otter.log.formatters import PEP3101FormattingWrapper
-from otter.log.intents import msg as msg_effect
+from otter.log.intents import err as err_effect, msg as msg_effect
 from otter.util.http import append_segments
 from otter.util.pure_http import has_code
 from otter.util.retry import (
@@ -56,14 +56,14 @@ def cf_msg(msg, **fields):
     return msg_effect(msg, cloud_feed=True, **fields)
 
 
-def cf_err_no_failure(msg, **fields):
+def cf_err(msg, **fields):
     """
     Log cloud feed error event without failure
     """
     return msg_effect(msg, isError=True, cloud_feed=True, **fields)
 
 
-def cf_err(failure, msg, **fields):
+def cf_fail(failure, msg, **fields):
     """
     Log cloud feed error event with failure
     """
