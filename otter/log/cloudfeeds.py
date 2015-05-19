@@ -56,6 +56,20 @@ def cf_msg(msg, **fields):
     return msg_effect(msg, cloud_feed=True, **fields)
 
 
+def cf_err_no_failure(msg, **fields):
+    """
+    Log cloud feed error event without failure
+    """
+    return msg_effect(msg, isError=True, cloud_feed=True, **fields)
+
+
+def cf_err(failure, msg, **fields):
+    """
+    Log cloud feed error event with failure
+    """
+    return err_effect(failure, msg, cloud_feed=True, **fields)
+
+
 def sanitize_event(event):
     """
     Sanitize event by removing all items except the ones in autoscale schema.
