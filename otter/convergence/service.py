@@ -32,7 +32,7 @@ from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
-from otter.log.cloudfeeds import cf_msg
+from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, with_log
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus)
@@ -154,7 +154,7 @@ def execute_convergence(tenant_id, group_id,
     elif worst_status == StepResult.FAILURE:
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))
-        yield cf_msg(
+        yield cf_err(
             'group-status-error', status=ScalingGroupStatus.ERROR.name)
 
     yield do_return(worst_status)

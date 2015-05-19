@@ -779,7 +779,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ERROR),
              noop),
-            (Log('group-status-error', dict(cloud_feed=True, status='ERROR')),
+            (Log('group-status-error', dict(isError=True, cloud_feed=True,
+                                            status='ERROR')),
              noop)
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
