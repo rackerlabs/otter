@@ -857,9 +857,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         d.addCallback(lambda _: group)
         return d
 
-    @skip_me("Autoscale has not implemented server building timeout yet as "
-             "a config option, and hence this test would take too long. "
-             "See #1368.")
     @tag("CATC-010")
     @inlineCallbacks
     def test_servers_that_build_for_too_long_time_out_and_are_replaced(self):
