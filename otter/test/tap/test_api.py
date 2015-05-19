@@ -677,7 +677,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         parent = makeService(config)
 
         mock_setup_converger.assert_called_once_with(
-            parent, kz_client, mock.ANY, 10)
+            parent, kz_client, mock.ANY, 10, 3600)
 
         dispatcher = mock_setup_converger.call_args[0][2]
 
@@ -698,9 +698,10 @@ class ConvergerSetupTests(SynchronousTestCase):
         kz_client = object()
         dispatcher = object()
         interval = 50
-        setup_converger(ms, kz_client, dispatcher, interval)
+        setup_converger(ms, kz_client, dispatcher, interval, build_timeout=35)
         [converger] = ms.services
         self.assertIs(converger.__class__, Converger)
+        self.assertEqual(converger.build_timeout, 35)
         self.assertEqual(converger._dispatcher, dispatcher)
         [partitioner] = converger.services
         [timer] = partitioner.services
