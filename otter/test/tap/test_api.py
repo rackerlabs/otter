@@ -18,7 +18,6 @@ from otter.auth import CachingAuthenticator, SingleTenantAuthenticator
 from otter.constants import (
     CONVERGENCE_DIRTY_DIR, ServiceType, get_service_configs)
 from otter.convergence.service import Converger
-from otter.log.cloudfeeds import CloudFeedsObserver
 from otter.models.cass import CassScalingGroupCollection as OriginalStore
 from otter.supervisor import SupervisorService, get_supervisor, set_supervisor
 from otter.tap.api import (
