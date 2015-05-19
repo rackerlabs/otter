@@ -27,7 +27,7 @@ from otter.integration.lib.autoscale import (
 )
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer, CloudLoadBalancerController,
-    ContainsAllIPs, ExcludesAllIPs, HasLength
+    ContainsAllIPs, ExcludesAllIPs, HasLength,
 )
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.mimic import MimicNova
@@ -502,7 +502,9 @@ class TestConvergence(unittest.TestCase):
 
         def create_clb_first():
             self.clb = CloudLoadBalancer(pool=self.helper.pool)
-            self.clbController = CloudLoadBalancerController(clb=self.clb)
+            self.clbController = CloudLoadBalancerController(
+                pool=self.helper.pool, clb=self.clb, rcs=rcs
+            )
             return (
                 self.identity.authenticate_user(
                     rcs,
@@ -535,7 +537,7 @@ class TestConvergence(unittest.TestCase):
             )
 
         def force_lb_into_pending_delete(_):
-            return succeed(rcs)   # XXX Waiting on mimic changes.
+            return self.clbController.enterPendingDeleteState()
 
     
         def scale_up(_):

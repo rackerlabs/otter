@@ -20,6 +20,8 @@ from otter.util.retry import (
     terminal_errors_except
 )
 
+from otter.integration.lib.resources import TestResources
+
 
 @attributes([
     Attribute('pool', default_value=None),
@@ -267,10 +269,31 @@ Matcher that asserts that all the given IPs are on the load balancer.
 
 
 @attributes([
-    Attribute('clb', instance_of=CloudLoadBalancer)
+    Attribute('pool', default_value=None),
+    Attribute('clb', instance_of=CloudLoadBalancer),
+    Attribute('rcs', instance_of=TestResources)
 ])
 class CloudLoadBalancerController(object):
     """
     The CloudLoadBalancerController class provides an interface that allows
     out-of-band control over a cloud load balancer through Mimic's API.
     """
+
+    def enterPendingDeleteState(self):
+        """
+        Causes Mimic to return a specific return code for any action against
+        the cloud load balancer.  This remains in effect until somehow removed
+        or until the CLB is destroyed.
+        """
+        return (
+            treq.post(
+                "{}/loadbalancer/{}/returnOverride/{}".format(
+                    str(self.rcs.endpoints["cloudLoadBalancerControl"]),
+                    self.clb.clb_id,
+                    422
+                ),
+                headers=headers(str(self.rcs.token)),
+                pool=self.pool
+            ).addCallback(check_success, [204])
+            .addCallback(lambda _: self.rcs)
+        )
