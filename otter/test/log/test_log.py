@@ -25,9 +25,9 @@ from otter.log.formatters import (
     PEP3101FormattingWrapper,
     StreamObserverWrapper,
     SystemFilterWrapper,
-    throttling_wrapper,
     audit_log_formatter,
-    serialize_to_jsonable)
+    serialize_to_jsonable,
+    throttling_wrapper)
 from otter.test.utils import SameJSON, matches
 
 
