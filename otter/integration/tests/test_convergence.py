@@ -586,11 +586,9 @@ def _test_error_active_and_converge(
     returnValue(scaling_group)
 
 
-class ConvergenceSet1(unittest.TestCase):
+class ConvergenceTestsNoLBs(unittest.TestCase):
     """
-    Class for CATC 4-12 that run without CLB, but can be run with CLB (
-    so the CLB versions of these tests can be run by just subclassing this
-    test case).
+    Class for convergence tests that do not require any load balancers.
     """
     timeout = 1800
 
@@ -830,6 +828,35 @@ class ConvergenceSet1(unittest.TestCase):
                 maxEntities=max_servers + 2)
         )
 
+    @tag("CATC-009")
+    def test_convergence_fixes_errored_building_servers(self):
+        """
+        CATC-009
+
+        If a server transitions into ERROR status from BUILD status,
+        convergence will clean it up and create a new server to replace it.
+
+        Checks nova to make sure that convergence has not overprovisioned.
+        """
+        group = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=2, max_entities=10,
+            server_name_prefix="build-to-error"
+        )
+        d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": "build-to-error.*"}],
+            behaviors=[
+                {"name": "error", "parameters": {}},
+                {"name": "default"}
+            ])
+        d.addCallback(
+            lambda _: self.helper.start_group_and_wait(group, self.rcs))
+        d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
+                      matcher=HasLength(2), timeout=600)
+        d.addCallback(lambda _: group)
+        return d
+
     @skip_me("Autoscale has not implemented server building timeout yet as "
              "a config option, and hence this test would take too long. "
              "See #1368.")
@@ -950,6 +977,36 @@ class ConvergenceSet1(unittest.TestCase):
         return _test_error_active_and_converge(
             self.helper, self.rcs, num_to_error=2, scale_by=0,
             min_servers=2, max_servers=4, desired_servers=3)
+
+    @tag("CATC-029")
+    def test_false_negative_on_server_create_from_nova_no_overshoot(self):
+        """
+        CATC-029
+
+        Nova returns 500 on server create, but creates the server anyway.
+        Convergence does not overprovision servers as a result.
+
+        Checks nova to make sure that convergence has not overprovisioned.
+        """
+        group = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=2, max_entities=10,
+            server_name_prefix="false-negative"
+        )
+        d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": "false-negative.*"}],
+            behaviors=[
+                {"name": "false-negative",
+                 "parameters": {"code": 500,
+                                "message": "Server creation failed."}},
+                {"name": "default"}
+            ])
+        d.addCallback(
+            lambda _: self.helper.start_group_and_wait(group, self.rcs))
+        d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
+                      matcher=HasLength(2), timeout=600)
+        return d
 
 
 def _catc_tags(start_num, end_num):
@@ -1139,7 +1196,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
 
 
 copy_test_methods(
-    ConvergenceSet1, ConvergenceTestsWith1CLB,
+    ConvergenceTestsNoLBs, ConvergenceTestsWith1CLB,
     filter_and_change=ConvergenceTestsWith1CLB._only_oob_del_and_error_tests)
 
 

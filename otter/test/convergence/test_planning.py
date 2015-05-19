@@ -1008,7 +1008,8 @@ class PlanTests(SynchronousTestCase):
                         servicenet_address='1.2.3.4',
                         desired_lbs=desired_lbs)]),
             set(),
-            0)
+            0,
+            build_timeout=3600)
 
         self.assertEqual(
             result,
@@ -1017,3 +1018,23 @@ class PlanTests(SynchronousTestCase):
                     lb_id='5',
                     address_configs=s(('1.1.1.1', desc), ('1.2.3.4', desc))
                 )] + [CreateServer(server_config=pmap({}))] * 10))
+
+    def test_build_timeout_propagated(self):
+        """The build timeout is propagated to converge."""
+        desired_group_state = DesiredGroupState(
+            server_config={}, capacity=1, desired_lbs=s())
+
+        result = plan(
+            desired_group_state,
+            set([server('server1', state=ServerState.BUILD,
+                        servicenet_address='1.1.1.1', created=0)]),
+            set(),
+            now=1,
+            build_timeout=1)
+
+        self.assertEqual(
+            result,
+            pbag([
+                DeleteServer(server_id='server1'),
+                CreateServer(server_config=pmap({}))
+            ]))

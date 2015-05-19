@@ -266,13 +266,14 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                 converge_later)
 
 
-def plan(desired_group_state, servers, lb_nodes, now):
+def plan(desired_group_state, servers, lb_nodes, now, build_timeout):
     """
     Get an optimized convergence plan.
 
     Takes the same arguments as :func:`converge`.
     """
-    steps = converge(desired_group_state, servers, lb_nodes, now)
+    steps = converge(desired_group_state, servers, lb_nodes, now,
+                     timeout=build_timeout)
     steps = limit_steps_by_count(steps)
     return optimize_steps(steps)
 
