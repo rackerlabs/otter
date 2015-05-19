@@ -19,13 +19,14 @@ from otter.constants import ServiceType
 from otter.log.cloudfeeds import (
     CloudFeedsObserver,
     UnsuitableMessage,
+    add_cf_observer,
     add_event,
     prepare_request,
     request_format,
     sanitize_event
 )
 from otter.log.formatters import LogLevel
-from otter.test.utils import CheckFailure, mock_log, resolve_effect
+from otter.test.utils import CheckFailure, mock_log, patch, resolve_effect
 from otter.util.retry import (
     ShouldDelayAndRetry,
     exponential_backoff_interval,
@@ -294,3 +295,40 @@ class CloudFeedsObserverTests(SynchronousTestCase):
             None, 'cf-unsuitable-message', unsuitable_message='bad',
             event_data={'event': 'dict'}, system='otter.cloud_feed',
             cf_msg='m')
+
+    def test_add_cf_observer(self):
+        """
+        `add_cf_observer` sets up observer chain before creating and adding
+        CloudFeedsObserver
+        """
+        def wrapper(name, observer):
+            def _observer(e):
+                observer(e + name)
+            return _observer
+
+        patch(self, 'otter.log.cloudfeeds.SpecificationObserverWrapper',
+              side_effect=partial(wrapper, 'spec'))
+        patch(self, 'otter.log.cloudfeeds.PEP3101FormattingWrapper',
+              side_effect=partial(wrapper, 'pep'))
+        patch(self, 'otter.log.cloudfeeds.ErrorFormattingWrapper',
+              side_effect=partial(wrapper, 'error'))
+
+        def cf_observer_called(text):
+            self.cf_observer_text = text
+        mock_cfo = patch(self, 'otter.log.cloudfeeds.CloudFeedsObserver')
+        cfo = mock_cfo.return_value
+        cfo.side_effect = cf_observer_called
+
+        def addobserver(o):
+            self.final_observer = o
+        patch(self, 'otter.log.cloudfeeds.addObserver',
+              side_effect=addobserver)
+
+        add_cf_observer(*range(5))
+
+        mock_cfo.assert_called_once_with(
+            reactor=0, authenticator=1, tenant_id=2, region=3,
+            service_configs=4)
+
+        self.final_observer('test')
+        self.assertEqual(self.cf_observer_text, 'testspecpeperror')
