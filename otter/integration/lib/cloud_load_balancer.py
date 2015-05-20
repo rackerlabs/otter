@@ -240,11 +240,11 @@ class CloudLoadBalancer(object):
 
 
 HasLength = MatchesPredicateWithParams(
-    lambda nodes, length: len(nodes) == length,
+    lambda items, length: len(items) == length,
     "len({0}) is not {1}"
 )
 """
-Matcher that asserts something about the number of nodes on the CLB.
+Matcher that asserts something about the number of items.
 """
 
 ExcludesAllIPs = MatchesPredicateWithParams(

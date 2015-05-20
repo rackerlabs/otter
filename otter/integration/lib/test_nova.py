@@ -1,10 +1,14 @@
 """Tests for :mod:`otter.integration.lib.nova`"""
 import json
 
+from testtools.matchers import Equals
+
 from twisted.internet.defer import succeed
+from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.integration.lib.nova import NovaServer
+from otter.integration.lib import nova
+from otter.util.deferredutils import TimedOutError
 from otter.util.http import headers
 
 
@@ -44,6 +48,11 @@ def get_fake_treq(test_case, method, url, expected_args_and_kwargs, response):
     return _treq
 
 
+class _FakeRCS(object):
+    endpoints = {'nova': 'novaurl'}
+    token = "token"
+
+
 class NovaServerTestCase(SynchronousTestCase):
     """
     Tests for :class:`NovaServer`
@@ -53,12 +62,7 @@ class NovaServerTestCase(SynchronousTestCase):
         Set up fake pool, treq, responses, and RCS.
         """
         self.pool = object()
-
-        class FakeRCS(object):
-            endpoints = {'nova': 'novaurl'}
-            token = "token"
-
-        self.rcs = FakeRCS()
+        self.rcs = _FakeRCS()
         self.server_id = 'server_id'
         self.expected_kwargs = {
             'headers': headers('token'),
@@ -69,10 +73,10 @@ class NovaServerTestCase(SynchronousTestCase):
         """
         Stub out treq, and return a nova server with
         """
-        return NovaServer(id=self.server_id, pool=self.pool,
-                          treq=get_fake_treq(self, method, url,
-                                             treq_args_kwargs,
-                                             (response, str_body)))
+        return nova.NovaServer(id=self.server_id, pool=self.pool,
+                               treq=get_fake_treq(self, method, url,
+                                                  treq_args_kwargs,
+                                                  (response, str_body)))
 
     def test_delete(self):
         """
@@ -114,3 +118,87 @@ class NovaServerTestCase(SynchronousTestCase):
                                  Response(200), '{"addresses": {}}')
         d = server.get_addresses(self.rcs)
         self.assertEqual({'addresses': {}}, self.successResultOf(d))
+
+
+class NovaServerCollectionTestCase(SynchronousTestCase):
+    """
+    Tests for multi-server api helpers in :mod:`otter.integration.lib.nova`.
+    """
+    def setUp(self):
+        """
+        Set up fake pool, treq, responses, and RCS.
+        """
+        self.pool = object()
+        self.rcs = _FakeRCS()
+
+    def test_list_servers(self):
+        """
+        Get all addresses with a particular name and succeeds on 200.
+        """
+        treq = get_fake_treq(self, 'get', 'novaurl/servers/detail',
+                             ((), {'params': {'limit': 10000},
+                                   'headers': headers('token'),
+                                   'pool': self.pool}),
+                             (Response(200), '{"servers": {}}'))
+        d = nova.list_servers(self.rcs, pool=self.pool,
+                              _treq=treq)
+        self.assertEqual({'servers': {}}, self.successResultOf(d))
+
+
+class NovaWaitForServersTestCase(SynchronousTestCase):
+    """
+    Tests for :func:`nova.wait_for_server`.
+    """
+    def setUp(self):
+        """
+        Set up fake pool, treq, responses, and RCS.
+        """
+        class Group(object):
+            group_id = "group_id"
+
+        self.pool = object()
+        self.treq = object()
+        self.clock = Clock()
+        self.rcs = _FakeRCS()
+        self.group = Group()
+        self.servers = [
+            {"metadata": {"rax:autoscale:group:id": "wrong_id"}},
+            {"metadata": {}},
+        ]
+
+        def _list_servers(rcs, pool, _treq):
+            self.assertEqual(rcs, self.rcs)
+            self.assertEqual(pool, self.pool)
+            self.assertEqual(_treq, self.treq)
+            return succeed({'servers': self.servers})
+
+        self.patch(nova, 'list_servers', _list_servers)
+
+        self.wanted = [
+            {"metadata": {"rax:autoscale:group:id": "group_id"}}
+        ]
+
+    def test_wait_for_servers_retries_until_matcher_matches(self):
+        """
+        If the matcher does not matches the nova state, retries until it does.
+        """
+        d = nova.wait_for_servers(self.rcs, self.pool, self.group,
+                                  Equals(self.wanted), timeout=5, period=1,
+                                  clock=self.clock, _treq=self.treq)
+        self.clock.pump((1, 1, 1))
+        self.assertNoResult(d)
+
+        self.servers.extend(self.wanted)
+        self.clock.pump([1])
+        self.assertEqual(self.rcs, self.successResultOf(d))
+
+    def test_wait_for_servers_retries_until_timeout(self):
+        """
+        If the matcher does not matches the server state, retries until
+        it times out.
+        """
+        d = nova.wait_for_servers(self.rcs, self.pool, self.group,
+                                  Equals(self.wanted), timeout=5, period=1,
+                                  clock=self.clock, _treq=self.treq)
+        self.clock.pump((1, 1, 1, 1, 1))
+        self.failureResultOf(d, TimedOutError)
