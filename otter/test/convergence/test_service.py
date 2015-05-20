@@ -772,8 +772,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
                 ConvergeLater(reasons=['mywish']),
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                TestStep(Effect(Constant((StepResult.FAILURE, [])))),
-                TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
+                TestStep(Effect(Constant((StepResult.FAILURE, ['bad'])))),
+                TestStep(Effect(Constant((StepResult.SUCCESS, []))))
             ])
 
         eff = execute_convergence(self.tenant_id, self.group_id,
@@ -789,6 +789,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ERROR),
              noop),
+            (Log('group-status-error', dict(isError=True, cloud_feed=True,
+                                            status='ERROR')),
+             noop)
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
         with sequence.consume():
@@ -818,6 +821,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ACTIVE),
              noop),
+            (Log('group-status-active',
+                 dict(cloud_feed=True, status='ACTIVE')), noop)
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
         with sequence.consume():
