@@ -133,7 +133,7 @@ def wait_for_servers(rcs, pool, group, matcher, timeout=600, period=10,
         mismatch = matcher.match(servers_in_group)
         if mismatch:
             raise TransientRetryError(mismatch.describe())
-        returnValue(rcs)
+        returnValue(servers_in_group)
 
     return retry_and_timeout(
         do_work, timeout,
