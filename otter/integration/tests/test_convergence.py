@@ -54,6 +54,14 @@ mimic_nova_key = os.environ.get("MIMICNOVA_SC_KEY", 'cloudServersBehavior')
 otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
 
 
+def not_mimic():
+    """
+    Return True unless the environment variable AS_USING_MIMIC is set to
+    something truthy.
+    """
+    return not bool(os.environ.get("AS_USING_MIMIC", False))
+
+
 class TestHelper(object):
     """
     A helper class that contains useful functions for actual test cases.  This
@@ -186,7 +194,7 @@ def skip_me(reason):
     """
     Decorator that skips a test method or test class by setting the property
     "skip".  This decorator is not named "skip", because setting "skip" on a
-    module skips the whole tes module.
+    module skips the whole test module.
 
     This should be added upstream to Twisted trial.
     """
@@ -194,6 +202,16 @@ def skip_me(reason):
         function.skip = reason
         return function
     return decorate
+
+
+def skip_if(predicate, reason):
+    """
+    Decorator that skips a test method or test class by setting the property
+    "skip", and only if the provided predicate evaluates to True.
+    """
+    if predicate():
+        return skip_me(reason)
+    return lambda f: f
 
 
 def copy_test_methods(from_class, to_class, filter_and_change=None):
@@ -243,7 +261,6 @@ class TestConvergence(unittest.TestCase):
         some random sampling of servers.  Note that this version exercises the
         path that group max is less than CLB max.
         """
-
         rcs = TestResources()
 
         self.untouchable_scaling_group = ScalingGroup(
@@ -857,13 +874,12 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         d.addCallback(lambda _: group)
         return d
 
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-010")
     @inlineCallbacks
     def test_servers_that_build_for_too_long_time_out_and_are_replaced(self):
         """
         CATC-010
-
-        Requires Mimic for error injection.
 
         1. Mimic should cause a single server to remain in building too
            long.
@@ -924,12 +940,11 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             ))
         returnValue(group)
 
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-011")
     def test_scale_up_after_servers_error_from_active(self):
         """
         CATC-011
-
-        Requires Mimic for error injection.
 
         1. Create a scaling group with N min servers and M max servers.
         2. After the servers are active, E go into error state.
@@ -941,12 +956,11 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             self.helper, self.rcs, num_to_error=1, scale_by=2,
             min_servers=2, max_servers=4)
 
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-012")
     def test_scale_down_after_servers_error_from_active(self):
         """
         CATC-012
-
-        Requires Mimic for error injection.
 
         1. Create a scaling group with N min servers and M max servers.
         2. Set the number of servers to be X (N<X<M)
@@ -959,12 +973,11 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             self.helper, self.rcs, num_to_error=2, scale_by=-1,
             min_servers=2, max_servers=4, desired_servers=3)
 
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-013")
     def test_trigger_convergence_after_servers_error_from_active(self):
         """
         CATC-013
-
-        Requires Mimic for error injection.
 
         1. Create a scaling group with N min servers and M max servers.
         2. Set the number of servers to be X (N<X<M)
@@ -977,6 +990,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             self.helper, self.rcs, num_to_error=2, scale_by=0,
             min_servers=2, max_servers=4, desired_servers=3)
 
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-029")
     def test_false_negative_on_server_create_from_nova_no_overshoot(self):
         """
