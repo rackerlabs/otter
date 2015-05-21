@@ -7,7 +7,8 @@ from __future__ import print_function
 import os
 from functools import wraps
 
-from testtools.matchers import ContainsDict, Equals, MatchesAll
+from testtools.matchers import (
+    AllMatch, ContainsDict, Equals, MatchesAll, MatchesSetwise, NotEquals)
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
@@ -27,7 +28,8 @@ from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.mimic import MimicNova
-from otter.integration.lib.nova import NovaServer, delete_servers
+from otter.integration.lib.nova import (
+    NovaServer, delete_servers, wait_for_servers)
 from otter.integration.lib.resources import TestResources
 
 
@@ -47,6 +49,9 @@ clb_key = os.environ.get('AS_CLB_SC_KEY', 'cloudLoadBalancers')
 
 # these are the service names for mimic control planes
 mimic_nova_key = os.environ.get("MIMICNOVA_SC_KEY", 'cloudServersBehavior')
+
+# otter configuration options for testing
+otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
 
 
 class TestHelper(object):
@@ -581,11 +586,9 @@ def _test_error_active_and_converge(
     returnValue(scaling_group)
 
 
-class ConvergenceSet1(unittest.TestCase):
+class ConvergenceTestsNoLBs(unittest.TestCase):
     """
-    Class for CATC 4-12 that run without CLB, but can be run with CLB (
-    so the CLB versions of these tests can be run by just subclassing this
-    test case).
+    Class for convergence tests that do not require any load balancers.
     """
     timeout = 1800
 
@@ -825,6 +828,102 @@ class ConvergenceSet1(unittest.TestCase):
                 maxEntities=max_servers + 2)
         )
 
+    @tag("CATC-009")
+    def test_convergence_fixes_errored_building_servers(self):
+        """
+        CATC-009
+
+        If a server transitions into ERROR status from BUILD status,
+        convergence will clean it up and create a new server to replace it.
+
+        Checks nova to make sure that convergence has not overprovisioned.
+        """
+        group = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=2, max_entities=10,
+            server_name_prefix="build-to-error"
+        )
+        d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": "build-to-error.*"}],
+            behaviors=[
+                {"name": "error", "parameters": {}},
+                {"name": "default"}
+            ])
+        d.addCallback(
+            lambda _: self.helper.start_group_and_wait(group, self.rcs))
+        d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
+                      matcher=HasLength(2), timeout=600)
+        d.addCallback(lambda _: group)
+        return d
+
+    @tag("CATC-010")
+    @inlineCallbacks
+    def test_servers_that_build_for_too_long_time_out_and_are_replaced(self):
+        """
+        CATC-010
+
+        Requires Mimic for error injection.
+
+        1. Mimic should cause a single server to remain in building too
+           long.
+        2. Create group with 2 servers.  (One of them will time out building.)
+        3. Check with Nova that 2 servers are built - wait for one to be
+           active.  The other is the one that should remain in build.
+        4. Wait for autoscale to show 2 servers being active.
+        5. Check with Nova to ensure that there are only 2 active servers on
+           the account.  The one that was building forever should be deleted.
+        """
+        group = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=2, max_entities=10,
+            server_name_prefix="build-timeout"
+        )
+
+        yield MimicNova(pool=self.helper.pool).sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": "build-timeout.*"}],
+            behaviors=[
+                {"name": "build",
+                 "parameters": {"duration": otter_build_timeout * 2}},
+                {"name": "default"}
+            ])
+        yield group.start(self.rcs, self)
+
+        initial_servers = yield wait_for_servers(
+            self.rcs, pool=self.helper.pool, group=group,
+            timeout=otter_build_timeout,
+            matcher=MatchesSetwise(
+                ContainsDict({'status': Equals('ACTIVE')}),
+                ContainsDict({'status': Equals('BUILD')}),
+            ))
+
+        # the above ensures that there is one server with status BUILD
+        building_server_id = next(s['id'] for s in initial_servers
+                                  if s['status'] == 'BUILD')
+
+        yield group.wait_for_state(
+            self.rcs,
+            MatchesAll(
+                ContainsDict({
+                    'pendingCapacity': Equals(0),
+                    'desiredCapacity': Equals(2),
+                    'status': Equals("ACTIVE")
+                }),
+                HasActive(2),
+                ExcludesServers([building_server_id])),
+            timeout=600)
+
+        yield wait_for_servers(
+            self.rcs, pool=self.helper.pool, group=group,
+            timeout=600,
+            matcher=MatchesAll(
+                AllMatch(ContainsDict({'status': Equals('ACTIVE'),
+                                       'id': NotEquals(building_server_id)})),
+                HasLength(2)
+            ))
+        returnValue(group)
+
     @tag("CATC-011")
     def test_scale_up_after_servers_error_from_active(self):
         """
@@ -877,6 +976,36 @@ class ConvergenceSet1(unittest.TestCase):
         return _test_error_active_and_converge(
             self.helper, self.rcs, num_to_error=2, scale_by=0,
             min_servers=2, max_servers=4, desired_servers=3)
+
+    @tag("CATC-029")
+    def test_false_negative_on_server_create_from_nova_no_overshoot(self):
+        """
+        CATC-029
+
+        Nova returns 500 on server create, but creates the server anyway.
+        Convergence does not overprovision servers as a result.
+
+        Checks nova to make sure that convergence has not overprovisioned.
+        """
+        group = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=2, max_entities=10,
+            server_name_prefix="false-negative"
+        )
+        d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": "false-negative.*"}],
+            behaviors=[
+                {"name": "false-negative",
+                 "parameters": {"code": 500,
+                                "message": "Server creation failed."}},
+                {"name": "default"}
+            ])
+        d.addCallback(
+            lambda _: self.helper.start_group_and_wait(group, self.rcs))
+        d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
+                      matcher=HasLength(2), timeout=600)
+        return d
 
 
 def _catc_tags(start_num, end_num):
@@ -1066,7 +1195,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
 
 
 copy_test_methods(
-    ConvergenceSet1, ConvergenceTestsWith1CLB,
+    ConvergenceTestsNoLBs, ConvergenceTestsWith1CLB,
     filter_and_change=ConvergenceTestsWith1CLB._only_oob_del_and_error_tests)
 
 

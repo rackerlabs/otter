@@ -32,6 +32,7 @@ from otter.convergence.effecting import steps_to_effect
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
+from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, with_log
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus)
@@ -88,16 +89,20 @@ def _update_active(scaling_group, active):
 
 
 @do
-def execute_convergence(tenant_id, group_id,
+def execute_convergence(tenant_id, group_id, build_timeout,
                         get_all_convergence_data=get_all_convergence_data,
                         plan=plan):
     """
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
 
-    :param group_id: group id
-    :param get_all_convergence_data: like :func`get_all_convergence_data`, used
-        for testing.
+    :param str tenant_id: the tenant ID for the group to converge
+    :param str group_id: the ID of the group to be converged
+    :param number build_timeout: number of seconds to wait for servers to be in
+        building before it's is timed out and deleted
+    :param callable get_all_convergence_data: like
+        :func`get_all_convergence_data`, used for testing.
+    :param callable plan: like :func:`plan`, to be used for test injection only
 
     :return: Effect of most severe StepResult
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
@@ -121,7 +126,7 @@ def execute_convergence(tenant_id, group_id,
                         else group_state.desired)
     desired_group_state = get_desired_group_state(
         group_id, launch_config, desired_capacity)
-    steps = plan(desired_group_state, servers, lb_nodes, now)
+    steps = plan(desired_group_state, servers, lb_nodes, now, build_timeout)
     active = determine_active(servers, lb_nodes)
     yield msg('execute-convergence',
               servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
@@ -148,9 +153,13 @@ def execute_convergence(tenant_id, group_id,
         elif group_state.status == ScalingGroupStatus.ERROR:
             yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                            status=ScalingGroupStatus.ACTIVE))
+            yield cf_msg('group-status-active',
+                         status=ScalingGroupStatus.ACTIVE.name)
     elif worst_status == StepResult.FAILURE:
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))
+        yield cf_err(
+            'group-status-error', status=ScalingGroupStatus.ERROR.name)
 
     yield do_return(worst_status)
 
@@ -315,15 +324,21 @@ def get_my_divergent_groups(my_buckets, all_buckets, divergent_flags):
 
 @do
 def converge_one_group(currently_converging, tenant_id, group_id, version,
-                       execute_convergence=execute_convergence):
+                       build_timeout, execute_convergence=execute_convergence):
     """
     Converge one group, non-concurrently, and clean up the dirty flag when
     done.
 
     :param Reference currently_converging: pset of currently converging groups
+    :param str tenant_id: the tenant ID of the group that is converging
+    :param str group_id: the ID of the group that is converging
     :param version: version number of ZNode of the group's dirty flag
+    :param number build_timeout: number of seconds to wait for servers to be in
+        building before it's is timed out and deleted
+    :param callable execute_convergence: like :func`execute_convergence`, to
+        be used for test injection only
     """
-    eff = execute_convergence(tenant_id, group_id)
+    eff = execute_convergence(tenant_id, group_id, build_timeout)
     try:
         result = yield non_concurrently(currently_converging, group_id, eff)
     except ConcurrentError:
@@ -344,11 +359,22 @@ def converge_one_group(currently_converging, tenant_id, group_id, version,
 
 @do
 def converge_all_groups(currently_converging, my_buckets, all_buckets,
-                        divergent_flags,
+                        divergent_flags, build_timeout,
                         converge_one_group=converge_one_group):
     """
     Check for groups that need convergence and which match up to the
     buckets we've been allocated.
+
+    :param Reference currently_converging: pset of currently converging groups
+    :param my_buckets: The buckets that should be checked for group IDs to
+        converge on.
+    :param all_buckets: The set of all buckets that can be checked for group
+        IDs to converge on.  ``my_buckets`` should be a subset of this.
+    :param divergent_flags: divergent flags that were found in zookeeper.
+    :param number build_timeout: number of seconds to wait for servers to be in
+        building before it's is timed out and deleted
+    :param callable converge_one_group: function to use to converge a single
+        group - to be used for test injection only
     """
     group_infos = get_my_divergent_groups(
         my_buckets, all_buckets, divergent_flags)
@@ -364,7 +390,8 @@ def converge_all_groups(currently_converging, my_buckets, all_buckets,
         return Effect(GetStat(dirty_flag)).on(
             lambda stat: Effect(TenantScope(
                 converge_one_group(currently_converging,
-                                   tenant_id, group_id, stat.version),
+                                   tenant_id, group_id, stat.version,
+                                   build_timeout),
                 tenant_id)))
 
     effs = []
@@ -411,7 +438,7 @@ class Converger(MultiService):
     """
 
     def __init__(self, log, dispatcher, buckets, partitioner_factory,
-                 converge_all_groups=converge_all_groups):
+                 build_timeout, converge_all_groups=converge_all_groups):
         """
         :param log: a bound log
         :param dispatcher: The dispatcher to use to perform effects.
@@ -421,6 +448,10 @@ class Converger(MultiService):
             groups.
         :param partitioner_factory: Callable of (log, callback) which should
             create an :obj:`Partitioner` to distribute the buckets.
+        :param number build_timeout: number of seconds to wait for servers to
+            be in building before it's is timed out and deleted
+        :param callable converge_all_groups: like :func:`converge_all_groups`,
+            to be used for test injection only
         """
         MultiService.__init__(self)
         self.log = log.bind(otter_service='converger')
@@ -429,13 +460,14 @@ class Converger(MultiService):
         self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
         self.partitioner.setServiceParent(self)
         self.currently_converging = Reference(pset())
+        self.build_timeout = build_timeout
         self._converge_all_groups = converge_all_groups
 
     def _converge_all(self, my_buckets, divergent_flags):
         """Run :func:`converge_all_groups` and log errors."""
         eff = self._converge_all_groups(self.currently_converging,
                                         my_buckets, self._buckets,
-                                        divergent_flags)
+                                        divergent_flags, self.build_timeout)
         return eff.on(
             error=lambda e: err(
                 exc_info_to_failure(e), 'converge-all-groups-error'))
