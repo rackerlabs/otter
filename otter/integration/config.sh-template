@@ -49,3 +49,6 @@ export AS_NOVA_SC_KEY=cloudServersOpenStack
 # Adjust this if your your cloud load balancer service is registered under a
 # different key in the service catalog.
 export AS_CLB_SC_KEY=cloudLoadBalancers
+
+# Uncomment this if you are running tests against Mimic.
+# export AS_USING_MIMIC=true
