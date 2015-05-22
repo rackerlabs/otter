@@ -447,6 +447,9 @@ def _oob_disable_then(helper, rcs, num_to_disable, disabler, then,
         out with the minimum number of servers. If provided, immediately after
         creation the group will be scaled to this number before any deletions
         or other scaling occurs.
+    :param int final_servers: The number of servers to expect at the end as
+        both active and desired servers.  If not passed, defaults to the
+        number of desired servers, or min servers.
 
     :return: The scaling group that was created and tested.
     """
