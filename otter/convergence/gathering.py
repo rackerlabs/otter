@@ -94,7 +94,7 @@ def _discard_response((response, body)):
 def get_all_scaling_group_servers(changes_since=None,
                                   server_predicate=identity):
     """
-    Return tenant's servers that belong to a scaling group as
+    Return tenant's servers that belong to any scaling group as
     {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
 
     :param datetime changes_since: Get server since this time. Must be UTC
@@ -132,10 +132,10 @@ def all_servers(cache, changes):
 def get_scaling_group_servers(tenant_id, group_id, cache_coll=None):
     """
     Get a group's servers taken from cache if it exists. Updates cache as
-    part of getting the group
+    if it is empty from newly fetched servers
 
     :return: Servers as iterator of dicts
-    :rtype: ``iterator``
+    :rtype: Effect
     """
     coll = cache_coll or CassScalingGroupServersCache()
     cache, last_update = yield coll.get_servers(tenant_id, group_id)
