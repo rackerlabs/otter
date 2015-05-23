@@ -643,6 +643,11 @@ class IScalingGroupServersCache(Interface):
         :return: Effect of None
         """
 
+    def delete_servers(tenant_id, group_id):
+        """
+        Remove all servers of the group
+        """
+
 
 class IScalingScheduleCollection(Interface):
     """

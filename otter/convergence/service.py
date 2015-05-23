@@ -34,6 +34,7 @@ from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, with_log
+from otter.models.cass import CassScalingGroupServersCache
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
@@ -91,7 +92,7 @@ def _update_active(scaling_group, active):
 @do
 def execute_convergence(tenant_id, group_id, build_timeout,
                         get_all_convergence_data=get_all_convergence_data,
-                        plan=plan):
+                        plan=plan, cache_coll=None):
     """
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
@@ -155,6 +156,10 @@ def execute_convergence(tenant_id, group_id, build_timeout,
                                            status=ScalingGroupStatus.ACTIVE))
             yield cf_msg('group-status-active',
                          status=ScalingGroupStatus.ACTIVE.name)
+        else:
+            # Clear servers cache that removes deleted servers
+            coll = cache_coll or CassScalingGroupServersCache()
+            yield coll.delete_servers(tenant_id, group_id)
     elif worst_status == StepResult.FAILURE:
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))

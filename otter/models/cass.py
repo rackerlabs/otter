@@ -1729,6 +1729,12 @@ class CassScalingGroupServersCache(object):
             queries.append(query.format(cf=self.table, i=i))
         return cql_eff(batch(queries), params)
 
+    def delete_servers(self, tenant_id, group_id):
+        query = ("DELETE FROM {cf} WHERE tenant_id=:tenant_id AND "
+                 "group_id=:group_id;")
+        params = {"tenant_id": tenant_id, "group_id": group_id}
+        return cql_eff(query.format(cf=self.table), params)
+
 
 @implementer(IAdmin)
 class CassAdmin(object):
