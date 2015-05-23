@@ -12,7 +12,7 @@ from datetime import datetime
 
 from characteristic import attributes
 
-from effect import Effect, parallel
+from effect import Effect, do, do_return, parallel
 
 from jsonschema import ValidationError
 
@@ -37,6 +37,7 @@ from otter.models.interface import (
     IAdmin,
     IScalingGroup,
     IScalingGroupCollection,
+    IScalingGroupServersCache,
     IScalingScheduleCollection,
     NoSuchPolicyError,
     NoSuchScalingGroupError,
@@ -51,6 +52,7 @@ from otter.util import timestamp
 from otter.util.config import config_value
 from otter.util.cqlbatch import Batch, batch
 from otter.util.deferredutils import with_lock
+from otter.util.fp import take_while
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util.retry import repeating_interval, retry, retry_times
 
@@ -72,6 +74,15 @@ def perform_cql_query(conn, disp, intent):
     """
     return conn.execute(
         intent.query, intent.params, intent.consistency_level)
+
+
+def cql_eff(query, params={}, consistency_level=ConsistencyLevel.ONE):
+    """
+    Return Effect of CQLQueryExecute intent
+    """
+    return Effect(
+        CQLQueryExecute(query=query, params=params,
+                        consistency_level=consistency_level))
 
 
 def serialize_json_data(data, ver):
@@ -1680,6 +1691,43 @@ class CassScalingGroupCollection:
                       (True, {'cassandra_time':
                               self.reactor.seconds() - start_time}))
         return d
+
+
+@implementer(IScalingGroupServersCache)
+class CassScalingGroupServersCache(object):
+    """
+    Collection of cache of scaling group servers
+    """
+
+    table = "servers_cache"
+
+    @do
+    def get_servers(self, tenant_id, group_id):
+        query = ("SELECT server_blob, last_update FROM {cf} "
+                 "WHERE tenant_id=:tenant_id AND group_id=:group_id "
+                 "ORDER BY last_update DESC;")
+        params = {"tenant_id": tenant_id, "group_id": group_id}
+        rows = yield cql_eff(query.format(cf=self.table), params)
+        if len(rows) == 0:
+            yield do_return(([], None))
+        last_update = rows[0]['last_update']
+        rows = take_while(lambda r: r['last_update'] == last_update, rows)
+        yield do_return(([json.loads(r['server_blob']) for r in rows],
+                         last_update))
+
+    def insert_servers(self, tenant_id, group_id, last_update, servers):
+        query = ("INSERT INTO {cf} (tenant_id, group_id, last_update, "
+                 "server_id, server_blob "
+                 "VALUES(:tenant_id, :group_id, :last_update, :server_id{i}, "
+                 ":server_blob{i});")
+        params = {"tenant_id": tenant_id, "group_id": group_id,
+                  "last_update": last_update}
+        queries = []
+        for i, server in enumerate(servers):
+            params['server_id{}'.format(i)] = server['id']
+            params['server_blob{}'.format(i)] = json.dumps(server)
+            queries.append(query.format(cf=self.table, i=i))
+        return cql_eff(batch(queries), params)
 
 
 @implementer(IAdmin)

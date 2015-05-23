@@ -1,12 +1,13 @@
 """Code related to gathering data to inform convergence."""
+from datetime import datetime
 from functools import partial
 from urllib import urlencode
 from urlparse import parse_qs, urlparse
 
-from effect import catch, parallel
+from effect import Func, catch, do, do_return, parallel
 
 from toolz.curried import filter, groupby, keyfilter, map
-from toolz.dicttoolz import get_in
+from toolz.dicttoolz import get_in, merge
 from toolz.functoolz import compose, identity
 from toolz.itertoolz import concat
 
@@ -23,6 +24,7 @@ from otter.convergence.model import (
     RCv3Node,
     group_id_from_metadata)
 from otter.indexer import atom
+from otter.models.cass import CassScalingGroupServersCache
 from otter.util.http import append_segments
 from otter.util.retry import (
     exponential_backoff_interval, retry_effect, retry_times)
@@ -89,7 +91,8 @@ def _discard_response((response, body)):
     return body
 
 
-def get_scaling_group_servers(changes_since=None, server_predicate=identity):
+def get_all_scaling_group_servers(changes_since=None,
+                                  server_predicate=identity):
     """
     Return tenant's servers that belong to a scaling group as
     {group_id: [server1, server2]} ``dict``. No specific ordering is guaranteed
@@ -111,8 +114,43 @@ def get_scaling_group_servers(changes_since=None, server_predicate=identity):
                             filter(server_predicate),
                             filter(has_group_id))
 
-    eff = get_all_server_details(changes_since)
-    return eff.on(servers_apply)
+    return get_all_server_details(changes_since).on(servers_apply)
+
+
+def all_servers(cache, changes):
+    """
+    Return all servers got by merging cache and changes since the cache was
+    last fetch
+    """
+    def sdict(servers):
+        return {s['id']: s for s in servers}
+
+    return merge(sdict(cache), sdict(changes)).itervalues()
+
+
+@do
+def get_scaling_group_servers(tenant_id, group_id, cache_coll=None):
+    """
+    Get a group's servers taken from cache if it exists. Updates cache as
+    part of getting the group
+
+    :return: Servers as iterator of dicts
+    :rtype: ``iterator``
+    """
+    coll = cache_coll or CassScalingGroupServersCache()
+    cache, last_update = yield coll.get_servers(tenant_id, group_id)
+    all_changes = yield get_all_scaling_group_servers(last_update)
+    changes = all_changes[group_id]
+    if last_update is None:
+        # cache is empty. create it from current servers
+        now = yield Func(datetime.now)
+        # TODO: Should the time be "now - (say) 5 mins" to avoid possible
+        # clock drift between this machine and nova servers
+        yield coll.insert_servers(tenant_id, group_id, changes, now)
+        servers = changes
+    else:
+        servers = all_servers(cache, changes)
+    yield do_return(servers)
 
 
 def get_clb_contents():
@@ -235,6 +273,7 @@ def get_rcv3_contents():
 
 
 def get_all_convergence_data(
+        tenant_id,
         group_id,
         get_scaling_group_servers=get_scaling_group_servers,
         get_clb_contents=get_clb_contents,
@@ -246,8 +285,7 @@ def get_all_convergence_data(
     Returns an Effect of ([NovaServer], [LBNode]).
     """
     eff = parallel(
-        [get_scaling_group_servers()
-         .on(lambda servers: servers.get(group_id, []))
+        [get_scaling_group_servers(tenant_id, group_id)
          .on(map(NovaServer.from_server_details_json)).on(list),
          get_clb_contents(),
          get_rcv3_contents()]

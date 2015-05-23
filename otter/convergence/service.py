@@ -111,7 +111,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     # fetching of the scaling group info from cassandra.
     sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
                                         group_id=group_id))
-    gather_eff = get_all_convergence_data(group_id)
+    gather_eff = get_all_convergence_data(tenant_id, group_id)
     try:
         data = yield parallel([sg_eff, gather_eff])
     except FirstError as fe:

@@ -86,3 +86,16 @@ def assoc_obj(o, **k):
     new_o = deepcopy(o)
     new_o.__dict__.update(k)
     return new_o
+
+
+def take_while(pred, items):
+    """
+    Return list until pred is true for item in items. Similar to `takeWhile`
+    in Haskell
+
+    :param callable pred: item -> Bool predicate function
+    :param list items: List of items to extract
+    """
+    for item in items:
+        if pred(item):
+            yield item
