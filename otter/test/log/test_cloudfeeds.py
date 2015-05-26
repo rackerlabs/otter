@@ -19,9 +19,9 @@ from otter.constants import ServiceType
 from otter.log.cloudfeeds import (
     CloudFeedsObserver,
     UnsuitableMessage,
-    add_cf_observer,
     add_event,
     cf_err, cf_fail, cf_msg,
+    get_cf_observer,
     prepare_request,
     request_format,
     sanitize_event
@@ -334,10 +334,10 @@ class CloudFeedsObserverTests(SynchronousTestCase):
             event_data={'event': 'dict'}, system='otter.cloud_feed',
             cf_msg='m')
 
-    def test_add_cf_observer(self):
+    def test_get_cf_observer(self):
         """
-        `add_cf_observer` sets up observer chain before creating and adding
-        CloudFeedsObserver
+        `get_cf_observer` returns CloudFeedsObserver with observer chain setup
+        before creating
         """
         def wrapper(name, observer):
             def _observer(e):
@@ -354,19 +354,14 @@ class CloudFeedsObserverTests(SynchronousTestCase):
         def cf_observer_called(text):
             self.cf_observer_text = text
         mock_cfo = patch(self, 'otter.log.cloudfeeds.CloudFeedsObserver')
-        cfo = mock_cfo.return_value
-        cfo.side_effect = cf_observer_called
+        cfo_class = mock_cfo.return_value
+        cfo_class.side_effect = cf_observer_called
 
-        def addobserver(o):
-            self.final_observer = o
-        patch(self, 'otter.log.cloudfeeds.addObserver',
-              side_effect=addobserver)
-
-        add_cf_observer(*range(5))
+        cfo = get_cf_observer(*range(5))
 
         mock_cfo.assert_called_once_with(
             reactor=0, authenticator=1, tenant_id=2, region=3,
             service_configs=4)
 
-        self.final_observer('test')
+        cfo('test')
         self.assertEqual(self.cf_observer_text, 'testspecpeperror')

@@ -12,8 +12,6 @@ from effect import Effect, Func
 
 from toolz.dicttoolz import keyfilter
 
-from twisted.python.log import addObserver
-
 from txeffect import perform
 
 from otter.cloud_client import TenantScope, service_request
@@ -198,15 +196,14 @@ class CloudFeedsObserver(object):
                 eff).addErrback(log.err, 'cf-add-failure')
 
 
-def add_cf_observer(reactor, authenticator, tenant_id, region,
+def get_cf_observer(reactor, authenticator, tenant_id, region,
                     service_configs):
     """
-    Add cloud feeds observer after setting up some intial formatting
+    Return cloud feeds observer after setting up some intial formatting
     """
     cf_observer = CloudFeedsObserver(
         reactor=reactor, authenticator=authenticator, tenant_id=tenant_id,
         region=region, service_configs=service_configs)
-    addObserver(
-        SpecificationObserverWrapper(
+    return SpecificationObserverWrapper(
             PEP3101FormattingWrapper(
-                ErrorFormattingWrapper(cf_observer))))
+                ErrorFormattingWrapper(cf_observer)))
