@@ -147,18 +147,24 @@ def execute_convergence(tenant_id, group_id, build_timeout,
               results=zip(steps, results),
               worst_status=worst_status)
 
+    cache_coll = cache_class(tenant_id, group_id)
     if worst_status == StepResult.SUCCESS:
         if group_state.status == ScalingGroupStatus.DELETING:
             # servers have been deleted. Delete the group for real
             yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
+            # Delete the cache too
+            yield cache_coll.delete_servers()
         elif group_state.status == ScalingGroupStatus.ERROR:
             yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                            status=ScalingGroupStatus.ACTIVE))
             yield cf_msg('group-status-active',
                          status=ScalingGroupStatus.ACTIVE.name)
         else:
-            # Clear servers cache that removes deleted servers
-            yield cache_class(tenant_id, group_id).delete_servers()
+            # Clear servers cache and update it with latest servers
+            yield cache_coll.delete_servers()
+            yield cache_coll.insert_servers(
+                datetime.fromutctimestamp(now),
+                filter(lambda s: s.state != ServerState.DELETED, servers))
     elif worst_status == StepResult.FAILURE:
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))
