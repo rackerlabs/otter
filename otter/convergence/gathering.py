@@ -129,7 +129,8 @@ def all_servers(cache, changes):
 
 
 @do
-def get_scaling_group_servers(tenant_id, group_id, cache_coll=None):
+def get_scaling_group_servers(tenant_id, group_id,
+                              cache_class=CassScalingGroupServersCache):
     """
     Get a group's servers taken from cache if it exists. Updates cache as
     if it is empty from newly fetched servers
@@ -137,7 +138,7 @@ def get_scaling_group_servers(tenant_id, group_id, cache_coll=None):
     :return: Servers as iterator of dicts
     :rtype: Effect
     """
-    coll = cache_coll or CassScalingGroupServersCache()
+    coll = cache_class(tenant_id, group_id)
     cache, last_update = yield coll.get_servers(tenant_id, group_id)
     all_changes = yield get_all_scaling_group_servers(last_update)
     changes = all_changes[group_id]
@@ -146,7 +147,7 @@ def get_scaling_group_servers(tenant_id, group_id, cache_coll=None):
         now = yield Func(datetime.now)
         # TODO: Should the time be "now - (say) 5 mins" to avoid possible
         # clock drift between this machine and nova servers
-        yield coll.insert_servers(tenant_id, group_id, changes, now)
+        yield coll.insert_servers(changes, now)
         servers = changes
     else:
         servers = all_servers(cache, changes)

@@ -92,7 +92,7 @@ def _update_active(scaling_group, active):
 @do
 def execute_convergence(tenant_id, group_id, build_timeout,
                         get_all_convergence_data=get_all_convergence_data,
-                        plan=plan, cache_coll=None):
+                        plan=plan, cache_class=CassScalingGroupServersCache):
     """
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
@@ -158,8 +158,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
                          status=ScalingGroupStatus.ACTIVE.name)
         else:
             # Clear servers cache that removes deleted servers
-            coll = cache_coll or CassScalingGroupServersCache()
-            yield coll.delete_servers(tenant_id, group_id)
+            yield cache_class(tenant_id, group_id).delete_servers()
     elif worst_status == StepResult.FAILURE:
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))

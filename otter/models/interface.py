@@ -618,32 +618,30 @@ class IScalingGroupServersCache(Interface):
     """
     Cache of servers in scaling groups
     """
+    tenant_id = Attribute("Rackspace Tenant ID of the owner of this group.")
+    group_id = Attribute("UUID of the scaling group - immutable.")
 
-    def get_servers(tenant_id, group_id):
+    def get_servers():
         """
         Return latest cache of servers in a group along with last time the
         cache was updated.
 
-        :param str tenant_id: Tenant ID
-        :param str group_id: Scaling group ID
         :return: Effect of (servers, last update time) tuple where servers
             is list of dict and last update time is datetime object. Will
             return last_update time as None if cache is empty
         :rtype: Effect
         """
 
-    def insert_servers(tenant_id, group_id, last_update, servers):
+    def insert_servers(last_update, servers):
         """
         Update the servers cache of the group with last update time
 
-        :param str tenant_id: Tenant ID
-        :param str group_id: Scaling group ID
         :param datetime last_update: Update time of the cache
         :param list servers: List of server dicts
         :return: Effect of None
         """
 
-    def delete_servers(tenant_id, group_id):
+    def delete_servers():
         """
         Remove all servers of the group
         """

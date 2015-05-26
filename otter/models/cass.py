@@ -22,7 +22,7 @@ from pyrsistent import freeze
 
 from silverberg.client import ConsistencyLevel
 
-from toolz.dicttoolz import keymap
+from toolz.dicttoolz import keymap, merge
 
 from twisted.internet import defer
 
@@ -1699,15 +1699,18 @@ class CassScalingGroupServersCache(object):
     Collection of cache of scaling group servers
     """
 
-    table = "servers_cache"
+    def __init__(self, tenant_id, group_id):
+        self.tenant_id = tenant_id
+        self.group_id = group_id
+        self.table = "servers_cache"
+        self.params = {"tenant_id": tenant_id, "group_id": group_id}
 
     @do
-    def get_servers(self, tenant_id, group_id):
+    def get_servers(self):
         query = ("SELECT server_blob, last_update FROM {cf} "
                  "WHERE tenant_id=:tenant_id AND group_id=:group_id "
                  "ORDER BY last_update DESC;")
-        params = {"tenant_id": tenant_id, "group_id": group_id}
-        rows = yield cql_eff(query.format(cf=self.table), params)
+        rows = yield cql_eff(query.format(cf=self.table), self.params)
         if len(rows) == 0:
             yield do_return(([], None))
         last_update = rows[0]['last_update']
@@ -1715,13 +1718,12 @@ class CassScalingGroupServersCache(object):
         yield do_return(([json.loads(r['server_blob']) for r in rows],
                          last_update))
 
-    def insert_servers(self, tenant_id, group_id, last_update, servers):
+    def insert_servers(self, last_update, servers):
         query = ("INSERT INTO {cf} (tenant_id, group_id, last_update, "
                  "server_id, server_blob "
                  "VALUES(:tenant_id, :group_id, :last_update, :server_id{i}, "
                  ":server_blob{i});")
-        params = {"tenant_id": tenant_id, "group_id": group_id,
-                  "last_update": last_update}
+        params = merge(self.params, {"last_update": last_update})
         queries = []
         for i, server in enumerate(servers):
             params['server_id{}'.format(i)] = server['id']
@@ -1729,11 +1731,10 @@ class CassScalingGroupServersCache(object):
             queries.append(query.format(cf=self.table, i=i))
         return cql_eff(batch(queries), params)
 
-    def delete_servers(self, tenant_id, group_id):
+    def delete_servers(self):
         query = ("DELETE FROM {cf} WHERE tenant_id=:tenant_id AND "
                  "group_id=:group_id;")
-        params = {"tenant_id": tenant_id, "group_id": group_id}
-        return cql_eff(query.format(cf=self.table), params)
+        return cql_eff(query.format(cf=self.table), self.params)
 
 
 @implementer(IAdmin)
