@@ -16,6 +16,10 @@ msg_types = {
         "Fatal error while converging group {scaling_group_id}."),
     "converge-non-fatal-error": (
         "Non-fatal error while converging group {scaling_group_id}"),
+    "cf-add-failure": "Failed to add event to cloud feeds",
+    "cf-unsuitable-message": (
+        "Tried to add unsuitable message in cloud feeds: "
+        "{unsuitable_message}"),
     "delete-server": "Deleting {server_id} server",
     "execute-convergence": "Executing convergence",
     "execute-convergence-results": (

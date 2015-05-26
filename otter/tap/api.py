@@ -37,7 +37,7 @@ from otter.convergence.service import (
     ConvergenceStarter, Converger, set_convergence_starter)
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log
-from otter.log.cloudfeeds import CloudFeedsObserver
+from otter.log.cloudfeeds import get_cf_observer
 from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.rest.admin import OtterAdmin
 from otter.rest.application import Otter
@@ -247,11 +247,8 @@ def makeService(config):
         id_conf = deepcopy(config['identity'])
         id_conf['strategy'] = 'single_tenant'
         addObserver(
-            CloudFeedsObserver(
-                reactor=reactor,
-                authenticator=generate_authenticator(reactor, id_conf),
-                region=region, tenant_id=cf_conf['tenant_id'],
-                service_configs=service_configs))
+            get_cf_observer(reactor, generate_authenticator(reactor, id_conf),
+                            cf_conf['tenant_id'], region, service_configs))
 
     # Setup Kazoo client
     if config_value('zookeeper'):
