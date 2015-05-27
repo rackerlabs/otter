@@ -632,19 +632,15 @@ class IScalingGroupServersCache(Interface):
         :rtype: Effect
         """
 
-    def insert_servers(last_update, servers):
+    def insert_servers(last_update, servers, clear_others):
         """
         Update the servers cache of the group with last update time
 
         :param datetime last_update: Update time of the cache
         :param list servers: List of server dicts
+        :param bool clear_others: Should any other cache from a different
+            update_time be deleted?
         :return: Effect of None
-        """
-
-    def insert_single_cache(last_update, servers):
-        """
-        Deletes any existing cache and inserts new cache. Basically
-        composition of `delete_servers` and `insert_servers`
         """
 
     def delete_servers():

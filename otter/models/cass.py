@@ -1718,7 +1718,7 @@ class CassScalingGroupServersCache(object):
         yield do_return(([json.loads(r['server_blob']) for r in rows],
                          last_update))
 
-    def insert_servers(self, last_update, servers):
+    def insert_servers(self, last_update, servers, clear_others):
         query = ("INSERT INTO {cf} (tenant_id, group_id, last_update, "
                  "server_id, server_blob "
                  "VALUES(:tenant_id, :group_id, :last_update, :server_id{i}, "
@@ -1729,16 +1729,16 @@ class CassScalingGroupServersCache(object):
             params['server_id{}'.format(i)] = server['id']
             params['server_blob{}'.format(i)] = json.dumps(server)
             queries.append(query.format(cf=self.table, i=i))
-        return cql_eff(batch(queries), params)
+        if clear_others:
+            return self.delete_servers().on(
+                lambda _: cql_eff(batch(queries), params))
+        else:
+            return cql_eff(batch(queries), params)
 
     def delete_servers(self):
         query = ("DELETE FROM {cf} WHERE tenant_id=:tenant_id AND "
                  "group_id=:group_id;")
         return cql_eff(query.format(cf=self.table), self.params)
-
-    def insert_single_cache(self, last_update, servers):
-        return self.delete_servers().on(
-            lambda _: self.insert_servers(last_update, servers))
 
 
 @implementer(IAdmin)
