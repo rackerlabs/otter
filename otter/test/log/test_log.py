@@ -20,13 +20,14 @@ from otter.log.bound import BoundLog
 from otter.log.formatters import (
     ErrorFormattingWrapper,
     JSONObserverWrapper,
+    LogLevel,
     ObserverWrapper,
     PEP3101FormattingWrapper,
     StreamObserverWrapper,
     SystemFilterWrapper,
-    throttling_wrapper,
     audit_log_formatter,
-    serialize_to_jsonable)
+    serialize_to_jsonable,
+    throttling_wrapper)
 from otter.test.utils import SameJSON, matches
 
 
@@ -377,14 +378,14 @@ class ErrorFormatterTests(SynchronousTestCase):
 
     def test_no_failure(self):
         """
-        If event does not have failure, it sets level=6 and removes
-        all error fields
+        If event does not have failure, it sets level to LogLevel.INFO
+        and removes all error fields
         """
         self.wrapper({'isError': False, 'failure': 'f', 'why': 'w',
                       'foo': 'bar'})
         self.assertEqual(
             self._formatted_event(),
-            {'level': 6, 'message': ('',), 'foo': 'bar'})
+            {'level': LogLevel.INFO, 'message': ('',), 'foo': 'bar'})
 
     def test_failure_include_traceback_in_event_dict(self):
         """
@@ -412,13 +413,13 @@ class ErrorFormatterTests(SynchronousTestCase):
         self.observer.assert_called_once_with(
             matches(ContainsDict({'message': Equals(('uh oh',))})))
 
-    def test_isError_sets_level_3(self):
+    def test_isError_sets_level_error(self):
         """
-        The observer sets the level to 3 (syslog ERROR) when isError is true.
+        The observer sets the level to LogLevel.ERROR when isError is true.
         """
         self.wrapper({'failure': Failure(ValueError()), 'isError': True})
         self.observer.assert_called_once_with(
-            matches(ContainsDict({'level': Equals(3)})))
+            matches(ContainsDict({'level': Equals(LogLevel.ERROR)})))
 
     def test_isError_removes_error_fields(self):
         """
@@ -472,7 +473,7 @@ class ErrorFormatterTests(SynchronousTestCase):
                       'why': 'reason', 'failure': failure})
         self.assertEqual(
             self._formatted_event(),
-            {'message': ('mineyours',), 'level': 3,
+            {'message': ('mineyours',), 'level': LogLevel.ERROR,
              'traceback': failure.getTraceback(),
              'exception_type': 'ValueError'})
 
