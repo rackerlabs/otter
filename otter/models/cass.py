@@ -12,7 +12,8 @@ from datetime import datetime
 
 from characteristic import attributes
 
-from effect import Effect, do, do_return, parallel
+from effect import Effect, parallel
+from effect.do import do, do_return
 
 from jsonschema import ValidationError
 

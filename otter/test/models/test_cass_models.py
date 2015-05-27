@@ -8,8 +8,10 @@ from copy import deepcopy
 from datetime import datetime
 from functools import partial
 
-from effect import Effect, ParallelEffects, TypeDispatcher, sync_perform
-from effect.testing import resolve_effect
+from effect import (
+    ComposedDispatcher, Effect, ParallelEffects, TypeDispatcher,
+    base_dispatcher, sync_perform)
+from effect.testing import SequenceDispatcher, resolve_effect
 
 from jsonschema import ValidationError
 
@@ -36,6 +38,7 @@ from otter.models.cass import (
     CassAdmin,
     CassScalingGroup,
     CassScalingGroupCollection,
+    CassScalingGroupServersCache,
     WeakLocks,
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
@@ -3640,26 +3643,109 @@ class CassGroupServersCacheTests(SynchronousTestCase):
     Tests for :class:`CassScalingGroupServersCache`
     """
 
+    def setUp(self):
+        self.tenant_id = 'tid'
+        self.group_id = 'gid'
+        self.params = {"tenant_id": self.tenant_id, "group_id": self.group_id}
+        self.cache = CassScalingGroupServersCache(
+            self.tenant_id, self.group_id)
+        self.dt = datetime(2010, 10, 20, 10, 0, 0)
+
+    def _test_get_servers(self, query_result, exp_result):
+        sequence = SequenceDispatcher([
+            (CQLQueryExecute(
+                query=("SELECT server_blob, last_update FROM servers_cache "
+                       "WHERE tenant_id=:tenant_id AND group_id=:group_id "
+                       "ORDER BY last_update DESC;"),
+                params=self.params, consistency_level=ConsistencyLevel.ONE),
+             lambda i: query_result)])
+        dispatcher = ComposedDispatcher([sequence, base_dispatcher])
+        with sequence.consume():
+            self.assertEqual(
+                sync_perform(dispatcher, self.cache.get_servers()),
+                exp_result)
+
     def test_get_servers_empty(self):
         """
         `get_servers` returns ([], None) if cache is empty
         """
+        self._test_get_servers([], ([], None))
 
     def test_get_servers(self):
         """
         `get_servers` fetches all servers that have highest last_fetch
         time
         """
+        self._test_get_servers(
+            [{"server_blob": '{"a": "b"}', "last_update": self.dt},
+             {"server_blob": '{"d": "e"}', "last_update": self.dt}],
+            ([{"a": "b"}, {"d": "e"}], self.dt))
+
+    def test_get_servers_diff_last_update(self):
+        """
+        `get_servers` will return servers with only latest last_update time
+        if there are multiple caches
+        """
+        dt_earlier = datetime(2010, 10, 15, 10, 0, 0)
+        self._test_get_servers(
+            [{"server_blob": '{"a": "b"}', "last_update": dt_earlier},
+             {"server_blob": '{"d": "e"}', "last_update": dt_earlier},
+             {"server_blob": '{"c": "f"}', "last_update": self.dt}],
+            ([{"a": "b"}, {"d": "e"}], dt_earlier))
+
+    def _test_insert_servers(self, eff):
+        query = (
+            "BEGIN BATCH "
+            "INSERT INTO servers_cache (tenant_id, group_id, last_update, "
+            "server_id, server_blob "
+            "VALUES(:tenant_id, :group_id, :last_update, :server_id0, "
+            ":server_blob0); "
+            "INSERT INTO servers_cache (tenant_id, group_id, last_update, "
+            "server_id, server_blob "
+            "VALUES(:tenant_id, :group_id, :last_update, :server_id1, "
+            ":server_blob1); APPLY BATCH;")
+        self.params.update(
+            {"server_id0": "a", "server_blob0": '{"id": "a"}',
+             "server_id1": "b", "server_blob1": '{"id": "b"}',
+             "last_update": self.dt})
+        self.assertEqual(
+            eff.intent,
+            CQLQueryExecute(query=query, params=self.params,
+                            consistency_level=ConsistencyLevel.ONE))
+        self.assertEqual(resolve_effect(eff, None), None)
 
     def test_insert_servers(self):
         """
         `insert_servers` issues query to insert server as json blobs
         """
+        eff = self.cache.insert_servers(
+            self.dt, [{"id": "a"}, {"id": "b"}], False)
+        self._test_insert_servers(eff)
+
+    def test_insert_servers_delete(self):
+        """
+        `insert_servers` deletes existing caches before inserting
+        when clear_others=True
+        """
+        self.cache.delete_servers = lambda: Effect("delete")
+        eff = self.cache.insert_servers(
+            self.dt, [{"id": "a"}, {"id": "b"}], True)
+        self.assertEqual(eff.intent, "delete")
+        eff = resolve_effect(eff, None)
+        self._test_insert_servers(eff)
 
     def test_delete_servers(self):
         """
         `delete_servers` issues query to delete the whole cache
         """
+        self.assertEqual(
+            self.cache.delete_servers(),
+            Effect(
+                CQLQueryExecute(
+                    query=("DELETE FROM servers_cache WHERE "
+                           "tenant_id=:tenant_id AND group_id=:group_id;"),
+                    params=self.params,
+                    consistency_level=ConsistencyLevel.ONE)))
 
 
 class CassAdminTestCase(SynchronousTestCase):
