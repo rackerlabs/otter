@@ -146,11 +146,11 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     :rtype: Effect
     """
     coll = cache_class(tenant_id, group_id)
-    cache, last_update = yield coll.get_servers(tenant_id, group_id)
+    cache, last_update = yield coll.get_servers()
     if last_update is None or last_update - now >= timedelta(days=30):
         last_update = now - timedelta(days=30)
         changes = (yield get_all_scaling_group_servers(last_update))[group_id]
-        current = (yield get_all_server_details())[group_id]
+        current = (yield get_all_scaling_group_servers())[group_id]
         servers = merge_servers(changes, current)
         yield coll.insert_servers(now, servers, True)
     else:
