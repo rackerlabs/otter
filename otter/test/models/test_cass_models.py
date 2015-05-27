@@ -3635,6 +3635,33 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
             (True, {'cassandra_time': 0}))
 
 
+class CassGroupServersCacheTests(SynchronousTestCase):
+    """
+    Tests for :class:`CassScalingGroupServersCache`
+    """
+
+    def test_get_servers_empty(self):
+        """
+        `get_servers` returns ([], None) if cache is empty
+        """
+
+    def test_get_servers(self):
+        """
+        `get_servers` fetches all servers that have highest last_fetch
+        time
+        """
+
+    def test_insert_servers(self):
+        """
+        `insert_servers` issues query to insert server as json blobs
+        """
+
+    def test_delete_servers(self):
+        """
+        `delete_servers` issues query to delete the whole cache
+        """
+
+
 class CassAdminTestCase(SynchronousTestCase):
     """
     Tests for :class:`CassAdmin`
