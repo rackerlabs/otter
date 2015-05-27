@@ -286,12 +286,14 @@ class CloudLoadBalancerController(object):
         or until the CLB is destroyed.
         """
         return (
-            treq.post(
-                "{}/loadbalancer/{}/returnOverride/{}".format(
+            treq.patch(
+                "{}/loadbalancer/{}/attributes".format(
                     str(self.rcs.endpoints["cloudLoadBalancerControl"]),
                     self.clb.clb_id,
-                    422
                 ),
+                json.dumps({
+                    "status": "PENDING_DELETE",
+                }),
                 headers=headers(str(self.rcs.token)),
                 pool=self.pool
             ).addCallback(check_success, [204])
