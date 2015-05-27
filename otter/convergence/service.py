@@ -163,9 +163,10 @@ def execute_convergence(tenant_id, group_id, build_timeout,
                          status=ScalingGroupStatus.ACTIVE.name)
         else:
             # Clear servers cache and update it with latest servers
-            yield cache_coll.insert_single_cache(
+            yield cache_coll.insert_servers(
                 now_dt,
-                filter(lambda s: s.state != ServerState.DELETED, servers))
+                filter(lambda s: s.state != ServerState.DELETED, servers),
+                True)
     elif worst_status == StepResult.FAILURE:
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))

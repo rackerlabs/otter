@@ -117,15 +117,19 @@ def get_all_scaling_group_servers(changes_since=None,
     return get_all_server_details(changes_since).on(servers_apply)
 
 
-def all_servers(cache, changes):
+def merge_servers(first, second):
     """
-    Return all servers got by merging cache and changes since the cache was
-    last fetch
+    Return servers got by merging the two sets of servers where second
+    takes precedence over first
+
+    :param list first: List of server dicts
+    :param list second: List of server dicts
+    :return: List of merged server dicts
     """
     def sdict(servers):
         return {s['id']: s for s in servers}
 
-    return merge(sdict(cache), sdict(changes)).itervalues()
+    return merge(sdict(first), sdict(second)).itervalues()
 
 
 @do
@@ -147,11 +151,11 @@ def get_scaling_group_servers(tenant_id, group_id, now,
         last_update = now - timedelta(days=30)
         changes = (yield get_all_scaling_group_servers(last_update))[group_id]
         current = (yield get_all_server_details())[group_id]
-        servers = all_servers(changes, current)
+        servers = merge_servers(changes, current)
+        yield coll.insert_servers(now, servers, True)
     else:
         changes = (yield get_all_scaling_group_servers(last_update))[group_id]
-        servers = all_servers(cache, changes)
-    yield coll.insert_single_cache(now, servers)
+        servers = merge_servers(cache, changes)
     yield do_return(servers)
 
 
