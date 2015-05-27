@@ -5,8 +5,8 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 :obj:`Converger`.
 """
 
-import time
 import uuid
+from datetime import datetime
 from functools import partial
 from hashlib import sha1
 
@@ -39,6 +39,7 @@ from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.fp import assoc_obj
+from otter.util.timestamp import datetime_to_epoch
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 
@@ -112,7 +113,8 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     # fetching of the scaling group info from cassandra.
     sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
                                         group_id=group_id))
-    gather_eff = get_all_convergence_data(tenant_id, group_id)
+    now_dt = yield Effect(Func(datetime.now))
+    gather_eff = get_all_convergence_data(tenant_id, group_id, now_dt)
     try:
         data = yield parallel([sg_eff, gather_eff])
     except FirstError as fe:
@@ -121,16 +123,16 @@ def execute_convergence(tenant_id, group_id, build_timeout,
 
     group_state = manifest['state']
     launch_config = manifest['launchConfiguration']
-    now = yield Effect(Func(time.time))
 
     desired_capacity = (0 if group_state.status == ScalingGroupStatus.DELETING
                         else group_state.desired)
     desired_group_state = get_desired_group_state(
         group_id, launch_config, desired_capacity)
-    steps = plan(desired_group_state, servers, lb_nodes, now, build_timeout)
+    steps = plan(desired_group_state, servers, lb_nodes,
+                 datetime_to_epoch(now_dt), build_timeout)
     active = determine_active(servers, lb_nodes)
     yield msg('execute-convergence',
-              servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
+              servers=servers, lb_nodes=lb_nodes, steps=steps, now=now_dt,
               desired=desired_group_state, active=active)
     # Since deleting groups are not publicly visible
     if group_state.status != ScalingGroupStatus.DELETING:
@@ -161,9 +163,8 @@ def execute_convergence(tenant_id, group_id, build_timeout,
                          status=ScalingGroupStatus.ACTIVE.name)
         else:
             # Clear servers cache and update it with latest servers
-            yield cache_coll.delete_servers()
-            yield cache_coll.insert_servers(
-                datetime.fromutctimestamp(now),
+            yield cache_coll.insert_single_cache(
+                now_dt,
                 filter(lambda s: s.state != ServerState.DELETED, servers))
     elif worst_status == StepResult.FAILURE:
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,

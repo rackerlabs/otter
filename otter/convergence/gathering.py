@@ -1,10 +1,10 @@
 """Code related to gathering data to inform convergence."""
-from datetime import datetime
+from datetime import timedelta
 from functools import partial
 from urllib import urlencode
 from urlparse import parse_qs, urlparse
 
-from effect import Func, catch, do, do_return, parallel
+from effect import catch, do, do_return, parallel
 
 from toolz.curried import filter, groupby, keyfilter, map
 from toolz.dicttoolz import get_in, merge
@@ -129,28 +129,29 @@ def all_servers(cache, changes):
 
 
 @do
-def get_scaling_group_servers(tenant_id, group_id,
+def get_scaling_group_servers(tenant_id, group_id, now,
                               cache_class=CassScalingGroupServersCache):
     """
-    Get a group's servers taken from cache if it exists. Updates cache as
+    Get a group's servers taken from cache if it exists. Updates cache
     if it is empty from newly fetched servers
+    # NOTE: This function takes tenant_id even though the whole effect is
+    # scoped on the tenant because cache calls require tenant_id. Should
+    # they also not take tenant_id and work on the scope?
 
     :return: Servers as iterator of dicts
     :rtype: Effect
     """
     coll = cache_class(tenant_id, group_id)
     cache, last_update = yield coll.get_servers(tenant_id, group_id)
-    all_changes = yield get_all_scaling_group_servers(last_update)
-    changes = all_changes[group_id]
-    if last_update is None:
-        # cache is empty. create it from current servers
-        now = yield Func(datetime.now)
-        # TODO: Should the time be "now - (say) 5 mins" to avoid possible
-        # clock drift between this machine and nova servers
-        yield coll.insert_servers(changes, now)
-        servers = changes
+    if last_update is None or last_update - now >= timedelta(days=30):
+        last_update = now - timedelta(days=30)
+        changes = (yield get_all_scaling_group_servers(last_update))[group_id]
+        current = (yield get_all_server_details())[group_id]
+        servers = all_servers(changes, current)
     else:
+        changes = (yield get_all_scaling_group_servers(last_update))[group_id]
         servers = all_servers(cache, changes)
+    yield coll.insert_single_cache(now, servers)
     yield do_return(servers)
 
 
@@ -276,17 +277,18 @@ def get_rcv3_contents():
 def get_all_convergence_data(
         tenant_id,
         group_id,
+        now,
         get_scaling_group_servers=get_scaling_group_servers,
         get_clb_contents=get_clb_contents,
         get_rcv3_contents=get_rcv3_contents):
     """
-    Gather all data relevant for convergence, in parallel where
-    possible.
+    Gather all data relevant for convergence w.r.t given time,
+    in parallel where possible.
 
     Returns an Effect of ([NovaServer], [LBNode]).
     """
     eff = parallel(
-        [get_scaling_group_servers(tenant_id, group_id)
+        [get_scaling_group_servers(tenant_id, group_id, now)
          .on(map(NovaServer.from_server_details_json)).on(list),
          get_clb_contents(),
          get_rcv3_contents()]
