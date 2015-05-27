@@ -369,31 +369,55 @@ class TestConvergence(unittest.TestCase):
         """
         LB_max = 25
         group_max = 30
+
+        rcs = TestResources()
+        self.helper = TestHelper(self, num_clbs=1)
+
+        # def create_clb_first():
+        #     self.clb = CloudLoadBalancer(pool=self.helper.pool)
+        #     self.helper.clbs = [self.clb]
+        #     return (
+        #         self.identity.authenticate_user(
+        #             rcs,
+        #             resources={
+        #                 "otter": (otter_key, otter_url),
+        #                 "nova": (nova_key,),
+        #                 "loadbalancers": (clb_key,)
+        #             },
+        #             region=region,
+        #         ).addCallback(self.clb.start, self)
+        #         .addCallback(self.clb.wait_for_state, "ACTIVE", 600)
+        #     )
+
+        # def then_test(_):
         self.scaling_group = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref, min_entities=1,
             max_entities=group_max)
 
-        self.scale_up_to_max = ScalingPolicy(
-            scale_by=group_max,
+        self.scale_up_to_group_max = ScalingPolicy(
+            set_to=LB_max,
             scaling_group=self.scaling_group
         )
 
         return (
-            self.helper.start_group_and_wait(self.scaling_group, self.rcs)
-            .addCallback(self.scale_up_to_max.start, self)
-            .addCallback(self.scale_up_to_max.execute)
+            self.helper.start_group_and_wait(self.scaling_group, rcs,
+                                             desired=LB_max - 2)
+            .addCallback(self.scale_up_to_group_max.start, self)
+            .addCallback(self.scale_up_to_group_max.execute)
             .addCallback(
                 self.scaling_group.wait_for_state,
                 MatchesAll(
                     ContainsDict({
                         'pendingCapacity': Equals(0),
-                        'desiredCapacity': Equals(group_max),
-                        'status': Equals("ERROR")
+                        'desiredCapacity': Equals(LB_max),
+                        'status': Equals("ACTIVE")
                     }),
                     HasActive(LB_max)),
-                timeout=1600
+                timeout=600
             )
         )
+
+        # return create_clb_first().addCallback(then_test)
 
     @skip_me("Autoscale does not clean up servers deleted OOB yet. See #881.")
     def test_scaling_to_clb_max_after_oob_delete_type1(self):
