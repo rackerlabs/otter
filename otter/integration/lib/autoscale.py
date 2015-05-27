@@ -14,6 +14,7 @@ from testtools.matchers import MatchesPredicateWithParams
 
 import treq
 
+from twisted.python.log import msg
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 
@@ -448,6 +449,8 @@ class ScalingGroup(object):
             response, group_state = result
             mismatch = matcher.match(group_state['group'])
             if mismatch:
+                msg("Waiting for desired group state.\nMismatch: {}"
+                    .format(mismatch.describe()))
                 raise TransientRetryError(mismatch.describe())
             return rcs
 
