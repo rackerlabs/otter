@@ -641,6 +641,12 @@ class IScalingGroupServersCache(Interface):
         :return: Effect of None
         """
 
+    def insert_single_cache(last_update, servers):
+        """
+        Deletes any existing cache and inserts new cache. Basically
+        composition of `delete_servers` and `insert_servers`
+        """
+
     def delete_servers():
         """
         Remove all servers of the group

@@ -1736,6 +1736,10 @@ class CassScalingGroupServersCache(object):
                  "group_id=:group_id;")
         return cql_eff(query.format(cf=self.table), self.params)
 
+    def insert_single_cache(self, last_update, servers):
+        return self.delete_servers().on(
+            lambda _: self.insert_servers(last_update, servers))
+
 
 @implementer(IAdmin)
 class CassAdmin(object):
