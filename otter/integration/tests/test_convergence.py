@@ -61,7 +61,6 @@ def not_mimic():
     """
     return not bool(os.environ.get("AS_USING_MIMIC", False))
 
-
 class TestHelper(object):
     """
     A helper class that contains useful functions for actual test cases.  This
@@ -191,6 +190,14 @@ def copy_test_methods(from_class, to_class, filter_and_change=None):
                     setattr(to_class, *filtered)
             else:
                 setattr(to_class, name, attr)
+
+
+def random_string(byte_len=4):
+    """
+    Generate a random string of the ``byte_len``.
+    The string will be 2 * ``byte_len`` in length.
+    """
+    return os.urandom(byte_len).encode('hex')
 
 
 class TestConvergence(unittest.TestCase):
@@ -800,14 +807,15 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
 
         Checks nova to make sure that convergence has not overprovisioned.
         """
+        server_name_prefix = "build-to-error-{}".format(random_string())
         group = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref,
             min_entities=2, max_entities=10,
-            server_name_prefix="build-to-error"
+            server_name_prefix=server_name_prefix
         )
         d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
             self.rcs,
-            criteria=[{"server_name": "build-to-error.*"}],
+            criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
                 {"name": "error", "parameters": {}},
                 {"name": "default"}
@@ -835,18 +843,20 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         5. Check with Nova to ensure that there are only 2 active servers on
            the account.  The one that was building forever should be deleted.
         """
+        server_name_prefix = "build-timeout-{}".format(random_string())
         group = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref,
             min_entities=2, max_entities=10,
-            server_name_prefix="build-timeout"
+            server_name_prefix=server_name_prefix
         )
 
         yield MimicNova(pool=self.helper.pool).sequenced_behaviors(
             self.rcs,
-            criteria=[{"server_name": "build-timeout.*"}],
+            criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
                 {"name": "build",
                  "parameters": {"duration": otter_build_timeout * 2}},
+                {"name": "default"},
                 {"name": "default"}
             ])
         yield group.start(self.rcs, self)
@@ -948,19 +958,19 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
 
         Checks nova to make sure that convergence has not overprovisioned.
         """
+        server_name_prefix = "false-negative-{}".format(random_string())
         group = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref,
             min_entities=2, max_entities=10,
-            server_name_prefix="false-negative"
+            server_name_prefix=server_name_prefix
         )
         d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
             self.rcs,
-            criteria=[{"server_name": "false-negative.*"}],
+            criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
                 {"name": "false-negative",
                  "parameters": {"code": 500,
                                 "message": "Server creation failed."}},
-                {"name": "default"}
             ])
         d.addCallback(
             lambda _: self.helper.start_group_and_wait(group, self.rcs))
