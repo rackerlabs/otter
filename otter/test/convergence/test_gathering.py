@@ -30,6 +30,7 @@ from otter.convergence.gathering import (
     get_all_server_details,
     get_clb_contents,
     get_rcv3_contents,
+    get_all_scaling_group_servers,
     get_scaling_group_servers)
 from otter.convergence.model import (
     CLBDescription,
@@ -212,9 +213,9 @@ class GetAllServerDetailsTests(SynchronousTestCase):
                                 next_interval=exponential_backoff_interval(2)))
 
 
-class GetScalingGroupServersTests(SynchronousTestCase):
+class GetAllScalingGroupServersTests(SynchronousTestCase):
     """
-    Tests for :func:`get_scaling_group_servers`
+    Tests for :func:`get_all_scaling_group_servers`
     """
 
     def setUp(self):
@@ -228,7 +229,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         """
         since = datetime(2010, 10, 10, 10, 10, 0)
         eff = resolve_retry_stubs(
-            get_scaling_group_servers(changes_since=since))
+            get_all_scaling_group_servers(changes_since=since))
         fake_response = object()
         body = {'servers': []}
         result = resolve_svcreq(
@@ -240,7 +241,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         Servers without metadata are not included in the result.
         """
         servers = [{'id': i} for i in range(10)]
-        eff = resolve_retry_stubs(get_scaling_group_servers())
+        eff = resolve_retry_stubs(get_all_scaling_group_servers())
         fake_response = object()
         body = {'servers': servers}
         result = resolve_svcreq(eff, (fake_response, body), *self.req)
@@ -252,7 +253,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         in it
         """
         servers = [{'id': i, 'metadata': {}} for i in range(10)]
-        eff = resolve_retry_stubs(get_scaling_group_servers())
+        eff = resolve_retry_stubs(get_all_scaling_group_servers())
         fake_response = object()
         body = {'servers': servers}
         result = resolve_svcreq(eff, (fake_response, body), *self.req)
@@ -269,7 +270,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
              for i in range(5, 8)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
         servers = as_servers + [{'metadata': 'junk'}] * 3
-        eff = resolve_retry_stubs(get_scaling_group_servers())
+        eff = resolve_retry_stubs(get_all_scaling_group_servers())
         fake_response = object()
         body = {'servers': servers}
         result = resolve_svcreq(eff, (fake_response, body), *self.req)
@@ -288,7 +289,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
              for i in range(5, 8)])
         servers = as_servers + [{'metadata': 'junk'}] * 3
         eff = resolve_retry_stubs(
-            get_scaling_group_servers(
+            get_all_scaling_group_servers(
                 server_predicate=lambda s: s['id'] % 3 == 0))
         fake_response = object()
         body = {'servers': servers}
