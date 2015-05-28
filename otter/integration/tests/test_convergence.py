@@ -61,6 +61,7 @@ def not_mimic():
     """
     return not bool(os.environ.get("AS_USING_MIMIC", False))
 
+
 class TestHelper(object):
     """
     A helper class that contains useful functions for actual test cases.  This
