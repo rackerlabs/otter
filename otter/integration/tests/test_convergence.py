@@ -351,74 +351,6 @@ class TestConvergence(unittest.TestCase):
             )
         )
 
-    @tag("CATC-019")
-    def test_scale_over_lb_limit(self):
-        """
-        CATC-019-a: Validate that when a group attempts to scale over the
-        load balancer limit the group enters an error state. It is expected
-        that the active capacity will match the maximum allowed on the load
-        balancer and the pending capacity will become zero once the group is
-        in ERROR state.
-
-        1. Creates a scaling group with a load balancer and max servers
-           greater than the load balancer max. (Assume LB_max == 25)
-        2. Scale up to a desired capacity greater than the LB_max
-        3. Assert that the scaling group goes into error state, that the
-           active count is equal to LB_max, and that no servers are pending.
-
-        """
-        LB_max = 25
-        group_max = 30
-
-        rcs = TestResources()
-        self.helper = TestHelper(self, num_clbs=1)
-
-        # def create_clb_first():
-        #     self.clb = CloudLoadBalancer(pool=self.helper.pool)
-        #     self.helper.clbs = [self.clb]
-        #     return (
-        #         self.identity.authenticate_user(
-        #             rcs,
-        #             resources={
-        #                 "otter": (otter_key, otter_url),
-        #                 "nova": (nova_key,),
-        #                 "loadbalancers": (clb_key,)
-        #             },
-        #             region=region,
-        #         ).addCallback(self.clb.start, self)
-        #         .addCallback(self.clb.wait_for_state, "ACTIVE", 600)
-        #     )
-
-        # def then_test(_):
-        self.scaling_group = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=1,
-            max_entities=group_max)
-
-        self.scale_up_to_group_max = ScalingPolicy(
-            set_to=LB_max,
-            scaling_group=self.scaling_group
-        )
-
-        return (
-            self.helper.start_group_and_wait(self.scaling_group, rcs,
-                                             desired=LB_max - 2)
-            .addCallback(self.scale_up_to_group_max.start, self)
-            .addCallback(self.scale_up_to_group_max.execute)
-            .addCallback(
-                self.scaling_group.wait_for_state,
-                MatchesAll(
-                    ContainsDict({
-                        'pendingCapacity': Equals(0),
-                        'desiredCapacity': Equals(LB_max),
-                        'status': Equals("ACTIVE")
-                    }),
-                    HasActive(LB_max)),
-                timeout=600
-            )
-        )
-
-        # return create_clb_first().addCallback(then_test)
-
     @skip_me("Autoscale does not clean up servers deleted OOB yet. See #881.")
     def test_scaling_to_clb_max_after_oob_delete_type1(self):
         """
@@ -1147,6 +1079,52 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 "Autoscale does not clean up servers deleted OOB yet. "
                 "See #881.")
         return (name, wrapper)
+
+    @tag("CATC-019")
+    def test_scale_over_lb_limit(self):
+        """
+        CATC-019-a: Validate that when a group attempts to scale over the
+        load balancer limit the group enters an error state. It is expected
+        that the active capacity will match the maximum allowed on the load
+        balancer and the pending capacity will become zero once the group is
+        in ERROR state.
+
+        1. Creates a scaling group with a load balancer and max servers
+           greater than the load balancer max. (Assume LB_max == 25)
+        2. Scale up to a desired capacity greater than the LB_max
+        3. Assert that the scaling group goes into error state, that the
+           active count is equal to LB_max, and that no servers are pending.
+
+        """
+        LB_max = 25
+        group_max = 30
+
+        group = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=1,
+            max_entities=group_max)
+
+        scale_up_to_group_max = ScalingPolicy(
+            set_to=group_max,
+            scaling_group=group
+        )
+
+        return (
+            self.helper.start_group_and_wait(group, self.rcs,
+                                             desired=LB_max - 5)
+            .addCallback(scale_up_to_group_max.start, self)
+            .addCallback(scale_up_to_group_max.execute)
+            .addCallback(
+                group.wait_for_state,
+                MatchesAll(
+                    ContainsDict({
+                        'pendingCapacity': Equals(0),
+                        'desiredCapacity': Equals(group_max),
+                        'status': Equals("ERROR")
+                    }),
+                    HasActive(LB_max)),
+                timeout=600
+            )
+        )
 
     @tag("CATC-020")
     def test_delete_all_loadbalancers_and_scale_up(self, delete_clb=None):
