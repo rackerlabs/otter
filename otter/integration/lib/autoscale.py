@@ -14,9 +14,9 @@ from testtools.matchers import MatchesPredicateWithParams
 
 import treq
 
-from twisted.python.log import msg
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
+from twisted.python.log import msg
 
 from otter.integration.lib.nova import NovaServer
 from otter.util.deferredutils import retry_and_timeout
