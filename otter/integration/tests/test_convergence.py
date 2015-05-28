@@ -819,6 +819,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
                 {"name": "error", "parameters": {}},
+                {"name": "default"},
                 {"name": "default"}
             ])
         d.addCallback(
@@ -972,6 +973,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                 {"name": "false-negative",
                  "parameters": {"code": 500,
                                 "message": "Server creation failed."}},
+                {"name": "default"},
+                {"name": "default"}
             ])
         d.addCallback(
             lambda _: self.helper.start_group_and_wait(group, self.rcs))
