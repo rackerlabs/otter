@@ -98,7 +98,7 @@ def create_scaling_group_dict(
             }
         },
         "groupConfiguration": {
-            "name": name,
+            "name": "{}-{}".format(name, reactor.seconds()),
             "cooldown": 0,
             "minEntities": min_entities,
             "maxEntities": max_entities,
