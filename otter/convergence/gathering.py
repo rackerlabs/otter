@@ -4,7 +4,8 @@ from functools import partial
 from urllib import urlencode
 from urlparse import parse_qs, urlparse
 
-from effect import catch, do, do_return, parallel
+from effect import catch, parallel
+from effect.do import do, do_return
 
 from toolz.curried import filter, groupby, keyfilter, map
 from toolz.dicttoolz import get_in, merge

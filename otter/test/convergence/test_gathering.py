@@ -590,8 +590,8 @@ class GetRCv3ContentsTests(SynchronousTestCase):
             sync_perform(dispatcher, get_rcv3_contents()), [])
 
 
-def _constant_as_eff(constant):
-    return lambda: Effect(Stub(Constant(constant)))
+def _constant_as_eff(args, retval):
+    return lambda *a: Effect(Stub(Constant(retval))) if a == args else (1 / 0)
 
 
 class GetAllConvergenceDataTests(SynchronousTestCase):
@@ -617,6 +617,7 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                                         'version': 4}]},
              'links': [{'href': 'link2', 'rel': 'self'}]}
         ]
+        self.now = datetime(2010, 10, 20, 03, 30, 00)
 
     def test_success(self):
         """
@@ -628,10 +629,13 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                                description=RCv3Description(lb_id='lb2'))]
 
         eff = get_all_convergence_data(
+            'tid',
             'gid',
-            get_scaling_group_servers=_constant_as_eff({'gid': self.servers}),
-            get_clb_contents=_constant_as_eff(clb_nodes),
-            get_rcv3_contents=_constant_as_eff(rcv3_nodes))
+            self.now,
+            get_scaling_group_servers=_constant_as_eff(
+                ('tid', 'gid', self.now), self.servers),
+            get_clb_contents=_constant_as_eff((), clb_nodes),
+            get_rcv3_contents=_constant_as_eff((), rcv3_nodes))
 
         expected_servers = [
             NovaServer(id='a',
@@ -658,9 +662,12 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         an empty list.
         """
         eff = get_all_convergence_data(
+            'tid',
             'gid',
-            get_scaling_group_servers=_constant_as_eff({}),
-            get_clb_contents=_constant_as_eff([]),
-            get_rcv3_contents=_constant_as_eff([]))
+            self.now,
+            get_scaling_group_servers=_constant_as_eff(
+                ('tid', 'gid', self.now), []),
+            get_clb_contents=_constant_as_eff((), []),
+            get_rcv3_contents=_constant_as_eff((), []))
 
         self.assertEqual(resolve_stubs(eff), ([], []))
