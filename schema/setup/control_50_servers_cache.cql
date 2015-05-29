@@ -7,7 +7,7 @@ CREATE TABLE servers_cache (
     server_id ascii,
     server_blob ascii,
     PRIMARY KEY((tenant_id, group_id), last_fetch, server_id)
-) WITH CLUSTERING ORDER BY (last_fetch DESC, server_id ASC) AND 
+) WITH CLUSTERING ORDER BY (last_update DESC, server_id ASC) AND
 compaction = {
     'class' : 'SizeTieredCompactionStrategy',
     'min_threshold' : '2'
