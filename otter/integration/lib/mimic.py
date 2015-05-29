@@ -8,6 +8,8 @@ from characteristic import Attribute, attributes
 
 import treq
 
+from twisted.internet.defer import inlineCallbacks, returnValue
+
 from otter.util.http import check_success, headers
 
 
@@ -41,25 +43,32 @@ class MimicNova(object):
             pool=self.pool
         ).addCallback(check_success, [201]).addCallback(self.treq.content)
 
+    @inlineCallbacks
     def sequenced_behaviors(self, rcs, criteria, behaviors,
-                            event_description="creation"):
+                            event_description="creation",
+                            add_cleanup_to=None):
         """
         Cause nova to fail sometimes or all the time, with a pre-determined
         sequence of successes and/or failures.
 
         :param rcs: A :class:`otter.integration.lib.resources.TestResources`
             instance.
-        :param criteria: The criteria for the servers that should exhibit
+        :param list criteria: The criteria for the servers that should exhibit
             this behavior.  See, in mimic the control plane API,
             :func:`register_creation_behavior`, for more information.
-        :param behaviors:  A list of dictionaries containing the names of
+        :param list behaviors:  A list of dictionaries containing the names of
             creation behaviors parameters.
             See, in the mimic codebase,
             :func:`mimic.model.nova_objects.sequence` for more information.
-        :param event_description: Which event this sequence of behaviors
+        :param str event_description: Which event this sequence of behaviors
             should apply to - the default event is server creation.
+        :param TestCase add_cleanup_to: If provided, will add a cleanup to
+            delete this behavior at the end of the test case.
+
+        :return: the ID of the created behavior
+        :rtype: `str`
         """
-        return self.treq.post(
+        body = yield self.treq.post(
             "{0}/behaviors/{1}".format(rcs.endpoints['mimic_nova'],
                                        event_description),
             json.dumps({
@@ -71,4 +80,37 @@ class MimicNova(object):
             }),
             headers=headers(str(rcs.token)),
             pool=self.pool
-        ).addCallback(check_success, [201]).addCallback(self.treq.content)
+        ).addCallback(check_success, [201]).addCallback(self.treq.json_content)
+
+        behavior_id = body['id']
+
+        if add_cleanup_to is not None:
+            add_cleanup_to.addCleanup(
+                self.delete_behavior, rcs, behavior_id, event_description,
+                [204])
+
+        returnValue(behavior_id)
+
+    def delete_behavior(self, rcs, behavior_id, event_description="creation",
+                        success_codes=None):
+        """
+        Given a behavior ID, delete it from mimic.
+
+        :param rcs: A :class:`otter.integration.lib.resources.TestResources`
+            instance.
+        :param event_description: What type of event this is that should be
+            deleted.
+        :param str behavior_id: The ID of the behavior to delete.
+        :param list success_codes: The list of codes to count as a successful
+            behavior deletion - defaults to 204 and 404.
+        """
+        d = self.treq.delete(
+            "{0}/behaviors/{1}/{2}".format(rcs.endpoints['mimic_nova'],
+                                           event_description, behavior_id),
+            headers=headers(str(rcs.token)),
+            pool=self.pool
+        )
+        d.addCallback(check_success,
+                      [204, 404] if success_codes is None else success_codes)
+        d.addCallback(self.treq.content)
+        return d
