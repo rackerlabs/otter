@@ -234,20 +234,22 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             'tid', 'gid', self.now, cache_class=Cache,
             all_as_servers=intent_func("all-as"))
 
-    def _test_old_case(self, last_update):
+    def _test_old_case(self, last_update, as_srvs=True, cur_srvs=True):
         exp_last_update = datetime(2010, 5, 1)
         as_servers = [{'id': 'a', 'a': 'b'}, {'id': 'b', 'b': 'c'}]
         current = [{'id': 'd', 'd': 'e'}]
         sequence = SequenceDispatcher([
             ("cachegstidgid", lambda i: (object(), last_update)),
-            (("all-as", exp_last_update), lambda i: {'gid': as_servers}),
-            (("all-as",), lambda i: {"gid": current}),
+            (("all-as", exp_last_update),
+             lambda i: {'gid': as_servers} if as_srvs else {}),
+            (("all-as",), lambda i: {"gid": current} if cur_srvs else {}),
             (("cacheistidgid", self.now, mock.ANY, True), noop)])
         with sequence.consume():
             disp = ComposedDispatcher([sequence, base_dispatcher])
             eff = self._invoke()
             self.assertEqual(
-                list(sync_perform(disp, eff)), as_servers + current)
+                list(sync_perform(disp, eff)),
+                (as_srvs and as_servers or []) + (cur_srvs and current or []))
 
     def test_no_cache(self):
         """
@@ -255,6 +257,8 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         and changes since last 30 days. The cache is updated with this list
         """
         self._test_old_case(None)
+        self._test_old_case(None, False, True)
+        self._test_old_case(None, True, False)
 
     def test_really_old_cache(self):
         """
@@ -262,7 +266,10 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         current list and changes since last 30 days. The cache is updated with
         this list
         """
-        self._test_old_case(datetime(2010, 3, 1))
+        dt = datetime(2010, 3, 1)
+        self._test_old_case(dt)
+        self._test_old_case(dt, False, True)
+        self._test_old_case(dt, True, False)
 
     def test_from_cache(self):
         """
@@ -280,6 +287,22 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             eff = self._invoke()
             self.assertEqual(
                 list(sync_perform(disp, eff)), cache + changes)
+
+    def test_from_cache_no_changes(self):
+        """
+        If cache is < 30 days old then servers are returned
+        from cache if there are no changes
+        """
+        cache = [{'id': 'a', 'a': 'b'}, {'id': 'b', 'b': 'c'}]
+        last_update = datetime(2010, 5, 20)
+        sequence = SequenceDispatcher([
+            ("cachegstidgid", lambda i: (cache, last_update)),
+            (("all-as", last_update), lambda i: {})])
+        with sequence.consume():
+            disp = ComposedDispatcher([sequence, base_dispatcher])
+            eff = self._invoke()
+            self.assertEqual(
+                list(sync_perform(disp, eff)), cache)
 
     def test_merge_servers_precedence(self):
         """
