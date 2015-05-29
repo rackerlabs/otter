@@ -823,15 +823,15 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=2, max_entities=10,
             server_name_prefix="build-to-error"
         )
-        d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        d = mimic_nova.sequenced_behaviors(
             self.rcs,
             criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
                 {"name": "error", "parameters": {}},
                 {"name": "default"},
                 {"name": "default"}
-            ],
-            add_cleanup_to=self)
+            ])
         d.addCallback(
             lambda _: self.helper.start_group_and_wait(group, self.rcs))
         d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
@@ -860,8 +860,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=2, max_entities=10,
             server_name_prefix="build-timeout"
         )
-
-        yield MimicNova(pool=self.helper.pool).sequenced_behaviors(
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        yield mimic_nova.sequenced_behaviors(
             self.rcs,
             criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
@@ -869,8 +869,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                  "parameters": {"duration": otter_build_timeout * 2}},
                 {"name": "default"},
                 {"name": "default"}
-            ],
-            add_cleanup_to=self)
+            ])
         yield group.start(self.rcs, self)
 
         initial_servers = yield wait_for_servers(
@@ -975,7 +974,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=2, max_entities=10,
             server_name_prefix="false-negative"
         )
-        d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        d = mimic_nova.sequenced_behaviors(
             self.rcs,
             criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
@@ -984,8 +984,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                                 "message": "Server creation failed."}},
                 {"name": "default"},
                 {"name": "default"}
-            ],
-            add_cleanup_to=self)
+            ])
         d.addCallback(
             lambda _: self.helper.start_group_and_wait(group, self.rcs))
         d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
