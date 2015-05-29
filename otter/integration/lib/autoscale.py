@@ -110,11 +110,8 @@ def create_scaling_group_dict(
     if use_lbs:
         launch_config_args["loadBalancers"] = use_lbs
 
-    server_name = "test-server"
     if server_name_prefix is not None:
-        server_name = server_name_prefix
-    launch_config_args["server"]["name"] = "{}-{}".format(server_name,
-                                                          reactor.seconds())
+        launch_config_args["server"]["name"] = server_name_prefix
 
     return obj
 
