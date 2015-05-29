@@ -67,6 +67,16 @@ xmlns:html="http://www.w3.org/1999/xhtml" xml:id="autoscale-getting-started" xml
             </legalnotice>
             <revhistory>
                 <revision xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                    <date>2015-05-06</date>
+                    <revdescription>
+                        <itemizedlist spacing="compact">
+                            <listitem>
+                                <para>Added new examples to API operations for sending requests.</para>
+                            </listitem>
+                        </itemizedlist>
+                    </revdescription>
+                </revision>
+                <revision xmlns:raxm="http://docs.rackspace.com/api/metadata">
                     <date>2015-03-17</date>
                     <revdescription>
                         <itemizedlist spacing="compact">
