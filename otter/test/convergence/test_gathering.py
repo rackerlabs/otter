@@ -221,7 +221,7 @@ class GetAllServerDetailsTests(SynchronousTestCase):
                                 next_interval=exponential_backoff_interval(2)))
 
 
-class GetScalingGroupServerTests(SynchronousTestCase):
+class GetScalingGroupServersTests(SynchronousTestCase):
     """
     Tests for :func:`get_scaling_group_servers`
     """
