@@ -3,7 +3,7 @@ USE @@KEYSPACE@@;
 CREATE TABLE servers_cache (
     tenant_id ascii,
     group_id ascii,
-    last_fetch timestamp,
+    last_update timestamp,
     server_id ascii,
     server_blob ascii,
     PRIMARY KEY((tenant_id, group_id), last_fetch, server_id)
