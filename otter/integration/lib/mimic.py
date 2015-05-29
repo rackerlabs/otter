@@ -13,7 +13,9 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 from otter.util.http import check_success, headers
 
 
-@attributes(["pool", Attribute("treq", default_value=treq)])
+@attributes(["pool",
+             Attribute("test_case", default_value=None),
+             Attribute("treq", default_value=treq)])
 class MimicNova(object):
     """
     Class that handles HTTP requests to the mimic nova control plane.
@@ -21,10 +23,20 @@ class MimicNova(object):
     Please see the mimic control plane API
     (:class:`mimic.rest.nova_api.NovaControlAPIRegion`) in the mimic
     codebase for more information.
+
+    :ivar pool: a :class:`twisted.web.client.HTTPConnectionPool` to pass to
+        all treq requests
+    :ivar test_case: a :class:`twisted.trial.unittest.TestCase`, which if not
+        None, will be used to clean up added behaviors.
+    :ivar treq: the treq module to use for making requests - if not provided,
+        the default library :mod:`treq` will be used.  Mainly to be used for
+        injecting stubs during tests.
     """
     def change_server_statuses(self, rcs, ids_to_status):
         """
-        Change the statuses of the given server IDs.
+        Change the statuses of the given server IDs.  Changing the statuses of
+        servers does not require any cleanup, because this is not creating a
+        persistent behavior in mimic.
 
         :param rcs: A :class:`otter.integration.lib.resources.TestResources`
             instance.
@@ -45,8 +57,7 @@ class MimicNova(object):
 
     @inlineCallbacks
     def sequenced_behaviors(self, rcs, criteria, behaviors,
-                            event_description="creation",
-                            add_cleanup_to=None):
+                            event_description="creation"):
         """
         Cause nova to fail sometimes or all the time, with a pre-determined
         sequence of successes and/or failures.
@@ -62,8 +73,6 @@ class MimicNova(object):
             :func:`mimic.model.nova_objects.sequence` for more information.
         :param str event_description: Which event this sequence of behaviors
             should apply to - the default event is server creation.
-        :param TestCase add_cleanup_to: If provided, will add a cleanup to
-            delete this behavior at the end of the test case.
 
         :return: the ID of the created behavior
         :rtype: `str`
@@ -84,8 +93,8 @@ class MimicNova(object):
 
         behavior_id = body['id']
 
-        if add_cleanup_to is not None:
-            add_cleanup_to.addCleanup(
+        if self.test_case is not None:
+            self.test_case.addCleanup(
                 self.delete_behavior, rcs, behavior_id, event_description,
                 [204])
 

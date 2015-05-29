@@ -67,10 +67,9 @@ class MimicNovaTestCase(SynchronousTestCase):
              self.expected_kwargs),
             (Response(201), '{"id": "my_id"}'))
 
-        mimic_nova = MimicNova(pool=self.pool, treq=_treq)
+        mimic_nova = MimicNova(pool=self.pool, test_case=test_case, treq=_treq)
         d = mimic_nova.sequenced_behaviors(
-            self.rcs, criteria, behaviors, event_description="some_event",
-            add_cleanup_to=test_case)
+            self.rcs, criteria, behaviors, event_description="some_event")
         self.assertEqual("my_id", self.successResultOf(d))
         self.assertEqual(
             test_case.called_with,
