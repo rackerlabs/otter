@@ -7,6 +7,7 @@ import treq
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
+from twisted.python.log import msg
 
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import check_success, headers
@@ -132,6 +133,8 @@ def wait_for_servers(rcs, pool, group, matcher, timeout=600, period=10,
         ]
         mismatch = matcher.match(servers_in_group)
         if mismatch:
+            msg("Waiting for Nova servers in group {}.\nMismatch: {}"
+                .format(group.group_id, mismatch.describe()))
             raise TransientRetryError(mismatch.describe())
         returnValue(servers_in_group)
 
