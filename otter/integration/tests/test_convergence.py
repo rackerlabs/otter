@@ -80,14 +80,24 @@ class TestHelper(object):
 
     def create_group(self, **kwargs):
         """
-        Return a scaling group with the helper's pool.
+        :return: a tuple of the scaling group with (the helper's pool) and
+            the server name prefix used for the scaling group.
         """
         if self.clbs:
             kwargs['use_lbs'] = [clb.scaling_group_spec() for clb in self.clbs]
 
-        return ScalingGroup(
-            group_config=create_scaling_group_dict(**kwargs),
-            pool=self.pool)
+        server_name_prefix = "{}-{}".format(
+            random_string(), reactor.seconds())
+        if "server_name_prefix" in kwargs:
+            server_name_prefix = "{}-{}".format(kwargs['server_name_prefix'],
+                                                server_name_prefix)
+        kwargs['server_name_prefix'] = server_name_prefix
+
+        return (
+            ScalingGroup(
+                group_config=create_scaling_group_dict(**kwargs),
+                pool=self.pool),
+            server_name_prefix)
 
     @inlineCallbacks
     def start_group_and_wait(self, group, rcs, desired=None):
@@ -191,6 +201,14 @@ def copy_test_methods(from_class, to_class, filter_and_change=None):
                     setattr(to_class, *filtered)
             else:
                 setattr(to_class, name, attr)
+
+
+def random_string(byte_len=4):
+    """
+    Generate a random string of the ``byte_len``.
+    The string will be 2 * ``byte_len`` in length.
+    """
+    return os.urandom(byte_len).encode('hex')
 
 
 class TestConvergence(unittest.TestCase):
@@ -474,7 +492,7 @@ def _oob_disable_then(helper, rcs, num_to_disable, disabler, then,
 
     :return: The scaling group that was created and tested.
     """
-    scaling_group = helper.create_group(
+    scaling_group, _ = helper.create_group(
         image_ref=image_ref, flavor_ref=flavor_ref,
         min_entities=min_servers, max_entities=max_servers
     )
@@ -800,16 +818,17 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
 
         Checks nova to make sure that convergence has not overprovisioned.
         """
-        group = self.helper.create_group(
+        group, server_name_prefix = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref,
             min_entities=2, max_entities=10,
             server_name_prefix="build-to-error"
         )
         d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
             self.rcs,
-            criteria=[{"server_name": "build-to-error.*"}],
+            criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
                 {"name": "error", "parameters": {}},
+                {"name": "default"},
                 {"name": "default"}
             ])
         d.addCallback(
@@ -835,7 +854,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         5. Check with Nova to ensure that there are only 2 active servers on
            the account.  The one that was building forever should be deleted.
         """
-        group = self.helper.create_group(
+        group, server_name_prefix = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref,
             min_entities=2, max_entities=10,
             server_name_prefix="build-timeout"
@@ -843,10 +862,11 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
 
         yield MimicNova(pool=self.helper.pool).sequenced_behaviors(
             self.rcs,
-            criteria=[{"server_name": "build-timeout.*"}],
+            criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
                 {"name": "build",
                  "parameters": {"duration": otter_build_timeout * 2}},
+                {"name": "default"},
                 {"name": "default"}
             ])
         yield group.start(self.rcs, self)
@@ -948,18 +968,19 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
 
         Checks nova to make sure that convergence has not overprovisioned.
         """
-        group = self.helper.create_group(
+        group, server_name_prefix = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref,
             min_entities=2, max_entities=10,
             server_name_prefix="false-negative"
         )
         d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
             self.rcs,
-            criteria=[{"server_name": "false-negative.*"}],
+            criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
                 {"name": "false-negative",
                  "parameters": {"code": 500,
                                 "message": "Server creation failed."}},
+                {"name": "default"},
                 {"name": "default"}
             ])
         d.addCallback(
@@ -1144,7 +1165,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             and a load balancer and deletes (or pending-deletes) the
             load balancer.
         """
-        group = self.helper.create_group(
+        group, _ = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref, min_entities=1)
 
         return (
@@ -1181,7 +1202,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             and a load balancer and deletes (or pending-deletes) the
             load balancer.
         """
-        group = self.helper.create_group(
+        group, _ = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref)
 
         return (
