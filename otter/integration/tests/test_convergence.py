@@ -811,7 +811,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             behaviors=[
                 {"name": "error", "parameters": {}},
                 {"name": "default"}
-            ])
+            ],
+            add_cleanup_to=self)
         d.addCallback(
             lambda _: self.helper.start_group_and_wait(group, self.rcs))
         d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
@@ -848,7 +849,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                 {"name": "build",
                  "parameters": {"duration": otter_build_timeout * 2}},
                 {"name": "default"}
-            ])
+            ],
+            add_cleanup_to=self)
         yield group.start(self.rcs, self)
 
         initial_servers = yield wait_for_servers(
@@ -961,7 +963,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                  "parameters": {"code": 500,
                                 "message": "Server creation failed."}},
                 {"name": "default"}
-            ])
+            ],
+            add_cleanup_to=self)
         d.addCallback(
             lambda _: self.helper.start_group_and_wait(group, self.rcs))
         d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
