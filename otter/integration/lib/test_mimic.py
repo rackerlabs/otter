@@ -73,8 +73,7 @@ class MimicNovaTestCase(SynchronousTestCase):
         self.assertEqual("my_id", self.successResultOf(d))
         self.assertEqual(
             test_case.called_with,
-            ((mimic_nova.delete_behavior, self.rcs,
-              "my_id", "some_event", [204]),
+            ((mimic_nova.delete_behavior, self.rcs, "my_id", "some_event"),
              {}))
 
     def test_delete_behavior(self):

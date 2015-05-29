@@ -95,13 +95,11 @@ class MimicNova(object):
 
         if self.test_case is not None:
             self.test_case.addCleanup(
-                self.delete_behavior, rcs, behavior_id, event_description,
-                [204])
+                self.delete_behavior, rcs, behavior_id, event_description)
 
         returnValue(behavior_id)
 
-    def delete_behavior(self, rcs, behavior_id, event_description="creation",
-                        success_codes=None):
+    def delete_behavior(self, rcs, behavior_id, event_description="creation"):
         """
         Given a behavior ID, delete it from mimic.
 
@@ -110,8 +108,6 @@ class MimicNova(object):
         :param event_description: What type of event this is that should be
             deleted.
         :param str behavior_id: The ID of the behavior to delete.
-        :param list success_codes: The list of codes to count as a successful
-            behavior deletion - defaults to 204 and 404.
         """
         d = self.treq.delete(
             "{0}/behaviors/{1}/{2}".format(rcs.endpoints['mimic_nova'],
@@ -119,7 +115,6 @@ class MimicNova(object):
             headers=headers(str(rcs.token)),
             pool=self.pool
         )
-        d.addCallback(check_success,
-                      [204, 404] if success_codes is None else success_codes)
+        d.addCallback(check_success, [204, 404])
         d.addCallback(self.treq.content)
         return d
