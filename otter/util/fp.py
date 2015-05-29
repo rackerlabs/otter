@@ -90,11 +90,11 @@ def assoc_obj(o, **k):
 
 def take_while(pred, items):
     """
-    Return list until pred is true for item in items. Similar to `takeWhile`
-    in Haskell
+    Returns the longest prefix (possibly empty) of items of elements that
+    satisfy pred. Similar to `takeWhile` in Haskell
 
     :param callable pred: item -> Bool predicate function
-    :param list items: List of items to extract
+    :param list items: List of items to extract from
     """
     for item in items:
         if pred(item):
