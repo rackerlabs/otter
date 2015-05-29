@@ -1721,7 +1721,7 @@ class CassScalingGroupServersCache(object):
 
     def insert_servers(self, last_update, servers, clear_others):
         query = ("INSERT INTO {cf} (tenant_id, group_id, last_update, "
-                 "server_id, server_blob "
+                 "server_id, server_blob) "
                  "VALUES(:tenant_id, :group_id, :last_update, :server_id{i}, "
                  ":server_blob{i});")
         params = merge(self.params, {"last_update": last_update})

@@ -3697,11 +3697,11 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         query = (
             "BEGIN BATCH "
             "INSERT INTO servers_cache (tenant_id, group_id, last_update, "
-            "server_id, server_blob "
+            "server_id, server_blob) "
             "VALUES(:tenant_id, :group_id, :last_update, :server_id0, "
             ":server_blob0); "
             "INSERT INTO servers_cache (tenant_id, group_id, last_update, "
-            "server_id, server_blob "
+            "server_id, server_blob) "
             "VALUES(:tenant_id, :group_id, :last_update, :server_id1, "
             ":server_blob1); APPLY BATCH;")
         self.params.update(
