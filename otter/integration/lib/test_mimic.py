@@ -45,8 +45,16 @@ class MimicNovaTestCase(SynchronousTestCase):
 
     def test_sequenced_behaviors(self):
         """
-        Cause a sequence of behaviors, and succeeds on 201.
+        Cause a sequence of behaviors, and succeeds on 201.  When a test case
+        is provided for which a cleanup should be added, delete is added as
+        a cleanup.
         """
+        class FakeTestCase(object):
+            def addCleanup(test_self, *args, **kwargs):
+                test_self.called_with = (args, kwargs)
+
+        test_case = FakeTestCase()
+
         criteria = [{"server_name": "name_criteria_.*"}]
         behaviors = [{'name': "behavior name",
                       'parameters': {"behavior": "params"}}]
@@ -57,9 +65,28 @@ class MimicNovaTestCase(SynchronousTestCase):
                           'name': "sequence",
                           'parameters': {"behaviors": behaviors}}),),
              self.expected_kwargs),
-            (Response(201), "successful behavior response"))
+            (Response(201), '{"id": "my_id"}'))
 
-        d = MimicNova(pool=self.pool, treq=_treq).sequenced_behaviors(
+        mimic_nova = MimicNova(pool=self.pool, test_case=test_case, treq=_treq)
+        d = mimic_nova.sequenced_behaviors(
             self.rcs, criteria, behaviors, event_description="some_event")
-        self.assertEqual('successful behavior response',
+        self.assertEqual("my_id", self.successResultOf(d))
+        self.assertEqual(
+            test_case.called_with,
+            ((mimic_nova.delete_behavior, self.rcs, "my_id", "some_event"),
+             {}))
+
+    def test_delete_behavior(self):
+        """
+        Delete an existing behavior.
+        """
+        _treq = get_fake_treq(
+            self, 'DELETE', "mimicnovaurl/behaviors/some_event/behavior_id",
+            ((),
+             self.expected_kwargs),
+            (Response(204), "successfully deleted behavior"))
+
+        d = MimicNova(pool=self.pool, treq=_treq).delete_behavior(
+            self.rcs, "behavior_id", event_description="some_event")
+        self.assertEqual('successfully deleted behavior',
                          self.successResultOf(d))

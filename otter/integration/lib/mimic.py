@@ -8,10 +8,14 @@ from characteristic import Attribute, attributes
 
 import treq
 
+from twisted.internet.defer import inlineCallbacks, returnValue
+
 from otter.util.http import check_success, headers
 
 
-@attributes(["pool", Attribute("treq", default_value=treq)])
+@attributes(["pool",
+             Attribute("test_case", default_value=None),
+             Attribute("treq", default_value=treq)])
 class MimicNova(object):
     """
     Class that handles HTTP requests to the mimic nova control plane.
@@ -19,10 +23,20 @@ class MimicNova(object):
     Please see the mimic control plane API
     (:class:`mimic.rest.nova_api.NovaControlAPIRegion`) in the mimic
     codebase for more information.
+
+    :ivar pool: a :class:`twisted.web.client.HTTPConnectionPool` to pass to
+        all treq requests
+    :ivar test_case: a :class:`twisted.trial.unittest.TestCase`, which if not
+        None, will be used to clean up added behaviors.
+    :ivar treq: the treq module to use for making requests - if not provided,
+        the default library :mod:`treq` will be used.  Mainly to be used for
+        injecting stubs during tests.
     """
     def change_server_statuses(self, rcs, ids_to_status):
         """
-        Change the statuses of the given server IDs.
+        Change the statuses of the given server IDs.  Changing the statuses of
+        servers does not require any cleanup, because this is not creating a
+        persistent behavior in mimic.
 
         :param rcs: A :class:`otter.integration.lib.resources.TestResources`
             instance.
@@ -41,6 +55,7 @@ class MimicNova(object):
             pool=self.pool
         ).addCallback(check_success, [201]).addCallback(self.treq.content)
 
+    @inlineCallbacks
     def sequenced_behaviors(self, rcs, criteria, behaviors,
                             event_description="creation"):
         """
@@ -49,17 +64,20 @@ class MimicNova(object):
 
         :param rcs: A :class:`otter.integration.lib.resources.TestResources`
             instance.
-        :param criteria: The criteria for the servers that should exhibit
+        :param list criteria: The criteria for the servers that should exhibit
             this behavior.  See, in mimic the control plane API,
             :func:`register_creation_behavior`, for more information.
-        :param behaviors:  A list of dictionaries containing the names of
+        :param list behaviors:  A list of dictionaries containing the names of
             creation behaviors parameters.
             See, in the mimic codebase,
             :func:`mimic.model.nova_objects.sequence` for more information.
-        :param event_description: Which event this sequence of behaviors
+        :param str event_description: Which event this sequence of behaviors
             should apply to - the default event is server creation.
+
+        :return: the ID of the created behavior
+        :rtype: `str`
         """
-        return self.treq.post(
+        body = yield self.treq.post(
             "{0}/behaviors/{1}".format(rcs.endpoints['mimic_nova'],
                                        event_description),
             json.dumps({
@@ -71,4 +89,32 @@ class MimicNova(object):
             }),
             headers=headers(str(rcs.token)),
             pool=self.pool
-        ).addCallback(check_success, [201]).addCallback(self.treq.content)
+        ).addCallback(check_success, [201]).addCallback(self.treq.json_content)
+
+        behavior_id = body['id']
+
+        if self.test_case is not None:
+            self.test_case.addCleanup(
+                self.delete_behavior, rcs, behavior_id, event_description)
+
+        returnValue(behavior_id)
+
+    def delete_behavior(self, rcs, behavior_id, event_description="creation"):
+        """
+        Given a behavior ID, delete it from mimic.
+
+        :param rcs: A :class:`otter.integration.lib.resources.TestResources`
+            instance.
+        :param event_description: What type of event this is that should be
+            deleted.
+        :param str behavior_id: The ID of the behavior to delete.
+        """
+        d = self.treq.delete(
+            "{0}/behaviors/{1}/{2}".format(rcs.endpoints['mimic_nova'],
+                                           event_description, behavior_id),
+            headers=headers(str(rcs.token)),
+            pool=self.pool
+        )
+        d.addCallback(check_success, [204, 404])
+        d.addCallback(self.treq.content)
+        return d

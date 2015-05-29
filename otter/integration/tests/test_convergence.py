@@ -823,7 +823,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=2, max_entities=10,
             server_name_prefix="build-to-error"
         )
-        d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        d = mimic_nova.sequenced_behaviors(
             self.rcs,
             criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
@@ -859,8 +860,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=2, max_entities=10,
             server_name_prefix="build-timeout"
         )
-
-        yield MimicNova(pool=self.helper.pool).sequenced_behaviors(
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        yield mimic_nova.sequenced_behaviors(
             self.rcs,
             criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
@@ -973,7 +974,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=2, max_entities=10,
             server_name_prefix="false-negative"
         )
-        d = MimicNova(pool=self.helper.pool).sequenced_behaviors(
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        d = mimic_nova.sequenced_behaviors(
             self.rcs,
             criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
