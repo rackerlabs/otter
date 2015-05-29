@@ -1080,6 +1080,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 "See #881.")
         return (name, wrapper)
 
+    @skip_me("Mimic does not support CLB limits, skipped pending Mimic #291")
     @tag("CATC-019")
     def test_scale_over_lb_limit(self):
         """
