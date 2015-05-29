@@ -135,7 +135,8 @@ def merge_servers(first, second):
 
 @do
 def get_scaling_group_servers(tenant_id, group_id, now,
-                              cache_class=CassScalingGroupServersCache):
+                              cache_class=CassScalingGroupServersCache,
+                              all_as_servers=get_all_scaling_group_servers):
     """
     Get a group's servers taken from cache if it exists. Updates cache
     if it is empty from newly fetched servers
@@ -146,17 +147,17 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     :return: Servers as iterator of dicts
     :rtype: Effect
     """
-    coll = cache_class(tenant_id, group_id)
-    cache, last_update = yield coll.get_servers()
-    if last_update is None or last_update - now >= timedelta(days=30):
+    cache = cache_class(tenant_id, group_id)
+    cached_servers, last_update = yield cache.get_servers()
+    if last_update is None or now - last_update >= timedelta(days=30):
         last_update = now - timedelta(days=30)
-        changes = (yield get_all_scaling_group_servers(last_update))[group_id]
-        current = (yield get_all_scaling_group_servers())[group_id]
+        changes = (yield all_as_servers(last_update))[group_id]
+        current = (yield all_as_servers())[group_id]
         servers = merge_servers(changes, current)
-        yield coll.insert_servers(now, servers, True)
+        yield cache.insert_servers(now, servers, True)
     else:
-        changes = (yield get_all_scaling_group_servers(last_update))[group_id]
-        servers = merge_servers(cache, changes)
+        changes = (yield all_as_servers(last_update))[group_id]
+        servers = merge_servers(cached_servers, changes)
     yield do_return(servers)
 
 

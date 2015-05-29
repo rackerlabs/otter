@@ -10,11 +10,15 @@ from effect import (
     Effect,
     ParallelEffects,
     TypeDispatcher,
+    base_dispatcher,
     sync_perform,
     sync_performer)
 
 from effect.async import perform_parallel_async
-from effect.testing import EQDispatcher, EQFDispatcher, Stub
+from effect.testing import (
+    EQDispatcher, EQFDispatcher, SequenceDispatcher, Stub)
+
+import mock
 
 from pyrsistent import freeze
 
@@ -31,7 +35,8 @@ from otter.convergence.gathering import (
     get_clb_contents,
     get_rcv3_contents,
     get_all_scaling_group_servers,
-    get_scaling_group_servers)
+    get_scaling_group_servers,
+    merge_servers)
 from otter.convergence.model import (
     CLBDescription,
     CLBNode,
@@ -42,6 +47,9 @@ from otter.convergence.model import (
     RCv3Node,
     ServerState)
 from otter.test.utils import (
+    Cache,
+    intent_func,
+    noop,
     patch,
     resolve_effect,
     resolve_retry_stubs,
@@ -211,6 +219,78 @@ class GetAllServerDetailsTests(SynchronousTestCase):
             eff.intent.should_retry,
             ShouldDelayAndRetry(can_retry=retry_times(5),
                                 next_interval=exponential_backoff_interval(2)))
+
+
+class GetScalingGroupServerTests(SynchronousTestCase):
+    """
+    Tests for :func:`get_scaling_group_servers`
+    """
+
+    def setUp(self):
+        self.now = datetime(2010, 5, 31)
+
+    def _invoke(self):
+        return get_scaling_group_servers(
+            'tid', 'gid', self.now, cache_class=Cache,
+            all_as_servers=intent_func("all-as"))
+
+    def _test_old_case(self, last_update):
+        exp_last_update = datetime(2010, 5, 1)
+        as_servers = [{'id': 'a', 'a': 'b'}, {'id': 'b', 'b': 'c'}]
+        current = [{'id': 'd', 'd': 'e'}]
+        sequence = SequenceDispatcher([
+            ("cachegstidgid", lambda i: (object(), last_update)),
+            (("all-as", exp_last_update), lambda i: {'gid': as_servers}),
+            (("all-as",), lambda i: {"gid": current}),
+            (("cacheistidgid", self.now, mock.ANY, True), noop)])
+        with sequence.consume():
+            disp = ComposedDispatcher([sequence, base_dispatcher])
+            eff = self._invoke()
+            self.assertEqual(
+                list(sync_perform(disp, eff)), as_servers + current)
+
+    def test_no_cache(self):
+        """
+        If cache is empty then servers returned are got by getting current list
+        and changes since last 30 days. The cache is updated with this list
+        """
+        self._test_old_case(None)
+
+    def test_really_old_cache(self):
+        """
+        If cache is older than 30 days then servers returned are got by getting
+        current list and changes since last 30 days. The cache is updated with
+        this list
+        """
+        self._test_old_case(datetime(2010, 3, 1))
+
+    def test_from_cache(self):
+        """
+        If cache is < 30 days old then servers returned are merge of
+        changes since the cache time
+        """
+        cache = [{'id': 'a', 'a': 'b'}, {'id': 'b', 'b': 'c'}]
+        changes = [{'id': 'd', 'd': 'e'}]
+        last_update = datetime(2010, 5, 20)
+        sequence = SequenceDispatcher([
+            ("cachegstidgid", lambda i: (cache, last_update)),
+            (("all-as", last_update), lambda i: {'gid': changes})])
+        with sequence.consume():
+            disp = ComposedDispatcher([sequence, base_dispatcher])
+            eff = self._invoke()
+            self.assertEqual(
+                list(sync_perform(disp, eff)), cache + changes)
+
+    def test_merge_servers_precedence(self):
+        """
+        In :func:`merge_servers`, if first list has common servers with second
+        list, the second one takes precedence
+        """
+        first = [{'id': 'a', 'a': 1}, {'id': 'b', 'b': 2}]
+        second = [{'id': 'd', 'd': 3}, {'id': 'b', 'b': 4}]
+        exp_servers = set(map(freeze, [first[0]] + second))
+        self.assertEqual(
+            set(map(freeze, merge_servers(first, second))), exp_servers)
 
 
 class GetAllScalingGroupServersTests(SynchronousTestCase):
