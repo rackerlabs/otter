@@ -842,7 +842,7 @@ def intent_func(fname):
     Return function that returns Effect of tuple of fname and its args. Useful
     in writing tests that expect intent based on args
     """
-    return lambda *a: Effect(tuple([fname] + list(a)))
+    return lambda *a: Effect((fname,) + a)
 
 
 class Cache(object):
