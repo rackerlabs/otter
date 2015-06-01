@@ -9,7 +9,7 @@ from datetime import datetime
 from functools import partial
 
 from effect import (
-    ComposedDispatcher, Effect, ParallelEffects, TypeDispatcher,
+    ComposedDispatcher, Constant, Effect, ParallelEffects, TypeDispatcher,
     base_dispatcher, sync_perform)
 from effect.testing import SequenceDispatcher, resolve_effect
 
@@ -3733,6 +3733,14 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         self.assertEqual(eff.intent, "delete")
         eff = resolve_effect(eff, None)
         self._test_insert_servers(eff)
+
+    def test_insert_empty(self):
+        """
+        `insert_servers` does nothing if called with empty servers list
+        """
+        self.assertEqual(
+            self.cache.insert_servers(self.dt, [], False),
+            Effect(Constant(None)))
 
     def test_delete_servers(self):
         """

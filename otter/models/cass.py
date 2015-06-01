@@ -12,7 +12,7 @@ from datetime import datetime
 
 from characteristic import attributes
 
-from effect import Effect, parallel
+from effect import Constant, Effect, parallel
 from effect.do import do, do_return
 
 from jsonschema import ValidationError
@@ -1720,6 +1720,9 @@ class CassScalingGroupServersCache(object):
                          last_update))
 
     def insert_servers(self, last_update, servers, clear_others):
+        servers = list(servers)
+        if len(servers) == 0:
+            return Effect(Constant(None))
         query = ("INSERT INTO {cf} (tenant_id, group_id, last_update, "
                  "server_id, server_blob) "
                  "VALUES(:tenant_id, :group_id, :last_update, :server_id{i}, "
