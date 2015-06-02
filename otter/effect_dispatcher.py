@@ -1,7 +1,5 @@
 """Effect dispatchers for Otter."""
 
-from functools import partial
-
 from effect import (
     ComposedDispatcher,
     TypeDispatcher,
@@ -18,7 +16,7 @@ from .auth import (
 )
 from .cloud_client import get_cloud_client_dispatcher
 from .log.intents import get_log_dispatcher
-from .models.cass import CQLQueryExecute, perform_cql_query
+from .models.cass import get_cql_dispatcher
 from .models.intents import get_model_dispatcher
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
@@ -50,7 +48,7 @@ def get_simple_dispatcher(reactor):
 
 
 def get_full_dispatcher(reactor, authenticator, log, service_configs,
-                        kz_client, store, supervisor):
+                        kz_client, store, supervisor, cass_client):
     """
     Return a dispatcher that can perform all of Otter's effects.
     """
@@ -59,7 +57,8 @@ def get_full_dispatcher(reactor, authenticator, log, service_configs,
         get_zk_dispatcher(kz_client),
         get_model_dispatcher(log, store),
         get_eviction_dispatcher(supervisor),
-        get_log_dispatcher(log, {})
+        get_log_dispatcher(log, {}),
+        get_cql_dispatcher(cass_client)
     ])
 
 
@@ -72,19 +71,4 @@ def get_legacy_dispatcher(reactor, authenticator, log, service_configs):
         get_cloud_client_dispatcher(
             reactor, authenticator, log, service_configs),
         get_simple_dispatcher(reactor),
-    ])
-
-
-def get_cql_dispatcher(reactor, connection):
-    """
-    Get dispatcher with `CQLQueryExecute`'s performer in it
-
-    :param reactor: Twisted reactor
-    :param connection: Silverberg connection
-    """
-    return ComposedDispatcher([
-        get_simple_dispatcher(reactor),
-        TypeDispatcher({
-            CQLQueryExecute: partial(perform_cql_query, connection)
-        })
     ])
