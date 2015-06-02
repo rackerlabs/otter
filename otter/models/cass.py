@@ -12,7 +12,8 @@ from datetime import datetime
 
 from characteristic import attributes
 
-from effect import Effect, parallel
+from effect import Constant, Effect, TypeDispatcher, parallel
+from effect.do import do, do_return
 
 from jsonschema import ValidationError
 
@@ -72,6 +73,26 @@ def perform_cql_query(conn, disp, intent):
     """
     return conn.execute(
         intent.query, intent.params, intent.consistency_level)
+
+
+def get_cql_dispatcher(connection):
+    """
+    Get dispatcher with `CQLQueryExecute`'s performer in it
+
+    :param connection: Silverberg connection
+    """
+    return TypeDispatcher({
+        CQLQueryExecute: functools.partial(perform_cql_query, connection)
+    })
+
+
+def cql_eff(query, params={}, consistency_level=ConsistencyLevel.ONE):
+    """
+    Return Effect of CQLQueryExecute intent
+    """
+    return Effect(
+        CQLQueryExecute(query=query, params=params,
+                        consistency_level=consistency_level))
 
 
 def serialize_json_data(data, ver):
