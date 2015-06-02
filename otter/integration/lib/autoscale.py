@@ -16,6 +16,7 @@ import treq
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
+from twisted.python.log import msg
 
 from otter.integration.lib.nova import NovaServer
 from otter.util.deferredutils import retry_and_timeout
@@ -448,6 +449,8 @@ class ScalingGroup(object):
             response, group_state = result
             mismatch = matcher.match(group_state['group'])
             if mismatch:
+                msg("Waiting for desired group state.\nMismatch: {}"
+                    .format(mismatch.describe()))
                 raise TransientRetryError(mismatch.describe())
             return rcs
 

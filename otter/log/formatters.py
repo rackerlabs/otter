@@ -250,6 +250,12 @@ def serialize_to_jsonable(obj):
     return repr(obj)
 
 
+class LogLevel(object):
+    """ Log levels """
+    INFO = 6
+    ERROR = 3
+
+
 def ErrorFormattingWrapper(observer):
     """
     Return log observer that will format error if any and delegate it to
@@ -267,7 +273,7 @@ def ErrorFormattingWrapper(observer):
         message = ""
 
         if event.get("isError", False):
-            level = 3
+            level = LogLevel.ERROR
 
             if 'failure' in event:
                 excp = event['failure'].value
@@ -282,7 +288,7 @@ def ErrorFormattingWrapper(observer):
                 message = '{0}: {1}'.format(event['why'], message)
 
         else:
-            level = 6
+            level = LogLevel.INFO
 
         event.update({
             "message": (''.join(event.get("message", '')) or message, ),

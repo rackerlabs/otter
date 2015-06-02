@@ -21,12 +21,14 @@ from otter.log.cloudfeeds import (
     UnsuitableMessage,
     add_event,
     cf_err, cf_fail, cf_msg,
+    get_cf_observer,
     prepare_request,
     request_format,
     sanitize_event
 )
+from otter.log.formatters import LogLevel
 from otter.log.intents import Log, LogErr
-from otter.test.utils import CheckFailure, mock_log, resolve_effect
+from otter.test.utils import CheckFailure, mock_log, patch, resolve_effect
 from otter.util.retry import (
     ShouldDelayAndRetry,
     exponential_backoff_interval,
@@ -83,7 +85,8 @@ def sample_event_pair():
         "desired_capacity": 5,
         "current_capacity": 3,
         "message": ("human", ),
-        "time": 0
+        "time": 0,
+        "level": LogLevel.INFO
     }, {
         "scalingGroupId": "gid",
         "policyId": "pid",
@@ -135,32 +138,22 @@ class SanitizeEventTests(SynchronousTestCase):
 
     def test_error(self):
         """
-        returns error=True if event has isError=True
+        returns error=True if event has level is ERROR
         """
-        self.event['isError'] = True
+        self.event['level'] = LogLevel.ERROR
         self._check_santized_event(True)
 
     def test_unsuitable_msg(self):
         """
         Raises UnsuitableMessage if message contains traceback or exception
         """
-        self.event['isError'] = True
+        self.event['level'] = LogLevel.ERROR
 
         self.event['message'] = ('some traceback', )
         self.assertRaises(UnsuitableMessage, sanitize_event, self.event)
 
         self.event['message'] = ('some exception', )
         self.assertRaises(UnsuitableMessage, sanitize_event, self.event)
-
-    def test_formats_message(self):
-        """
-        message in event dict is formatted
-        """
-        self.event['message'] = ('abc {a},{b}', )
-        self.event['a'] = 'a1'
-        self.event['b'] = 'b1'
-        self.exp_cf_event['message'] = 'abc a1,b1'
-        self._check_santized_event(False)
 
 
 class EventTests(SynchronousTestCase):
@@ -322,9 +315,9 @@ class CloudFeedsObserverTests(SynchronousTestCase):
         self.successResultOf(d)
         # log doesn't have cloud_feed in it
         self.log.err.assert_called_once_with(
-            CheckFailure(ValueError), "Failed to add event",
+            CheckFailure(ValueError), 'cf-add-failure',
             event_data={'event': 'dict'}, system='otter.cloud_feed',
-            cf_msg='m', otter_msg_type='cf-add-failure')
+            cf_msg='m')
 
     def test_unsuitable_msg_logs(self):
         """
@@ -337,8 +330,38 @@ class CloudFeedsObserverTests(SynchronousTestCase):
         cf = self.make_cf(add_event=add_event, get_disp=lambda *a: 1 / 0)
         cf({'event': 'dict', 'cloud_feed': True, 'message': ('m', )})
         self.log.err.assert_called_once_with(
-            None, ('Tried to add unsuitable message in cloud feeds: '
-                   '{unsuitable_message}'),
-            unsuitable_message='bad', event_data={'event': 'dict'},
-            system='otter.cloud_feed', cf_msg='m',
-            otter_msg_type='cf-unsuitable-message')
+            None, 'cf-unsuitable-message', unsuitable_message='bad',
+            event_data={'event': 'dict'}, system='otter.cloud_feed',
+            cf_msg='m')
+
+    def test_get_cf_observer(self):
+        """
+        `get_cf_observer` returns CloudFeedsObserver with observer chain setup
+        before creating
+        """
+        def wrapper(name, observer):
+            def _observer(e):
+                observer(e + name)
+            return _observer
+
+        patch(self, 'otter.log.cloudfeeds.SpecificationObserverWrapper',
+              side_effect=partial(wrapper, 'spec'))
+        patch(self, 'otter.log.cloudfeeds.PEP3101FormattingWrapper',
+              side_effect=partial(wrapper, 'pep'))
+        patch(self, 'otter.log.cloudfeeds.ErrorFormattingWrapper',
+              side_effect=partial(wrapper, 'error'))
+
+        def cf_observer_called(text):
+            self.cf_observer_text = text
+        mock_cfo = patch(self, 'otter.log.cloudfeeds.CloudFeedsObserver')
+        cfo_class = mock_cfo.return_value
+        cfo_class.side_effect = cf_observer_called
+
+        cfo = get_cf_observer(*range(5))
+
+        mock_cfo.assert_called_once_with(
+            reactor=0, authenticator=1, tenant_id=2, region=3,
+            service_configs=4)
+
+        cfo('test')
+        self.assertEqual(self.cf_observer_text, 'testspecpeperror')
