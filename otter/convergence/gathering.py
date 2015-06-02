@@ -149,7 +149,10 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     """
     cache = cache_class(tenant_id, group_id)
     cached_servers, last_update = yield cache.get_servers()
-    if last_update is None or now - last_update >= timedelta(days=30):
+    if last_update is None:
+        servers = (yield all_as_servers()).get(group_id, [])
+        yield cache.insert_servers(now, servers, True)
+    elif now - last_update >= timedelta(days=30):
         last_update = now - timedelta(days=30)
         changes = (yield all_as_servers(last_update)).get(group_id, [])
         current = (yield all_as_servers()).get(group_id, [])
