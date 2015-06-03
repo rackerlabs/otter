@@ -19,11 +19,7 @@ from kazoo.recipe.partitioner import PartitionState
 from pyrsistent import pset
 from pyrsistent import thaw
 
-from singledispatch import singledispatch
-
 import six
-
-from sumtypes import match
 
 from twisted.application.service import MultiService
 
@@ -33,8 +29,9 @@ from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
+from otter.convergence.errors import present_reasons
 from otter.convergence.gathering import get_all_convergence_data
-from otter.convergence.model import ErrorReason, ServerState, StepResult
+from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, with_log
@@ -165,40 +162,9 @@ def execute_convergence(tenant_id, group_id, build_timeout,
                                        status=ScalingGroupStatus.ERROR))
         yield cf_err(
             'group-status-error', status=ScalingGroupStatus.ERROR.name,
-            reasons='; '.join(_get_user_presentable_reasons(all_reasons)))
+            reasons='; '.join(present_reasons(all_reasons)))
 
     yield do_return(worst_status)
-
-
-@match(ErrorReason)
-class _present_reason(object):
-    """Get a user-presentable message or None from an :obj:`ErrorReason`."""
-    def Exception(exc_info): return _present_exception(exc_info[1])
-    def _(_): return None
-
-
-def _present_reasons(reasons):
-    """
-    Get a list of user-presentable messages from a list of :obj:`ErrorReason`.
-    """
-    return filter(lambda: None, map(_present_reason, reasons))
-
-
-@singledispatch
-def _present_exception(exception):
-    """Get a user-presentable message or None from an exception instance."""
-    return None
-
-
-@_present_exception.register(NoSuchCLBError):
-def _present_no_such_clb_error(exception):
-    return "Cloud Load Balancer does not exist: %s" % (exception.lb_id,)
-
-
-@present_exception.register(CLBDeletedError):
-def _present_clb_deleted_error(exception):
-    return ("Cloud Load Balancer is currently being deleted: %s"
-            % (exception.lb_id,))
 
 
 def format_dirty_flag(tenant_id, group_id):
