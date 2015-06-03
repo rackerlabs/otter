@@ -13,7 +13,7 @@ def present_reasons(reasons):
     class _present_reason(object):
         def Exception(exc_info): return _present_exception(exc_info[1])
         def _(_): return None
-    return filter(lambda: None, map(_present_reason, reasons))
+    return filter(None, map(_present_reason, reasons))
 
 
 @singledispatch

@@ -129,8 +129,7 @@ class StepResult(Names):
 @sumtype
 class ErrorReason(object):
     """A reason for a step to be in a RETRY or FAILURE state."""
-    Exception = constructor(
-        ('exc_info', attr.ib(validator=instance_of(tuple))))
+    Exception = constructor('exc_info')
     Other = constructor(
         ('reason', attr.ib(validator=instance_of((unicode, str)))))
     Structured = constructor('structure')

@@ -10,5 +10,5 @@ def steps_to_effect(steps):
     # Treat unknown errors as RETRY.
     return parallel([
         s.as_effect().on(error=lambda e: (StepResult.RETRY,
-                                          [ErrorReason.ExceptionOccured(e)]))
+                                          [ErrorReason.Exception(e)]))
         for s in steps])

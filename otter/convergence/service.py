@@ -5,6 +5,7 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 :obj:`Converger`.
 """
 
+import operator
 import time
 import uuid
 from functools import partial
@@ -139,7 +140,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         yield do_return(StepResult.SUCCESS)
     results = yield steps_to_effect(steps)
 
-    all_reasons = (x[1] for x in results)
+    all_reasons = reduce(operator.add, (x[1] for x in results))
     severity = [StepResult.FAILURE, StepResult.RETRY, StepResult.SUCCESS]
     priority = sorted(results,
                       key=lambda (status, reasons): severity.index(status))

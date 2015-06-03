@@ -22,7 +22,7 @@ from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.model import (
-    CLBDescription, CLBNode, NovaServer, ServerState, StepResult)
+    CLBDescription, CLBNode, ErrorReason, NovaServer, ServerState, StepResult)
 from otter.convergence.service import (
     ConcurrentError,
     ConvergenceStarter,
@@ -751,7 +751,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         def plan(*args, **kwargs):
             return pbag([
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                ConvergeLater(reasons=['mywish']),
+                ConvergeLater(reasons=[ErrorReason.Other('mywish')]),
                 TestStep(Effect(Constant((StepResult.SUCCESS, []))))])
 
         eff = execute_convergence(self.tenant_id, self.group_id,
@@ -770,9 +770,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         def plan(*args, **kwargs):
             return pbag([
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                ConvergeLater(reasons=['mywish']),
+                ConvergeLater(reasons=[ErrorReason.Other('mywish')]),
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                TestStep(Effect(Constant((StepResult.FAILURE, ['bad'])))),
+                TestStep(Effect(Constant((StepResult.FAILURE,
+                                          [ErrorReason.Other('bad')])))),
                 TestStep(Effect(Constant((StepResult.SUCCESS, []))))
             ])
 
@@ -790,7 +791,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                status=ScalingGroupStatus.ERROR),
              noop),
             (Log('group-status-error', dict(isError=True, cloud_feed=True,
-                                            status='ERROR')),
+                                            status='ERROR', reasons='')),
              noop)
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
