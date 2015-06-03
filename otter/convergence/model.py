@@ -5,9 +5,14 @@ representation across the different phases of convergence.
 import json
 import re
 
+import attr
+from attr.validators import instance_of
+
 from characteristic import Attribute, attributes
 
 from pyrsistent import PSet, freeze, pmap, pset, pvector
+
+from sumtypes import constructor, sumtype
 
 from toolz.dicttoolz import get_in
 from toolz.itertoolz import groupby
@@ -110,6 +115,25 @@ class StepResult(Names):
     """
     The step failed. Retrying convergence won't help.
     """
+
+
+# okay, so this is what we care about
+# - exceptions should have their full tracebacks rendered in the logs
+# - *some* things should either *have* user-presentable error messages or be
+#   mappable to them
+# - other things we want to log with some structure, in case we want to be able
+#   to filter on it later with ElasticSearch
+# - other arbitrary messages that we _don't_ want to show to the user.
+# - The question is whether we should
+
+@sumtype
+class ErrorReason(object):
+    """A reason for a step to be in a RETRY or FAILURE state."""
+    Exception = constructor(
+        ('exc_info', attr.ib(validator=instance_of(tuple))))
+    Other = constructor(
+        ('reason', attr.ib(validator=instance_of((unicode, str)))))
+    Structured = constructor('structure')
 
 
 def get_service_metadata(service_name, metadata):
