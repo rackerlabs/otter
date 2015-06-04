@@ -35,6 +35,24 @@ def run(modules, other_args, reactor):
         raise SystemExit('modules {} failed'.format(','.join(failed)))
 
 
+def get_python_test_modules(root):
+    for dirpath, dirnames, filenames in os.walk(root, topdown=True):
+        for filename in filenames:
+            if filename.startswith("test_") and filename[-3:] == ".py":
+                yield filename[:-3]
+
+
+def find_dir(root, _dir):
+    for dirpath, dirnames, filenames in os.walk(root):
+        if os.path.split(dirpath)[1] == _dir:
+            return dirpath
+
+
+def get_test_modules(root, package):
+    mod_dir = find_dir(root, package)
+    return get_python_test_modules(mod_dir)
+
+
 def print_dot():
     print('.', end='')
     sys.stdout.flush()
@@ -53,8 +71,12 @@ def main(reactor, args):
                     'sub-processes. Every argument given here is passed '
                     'to cafe-runner')
     parser.add_argument(
-        '-m', dest='module', action='append', required=True,
+        '-m', dest='module', action='append', nargs='+',
         help='module pattern as in cafe-runner. Can be given multiple times')
+    parser.add_argument(
+        '-p', dest='package', action='append', nargs='+',
+        help='package as in cafe-runner. Can be given multiple times')
+
     parsed, others = parser.parse_known_args(args)
     d = run(parsed.module, others[1:], reactor)
     print('Running all tests')
@@ -63,4 +85,5 @@ def main(reactor, args):
 
 
 if __name__ == '__main__':
-    task.react(main, (sys.argv,))
+    #task.react(main, (sys.argv,))
+    test_mod()
