@@ -698,11 +698,14 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """When a step doesn't succeed, useful information is logged."""
         try:
             1 / 0
-        except:
+        except ZeroDivisionError:
             exc_info = sys.exc_info()
 
         step = TestStep(Effect(Constant(
-            (StepResult.RETRY, [ErrorReason.Exception(exc_info)]))))
+            (StepResult.RETRY, [
+                ErrorReason.Exception(exc_info),
+                ErrorReason.Other('foo'),
+                ErrorReason.Structured({'foo': 'bar'})]))))
 
         def plan(*args, **kwargs):
             return pbag([step])
@@ -719,7 +722,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             'results': [
                 (step, (StepResult.RETRY,
                         [{'exception': exc_msg,
-                          'traceback': tb_msg}]))],
+                          'traceback': tb_msg},
+                         'foo',
+                         {'foo': 'bar'}]))],
             'worst_status': 'RETRY'}
         sequence = SequenceDispatcher([
             (self.gsgi, lambda i: (self.group, self.manifest)),

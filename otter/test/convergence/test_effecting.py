@@ -2,15 +2,13 @@
 
 from effect import Constant, Effect, Error, ParallelEffects, sync_perform
 
-import mock
-
 from testtools.matchers import MatchesException
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.model import ErrorReason, StepResult
-from otter.test.utils import TestStep, matches, test_dispatcher, transform_eq
+from otter.test.utils import TestStep, matches, test_dispatcher
 
 
 class StepsToEffectTests(SynchronousTestCase):

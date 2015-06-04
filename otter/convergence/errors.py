@@ -1,8 +1,9 @@
 import traceback
 
+from singledispatch import singledispatch
+
 from toolz.functoolz import identity
 
-from singledispatch import singledispatch
 
 from sumtypes import match
 
@@ -44,4 +45,5 @@ class structure_reason(object):
         return  {
             'exception': serialize_to_jsonable(exc_info[1]),
             'traceback': ''.join(traceback.format_exception(*exc_info))}
-    _ = identity
+    Structured = identity
+    Other = identity
