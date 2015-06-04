@@ -121,8 +121,7 @@ class StepResult(Names):
 class ErrorReason(object):
     """A reason for a step to be in a RETRY or FAILURE state."""
     Exception = constructor('exc_info')
-    Other = constructor(
-        ('reason', attr.ib(validator=instance_of((unicode, str)))))
+    Other = constructor(reason=attr.ib(validator=instance_of((unicode, str))))
     Structured = constructor('structure')
 
 
