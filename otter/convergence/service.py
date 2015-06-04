@@ -30,7 +30,7 @@ from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
-from otter.convergence.errors import present_reasons
+from otter.convergence.errors import present_reasons, structure_reason
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
@@ -145,9 +145,13 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     priority = sorted(results,
                       key=lambda (status, reasons): severity.index(status))
     worst_status = priority[0][0]
+    results_to_log = zip(
+        steps,
+        [(result, map(structure_reason, reasons))
+         for result, reasons in results])
     yield msg('execute-convergence-results',
-              results=zip(steps, results),
-              worst_status=worst_status)
+              results=results_to_log,
+              worst_status=worst_status.name)
 
     if worst_status == StepResult.SUCCESS:
         if group_state.status == ScalingGroupStatus.DELETING:

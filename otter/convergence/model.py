@@ -117,15 +117,6 @@ class StepResult(Names):
     """
 
 
-# okay, so this is what we care about
-# - exceptions should have their full tracebacks rendered in the logs
-# - *some* things should either *have* user-presentable error messages or be
-#   mappable to them
-# - other things we want to log with some structure, in case we want to be able
-#   to filter on it later with ElasticSearch
-# - other arbitrary messages that we _don't_ want to show to the user.
-# - The question is whether we should
-
 @sumtype
 class ErrorReason(object):
     """A reason for a step to be in a RETRY or FAILURE state."""

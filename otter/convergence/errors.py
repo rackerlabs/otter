@@ -1,9 +1,14 @@
+import traceback
+
+from toolz.functoolz import identity
+
 from singledispatch import singledispatch
 
 from sumtypes import match
 
 from otter.cloud_client import CLBDeletedError, NoSuchCLBError
 from otter.convergence.model import ErrorReason
+from otter.log.formatters import serialize_to_jsonable
 
 def present_reasons(reasons):
     """
@@ -31,3 +36,12 @@ def _present_no_such_clb_error(exception):
 def _present_clb_deleted_error(exception):
     return ("Cloud Load Balancer is currently being deleted: %s"
             % (exception.lb_id,))
+
+
+@match(ErrorReason)
+class structure_reason(object):
+    def Exception(exc_info):
+        return  {
+            'exception': serialize_to_jsonable(exc_info[1]),
+            'traceback': ''.join(traceback.format_exception(*exc_info))}
+    _ = identity

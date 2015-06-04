@@ -1,4 +1,6 @@
+import sys
 import time
+import traceback
 import uuid
 
 from effect import (
@@ -658,7 +660,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              lambda i: None),
             (Log('execute-convergence-results',
                  {'results': [(steps[0], (StepResult.SUCCESS, []))],
-                  'worst_status': StepResult.SUCCESS}), lambda i: None)
+                  'worst_status': 'SUCCESS'}), lambda i: None)
         ])
         dispatcher = ComposedDispatcher([sequence, self._get_dispatcher()])
         with sequence.consume():
@@ -673,7 +675,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """
         gacd = self._get_gacd_func(self.group.uuid)
         for srv in self.servers:
-            srv.desired_lbs = pmap()
+            srv.desired_lbs = pset()
 
         eff = execute_convergence(self.tenant_id, self.group_id,
                                   build_timeout=3600,
@@ -691,6 +693,50 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         # And make sure that exception isn't wrapped in FirstError.
         e = self.assertRaises(RuntimeError, sync_perform, dispatcher, eff)
         self.assertEqual(str(e), 'foo')
+
+    def test_log_reasons(self):
+        """When a step doesn't succeed, useful information is logged."""
+        try:
+            1 / 0
+        except:
+            exc_info = sys.exc_info()
+
+        step = TestStep(Effect(Constant(
+            (StepResult.RETRY, [ErrorReason.Exception(exc_info)]))))
+
+        def plan(*args, **kwargs):
+            return pbag([step])
+
+        gacd = self._get_gacd_func(self.group.uuid)
+        eff = execute_convergence(self.tenant_id, self.group_id,
+                                  build_timeout=3600,
+                                  get_all_convergence_data=gacd,
+                                  plan=plan)
+
+        exc_msg = "ZeroDivisionError('integer division or modulo by zero',)"
+        tb_msg = ''.join(traceback.format_exception(*exc_info))
+        expected_fields = {
+            'results': [
+                (step, (StepResult.RETRY,
+                        [{'exception': exc_msg,
+                          'traceback': tb_msg}]))],
+            'worst_status': 'RETRY'}
+        sequence = SequenceDispatcher([
+            (self.gsgi, lambda i: (self.group, self.manifest)),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
+             noop),
+            (Log(msg='execute-convergence-results', fields=expected_fields),
+             noop),
+        ])
+
+        dispatcher = ComposedDispatcher([
+            base_dispatcher,
+            TypeDispatcher({ParallelEffects: perform_parallel_async}),
+            sequence])
+
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
 
     def test_deleting_group(self):
         """
