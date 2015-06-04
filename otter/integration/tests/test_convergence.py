@@ -369,7 +369,6 @@ class TestConvergence(unittest.TestCase):
             )
         )
 
-    @skip_me("Autoscale does not clean up servers deleted OOB yet. See #881.")
     def test_scaling_to_clb_max_after_oob_delete_type1(self):
         """
         CATC-015-a
@@ -388,7 +387,6 @@ class TestConvergence(unittest.TestCase):
         """
         return self._perform_oobd_clb_test(25)
 
-    @skip_me("Autoscale does not clean up servers deleted OOB yet. See #881.")
     def test_scaling_to_clb_max_after_oob_delete_type2(self):
         """
         CATC-015-b
@@ -1097,10 +1095,6 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 clb.wait_for_nodes(self.rcs, checks, timeout=1800)
                 for clb in self.helper.clbs])
 
-        if any(tag in tags for tag in _catc_tags(4, 8)):
-            wrapper.skip = (
-                "Autoscale does not clean up servers deleted OOB yet. "
-                "See #881.")
         return (name, wrapper)
 
     @skip_me("Mimic does not support CLB limits, skipped pending Mimic #291")
