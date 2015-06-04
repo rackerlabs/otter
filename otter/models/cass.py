@@ -1719,6 +1719,9 @@ class CassScalingGroupServersCache(object):
 
     @do
     def get_servers(self):
+        """
+        See :method:`IScalingGroupServersCache.get_servers`
+        """
         query = ("SELECT server_blob, last_update FROM {cf} "
                  "WHERE tenant_id=:tenant_id AND group_id=:group_id "
                  "ORDER BY last_update DESC;")
@@ -1731,6 +1734,9 @@ class CassScalingGroupServersCache(object):
                          last_update))
 
     def insert_servers(self, last_update, servers, clear_others):
+        """
+        See :method:`IScalingGroupServersCache.insert_servers`
+        """
         if len(servers) == 0:
             return Effect(Constant(None))
         query = ("INSERT INTO {cf} (tenant_id, group_id, last_update, "
@@ -1750,6 +1756,9 @@ class CassScalingGroupServersCache(object):
             return cql_eff(batch(queries), params)
 
     def delete_servers(self):
+        """
+        See :method:`IScalingGroupServersCache.delete_servers`
+        """
         query = ("DELETE FROM {cf} WHERE tenant_id=:tenant_id AND "
                  "group_id=:group_id;")
         return cql_eff(query.format(cf=self.table), self.params)
