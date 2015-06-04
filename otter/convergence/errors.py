@@ -2,10 +2,9 @@ import traceback
 
 from singledispatch import singledispatch
 
-from toolz.functoolz import identity
-
-
 from sumtypes import match
+
+from toolz.functoolz import identity
 
 from otter.cloud_client import CLBDeletedError, NoSuchCLBError
 from otter.convergence.model import ErrorReason
@@ -42,7 +41,7 @@ def _present_clb_deleted_error(exception):
 @match(ErrorReason)
 class structure_reason(object):
     def Exception(exc_info):
-        return  {
+        return {
             'exception': serialize_to_jsonable(exc_info[1]),
             'traceback': ''.join(traceback.format_exception(*exc_info))}
     Structured = identity
