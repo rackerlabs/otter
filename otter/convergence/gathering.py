@@ -51,15 +51,16 @@ def get_all_server_details(changes_since=None, batch_size=100):
     url = append_segments('servers', 'detail')
     query = {'limit': batch_size}
     if changes_since is not None:
-        query['changes_since'] = '{0}Z'.format(changes_since.isoformat())
+        query['changes-since'] = '{0}Z'.format(changes_since.isoformat())
 
     last_link = []
 
     def get_server_details(query_params):
+        params = sorted(query_params.items())
         eff = retry_effect(
             service_request(ServiceType.CLOUD_SERVERS, 'GET',
                             "{}?{}".format(url,
-                                           urlencode(query_params, True))),
+                                           urlencode(params, True))),
             retry_times(5), exponential_backoff_interval(2))
         return eff.on(continue_)
 
