@@ -1731,7 +1731,6 @@ class CassScalingGroupServersCache(object):
                          last_update))
 
     def insert_servers(self, last_update, servers, clear_others):
-        servers = list(servers)
         if len(servers) == 0:
             return Effect(Constant(None))
         query = ("INSERT INTO {cf} (tenant_id, group_id, last_update, "

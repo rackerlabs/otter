@@ -18,8 +18,6 @@ from effect.async import perform_parallel_async
 from effect.testing import (
     EQDispatcher, EQFDispatcher, SequenceDispatcher, Stub)
 
-import mock
-
 from pyrsistent import freeze
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -252,7 +250,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         with sequence.consume():
             disp = ComposedDispatcher([sequence, base_dispatcher])
             self.assertEqual(
-                list(sync_perform(disp, self._invoke())), current)
+                sync_perform(disp, self._invoke()), current)
 
     def test_no_cache(self):
         """
@@ -266,17 +264,17 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         exp_last_update = datetime(2010, 5, 1)
         as_servers = self.servers1
         current = self.servers2
+        servers = (as_srvs and as_servers or []) + (cur_srvs and current or [])
         sequence = SequenceDispatcher([
             ("cachegstidgid", lambda i: (object(), last_update)),
             (("all-as", exp_last_update),
              lambda i: {'gid': as_servers} if as_srvs else {}),
             (("all-as",), lambda i: {"gid": current} if cur_srvs else {}),
-            (("cacheistidgid", self.now, mock.ANY, True), noop)])
+            (("cacheistidgid", self.now, servers, True), noop)])
         with sequence.consume():
             disp = ComposedDispatcher([sequence, base_dispatcher])
             self.assertEqual(
-                list(sync_perform(disp, self._invoke())),
-                (as_srvs and as_servers or []) + (cur_srvs and current or []))
+                sync_perform(disp, self._invoke()), servers)
 
     def test_old_cache(self):
         """
@@ -303,7 +301,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         with sequence.consume():
             disp = ComposedDispatcher([sequence, base_dispatcher])
             self.assertEqual(
-                list(sync_perform(disp, self._invoke())), cache + changes)
+                sync_perform(disp, self._invoke()), cache + changes)
 
     def test_from_cache_no_changes(self):
         """
@@ -318,7 +316,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         with sequence.consume():
             disp = ComposedDispatcher([sequence, base_dispatcher])
             self.assertEqual(
-                list(sync_perform(disp, self._invoke())), cache)
+                sync_perform(disp, self._invoke()), cache)
 
     def test_merge_servers_precedence(self):
         """

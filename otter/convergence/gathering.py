@@ -131,7 +131,7 @@ def merge_servers(first, second):
     def sdict(servers):
         return {s['id']: s for s in servers}
 
-    return merge(sdict(first), sdict(second)).itervalues()
+    return merge(sdict(first), sdict(second)).values()
 
 
 @do
