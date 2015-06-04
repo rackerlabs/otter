@@ -15,7 +15,7 @@ from kazoo.recipe.partitioner import PartitionState
 
 import mock
 
-from pyrsistent import freeze, pbag, pmap, pset, s
+from pyrsistent import freeze, pbag, pset, s
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase

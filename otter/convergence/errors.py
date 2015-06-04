@@ -10,14 +10,19 @@ from otter.cloud_client import CLBDeletedError, NoSuchCLBError
 from otter.convergence.model import ErrorReason
 from otter.log.formatters import serialize_to_jsonable
 
+
 def present_reasons(reasons):
     """
     Get a list of user-presentable messages from a list of :obj:`ErrorReason`.
     """
     @match(ErrorReason)
     class _present_reason(object):
-        def Exception(exc_info): return _present_exception(exc_info[1])
-        def _(_): return None
+        def Exception(exc_info):
+            return _present_exception(exc_info[1])
+
+        def _(_):
+            return None
+
     return filter(None, map(_present_reason, reasons))
 
 
