@@ -11,7 +11,8 @@ import sys
 from argparse import ArgumentParser
 
 from twisted.internet import task
-from twisted.internet.defer import gatherResults, inlineCallbacks, DeferredSemaphore
+from twisted.internet.defer import (
+    DeferredSemaphore, gatherResults, inlineCallbacks)
 from twisted.internet.utils import getProcessOutputAndValue
 
 
@@ -88,7 +89,8 @@ def main(reactor, args):
                     'sub-processes. Every argument given here is passed '
                     'to cafe-runner')
     parser.add_argument(
-        '-m', dest='module', nargs='+', help='module pattern as in cafe-runner')
+        '-m', dest='module', nargs='+',
+        help='module pattern as in cafe-runner')
     parser.add_argument(
         '-p', dest='package', nargs='+', help='package as in cafe-runner.')
     parser.add_argument(
