@@ -11,28 +11,45 @@ import sys
 from argparse import ArgumentParser
 
 from twisted.internet import task
-from twisted.internet.defer import gatherResults, inlineCallbacks
+from twisted.internet.defer import gatherResults, inlineCallbacks, DeferredSemaphore
 from twisted.internet.utils import getProcessOutputAndValue
 
 
+def get_root():
+    from test_repo import autoscale
+    return autoscale.__path__[0]
+
+
+def get_cafe_args(packages, modules):
+    if modules:
+        proc_args = []
+        if packages:
+            proc_args.extend(['-p'] + packages)
+        return [proc_args + ['-m', module] for module in modules]
+    else:
+        return [['-p', package, '-m', module] for package in packages
+                for module in get_test_modules(get_root(), package)]
+
+
 @inlineCallbacks
-def run(modules, other_args, reactor):
+def run(packages, modules, other_args, reactor, limit):
+    sem = DeferredSemaphore(limit)
+    proc_argss = get_cafe_args(packages, modules)
     deferreds = [
-        getProcessOutputAndValue(
-            'cafe-runner', other_args + ['-m', module], env=os.environ,
-            reactor=reactor)
-        for module in modules]
+        sem.run(getProcessOutputAndValue, 'cafe-runner',
+                other_args + proc_args, env=os.environ, reactor=reactor)
+        for proc_args in proc_argss]
     results = yield gatherResults(deferreds, consumeErrors=True)
 
-    failed = []
-    for module, (stdout, stderr, code) in zip(modules, results):
-        print('Standard out and error when running module', module)
-        print(stdout, '\n', stderr)
-        if code != 0:
-            failed.append(module)
+    failed = False
+    for proc_args, (stdout, stderr, code) in zip(proc_argss, results):
+        if code == 0:
+            continue
+        failed = True
+        print('Error when running ', ' '.join(proc_args), '\n', stderr)
 
     if failed:
-        raise SystemExit('modules {} failed'.format(','.join(failed)))
+        raise SystemExit('Some tests failed')
 
 
 def get_python_test_modules(root):
@@ -71,19 +88,21 @@ def main(reactor, args):
                     'sub-processes. Every argument given here is passed '
                     'to cafe-runner')
     parser.add_argument(
-        '-m', dest='module', action='append', nargs='+',
-        help='module pattern as in cafe-runner. Can be given multiple times')
+        '-m', dest='module', nargs='+', help='module pattern as in cafe-runner')
     parser.add_argument(
-        '-p', dest='package', action='append', nargs='+',
-        help='package as in cafe-runner. Can be given multiple times')
+        '-p', dest='package', nargs='+', help='package as in cafe-runner.')
+    parser.add_argument(
+        '-l', dest='limit', type=int, default=10,
+        help='Number of maximum processes at a time')
 
     parsed, others = parser.parse_known_args(args)
-    d = run(parsed.module, others[1:], reactor)
+    if not (parsed.package or parsed.module):
+        raise SystemExit("Need at least one of --package or --module")
+    d = run(parsed.package, parsed.module, others[1:], reactor, parsed.limit)
     print('Running all tests')
     call = print_dots(reactor)
     return d.addCallback(lambda _: call.stop())
 
 
 if __name__ == '__main__':
-    #task.react(main, (sys.argv,))
-    test_mod()
+    task.react(main, (sys.argv,))
