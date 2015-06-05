@@ -1047,7 +1047,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             ), timeout=600)
 
 
-
 def _catc_tags(start_num, end_num):
     """
     Return a list of CATC tags corresponding to the start test number and end
