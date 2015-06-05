@@ -47,7 +47,8 @@ def run(packages, modules, other_args, reactor, limit):
         if code == 0:
             continue
         failed = True
-        print('Error when running ', ' '.join(proc_args), '\n', stderr)
+        print('Error when running ', ' '.join(proc_args))
+        print('Stdout\n', stdout, 'Stderr\n', stderr)
 
     if failed:
         raise SystemExit('Some tests failed')
