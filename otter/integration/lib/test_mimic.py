@@ -3,7 +3,7 @@ import json
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.integration.lib.mimic import MimicNova, MimicIdentity
+from otter.integration.lib.mimic import MimicIdentity, MimicNova
 from otter.integration.lib.test_nova import Response, get_fake_treq
 
 
