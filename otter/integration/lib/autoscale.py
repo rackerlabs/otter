@@ -452,6 +452,8 @@ class ScalingGroup(object):
                 msg("Waiting for desired group state.\nMismatch: {}"
                     .format(mismatch.describe()))
                 raise TransientRetryError(mismatch.describe())
+            msg("Success: desired group state reached:\n{}\nmatches:\n{}"
+                .format(group_state['group'], matcher))
             return rcs
 
         def poll():

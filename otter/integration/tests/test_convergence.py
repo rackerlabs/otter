@@ -991,6 +991,62 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                       matcher=HasLength(2), timeout=600)
         return d
 
+    @skip_me("Autoscale does not yet handle Nova over-quota errors: #1470")
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
+    @tag("CATC-025")
+    @inlineCallbacks
+    def test_recovers_from_nova_over_quota_error(self):
+        """
+        CATC-025
+
+        Nova returns 403 over-quote on server create.  Group goes into error.
+        During the next scale up, Nova has been "fixed".  Group returns to
+        active state, and the correct number of servers appear.
+        """
+        group, server_name_prefix = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=2, max_entities=10,
+            server_name_prefix="over-quota"
+        )
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        over_quota_message = (
+            "Quota exceeded for ram: Requested 1024, but already used 131072 "
+            "of 131072 ram")
+
+        behavior_id = yield mimic_nova.sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": server_name_prefix + ".*"}],
+            behaviors=[
+                {"name": "default"},
+                {"name": "fail",
+                 "parameters": {"code": 403, "message": over_quota_message,
+                                "type": "forbidden"}}
+            ])
+
+        yield group.start(self.rcs, self)
+        yield group.wait_for_state(
+            self.rcs,
+            MatchesAll(
+                ContainsDict({
+                    'desiredCapacity': Equals(2),
+                    'status': Equals("ERROR")
+                }),
+            ), timeout=600)
+
+        yield mimic_nova.delete_behavior(self.rcs, behavior_id)
+        yield _scale_by(1)(self.helper, self.rcs, group)
+        yield group.wait_for_state(
+            self.rcs,
+            MatchesAll(
+                ContainsDict({
+                    'pendingCapacity': Equals(0),
+                    'desiredCapacity': Equals(3),
+                    'active': HasLength(3),
+                    'status': Equals("ACTIVE")
+                }),
+            ), timeout=600)
+
+
 
 def _catc_tags(start_num, end_num):
     """
