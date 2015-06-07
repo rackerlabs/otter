@@ -21,21 +21,23 @@ def get_root():
     return autoscale.__path__[0]
 
 
-def get_cafe_args(packages, modules):
+def get_cafe_args(packages, modules, excludes):
     if modules:
         proc_args = []
         if packages:
             proc_args.extend(['-p'] + packages)
-        return [proc_args + ['-m', module] for module in modules]
+        return [proc_args + ['-m', module]
+                for module in modules if module not in excludes]
     else:
         return [['-p', package, '-m', module] for package in packages
-                for module in get_test_modules(get_root(), package)]
+                for module in get_test_modules(get_root(), package)
+                if module not in excludes]
 
 
 @inlineCallbacks
-def run(packages, modules, other_args, reactor, limit):
+def run(packages, modules, other_args, reactor, limit, excludes):
     sem = DeferredSemaphore(limit)
-    proc_argss = get_cafe_args(packages, modules)
+    proc_argss = get_cafe_args(packages, modules, excludes)
     deferreds = [
         sem.run(getProcessOutputAndValue, 'cafe-runner',
                 other_args + proc_args, env=os.environ, reactor=reactor)
@@ -95,13 +97,17 @@ def main(reactor, args):
     parser.add_argument(
         '-p', dest='package', nargs='+', help='package as in cafe-runner.')
     parser.add_argument(
+        '-e', '--exclude', dest='exclude', nargs='+',
+        help='Exclude modules from running')
+    parser.add_argument(
         '-l', dest='limit', type=int, default=10,
         help='Number of maximum processes at a time')
 
     parsed, others = parser.parse_known_args(args)
     if not (parsed.package or parsed.module):
         raise SystemExit("Need at least one of --package or --module")
-    d = run(parsed.package, parsed.module, others[1:], reactor, parsed.limit)
+    d = run(parsed.package, parsed.module, others[1:], reactor,
+            parsed.limit, parsed.exclude)
     print('Running all tests')
     call = print_dots(reactor)
     return d.addCallback(lambda _: call.stop())
