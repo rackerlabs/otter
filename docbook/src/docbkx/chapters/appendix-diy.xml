@@ -114,14 +114,11 @@
                     <para>
                         <itemizedlist>
                             <listitem>
-                                <para>Use a text editor, such as Sublime, to form the commands. Copy
-                                    the command from this document into the editor and make the
-                                    required changes there. Then, paste the results into a shell
-                                    window and execute the command (press Enter). Note: Sublime
-                                    isn’t free, but there are several editors out there like
-                                    Notepad++, Vim, and Brackets, that are free. Trying to use the
-                                    commands, even modified, from the Word file directly may not
-                                    work.</para>
+                                <para>Copying and pasting commands directly from this documentation
+                                    into your terminal program may be somewhat error-prone, so we
+                                    recommend you first copy them into your text editor of choice,
+                                    modify them as required there, and then copy them into your
+                                    terminal.</para>
                             </listitem>
                             <listitem>
                                 <para> Watch out for quotes and dashes.</para>
