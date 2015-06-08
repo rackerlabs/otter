@@ -1226,6 +1226,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             )
         )
 
+    @skip_me("Otter does not yet support this error transition")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-023")
     def test_clb_plane(self):

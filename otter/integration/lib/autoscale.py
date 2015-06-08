@@ -307,16 +307,18 @@ class ScalingGroup(object):
         success_codes = [200, 404] if success_codes is None else success_codes
 
         def decide(resp):
-            if verbosity > 0:
-                print('ScalingGroup.get_scaling_group_state content: ')
-                pp.pprint(resp.data)
-
             if resp.code == 200:
                 return self.treq.json_content(resp).addCallback(
                     lambda x: (200, x))
 
             return self.treq.content(resp).addCallback(
                 lambda _: (resp.code, None))
+
+        def debug_print(resp_tuple):
+            if verbosity > 0:
+                print('ScalingGroup.get_scaling_group_state response: ')
+                pp.pprint(resp_tuple)
+            return resp_tuple
 
         return (
             self.treq.get(
@@ -327,6 +329,7 @@ class ScalingGroup(object):
                 pool=self.pool
             ).addCallback(check_success, success_codes)
             .addCallback(decide)
+            .addCallback(debug_print)
         )
 
     def start(self, rcs, test):
