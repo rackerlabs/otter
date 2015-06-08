@@ -1230,19 +1230,16 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
     @tag("CATC-023")
     def test_clb_plane(self):
         """
-        Simulate getting a 422 on scale up from CLB when in PENDING_DELETE which
-should cause the group to error
+        CATC-023-a: Validate that Otter correctly enters an error state when
+        attemting to scale up while the CLB is in the PENDING_DELETE state.
 
-Create a group with non-min servers and a CLB (or more)
-Set mimic to return 422 and state PENDING_DELETE on the CLB
-Attempt to scale up
-Verify that the group goes into error state since it cannot take action
-Prereq: MUST be able to use Mimic to simulate incorrect CLB behavior
-
+        1. Create a group with non-min servers attached to a CLB
+        2. Place the CLB into the PENDING_DELETE state
+            - Return 422, status: PENDING_DELETE on any mutating request
+        3. Scale up
+        4. Assert that the group goes into error state since it cannot
+            take action.
         """
-        print(self.helper.clbs[0])
-
-        # Create group
         group, _ = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref, min_entities=1)
 
@@ -1255,7 +1252,6 @@ Prereq: MUST be able to use Mimic to simulate incorrect CLB behavior
 
         return (
             self.helper.start_group_and_wait(group, self.rcs)
-            # Change LB state to PENDING DELETE
             .addCallback(
                 mimic_clb.set_clb_attributes,
                 self.helper.clbs[0].clb_id, {"status": "PENDING_DELETE"})
