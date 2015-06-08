@@ -154,8 +154,9 @@ class MimicCLB(object):
         """
         print('Use mimic to set CLB attribute')
         return self.treq.patch(
-            "{0}/{1}/attributes".format(rcs.endpoints["mimic_clb"], clb_id),
+            "{0}/loadbalancer/{1}/attributes".format(
+                rcs.endpoints["mimic_clb"], clb_id),
             json.dumps(kvpairs),
             headers=headers(str(rcs.token)),
             pool=self.pool
-        ).addCallback(check_success, [201]).addCallback(self.treq.content)
+        ).addCallback(check_success, [204]).addCallback(self.treq.content)

@@ -1230,7 +1230,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
     @tag("CATC-023")
     def test_clb_plane(self):
         """
-Simulate getting a 422 on scale up from CLB when in PENDING_DELETE which
+        Simulate getting a 422 on scale up from CLB when in PENDING_DELETE which
 should cause the group to error
 
 Create a group with non-min servers and a CLB (or more)
@@ -1240,7 +1240,7 @@ Verify that the group goes into error state since it cannot take action
 Prereq: MUST be able to use Mimic to simulate incorrect CLB behavior
 
         """
-        print(self.helper.clbs)
+        print(self.helper.clbs[0])
 
         # Create group
         group, _ = self.helper.create_group(
@@ -1253,26 +1253,19 @@ Prereq: MUST be able to use Mimic to simulate incorrect CLB behavior
             scaling_group=group
         )
 
-        def debug_print(msg):
-            print('...... debug ... ')
-            print(msg)
-            return msg
-
         return (
             self.helper.start_group_and_wait(group, self.rcs)
             # Change LB state to PENDING DELETE
             .addCallback(
                 mimic_clb.set_clb_attributes,
                 self.helper.clbs[0].clb_id, {"status": "PENDING_DELETE"})
-            .addCallback(debug_print)
+            .addCallback(lambda _: self.rcs)
             .addCallback(policy_scale_up.start, self)
             .addCallback(policy_scale_up.execute)
             .addCallback(
                 group.wait_for_state,
                 MatchesAll(
                     ContainsDict({
-                        # 'pendingCapacity': Equals(2),
-                        # 'desiredCapacity': Equals(2),
                         'status': Equals("ERROR")
                     })),
                 timeout=600
