@@ -8,7 +8,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.convergence.logging import log_steps
 from otter.convergence.model import CLBDescription
 from otter.convergence.steps import (
-    AddNodesToCLB, CreateServer, DeleteServer
+    AddNodesToCLB, CreateServer, DeleteServer, RemoveNodesFromCLB
 )
 from otter.log.intents import Log, LogErr
 from otter.test.utils import noop, test_dispatcher
@@ -47,16 +47,13 @@ class LogStepsTests(SynchronousTestCase):
         adds = pbag([
             AddNodesToCLB(
                 lb_id='lbid1',
-                address_configs=pset([('10.0.0.1', _clbd('lbid1', 1234))]),
-                ),
+                address_configs=pset([('10.0.0.1', _clbd('lbid1', 1234))])),
             AddNodesToCLB(
                 lb_id='lbid1',
-                address_configs=pset([('10.0.0.2', _clbd('lbid1', 1235))]),
-                ),
+                address_configs=pset([('10.0.0.2', _clbd('lbid1', 1235))])),
             AddNodesToCLB(
                 lb_id='lbid2',
-                address_configs=pset([('10.0.0.1', _clbd('lbid2', 4321))]),
-                )])
+                address_configs=pset([('10.0.0.1', _clbd('lbid2', 4321))]))])
         self.assert_logs(log_steps(adds), [
             Log('convergence-add-nodes-to-clb',
                 fields={'lb_id': 'lbid1',
@@ -66,4 +63,21 @@ class LogStepsTests(SynchronousTestCase):
                 fields={'lb_id': 'lbid2',
                         'addresses': '10.0.0.1:4321',
                         'cloud_feed': True})
+        ])
+
+    def test_remove_nodes_from_clbs(self):
+        removes = pbag([
+            RemoveNodesFromCLB(lb_id='lbid1', node_ids=pset(['a', 'b', 'c'])),
+            RemoveNodesFromCLB(lb_id='lbid2', node_ids=pset(['d', 'e', 'f']))
+        ])
+
+        self.assert_logs(log_steps(removes), [
+            Log('convergence-remove-nodes-from-clb',
+                fields={'lb_id': 'lbid1',
+                        'nodes': ['a', 'b', 'c'],
+                        'cloud_feed': True}),
+            Log('convergence-remove-nodes-from-clb',
+                fields={'lb_id': 'lbid2',
+                        'nodes': ['d', 'e', 'f'],
+                        'cloud_feed': True}),
         ])

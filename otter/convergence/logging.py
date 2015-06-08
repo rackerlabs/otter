@@ -7,8 +7,10 @@ from effect import parallel
 from pyrsistent import thaw
 
 from toolz.curried import groupby
+from toolz.itertoolz import concat
 
-from otter.convergence.steps import AddNodesToCLB, CreateServer, DeleteServer
+from otter.convergence.steps import (
+    AddNodesToCLB, CreateServer, DeleteServer, RemoveNodesFromCLB)
 from otter.log.cloudfeeds import cf_msg
 
 
@@ -55,6 +57,16 @@ def _(steps):
 
     return parallel([msg(lb_id, addresses)
                      for lb_id, addresses in sorted(lbs.iteritems())])
+
+
+@_logger(RemoveNodesFromCLB)
+def _(steps):
+    lbs = groupby(lambda s: s.lb_id, steps)
+    effs = [
+        cf_msg('convergence-remove-nodes-from-clb',
+               lb_id=lb, nodes=sorted(concat(s.node_ids for s in lbsteps)))
+        for lb, lbsteps in sorted(lbs.iteritems())]
+    return parallel(effs)
 
 
 def log_steps(steps):
