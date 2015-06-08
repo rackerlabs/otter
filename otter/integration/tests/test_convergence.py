@@ -27,7 +27,7 @@ from otter.integration.lib.autoscale import (
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
 from otter.integration.lib.identity import IdentityV2
-from otter.integration.lib.mimic import MimicNova
+from otter.integration.lib.mimic import MimicNova, MimicCLB
 from otter.integration.lib.nova import (
     NovaServer, delete_servers, wait_for_servers)
 from otter.integration.lib.resources import TestResources
@@ -49,6 +49,7 @@ clb_key = os.environ.get('AS_CLB_SC_KEY', 'cloudLoadBalancers')
 
 # these are the service names for mimic control planes
 mimic_nova_key = os.environ.get("MIMICNOVA_SC_KEY", 'cloudServersBehavior')
+mimic_clb_key = os.environ.get("MIMICCLB_SC_KEY", 'cloudLoadBalancerControl')
 
 # otter configuration options for testing
 otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
@@ -1055,7 +1056,8 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 "otter": (otter_key, otter_url),
                 "nova": (nova_key,),
                 "loadbalancers": (clb_key,),
-                "mimic_nova": (mimic_nova_key,)
+                "mimic_nova": (mimic_nova_key,),
+                "mimic_clb": (mimic_clb_key,)
             },
             region=region
         ).addCallback(lambda _: gatherResults([
@@ -1224,6 +1226,58 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             )
         )
 
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
+    @tag("CATC-023")
+    def test_clb_plane(self):
+        """
+Simulate getting a 422 on scale up from CLB when in PENDING_DELETE which
+should cause the group to error
+
+Create a group with non-min servers and a CLB (or more)
+Set mimic to return 422 and state PENDING_DELETE on the CLB
+Attempt to scale up
+Verify that the group goes into error state since it cannot take action
+Prereq: MUST be able to use Mimic to simulate incorrect CLB behavior
+
+        """
+        print(self.helper.clbs)
+
+        # Create group
+        group, _ = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=1)
+
+        mimic_clb = MimicCLB(pool=self.helper.pool, test_case=self)
+
+        policy_scale_up = ScalingPolicy(
+            scale_by=1,
+            scaling_group=group
+        )
+
+        def debug_print(msg):
+            print('...... debug ... ')
+            print(msg)
+            return msg
+
+        return (
+            self.helper.start_group_and_wait(group, self.rcs)
+            # Change LB state to PENDING DELETE
+            .addCallback(
+                mimic_clb.set_clb_attributes,
+                self.helper.clbs[0].clb_id, {"status": "PENDING_DELETE"})
+            .addCallback(debug_print)
+            .addCallback(policy_scale_up.start, self)
+            .addCallback(policy_scale_up.execute)
+            .addCallback(
+                group.wait_for_state,
+                MatchesAll(
+                    ContainsDict({
+                        # 'pendingCapacity': Equals(2),
+                        # 'desiredCapacity': Equals(2),
+                        'status': Equals("ERROR")
+                    })),
+                timeout=600
+            )
+        )
 
 copy_test_methods(
     ConvergenceTestsNoLBs, ConvergenceTestsWith1CLB,
