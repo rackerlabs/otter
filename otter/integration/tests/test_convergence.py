@@ -11,7 +11,9 @@ from testtools.matchers import (
     AllMatch, ContainsDict, Equals, MatchesAll, MatchesSetwise, NotEquals)
 
 from twisted.internet import reactor
-from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
+from twisted.internet.defer import (
+    gatherResults, inlineCallbacks, returnValue, succeed
+)
 from twisted.trial import unittest
 from twisted.web.client import HTTPConnectionPool
 
@@ -25,7 +27,9 @@ from otter.integration.lib.autoscale import (
     extract_active_ids,
 )
 from otter.integration.lib.cloud_load_balancer import (
-    CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
+    CloudLoadBalancer, CloudLoadBalancerController,
+    ContainsAllIPs, ExcludesAllIPs, HasLength,
+)
 from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.mimic import MimicNova
 from otter.integration.lib.nova import (
@@ -46,6 +50,8 @@ otter_key = os.environ.get('AS_AUTOSCALE_SC_KEY', 'autoscale')
 otter_url = os.environ.get('AS_AUTOSCALE_LOCAL_URL')
 nova_key = os.environ.get('AS_NOVA_SC_KEY', 'cloudServersOpenStack')
 clb_key = os.environ.get('AS_CLB_SC_KEY', 'cloudLoadBalancers')
+clb_ctrl_key = os.environ.get('AS_CLB_CTRL_KEY', 'cloudLoadBalancerControl')
+
 
 # these are the service names for mimic control planes
 mimic_nova_key = os.environ.get("MIMICNOVA_SC_KEY", 'cloudServersBehavior')
@@ -442,6 +448,87 @@ class TestConvergence(unittest.TestCase):
         return gatherResults([
             NovaServer(id=_id, pool=self.helper.pool).update_metadata({}, rcs)
             for _id in ids]).addCallback(lambda _: rcs)
+
+    def test_a(self):
+        return self.test_clb_pending_delete_on_scale_up()
+
+    def test_clb_pending_delete_on_scale_up(self):
+        """
+        Simulate getting a 422 on scale up from CLB when in PENDING_DELETE
+        which should cause the group to error.
+        - Create a group with non-zero min servers and a CLB (or more)
+        - Set mimic to return 422 and state PENDING_DELETE on addition to CLB
+        - Attempt to scale up
+        - Group goes into error state since it cannot take action
+
+        Prereq: MUST be able to use Mimic to simulate incorrect CLB behavior
+
+        Implements: https://github.com/rackerlabs/otter/issues/1331
+        """
+        rcs = TestResources()
+
+        def create_clb_first():
+            self.clb = CloudLoadBalancer(pool=self.helper.pool)
+            self.clbController = CloudLoadBalancerController(
+                pool=self.helper.pool, clb=self.clb, rcs=rcs
+            )
+            return (
+                self.identity.authenticate_user(
+                    rcs,
+                    resources={
+                        "otter": (otter_key, otter_url),
+                        "nova": (nova_key,),
+                        "loadbalancers": (clb_key,),
+                        "cloudLoadBalancerControl": (clb_ctrl_key,),
+                    },
+                    region=region,
+                ).addCallback(self.clb.start, self)
+                .addCallback(self.clb.wait_for_state, "ACTIVE", 600)
+            )
+
+        def create_group_with_lb(_):
+            self.scaling_group = ScalingGroup(
+                group_config=create_scaling_group_dict(
+                    image_ref=image_ref, flavor_ref=flavor_ref,
+                    use_lbs=[self.clb.scaling_group_spec()],
+                    min_entities=3,
+                ),
+                pool=self.helper.pool
+            )
+
+            return (
+                self.scaling_group.start(rcs, self)
+                .addCallback(lambda _: self.scaling_group.wait_for_state(
+                    rcs, HasActive(3), timeout=1800)
+                )
+            )
+
+        def force_lb_into_pending_delete(_):
+            return self.clbController.enterPendingDeleteState()
+
+    
+        def scale_up(_):
+            self.scaling_policy = ScalingPolicy(
+                scale_by=1, scaling_group=self.scaling_group
+            )
+
+            return (
+                self.scaling_policy.start(rcs, self)
+                .addCallback(self.scaling_policy.execute)
+            )
+
+        def expect_error_state(_):
+            return self.scaling_group.wait_for_state(
+                rcs, statusMatches("ERROR"), timeout=60
+            )
+
+        return (
+            create_clb_first()
+            .addCallback(create_group_with_lb)
+            .addCallback(force_lb_into_pending_delete)
+            .addCallback(scale_up)
+            .addCallback(expect_error_state)
+        )
 
 
 @inlineCallbacks
@@ -1231,13 +1318,13 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                          scale_by=1, delete_clb=delete_clb)
             .addCallback(
                 group.wait_for_state,
-                MatchesAll(
-                    ContainsDict({
-                        'pendingCapacity': Equals(2),
-                        'desiredCapacity': Equals(2),
-                        'status': Equals("ERROR")
-                    }),
-                    HasActive(0)),
+                MatchesAll(HasActive(0), statusMatches("ERROR", capacities=2)),
+#                    ContainsDict({
+#                        'pendingCapacity': Equals(2),
+#                        'desiredCapacity': Equals(2),
+#                        'status': Equals("ERROR")
+#                    }),
+#                    HasActive(0)),
                 timeout=600
             )
         )
@@ -1268,13 +1355,13 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                          scale_by=-1, delete_clb=delete_clb)
             .addCallback(
                 group.wait_for_state,
-                MatchesAll(
-                    ContainsDict({
-                        'pendingCapacity': Equals(0),
-                        'desiredCapacity': Equals(0),
-                        'status': Equals("ACTIVE")
-                    }),
-                    HasActive(0)),
+                MatchesAll(HasActive(0), statusMatches("ACTIVE", capacities=0)),
+#                    ContainsDict({
+#                        'pendingCapacity': Equals(0),
+#                        'desiredCapacity': Equals(0),
+#                        'status': Equals("ACTIVE")
+#                    }),
+#                    HasActive(0)),
                 timeout=600
             )
         )
@@ -1335,3 +1422,21 @@ class ConvergenceTestsWith2CLBs(unittest.TestCase):
 copy_test_methods(
     ConvergenceTestsWith1CLB, ConvergenceTestsWith2CLBs,
     filter_and_change=ConvergenceTestsWith2CLBs._only_delete_clb_while_scaling)
+
+def statusMatches(s, capacities=None):
+    """
+    Returns a matcher that checks for a given status `s`, where `s` may be
+    in the set "ACTIVE", "ERROR", "BUILD", etc. as appropriate for the API
+    under test.
+
+    Optionally, if `capacities` keyword argument is provided, it will cause
+    verification of the pendingCapacity and desiredCapacity states as well.
+    """
+    d = {
+        'status': Equals(s),
+    }
+    if capacities is not None:
+        d['pendingCapacity'] = Equals(capacities)
+        d['desiredCapacity'] = Equals(capacities)
+    return ContainsDict(d)
+
