@@ -20,6 +20,9 @@ from effect.testing import (
 
 from pyrsistent import freeze
 
+from toolz.curried import map
+from toolz.functoolz import compose
+
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import NoSuchEndpoint
@@ -235,11 +238,13 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         self.now = datetime(2010, 5, 31)
         self.servers1 = [{'id': 'a', 'a': 'b'}, {'id': 'b', 'b': 'c'}]
         self.servers2 = [{'id': 'd', 'd': 'e'}]
+        self.freeze = compose(set, map(freeze))
 
     def _invoke(self):
         return get_scaling_group_servers(
             'tid', 'gid', self.now, cache_class=Cache,
-            all_as_servers=intent_func("all-as"))
+            all_as_servers=intent_func("all-as"),
+            all_servers=intent_func("alls"))
 
     def _test_no_cache(self, empty):
         current = [] if empty else self.servers1
@@ -292,31 +297,22 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         If cache is < 30 days old then servers returned are merge of
         changes since the cache time
         """
-        cache = self.servers1
-        changes = self.servers2
+        asmetakey = "rax:autoscale:group:id"
+        cache = [
+            {'id': 'a', 'metadata': {asmetakey: "gid"}},
+            {'id': 'b', 'metadata': {asmetakey: "gid"}}]
+        changes = [
+            {'id': 'a', 'b': 'c', 'metadata': {asmetakey: "gid"}},
+            {'id': 'd', 'metadata': {"changed": "yes"}}]
         last_update = datetime(2010, 5, 20)
         sequence = SequenceDispatcher([
             ("cachegstidgid", lambda i: (cache, last_update)),
-            (("all-as", last_update), lambda i: {'gid': changes})])
+            (("alls", last_update), lambda i: changes)])
         with sequence.consume():
             disp = ComposedDispatcher([sequence, base_dispatcher])
             self.assertEqual(
-                sync_perform(disp, self._invoke()), cache + changes)
-
-    def test_from_cache_no_changes(self):
-        """
-        If cache is < 30 days old then servers are returned
-        from cache if there are no changes
-        """
-        cache = self.servers1
-        last_update = datetime(2010, 5, 20)
-        sequence = SequenceDispatcher([
-            ("cachegstidgid", lambda i: (cache, last_update)),
-            (("all-as", last_update), lambda i: {})])
-        with sequence.consume():
-            disp = ComposedDispatcher([sequence, base_dispatcher])
-            self.assertEqual(
-                sync_perform(disp, self._invoke()), cache)
+                self.freeze(sync_perform(disp, self._invoke())),
+                self.freeze([cache[1], changes[0]]))
 
     def test_merge_servers_precedence(self):
         """
@@ -325,9 +321,9 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         """
         first = [{'id': 'a', 'a': 1}, {'id': 'b', 'b': 2}]
         second = [{'id': 'd', 'd': 3}, {'id': 'b', 'b': 4}]
-        exp_servers = set(map(freeze, [first[0]] + second))
         self.assertEqual(
-            set(map(freeze, merge_servers(first, second))), exp_servers)
+            self.freeze(merge_servers(first, second)),
+            self.freeze([first[0]] + second))
 
 
 class GetAllScalingGroupServersTests(SynchronousTestCase):

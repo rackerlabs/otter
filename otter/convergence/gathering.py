@@ -134,10 +134,18 @@ def merge_servers(first, second):
     return merge(sdict(first), sdict(second)).values()
 
 
+def server_of_group(group_id, server):
+    """
+    Return True if server belongs to group_id. False otherwise
+    """
+    return group_id_from_metadata(server.get('metadata', {})) == group_id
+
+
 @do
 def get_scaling_group_servers(tenant_id, group_id, now,
                               cache_class=CassScalingGroupServersCache,
-                              all_as_servers=get_all_scaling_group_servers):
+                              all_as_servers=get_all_scaling_group_servers,
+                              all_servers=get_all_server_details):
     """
     Get a group's servers taken from cache if it exists. Updates cache
     if it is empty from newly fetched servers
@@ -145,7 +153,7 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     # scoped on the tenant because cache calls require tenant_id. Should
     # they also not take tenant_id and work on the scope?
 
-    :return: Servers as iterator of dicts
+    :return: Servers as list of dicts
     :rtype: Effect
     """
     cache = cache_class(tenant_id, group_id)
@@ -160,8 +168,9 @@ def get_scaling_group_servers(tenant_id, group_id, now,
         servers = merge_servers(changes, current)
         yield cache.insert_servers(now, servers, True)
     else:
-        changes = (yield all_as_servers(last_update)).get(group_id, [])
+        changes = yield all_servers(last_update)
         servers = merge_servers(cached_servers, changes)
+        servers = list(filter(partial(server_of_group, group_id), servers))
     yield do_return(servers)
 
 
