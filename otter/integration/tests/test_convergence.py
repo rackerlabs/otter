@@ -1229,7 +1229,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
     # @skip_me("Otter does not yet support this error transition")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-023")
-    def test_clb_plane(self):
+    def test_scale_up_when_pending_delete(self):
         """
         CATC-023-a: Validate that Otter correctly enters an error state when
         attemting to scale up while the CLB is in the PENDING_DELETE state.
