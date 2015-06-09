@@ -27,7 +27,7 @@ from otter.integration.lib.autoscale import (
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
 from otter.integration.lib.identity import IdentityV2
-from otter.integration.lib.mimic import MimicNova, MimicCLB
+from otter.integration.lib.mimic import MimicCLB, MimicNova
 from otter.integration.lib.nova import (
     NovaServer, delete_servers, wait_for_servers)
 from otter.integration.lib.resources import TestResources
@@ -1226,7 +1226,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             )
         )
 
-    @skip_me("Otter does not yet support this error transition")
+    # @skip_me("Otter does not yet support this error transition")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-023")
     def test_clb_plane(self):
