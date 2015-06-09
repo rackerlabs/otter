@@ -1229,7 +1229,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
     # @skip_me("Otter does not yet support this error transition")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-023")
-    def test_clb_plane(self):
+    def test_scale_up_when_pending_delete(self):
         """
         CATC-023-a: Validate that Otter correctly enters an error state when
         attemting to scale up while the CLB is in the PENDING_DELETE state.
@@ -1269,6 +1269,50 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             )
         )
 
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
+    @tag("CATC-023")
+    def test_scale_down_when_pending_delete(self):
+        """
+        CATC-023-b: Validate that Otter does not enter an error state when
+        attemting to scale down while the CLB is in the PENDING_DELETE state.
+
+        1. Create a group with non-min servers attached to a CLB
+        2. Place the CLB into the PENDING_DELETE state
+            - Return 422, status: PENDING_DELETE on any mutating request
+        3. Scale down
+        4. Assert that the group reaches the desired state
+        """
+        group, _ = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=0)
+
+        mimic_clb = MimicCLB(pool=self.helper.pool, test_case=self)
+
+        policy_scale_down = ScalingPolicy(
+            scale_by=-2,
+            scaling_group=group
+        )
+
+        return (
+            self.helper.start_group_and_wait(group, self.rcs, desired=3)
+            .addCallback(
+                mimic_clb.set_clb_attributes,
+                self.helper.clbs[0].clb_id, {"status": "PENDING_DELETE"})
+            .addCallback(lambda _: self.rcs)
+            .addCallback(policy_scale_down.start, self)
+            .addCallback(policy_scale_down.execute)
+            .addCallback(
+                group.wait_for_state,
+                MatchesAll(
+                    ContainsDict({
+                        'pendingCapacity': Equals(0),
+                        'desiredCapacity': Equals(1),
+                        'status': Equals("ACTIVE")
+                    }),
+                    HasActive(1)),
+                timeout=600
+            )
+        )
+# Run the ConvergenceTestsNoLBs in a configuration with 1 CLB
 copy_test_methods(
     ConvergenceTestsNoLBs, ConvergenceTestsWith1CLB,
     filter_and_change=ConvergenceTestsWith1CLB._only_oob_del_and_error_tests)
