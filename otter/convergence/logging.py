@@ -33,13 +33,14 @@ def _logger(step_type):
 
 @_logger(CreateServer)
 def _(steps):
-    # XXX RADIX TODO: groupby the server_config so we don't assume they're all
-    # the same.
-    return cf_msg(
-        'convergence-create-servers',
-        num_servers=len(steps),
-        server_config=thaw(next(iter(steps)).server_config),
-    )
+    by_cfg = groupby(lambda s: s.server_config, steps)
+    effs = [
+        cf_msg(
+            'convergence-create-servers',
+            num_servers=len(cfg_steps),
+            server_config=thaw(cfg))
+        for cfg, cfg_steps in sorted(by_cfg.iteritems())]
+    return parallel(effs)
 
 
 # Intentionally leaving out SetMetadataItemOnServer for now, since it seems
@@ -58,14 +59,12 @@ def _log_add_nodes_clb(steps):
     for step in steps:
         for (address, config) in step.address_configs:
             lbs[step.lb_id].append('%s:%s' % (address, config.port))
-
-    def msg(lb_id, addresses):
-        formatted_addresses = ', '.join(sorted(addresses))
-        return cf_msg('convergence-add-clb-nodes',
-                      lb_id=lb_id, addresses=formatted_addresses)
-
-    return parallel([msg(lb_id, addresses)
-                     for lb_id, addresses in sorted(lbs.iteritems())])
+    effs = [
+        cf_msg('convergence-add-clb-nodes',
+               lb_id=lb_id, addresses=', '.join(sorted(addresses)))
+        for lb_id, addresses in sorted(lbs.iteritems())
+    ]
+    return parallel(effs)
 
 
 @_logger(RemoveNodesFromCLB)

@@ -27,11 +27,20 @@ class LogStepsTests(SynchronousTestCase):
 
     def test_create_servers(self):
         cfg = {'configgy': 'configged'}
-        creates = pbag([CreateServer(server_config=pmap(cfg))] * 3)
+        cfg2 = {'configgy': 'conflagrated'}
+        creates = pbag([
+            CreateServer(server_config=pmap(cfg)),
+            CreateServer(server_config=pmap(cfg)),
+            CreateServer(server_config=pmap(cfg2))
+            ])
         self.assert_logs(creates, [
             Log('convergence-create-servers',
-                fields={'num_servers': 3, 'server_config': cfg,
-                        'cloud_feed': True})])
+                fields={'num_servers': 2, 'server_config': cfg,
+                        'cloud_feed': True}),
+            Log('convergence-create-servers',
+                fields={'num_servers': 1, 'server_config': cfg2,
+                        'cloud_feed': True})
+            ])
 
     def test_delete_servers(self):
         deletes = pbag([DeleteServer(server_id='1'),
