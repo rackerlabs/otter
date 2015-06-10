@@ -31,7 +31,7 @@ class LogStepsTests(SynchronousTestCase):
     def test_create_servers(self):
         """Logs :obj:`CreateServer`."""
         cfg = {'configgy': 'configged', 'nested': {'a': 'b'}}
-        cfg2 = {'configgy': 'conflagrated'}
+        cfg2 = {'configgy': 'configged', 'nested': {'a': 'c'}}
         creates = pbag([
             CreateServer(server_config=freeze(cfg)),
             CreateServer(server_config=freeze(cfg)),
@@ -53,8 +53,7 @@ class LogStepsTests(SynchronousTestCase):
                         DeleteServer(server_id='3')])
         self.assert_logs(deletes, [
             Log('convergence-delete-servers',
-                fields={'server_ids': ['1', '2', '3'],
-                        'cloud_feed': True})
+                fields={'servers': '1, 2, 3', 'cloud_feed': True})
         ])
 
     def test_add_nodes_to_clbs(self):

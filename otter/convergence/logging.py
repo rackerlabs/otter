@@ -26,6 +26,7 @@ _loggers = {}
 
 
 def _logger(step_type):
+    """Declare a function for logging a bag of steps of a particular type."""
     def _add_to_loggers(f):
         _loggers[step_type] = f
     return _add_to_loggers
@@ -33,13 +34,15 @@ def _logger(step_type):
 
 @_logger(CreateServer)
 def _(steps):
-    by_cfg = groupby(lambda s: tuple(thaw(s.server_config).items()), steps)
+    by_cfg = groupby(lambda s: s.server_config, steps)
     effs = [
         cf_msg(
             'convergence-create-servers',
             num_servers=len(cfg_steps),
             server_config=dict(cfg))
-        for cfg, cfg_steps in sorted(by_cfg.iteritems())]
+        # We sort the items with `thaw` because PMap does not support
+        # comparison
+        for cfg, cfg_steps in sorted(by_cfg.iteritems(), key=thaw)]
     return parallel(effs)
 
 
@@ -61,7 +64,7 @@ def _log_set_metadata(steps):
 def _log_delete_servers(steps):
     return cf_msg(
         'convergence-delete-servers',
-        server_ids=sorted([s.server_id for s in steps]))
+        servers=', '.join(sorted([s.server_id for s in steps])))
 
 
 @_logger(AddNodesToCLB)
