@@ -110,7 +110,8 @@ def _log_bulk_rcv3(event, steps):
     by_lbs = groupby(lambda s: s[0], concat(s.lb_node_pairs for s in steps))
     effs = [
         cf_msg(event,
-               lb_id=lb_id, nodes=', '.join(sorted(p[1] for p in pairs)))
+               lb_id=lb_id,
+               servers=', '.join(sorted(p[1] for p in pairs)))
         for lb_id, pairs in sorted(by_lbs.iteritems())
     ]
     return parallel(effs)

@@ -151,15 +151,16 @@ class LogStepsTests(SynchronousTestCase):
         ])
         self.assert_logs(adds, [
             Log('convergence-add-rcv3-nodes',
-                fields={'lb_id': 'lb1', 'nodes': 'node1, node2, nodea',
+                fields={'lb_id': 'lb1', 'servers': 'node1, node2, nodea',
                         'cloud_feed': True}),
             Log('convergence-add-rcv3-nodes',
-                fields={'lb_id': 'lb2', 'nodes': 'node2, node3',
+                fields={'lb_id': 'lb2', 'servers': 'node2, node3',
                         'cloud_feed': True}),
             Log('convergence-add-rcv3-nodes',
-                fields={'lb_id': 'lb3', 'nodes': 'node4', 'cloud_feed': True}),
+                fields={'lb_id': 'lb3', 'servers': 'node4',
+                        'cloud_feed': True}),
             Log('convergence-add-rcv3-nodes',
-                fields={'lb_id': 'lba', 'nodes': 'nodea, nodeb',
+                fields={'lb_id': 'lba', 'servers': 'nodea, nodeb',
                         'cloud_feed': True})
         ])
 
@@ -176,15 +177,16 @@ class LogStepsTests(SynchronousTestCase):
         ])
         self.assert_logs(adds, [
             Log('convergence-remove-rcv3-nodes',
-                fields={'lb_id': 'lb1', 'nodes': 'node1, node2, nodea',
+                fields={'lb_id': 'lb1', 'servers': 'node1, node2, nodea',
                         'cloud_feed': True}),
             Log('convergence-remove-rcv3-nodes',
-                fields={'lb_id': 'lb2', 'nodes': 'node2, node3',
+                fields={'lb_id': 'lb2', 'servers': 'node2, node3',
                         'cloud_feed': True}),
             Log('convergence-remove-rcv3-nodes',
-                fields={'lb_id': 'lb3', 'nodes': 'node4', 'cloud_feed': True}),
+                fields={'lb_id': 'lb3', 'servers': 'node4',
+                        'cloud_feed': True}),
             Log('convergence-remove-rcv3-nodes',
-                fields={'lb_id': 'lba', 'nodes': 'nodea, nodeb',
+                fields={'lb_id': 'lba', 'servers': 'nodea, nodeb',
                         'cloud_feed': True})
         ])
 
