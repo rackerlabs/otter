@@ -142,13 +142,17 @@ class MimicCLB(object):
     """
     def set_clb_attributes(self, rcs, clb_id, kvpairs):
         """
-
+        Update the attributes of a clould load balancer based on the provided
+        key, value pairs.
 
         :param rcs: A :class:`otter.integration.lib.resources.TestResources`
             instance.
-
-
-
+        :param clb_id: The ID of the load balancer to be altered
+        :param dict kvpairs: A dictionary of key value pairs. The keys
+        correspond to attributes in the load balancer details and the value is
+        what the attribute will be replaced with.
+        See the `mimic.model.RegionalCLBCollection.set_attribue` function
+        for the supported attributes.
         :return: A deferred that fires with the content of the response, which
             is probably the empty string.
         """
