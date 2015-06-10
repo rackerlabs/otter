@@ -10,7 +10,7 @@ from toolz.curried import groupby
 from toolz.itertoolz import concat
 
 from otter.convergence.steps import (
-    AddNodesToCLB, ChangeCLBNode, CreateServer, DeleteServer,
+    AddNodesToCLB, BulkAddToRCv3, ChangeCLBNode, CreateServer, DeleteServer,
     RemoveNodesFromCLB)
 from otter.log.cloudfeeds import cf_msg
 
@@ -60,7 +60,7 @@ def _log_add_nodes_clb(steps):
 
     def msg(lb_id, addresses):
         formatted_addresses = ', '.join(sorted(addresses))
-        return cf_msg('convergence-add-nodes-to-clb',
+        return cf_msg('convergence-add-clb-nodes',
                       lb_id=lb_id, addresses=formatted_addresses)
 
     return parallel([msg(lb_id, addresses)
@@ -71,7 +71,7 @@ def _log_add_nodes_clb(steps):
 def _log_remove_from_clb(steps):
     lbs = groupby(lambda s: s.lb_id, steps)
     effs = [
-        cf_msg('convergence-remove-nodes-from-clb',
+        cf_msg('convergence-remove-clb-nodes',
                lb_id=lb, nodes=sorted(concat(s.node_ids for s in lbsteps)))
         for lb, lbsteps in sorted(lbs.iteritems())]
     return parallel(effs)
@@ -88,6 +88,17 @@ def _log_change_clb_node(steps):
                condition=condition.name, weight=weight, type=node_type.name)
         for (lb, condition, weight, node_type), grouped_steps
         in sorted(lbs.iteritems())
+    ]
+    return parallel(effs)
+
+
+@_logger(BulkAddToRCv3)
+def _log_bulkadd_rcv3(steps):
+    by_lbs = groupby(lambda s: s[0], concat(s.lb_node_pairs for s in steps))
+    effs = [
+        cf_msg('convergence-add-rcv3-nodes',
+               lb_id=lb_id, nodes=', '.join(sorted(p[1] for p in pairs)))
+        for lb_id, pairs in sorted(by_lbs.iteritems())
     ]
     return parallel(effs)
 

@@ -9,7 +9,7 @@ from otter.convergence.logging import log_steps
 from otter.convergence.model import (
     CLBDescription, CLBNodeCondition, CLBNodeType)
 from otter.convergence.steps import (
-    AddNodesToCLB, ChangeCLBNode, CreateServer, DeleteServer,
+    AddNodesToCLB, BulkAddToRCv3, ChangeCLBNode, CreateServer, DeleteServer,
     RemoveNodesFromCLB
 )
 from otter.log.intents import Log
@@ -56,11 +56,11 @@ class LogStepsTests(SynchronousTestCase):
                 lb_id='lbid2',
                 address_configs=pset([('10.0.0.1', _clbd('lbid2', 4321))]))])
         self.assert_logs(adds, [
-            Log('convergence-add-nodes-to-clb',
+            Log('convergence-add-clb-nodes',
                 fields={'lb_id': 'lbid1',
                         'addresses': '10.0.0.1:1234, 10.0.0.2:1235',
                         'cloud_feed': True}),
-            Log('convergence-add-nodes-to-clb',
+            Log('convergence-add-clb-nodes',
                 fields={'lb_id': 'lbid2',
                         'addresses': '10.0.0.1:4321',
                         'cloud_feed': True})
@@ -73,11 +73,11 @@ class LogStepsTests(SynchronousTestCase):
         ])
 
         self.assert_logs(removes, [
-            Log('convergence-remove-nodes-from-clb',
+            Log('convergence-remove-clb-nodes',
                 fields={'lb_id': 'lbid1',
                         'nodes': ['a', 'b', 'c'],
                         'cloud_feed': True}),
-            Log('convergence-remove-nodes-from-clb',
+            Log('convergence-remove-clb-nodes',
                 fields={'lb_id': 'lbid2',
                         'nodes': ['d', 'e', 'f'],
                         'cloud_feed': True}),
@@ -121,4 +121,28 @@ class LogStepsTests(SynchronousTestCase):
                     'type': 'PRIMARY', 'condition': 'ENABLED', 'weight': 50,
                     'cloud_feed': True,
                 }),
+        ])
+
+    def test_bulk_add_to_rcv3(self):
+        adds = pbag([
+            BulkAddToRCv3(lb_node_pairs=pset([
+                ('lb1', 'node1'), ('lb1', 'node2'),
+                ('lb2', 'node2'), ('lb2', 'node3'),
+                ('lb3', 'node4')])),
+            BulkAddToRCv3(lb_node_pairs=pset([
+                ('lba', 'nodea'), ('lba', 'nodeb'),
+                ('lb1', 'nodea')]))
+        ])
+        self.assert_logs(adds, [
+            Log('convergence-add-rcv3-nodes',
+                fields={'lb_id': 'lb1', 'nodes': 'node1, node2, nodea',
+                        'cloud_feed': True}),
+            Log('convergence-add-rcv3-nodes',
+                fields={'lb_id': 'lb2', 'nodes': 'node2, node3',
+                        'cloud_feed': True}),
+            Log('convergence-add-rcv3-nodes',
+                fields={'lb_id': 'lb3', 'nodes': 'node4', 'cloud_feed': True}),
+            Log('convergence-add-rcv3-nodes',
+                fields={'lb_id': 'lba', 'nodes': 'nodea, nodeb',
+                        'cloud_feed': True})
         ])
