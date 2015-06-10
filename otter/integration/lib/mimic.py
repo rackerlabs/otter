@@ -118,3 +118,49 @@ class MimicNova(object):
         d.addCallback(check_success, [204, 404])
         d.addCallback(self.treq.content)
         return d
+
+
+@attributes(["pool",
+             Attribute("test_case", default_value=None),
+             Attribute("treq", default_value=treq)])
+class MimicCLB(object):
+    """
+    Class that handles HTTP requests to the mimic Cloud Load Blancer
+    control plane.
+
+    Please see the mimic control plane API
+    (:class:`mimic.rest.loadbalancer_api.LoadBalancerControlRegion`) in the
+    mimic codebase for more information.
+
+    :ivar pool: a :class:`twisted.web.client.HTTPConnectionPool` to pass to
+        all treq requests
+    :ivar test_case: a :class:`twisted.trial.unittest.TestCase`, which if not
+        None, will be used to clean up added behaviors.
+    :ivar treq: the treq module to use for making requests - if not provided,
+        the default library :mod:`treq` will be used.  Mainly to be used for
+        injecting stubs during tests.
+    """
+    def set_clb_attributes(self, rcs, clb_id, kvpairs):
+        """
+        Update the attributes of a clould load balancer based on the provided
+        key, value pairs.
+
+        :param rcs: A :class:`otter.integration.lib.resources.TestResources`
+            instance.
+        :param clb_id: The ID of the load balancer to be altered
+        :param dict kvpairs: A dictionary of key value pairs. The keys
+        correspond to attributes in the load balancer details and the value is
+        what the attribute will be replaced with.
+        See the `mimic.model.RegionalCLBCollection.set_attribue` function
+        for the supported attributes.
+        :return: A deferred that fires with the content of the response, which
+            is probably the empty string.
+        """
+        print('Use mimic to set CLB attribute')
+        return self.treq.patch(
+            "{0}/loadbalancer/{1}/attributes".format(
+                rcs.endpoints["mimic_clb"], clb_id),
+            json.dumps(kvpairs),
+            headers=headers(str(rcs.token)),
+            pool=self.pool
+        ).addCallback(check_success, [204]).addCallback(self.treq.content)

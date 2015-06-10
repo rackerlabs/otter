@@ -314,6 +314,12 @@ class ScalingGroup(object):
             return self.treq.content(resp).addCallback(
                 lambda _: (resp.code, None))
 
+        def debug_print(resp_tuple):
+            if verbosity > 0:
+                print('ScalingGroup.get_scaling_group_state response: ')
+                pp.pprint(resp_tuple)
+            return resp_tuple
+
         return (
             self.treq.get(
                 "%s/groups/%s/state" % (
@@ -323,6 +329,7 @@ class ScalingGroup(object):
                 pool=self.pool
             ).addCallback(check_success, success_codes)
             .addCallback(decide)
+            .addCallback(debug_print)
         )
 
     def start(self, rcs, test):

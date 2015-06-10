@@ -27,7 +27,7 @@ from otter.integration.lib.autoscale import (
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
 from otter.integration.lib.identity import IdentityV2
-from otter.integration.lib.mimic import MimicNova
+from otter.integration.lib.mimic import MimicCLB, MimicNova
 from otter.integration.lib.nova import (
     NovaServer, delete_servers, wait_for_servers)
 from otter.integration.lib.resources import TestResources
@@ -49,6 +49,7 @@ clb_key = os.environ.get('AS_CLB_SC_KEY', 'cloudLoadBalancers')
 
 # these are the service names for mimic control planes
 mimic_nova_key = os.environ.get("MIMICNOVA_SC_KEY", 'cloudServersBehavior')
+mimic_clb_key = os.environ.get("MIMICCLB_SC_KEY", 'cloudLoadBalancerControl')
 
 # otter configuration options for testing
 otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
@@ -1110,7 +1111,8 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 "otter": (otter_key, otter_url),
                 "nova": (nova_key,),
                 "loadbalancers": (clb_key,),
-                "mimic_nova": (mimic_nova_key,)
+                "mimic_nova": (mimic_nova_key,),
+                "mimic_clb": (mimic_clb_key,)
             },
             region=region
         ).addCallback(lambda _: gatherResults([
@@ -1279,7 +1281,93 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             )
         )
 
+    # @skip_me("Otter does not yet support this error transition")
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
+    @tag("CATC-023")
+    def test_scale_up_when_pending_delete(self):
+        """
+        CATC-023-a: Validate that Otter correctly enters an error state when
+        attemting to scale up while the CLB is in the PENDING_DELETE state.
 
+        1. Create a group with non-min servers attached to a CLB
+        2. Place the CLB into the PENDING_DELETE state
+            - Return 422, status: PENDING_DELETE on any mutating request
+        3. Scale up
+        4. Assert that the group goes into error state since it cannot
+            take action.
+        """
+        group, _ = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=1)
+
+        mimic_clb = MimicCLB(pool=self.helper.pool, test_case=self)
+
+        policy_scale_up = ScalingPolicy(
+            scale_by=1,
+            scaling_group=group
+        )
+
+        return (
+            self.helper.start_group_and_wait(group, self.rcs)
+            .addCallback(
+                mimic_clb.set_clb_attributes,
+                self.helper.clbs[0].clb_id, {"status": "PENDING_DELETE"})
+            .addCallback(lambda _: self.rcs)
+            .addCallback(policy_scale_up.start, self)
+            .addCallback(policy_scale_up.execute)
+            .addCallback(
+                group.wait_for_state,
+                MatchesAll(
+                    ContainsDict({
+                        'status': Equals("ERROR")
+                    })),
+                timeout=600
+            )
+        )
+
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
+    @tag("CATC-023")
+    def test_scale_down_when_pending_delete(self):
+        """
+        CATC-023-b: Validate that Otter does not enter an error state when
+        attemting to scale down while the CLB is in the PENDING_DELETE state.
+
+        1. Create a group with non-min servers attached to a CLB
+        2. Place the CLB into the PENDING_DELETE state
+            - Return 422, status: PENDING_DELETE on any mutating request
+        3. Scale down
+        4. Assert that the group reaches the desired state
+        """
+        group, _ = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=0)
+
+        mimic_clb = MimicCLB(pool=self.helper.pool, test_case=self)
+
+        policy_scale_down = ScalingPolicy(
+            scale_by=-2,
+            scaling_group=group
+        )
+
+        return (
+            self.helper.start_group_and_wait(group, self.rcs, desired=3)
+            .addCallback(
+                mimic_clb.set_clb_attributes,
+                self.helper.clbs[0].clb_id, {"status": "PENDING_DELETE"})
+            .addCallback(lambda _: self.rcs)
+            .addCallback(policy_scale_down.start, self)
+            .addCallback(policy_scale_down.execute)
+            .addCallback(
+                group.wait_for_state,
+                MatchesAll(
+                    ContainsDict({
+                        'pendingCapacity': Equals(0),
+                        'desiredCapacity': Equals(1),
+                        'status': Equals("ACTIVE")
+                    }),
+                    HasActive(1)),
+                timeout=600
+            )
+        )
+# Run the ConvergenceTestsNoLBs in a configuration with 1 CLB
 copy_test_methods(
     ConvergenceTestsNoLBs, ConvergenceTestsWith1CLB,
     filter_and_change=ConvergenceTestsWith1CLB._only_oob_del_and_error_tests)
