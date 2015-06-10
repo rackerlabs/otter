@@ -1,7 +1,7 @@
 from effect import sync_perform
 from effect.testing import SequenceDispatcher
 
-from pyrsistent import pbag, pmap, pset
+from pyrsistent import freeze, pbag, pset
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -10,7 +10,7 @@ from otter.convergence.model import (
     CLBDescription, CLBNodeCondition, CLBNodeType)
 from otter.convergence.steps import (
     AddNodesToCLB, BulkAddToRCv3, BulkRemoveFromRCv3, ChangeCLBNode,
-    CreateServer, DeleteServer, RemoveNodesFromCLB)
+    CreateServer, DeleteServer, RemoveNodesFromCLB, SetMetadataItemOnServer)
 from otter.log.intents import Log
 from otter.test.utils import noop, test_dispatcher
 
@@ -20,18 +20,22 @@ def _clbd(lbid, port):
 
 
 class LogStepsTests(SynchronousTestCase):
+    """Tests for :func:`log_steps`."""
+
     def assert_logs(self, steps, intents):
+        """Log some steps and ensure they result in the given Log intents."""
         sequence = SequenceDispatcher([(intent, noop) for intent in intents])
         with sequence.consume():
             sync_perform(test_dispatcher(sequence), log_steps(steps))
 
     def test_create_servers(self):
-        cfg = {'configgy': 'configged'}
+        """Logs :obj:`CreateServer`."""
+        cfg = {'configgy': 'configged', 'nested': {'a': 'b'}}
         cfg2 = {'configgy': 'conflagrated'}
         creates = pbag([
-            CreateServer(server_config=pmap(cfg)),
-            CreateServer(server_config=pmap(cfg)),
-            CreateServer(server_config=pmap(cfg2))
+            CreateServer(server_config=freeze(cfg)),
+            CreateServer(server_config=freeze(cfg)),
+            CreateServer(server_config=freeze(cfg2))
             ])
         self.assert_logs(creates, [
             Log('convergence-create-servers',
@@ -43,6 +47,7 @@ class LogStepsTests(SynchronousTestCase):
             ])
 
     def test_delete_servers(self):
+        """Logs :obj:`DeleteServer`."""
         deletes = pbag([DeleteServer(server_id='1'),
                         DeleteServer(server_id='2'),
                         DeleteServer(server_id='3')])
@@ -53,6 +58,7 @@ class LogStepsTests(SynchronousTestCase):
         ])
 
     def test_add_nodes_to_clbs(self):
+        """Logs :obj:`AddNodesToCLB`."""
         adds = pbag([
             AddNodesToCLB(
                 lb_id='lbid1',
@@ -75,6 +81,7 @@ class LogStepsTests(SynchronousTestCase):
         ])
 
     def test_remove_nodes_from_clbs(self):
+        """Logs :obj:`RemoveNodesFromCLB`."""
         removes = pbag([
             RemoveNodesFromCLB(lb_id='lbid1', node_ids=pset(['a', 'b', 'c'])),
             RemoveNodesFromCLB(lb_id='lbid2', node_ids=pset(['d', 'e', 'f']))
@@ -92,6 +99,7 @@ class LogStepsTests(SynchronousTestCase):
         ])
 
     def test_change_clb_node(self):
+        """Logs :obj:`ChangeCLBNode`."""
         changes = pbag([
             ChangeCLBNode(lb_id='lbid1', node_id='node1',
                           condition=CLBNodeCondition.DRAINING,
@@ -132,6 +140,7 @@ class LogStepsTests(SynchronousTestCase):
         ])
 
     def test_bulk_add_to_rcv3(self):
+        """Logs :obj:`BulkAddToRCv3`."""
         adds = pbag([
             BulkAddToRCv3(lb_node_pairs=pset([
                 ('lb1', 'node1'), ('lb1', 'node2'),
@@ -156,6 +165,7 @@ class LogStepsTests(SynchronousTestCase):
         ])
 
     def test_bulk_remove_from_rcv3(self):
+        """Logs :obj:`BulkRemoveFromRCv3`."""
         adds = pbag([
             BulkRemoveFromRCv3(lb_node_pairs=pset([
                 ('lb1', 'node1'), ('lb1', 'node2'),
@@ -176,5 +186,22 @@ class LogStepsTests(SynchronousTestCase):
                 fields={'lb_id': 'lb3', 'nodes': 'node4', 'cloud_feed': True}),
             Log('convergence-remove-rcv3-nodes',
                 fields={'lb_id': 'lba', 'nodes': 'nodea, nodeb',
+                        'cloud_feed': True})
+        ])
+
+    def test_set_metadata_item_on_server(self):
+        """Logs :obj:`SetMetadataItemOnServer`."""
+        sets = pbag([
+            SetMetadataItemOnServer(server_id='s1', key='k1', value='v1'),
+            SetMetadataItemOnServer(server_id='s2', key='k1', value='v1'),
+            SetMetadataItemOnServer(server_id='s3', key='k2', value='v2'),
+        ])
+
+        self.assert_logs(sets, [
+            Log('convergence-set-server-metadata',
+                fields={'servers': 's1, s2', 'key': 'k1', 'value': 'v1',
+                        'cloud_feed': True}),
+            Log('convergence-set-server-metadata',
+                fields={'servers': 's3', 'key': 'k2', 'value': 'v2',
                         'cloud_feed': True})
         ])

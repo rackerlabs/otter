@@ -12,7 +12,7 @@ from toolz.itertoolz import concat
 
 from otter.convergence.steps import (
     AddNodesToCLB, BulkAddToRCv3, BulkRemoveFromRCv3, ChangeCLBNode,
-    CreateServer, DeleteServer, RemoveNodesFromCLB)
+    CreateServer, DeleteServer, RemoveNodesFromCLB, SetMetadataItemOnServer)
 from otter.log.cloudfeeds import cf_msg
 
 
@@ -33,18 +33,29 @@ def _logger(step_type):
 
 @_logger(CreateServer)
 def _(steps):
-    by_cfg = groupby(lambda s: s.server_config, steps)
+    by_cfg = groupby(lambda s: tuple(thaw(s.server_config).items()), steps)
     effs = [
         cf_msg(
             'convergence-create-servers',
             num_servers=len(cfg_steps),
-            server_config=thaw(cfg))
+            server_config=dict(cfg))
         for cfg, cfg_steps in sorted(by_cfg.iteritems())]
     return parallel(effs)
 
 
-# Intentionally leaving out SetMetadataItemOnServer for now, since it seems
-# kind of low-level
+@_logger(SetMetadataItemOnServer)
+def _log_set_metadata(steps):
+    by_kv = groupby(lambda s: (s.key, s.value), steps)
+    effs = [
+        cf_msg(
+            'convergence-set-server-metadata',
+            servers=', '.join(sorted(s.server_id for s in kvsteps)),
+            key=key, value=value
+        )
+        for (key, value), kvsteps in sorted(by_kv.iteritems())
+    ]
+    return parallel(effs)
+
 
 @_logger(DeleteServer)
 def _log_delete_servers(steps):
@@ -109,6 +120,15 @@ _logger(BulkRemoveFromRCv3)(
 
 
 def log_steps(steps):
+    """
+    Log some steps (to cloud feeds).
+
+    In general this tries to reduce the number of Log calls to a reasonable
+    minimum, based on how steps are usually used. For example, multiple
+    :obj:`SetMetadataItemOnServer` that are setting the same key/value on a
+    server will be merged into one Log call that shows all the servers being
+    affected.
+    """
     steps_by_type = groupby(type, steps)
     effs = []
     for step_type, typed_steps in steps_by_type.iteritems():
