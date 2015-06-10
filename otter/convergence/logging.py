@@ -1,6 +1,7 @@
 """Utilities for formatting log messages."""
 
 from collections import defaultdict
+from functools import partial
 
 from effect import parallel
 
@@ -10,8 +11,8 @@ from toolz.curried import groupby
 from toolz.itertoolz import concat
 
 from otter.convergence.steps import (
-    AddNodesToCLB, BulkAddToRCv3, ChangeCLBNode, CreateServer, DeleteServer,
-    RemoveNodesFromCLB)
+    AddNodesToCLB, BulkAddToRCv3, BulkRemoveFromRCv3, ChangeCLBNode,
+    CreateServer, DeleteServer, RemoveNodesFromCLB)
 from otter.log.cloudfeeds import cf_msg
 
 
@@ -92,15 +93,20 @@ def _log_change_clb_node(steps):
     return parallel(effs)
 
 
-@_logger(BulkAddToRCv3)
-def _log_bulkadd_rcv3(steps):
+def _log_bulk_rcv3(event, steps):
     by_lbs = groupby(lambda s: s[0], concat(s.lb_node_pairs for s in steps))
     effs = [
-        cf_msg('convergence-add-rcv3-nodes',
+        cf_msg(event,
                lb_id=lb_id, nodes=', '.join(sorted(p[1] for p in pairs)))
         for lb_id, pairs in sorted(by_lbs.iteritems())
     ]
     return parallel(effs)
+
+
+_logger(BulkAddToRCv3)(
+    partial(_log_bulk_rcv3, 'convergence-add-rcv3-nodes'))
+_logger(BulkRemoveFromRCv3)(
+    partial(_log_bulk_rcv3, 'convergence-remove-rcv3-nodes'))
 
 
 def log_steps(steps):

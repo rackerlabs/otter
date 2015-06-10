@@ -9,9 +9,8 @@ from otter.convergence.logging import log_steps
 from otter.convergence.model import (
     CLBDescription, CLBNodeCondition, CLBNodeType)
 from otter.convergence.steps import (
-    AddNodesToCLB, BulkAddToRCv3, ChangeCLBNode, CreateServer, DeleteServer,
-    RemoveNodesFromCLB
-)
+    AddNodesToCLB, BulkAddToRCv3, BulkRemoveFromRCv3, ChangeCLBNode,
+    CreateServer, DeleteServer, RemoveNodesFromCLB)
 from otter.log.intents import Log
 from otter.test.utils import noop, test_dispatcher
 
@@ -143,6 +142,30 @@ class LogStepsTests(SynchronousTestCase):
             Log('convergence-add-rcv3-nodes',
                 fields={'lb_id': 'lb3', 'nodes': 'node4', 'cloud_feed': True}),
             Log('convergence-add-rcv3-nodes',
+                fields={'lb_id': 'lba', 'nodes': 'nodea, nodeb',
+                        'cloud_feed': True})
+        ])
+
+    def test_bulk_remove_from_rcv3(self):
+        adds = pbag([
+            BulkRemoveFromRCv3(lb_node_pairs=pset([
+                ('lb1', 'node1'), ('lb1', 'node2'),
+                ('lb2', 'node2'), ('lb2', 'node3'),
+                ('lb3', 'node4')])),
+            BulkRemoveFromRCv3(lb_node_pairs=pset([
+                ('lba', 'nodea'), ('lba', 'nodeb'),
+                ('lb1', 'nodea')]))
+        ])
+        self.assert_logs(adds, [
+            Log('convergence-remove-rcv3-nodes',
+                fields={'lb_id': 'lb1', 'nodes': 'node1, node2, nodea',
+                        'cloud_feed': True}),
+            Log('convergence-remove-rcv3-nodes',
+                fields={'lb_id': 'lb2', 'nodes': 'node2, node3',
+                        'cloud_feed': True}),
+            Log('convergence-remove-rcv3-nodes',
+                fields={'lb_id': 'lb3', 'nodes': 'node4', 'cloud_feed': True}),
+            Log('convergence-remove-rcv3-nodes',
                 fields={'lb_id': 'lba', 'nodes': 'nodea, nodeb',
                         'cloud_feed': True})
         ])
