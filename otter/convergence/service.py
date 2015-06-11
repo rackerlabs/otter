@@ -472,6 +472,14 @@ class Converger(MultiService):
             error=lambda e: err(
                 exc_info_to_failure(e), 'converge-all-groups-error'))
 
+    def _with_conv_runid(self, eff):
+        """
+        Return Effect wrapped with converger_run_id log field
+        """
+        return Effect(Func(uuid.uuid1)).on(str).on(
+            lambda uid: with_log(eff, otter_service='converger',
+                                 converger_run_id=uid))
+
     def buckets_acquired(self, my_buckets):
         """
         Get dirty flags from zookeeper and run convergence with them.
@@ -480,10 +488,7 @@ class Converger(MultiService):
         """
         ceff = Effect(GetChildren(CONVERGENCE_DIRTY_DIR)).on(
             partial(self._converge_all, my_buckets))
-        eff = Effect(Func(uuid.uuid1)).on(
-            lambda uid: with_log(ceff, otter_service='converger',
-                                 converger_run_id=uid))
-        return perform(self._dispatcher, eff)
+        return perform(self._dispatcher, self._with_conv_runid(ceff))
 
     def divergent_changed(self, children):
         """
@@ -501,7 +506,7 @@ class Converger(MultiService):
         if set(my_buckets).intersection(changed_buckets):
             # the return value is ignored, but we return this for testing
             eff = self._converge_all(my_buckets, children)
-            return perform(self._dispatcher, eff)
+            return perform(self._dispatcher, self._with_conv_runid(eff))
 
 # We're using a global for now because it's difficult to thread a new parameter
 # all the way through the REST objects to the controller code, where this

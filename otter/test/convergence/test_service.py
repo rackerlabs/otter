@@ -107,6 +107,17 @@ class ConvergerTests(SynchronousTestCase):
         self.fake_partitioner = FakePartitioner(log, callable)
         return self.fake_partitioner
 
+    def _log_sequence(self, disp):
+        uid = uuid.uuid1()
+        exp_uid = str(uid)
+        return SequenceDispatcher([
+            (Func(uuid.uuid1), lambda i: uid),
+            unwrap_wrapped_effect(
+                BoundFields, dict(fields={'otter_service': 'converger',
+                                          'converger_run_id': exp_uid}),
+                disp)
+        ])
+
     def test_buckets_acquired(self):
         """
         When buckets are allocated, the result of converge_all_groups is
@@ -131,14 +142,7 @@ class ConvergerTests(SynchronousTestCase):
                 3600),
                 lambda i: 'foo')
         ]
-
-        sequence = SequenceDispatcher([
-            (Func(uuid.uuid1), lambda i: 'uid'),
-            unwrap_wrapped_effect(
-                BoundFields, dict(fields={'otter_service': 'converger',
-                                          'converger_run_id': 'uid'}),
-                bound_sequence)
-        ])
+        sequence = self._log_sequence(bound_sequence)
 
         converger = self._converger(converge_all_groups, dispatcher=sequence)
 
@@ -163,14 +167,7 @@ class ConvergerTests(SynchronousTestCase):
                 CheckFailureValue(RuntimeError('foo')),
                 'converge-all-groups-error', {}), lambda i: None)
         ]
-
-        sequence = SequenceDispatcher([
-            (Func(uuid.uuid1), lambda i: 'uid'),
-            unwrap_wrapped_effect(
-                BoundFields, dict(fields={'otter_service': 'converger',
-                                          'converger_run_id': 'uid'}),
-                bound_sequence)
-        ])
+        sequence = self._log_sequence(bound_sequence)
 
         # relying on the side-effect of setting up self.fake_partitioner
         self._converger(converge_all_groups, dispatcher=sequence)
@@ -216,12 +213,13 @@ class ConvergerTests(SynchronousTestCase):
             (('converge-all-groups', ['group1', 'group2']),
              lambda i: None)
         ])
+        sequence = self._log_sequence(dispatcher)
         converger = self._converger(converge_all_groups,
-                                    dispatcher=dispatcher)
+                                    dispatcher=sequence)
         # sha1('group1') % 10 == 3
         self.fake_partitioner.current_state = PartitionState.ACQUIRED
         self.fake_partitioner.my_buckets = [3]
-        with dispatcher.consume():
+        with sequence.consume():
             converger.divergent_changed(['group1', 'group2'])
 
 
