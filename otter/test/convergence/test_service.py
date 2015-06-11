@@ -107,7 +107,7 @@ class ConvergerTests(SynchronousTestCase):
         self.fake_partitioner = FakePartitioner(log, callable)
         return self.fake_partitioner
 
-    def _log_sequence(self, disp):
+    def _log_sequence(self, intents):
         uid = uuid.uuid1()
         exp_uid = str(uid)
         return SequenceDispatcher([
@@ -115,7 +115,7 @@ class ConvergerTests(SynchronousTestCase):
             unwrap_wrapped_effect(
                 BoundFields, dict(fields={'otter_service': 'converger',
                                           'converger_run_id': exp_uid}),
-                disp)
+                intents)
         ])
 
     def test_buckets_acquired(self):
@@ -209,13 +209,15 @@ class ConvergerTests(SynchronousTestCase):
         def converge_all_groups(currently_converging, _my_buckets,
                                 all_buckets, divergent_flags, build_timeout):
             return Effect(('converge-all-groups', divergent_flags))
-        dispatcher = SequenceDispatcher([
+
+        intents = [
             (('converge-all-groups', ['group1', 'group2']),
              lambda i: None)
-        ])
-        sequence = self._log_sequence(dispatcher)
-        converger = self._converger(converge_all_groups,
-                                    dispatcher=sequence)
+        ]
+        sequence = self._log_sequence(intents)
+
+        converger = self._converger(converge_all_groups, dispatcher=sequence)
+
         # sha1('group1') % 10 == 3
         self.fake_partitioner.current_state = PartitionState.ACQUIRED
         self.fake_partitioner.my_buckets = [3]
