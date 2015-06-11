@@ -809,6 +809,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             max_servers=max_servers, desired_servers=set_to_servers,
             final_servers=set_to_servers)
 
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-009")
     def test_convergence_fixes_errored_building_servers(self):
         """
