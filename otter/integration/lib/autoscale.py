@@ -95,6 +95,11 @@ def create_scaling_group_dict(
                 "server": {
                     "flavorRef": flavor_ref,
                     "imageRef": image_ref,
+                    "networks": [
+                        {
+                            "uuid": "11111111-1111-1111-1111-111111111111"
+                        }
+                    ]
                 }
             }
         },
