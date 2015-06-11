@@ -22,7 +22,7 @@ from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.model import (
-    CLBDescription, CLBNode, NovaServer, ServerState, StepResult)
+    CLBDescription, CLBNode, ServerState, StepResult)
 from otter.convergence.service import (
     ConcurrentError,
     ConvergenceStarter,
@@ -554,22 +554,12 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
         self.desired_lbs = s(CLBDescription(lb_id='23', port=80))
         self.servers = (
-            NovaServer(id='a',
-                       state=ServerState.ACTIVE,
-                       created=0,
-                       image_id='image',
-                       flavor_id='flavor',
-                       servicenet_address='10.0.0.1',
-                       desired_lbs=self.desired_lbs,
-                       links=freeze([{'href': 'link1', 'rel': 'self'}])),
-            NovaServer(id='b',
-                       state=ServerState.ACTIVE,
-                       created=0,
-                       image_id='image',
-                       flavor_id='flavor',
-                       servicenet_address='10.0.0.2',
-                       desired_lbs=self.desired_lbs,
-                       links=freeze([{'href': 'link2', 'rel': 'self'}]))
+            server('a', ServerState.ACTIVE, servicenet_address='10.0.0.1',
+                   desired_lbs=self.desired_lbs,
+                   links=freeze([{'href': 'link1', 'rel': 'self'}])),
+            server('b', ServerState.ACTIVE, servicenet_address='10.0.0.2',
+                   desired_lbs=self.desired_lbs,
+                   links=freeze([{'href': 'link2', 'rel': 'self'}]))
         )
         gsgi = GetScalingGroupInfo(tenant_id='tenant-id',
                                    group_id='group-id')
@@ -632,14 +622,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """
         gacd = self._get_gacd_func()
         dgs = get_desired_group_state(self.group_id, self.lc, 2)
-        deleted = NovaServer(id='c',
-                             state=ServerState.DELETED,
-                             created=0,
-                             image_id='image',
-                             flavor_id='flavor',
-                             servicenet_address='10.0.0.3',
-                             desired_lbs=self.desired_lbs,
-                             links=freeze([{'href': 'link3', 'rel': 'self'}]))
+        deleted = server(
+            'c', ServerState.DELETED, servicenet_address='10.0.0.3',
+            desired_lbs=self.desired_lbs,
+            links=freeze([{'href': 'link3', 'rel': 'self'}]))
         servers = self.servers + (deleted,)
         steps = [
             TestStep(
@@ -671,8 +657,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (Log('execute-convergence-results',
                  {'results': [(steps[0], (StepResult.SUCCESS, []))],
                   'worst_status': StepResult.SUCCESS}), noop),
-            # Note that self.servers is non-deleted servers
-            (("cacheistenant-idgroup-id", self.now, self.servers, True), noop)
+            # Note that servers arg is non-deleted servers
+            (("cacheistenant-idgroup-id", self.now,
+              [{'id': 'a'}, {'id': 'b'}], True), noop)
         ])
         dispatcher = ComposedDispatcher([sequence, self._get_dispatcher()])
         with sequence.consume():

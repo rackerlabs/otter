@@ -381,7 +381,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
                        servicenet_address='',
-                       links=freeze(self.links[0])))
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
 
     def test_without_private(self):
         """
@@ -396,7 +397,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
                        servicenet_address='',
-                       links=freeze(self.links[0])))
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
 
     def test_with_servicenet(self):
         """
@@ -410,7 +412,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        flavor_id='valid_flavor',
                        created=self.createds[1][1],
                        servicenet_address='10.0.0.1',
-                       links=freeze(self.links[1])))
+                       links=freeze(self.links[1]),
+                       json=freeze(self.servers[1])))
 
     def test_without_image_id(self):
         """
@@ -427,7 +430,8 @@ class ToNovaServerTests(SynchronousTestCase):
                            flavor_id='valid_flavor',
                            created=self.createds[0][1],
                            servicenet_address='',
-                           links=freeze(self.links[0])))
+                           links=freeze(self.links[0]),
+                           json=freeze(self.servers[0])))
         del self.servers[0]['image']
         self.assertEqual(
             NovaServer.from_server_details_json(self.servers[0]),
@@ -437,7 +441,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
                        servicenet_address='',
-                       links=freeze(self.links[0])))
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
 
     def test_with_lb_metadata(self):
         """
@@ -471,7 +476,8 @@ class ToNovaServerTests(SynchronousTestCase):
                            CLBDescription(lb_id='1', port=80),
                            CLBDescription(lb_id='1', port=90)]),
                        servicenet_address='',
-                       links=freeze(self.links[0])))
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
 
     def test_lbs_from_metadata_ignores_unsupported_lb_types(self):
         """
@@ -490,7 +496,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        created=self.createds[0][1],
                        desired_lbs=pset(),
                        servicenet_address='',
-                       links=freeze(self.links[0])))
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
 
     def test_draining_from_metadata_trumps_active_build_nova_states(self):
         """
@@ -510,7 +517,8 @@ class ToNovaServerTests(SynchronousTestCase):
                            created=self.createds[0][1],
                            desired_lbs=pset(),
                            servicenet_address='',
-                           links=freeze(self.links[0])))
+                           links=freeze(self.links[0]),
+                           json=freeze(self.servers[0])))
 
     def test_draining_state_invalid_values(self):
         """
@@ -528,7 +536,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        created=self.createds[0][1],
                        desired_lbs=pset(),
                        servicenet_address='',
-                       links=freeze(self.links[0])))
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
 
     def test_error_and_deleted_nova_state_trumps_draining_from_metadata(self):
         """
@@ -548,7 +557,8 @@ class ToNovaServerTests(SynchronousTestCase):
                            created=self.createds[0][1],
                            desired_lbs=pset(),
                            servicenet_address='',
-                           links=freeze(self.links[0])))
+                           links=freeze(self.links[0]),
+                           json=freeze(self.servers[0])))
 
 
 class IPAddressTests(SynchronousTestCase):
