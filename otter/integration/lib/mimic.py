@@ -84,11 +84,6 @@ class MimicNova(object):
     (:class:`mimic.rest.nova_api.NovaControlAPIRegion`) in the mimic
     codebase for more information.
 
-    This also supports behavior injection, with the default type of behavior
-    to inject being server creation.
-
-    :see: :func:`supports_mimic_behavior_injection` above
-
     :ivar pool: a :class:`twisted.web.client.HTTPConnectionPool` to pass to
         all treq requests
     :ivar test_case: a :class:`twisted.trial.unittest.TestCase`, which if not
@@ -97,14 +92,6 @@ class MimicNova(object):
         the default library :mod:`treq` will be used.  Mainly to be used for
         injecting stubs during tests.
     """
-    def get_behavior_endpoint(self, rcs, event_description="creation"):
-        """
-        Return the default behavior injection endpoint, the default behavior
-        being server creation.
-        """
-        return "{0}/behaviors/{1}".format(rcs.endpoints['mimic_nova'],
-                                          event_description)
-
     def change_server_statuses(self, rcs, ids_to_status):
         """
         Change the statuses of the given server IDs.  Changing the statuses of
