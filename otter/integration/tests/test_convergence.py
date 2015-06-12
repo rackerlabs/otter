@@ -53,6 +53,7 @@ mimic_clb_key = os.environ.get("MIMICCLB_SC_KEY", 'cloudLoadBalancerControl')
 
 # otter configuration options for testing
 otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
+otter_username = os.environ.get("AS_SERVICE_USERNAME", "FAKEUSERNAME")
 
 
 def not_mimic():
@@ -868,7 +869,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
                 {"name": "build",
-                 "parameters": {"duration": otter_build_timeout * 2}},
+                 "parameters": {"duration": otter_build_timeout * 3000}},
                 {"name": "default"},
                 {"name": "default"}
             ])
@@ -1066,7 +1067,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
 
         d = mimic_identity.sequenced_behaviors(
             endpoint,
-            criteria=[{"username": username + ".*"}],
+            criteria=[{"username": otter_username + ".*"}],
             behaviors=[
                 {"name": "fail",
                  "parameters": {"code": 500,

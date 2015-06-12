@@ -177,7 +177,7 @@ class MimicIdentity(object):
         injecting stubs during tests.
     """
     def sequenced_behaviors(self, identity_endpoint, criteria, behaviors,
-                            event_description="authentication"):
+                            event_description="auth"):
         """
         Cause Identity to fail sometimes or all the time, with a pre-determined
         sequence of successes and/or failures.

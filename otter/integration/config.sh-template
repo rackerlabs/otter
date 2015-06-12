@@ -52,3 +52,11 @@ export AS_CLB_SC_KEY=cloudLoadBalancers
 
 # Uncomment this if you are running tests against Mimic.
 # export AS_USING_MIMIC=true
+
+# Uncomment this to change the default value of the otter build timeout for
+# testing
+# export AS_BUILD_TIMEOUT_SECONDS=30
+
+# The user name that otter uses to authenticate against identity - used to
+# test error injection.
+export AS_SERVICE_USERNAME=FAKEUSERNAME
