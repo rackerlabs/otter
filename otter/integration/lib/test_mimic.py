@@ -112,7 +112,8 @@ class MimicIdentityTestCase(SynchronousTestCase):
         self.expected_kwargs = {'pool': self.pool}
 
         self.delete_treq = get_fake_treq(
-            self, 'DELETE', "/mimic/v1.1/behaviors/some_event/behavior_id",
+            self, 'DELETE',
+            "/mimic/v1.1/IdentityControlAPI/behaviors/some_event/behavior_id",
             ((),
              self.expected_kwargs),
             (Response(204), "successfully deleted behavior"))
@@ -128,7 +129,8 @@ class MimicIdentityTestCase(SynchronousTestCase):
                       'parameters': {"behavior": "params"}}]
 
         _treq = get_fake_treq(
-            self, 'POST', "/mimic/v1.1/behaviors/some_event",
+            self, 'POST',
+            "/mimic/v1.1/IdentityControlAPI/behaviors/some_event",
             ((json.dumps({'criteria': criteria,
                           'name': "sequence",
                           'parameters': {"behaviors": behaviors}}),),
@@ -140,18 +142,9 @@ class MimicIdentityTestCase(SynchronousTestCase):
         mimic_identity = MimicIdentity(pool=self.pool, test_case=test_case,
                                        treq=_treq)
         d = mimic_identity.sequenced_behaviors(
-            self.rcs, criteria, behaviors, event_description="some_event")
+            "/identity/v2.0", criteria, behaviors,
+            event_description="some_event")
         self.assertEqual("behavior_id", self.successResultOf(d))
 
         self.assertEqual("successfully deleted behavior",
                          self.successResultOf(test_case.cleanup()))
-
-    def test_delete_behavior(self):
-        """
-        Delete an existing behavior.
-        """
-        mimic_identity = MimicIdentity(pool=self.pool, treq=self.delete_treq)
-        d = mimic_identity.delete_behavior(
-            self.rcs, "behavior_id", event_description="some_event")
-        self.assertEqual('successfully deleted behavior',
-                         self.successResultOf(d))

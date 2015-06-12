@@ -10,37 +10,26 @@ import treq
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 
-from zope.interface import Attribute as ZopeAttribute
-from zope.interface import Interface, implementedBy, implementer
-
 from otter.util.http import check_success
 
 
 @inlineCallbacks
-def _mimic_behaviors(pool, endpoint, behavior_name, criteria, parameters,
-                     test_case=None, _treq=treq):
+def _sequenced_behaviors(test_case, pool, endpoint, criteria, behaviors,
+                         _treq):
     """
-    Generic behavior registration in mimic.  Behavior CRUD is handled
-    generically in mimic (:see: :func:`mimic.model.behaviors.make_behavior_api`
-    in the Mimic codebase for more information.)
+    Cause an endpoint fail sometimes or all the time, with a pre-determined
+    sequence of successes and/or failures.
 
-    :see: :mod:`mimic.model.behaviors` in the mimic code base for more
-        information on how behaviors work overall.
-
-    Note that mimic does not do authentication, so an auth token is not
-    necessary.
-
-    :param str endpoint: The URL for the behavior endpoint (this includes the
-        behavior event type - e.g. for nova server creation behaviors, for
-        instance, the endpoint would be <nova_control_url>/behaviors/creation).
-    :param str behavior_name: The name of the behavior to einject.
-    :param list criteria: The criteria for the servers that should exhibit
-        this behavior.
-    :param dict parameters:  The parameters to pass to the behavior.  What
-        form the dictionary should take is dependent upon the behavior
-        specified.
-    :param test_case: an instance of :class:`twisted.trial.unittest.TestCase`
-    :param _treq: The treq instance to use
+    :param str endpoint: The endpoint for the mimic behavior to POST to
+    :param pool: a :class:`twisted.web.client.HTTPConnectionPool` to pass to
+        all treq requests
+    :param list criteria: The criteria that the event should apply for the
+        behavior to work
+    :param list behaviors:  A list of dictionaries containing the names of
+        behaviors parameters.
+    :param _treq: the treq module to use for making requests - if not provided,
+        the default library :mod:`treq` will be used.  Mainly to be used for
+        injecting stubs during tests.
 
     :return: the ID of the created behavior
     :rtype: `str`
@@ -49,8 +38,10 @@ def _mimic_behaviors(pool, endpoint, behavior_name, criteria, parameters,
         endpoint,
         json.dumps({
             "criteria": criteria,
-            "name": behavior_name,
-            "parameters": parameters
+            "name": "sequence",
+            "parameters": {
+                "behaviors": behaviors
+            }
         }),
         pool=pool
     ).addCallback(check_success, [201]).addCallback(_treq.json_content)
@@ -59,30 +50,22 @@ def _mimic_behaviors(pool, endpoint, behavior_name, criteria, parameters,
 
     if test_case is not None:
         test_case.addCleanup(
-            _mimic_delete_behavior, pool, endpoint, behavior_id,
-            test_case, _treq)
+            _delete_behavior, pool, endpoint, behavior_id, _treq)
 
     returnValue(behavior_id)
 
 
-def _mimic_delete_behavior(pool, endpoint, behavior_id, test_case, _treq=treq):
+def _delete_behavior(pool, endpoint, behavior_id, _treq):
     """
-    Generic behavior deletion in mimic.  Behavior CRUD is handled
-    generically in mimic (:see: :func:`mimic.model.behaviors.make_behavior_api`
-    in the Mimic codebase for more information.)
+    Given a behavior ID, delete it from mimic.
 
-    Note that mimic does not do authentication, so an auth token is not
-    necessary.
-
-    :param str endpoint: The URL for the behavior endpoint (this includes the
-        behavior event type - e.g. for nova server creation behaviors, for
-        instance, the endpoint would be <nova_control_url>/behaviors/creation).
+    :param str endpoint: The endpoint for the mimic behavior to POST to
+    :param pool: a :class:`twisted.web.client.HTTPConnectionPool` to pass to
+        all treq requests
     :param str behavior_id: The ID of the behavior to delete.
-    :param test_case: an instance of :class:`twisted.trial.unittest.TestCase`
-    :param _treq: The treq instance to use
-
-    :return: The string body of the response (the empty string)
-    :rtype: `str`
+    :param _treq: the treq module to use for making requests - if not provided,
+        the default library :mod:`treq` will be used.  Mainly to be used for
+        injecting stubs during tests.
     """
     d = _treq.delete("{0}/{1}".format(endpoint, behavior_id), pool=pool)
     d.addCallback(check_success, [204, 404])
@@ -90,88 +73,6 @@ def _mimic_delete_behavior(pool, endpoint, behavior_id, test_case, _treq=treq):
     return d
 
 
-class IMimicBehaviorAPISupporter(Interface):
-    """
-    Class to be implemented if support for injecting behavior into the mimic
-    object is required.
-    """
-    pool = ZopeAttribute("The HTTP connection pool to be used.")
-    test_case = ZopeAttribute("The test case to be used to clean up.")
-    treq = ZopeAttribute("The treq module to be used to make requests.")
-
-    def get_behavior_endpoint(rcs, event_description=None):
-        """
-        :param rcs: A :class:`otter.integration.lib.resources.TestResources`
-            instance.
-        :param str event_description: Which event this sequence of behaviors
-            should apply to.  Should have a default value.
-
-        :return: the behavior endpoint to be hit
-        """
-
-
-def supports_mimic_behavior_injection(klass):
-    """
-    Class decorator that adds functions to support registering sequence
-    behavior and deleting behavior from a Mimic controller API object.
-
-    :param klass: a :class:`IMimicBehaviorAPISupporter` implementer
-    """
-    assert IMimicBehaviorAPISupporter in implementedBy(klass)
-
-    def sequenced_behaviors(klass_self, rcs, criteria, behaviors,
-                            event_description=None):
-        """
-        Cause nova to fail sometimes or all the time, with a pre-determined
-        sequence of successes and/or failures.
-
-        :param rcs: A :class:`otter.integration.lib.resources.TestResources`
-            instance.
-        :param list criteria: The criteria for the servers that should exhibit
-            this behavior.  See, in mimic the control plane API,
-            :func:`register_creation_behavior`, for more information.
-        :param list behaviors:  A list of dictionaries containing the names of
-            creation behaviors parameters.
-            See, in the mimic codebase,
-            :func:`mimic.model.nova_objects.sequence` for more information.
-        :param str event_description: Which event this sequence of behaviors
-            should apply to - the default event is server creation.
-
-        :return: the ID of the created behavior
-        :rtype: `str`
-        """
-        return _mimic_behaviors(
-            klass_self.pool,
-            klass_self.get_behavior_endpoint(rcs, event_description),
-            "sequence",
-            criteria,
-            parameters={"behaviors": behaviors},
-            test_case=klass_self.test_case, _treq=klass_self.treq)
-
-    def delete_behavior(klass_self, rcs, behavior_id, event_description=None):
-        """
-        Given a behavior ID, delete it from mimic.
-
-        :param rcs: A :class:`otter.integration.lib.resources.TestResources`
-            instance.
-        :param event_description: What type of event this is that should be
-            deleted.
-        :param str behavior_id: The ID of the behavior to delete.
-        """
-        return _mimic_delete_behavior(
-            klass_self.pool,
-            klass_self.get_behavior_endpoint(rcs, event_description),
-            behavior_id,
-            test_case=klass_self.test_case,
-            _treq=klass_self.treq)
-
-    setattr(klass, 'sequenced_behaviors', sequenced_behaviors)
-    setattr(klass, 'delete_behavior', delete_behavior)
-    return klass
-
-
-@supports_mimic_behavior_injection
-@implementer(IMimicBehaviorAPISupporter)
 @attributes(["pool",
              Attribute("test_case", default_value=None),
              Attribute("treq", default_value=treq)])
@@ -226,24 +127,59 @@ class MimicNova(object):
             pool=self.pool
         ).addCallback(check_success, [201]).addCallback(self.treq.content)
 
+    def sequenced_behaviors(self, rcs, criteria, behaviors,
+                            event_description="creation"):
+        """
+        Cause Nova to fail sometimes or all the time, with a pre-determined
+        sequence of successes and/or failures.
 
-@supports_mimic_behavior_injection
-@implementer(IMimicBehaviorAPISupporter)
+        :param rcs: A :class:`otter.integration.lib.resources.TestResources`
+            instance.
+        :param list criteria: The criteria for the servers that should exhibit
+            this behavior.  See, in mimic the control plane API,
+            :func:`register_creation_behavior`, for more information.
+        :param list behaviors:  A list of dictionaries containing the names of
+            creation behaviors parameters.
+            See, in the mimic codebase,
+            :func:`mimic.model.nova_objects.sequence` for more information.
+        :param str event_description: Which event this sequence of behaviors
+            should apply to - the default event is server creation.
+
+        :return: the ID of the created behavior
+        :rtype: `str`
+        """
+        return _sequenced_behaviors(
+            self.test_case, self.pool,
+            "{0}/behaviors/{1}".format(rcs.endpoints['mimic_nova'],
+                                       event_description),
+            criteria, behaviors, self.treq)
+
+    def delete_behavior(self, rcs, behavior_id, event_description="creation"):
+        """
+        Given a behavior ID, delete it from mimic.
+
+        :param rcs: A :class:`otter.integration.lib.resources.TestResources`
+            instance.
+        :param str behavior_id: The ID of the behavior to delete.
+        :param event_description: What type of event this is that should be
+            deleted.
+        """
+        return _delete_behavior(
+            self.pool, "{0}/behaviors/{1}".format(rcs.endpoints['mimic_nova'],
+                                                  event_description),
+            behavior_id, self.treq)
+
+
 @attributes(["pool",
              Attribute("test_case", default_value=None),
              Attribute("treq", default_value=treq)])
 class MimicIdentity(object):
     """
-    Class that handles HTTP requests to the mimic identity control plane.
+    Class that handles HTTP requests to the Mimic Identity control plane.
 
-    Please see the mimic control plane API
-    (:func:`mimic.rest.resource.MimicRoot.handle_identity_behaviors`) in the
+    Please see the Mimic generic control plane (:mod:`mimic.model.behaviors`)
+    and specific auth failure behaviors (:class:`mimic.rest.auth_api`) in the
     mimic codebase for more information.
-
-    This also supports behavior injection, with the default type of behavior
-    to inject being authentication.
-
-    :see: :func:`supports_mimic_behavior_injection` above
 
     :ivar pool: a :class:`twisted.web.client.HTTPConnectionPool` to pass to
         all treq requests
@@ -253,12 +189,34 @@ class MimicIdentity(object):
         the default library :mod:`treq` will be used.  Mainly to be used for
         injecting stubs during tests.
     """
-    def get_behavior_endpoint(self, rcs, event_description="creation"):
+    def sequenced_behaviors(self, identity_endpoint, criteria, behaviors,
+                            event_description="authentication"):
         """
-        Return the default behavior injection endpoint, the default behavior
-        being authentication.
+        Cause Identity to fail sometimes or all the time, with a pre-determined
+        sequence of successes and/or failures.
+
+        :param identity_endpoint: The endpoint with which to auth against
+            identity - the mimic identity control endpoint is hardcoded, so
+            this can tell us what the control endpoint is.
+        :param list criteria: The criteria for the servers that should exhibit
+            this behavior.  See, in mimic the control plane API,
+            :func:`register_creation_behavior`, for more information.
+        :param list behaviors:  A list of dictionaries containing the names of
+            creation behaviors parameters.
+            See, in the mimic codebase,
+            :func:`mimic.model.nova_objects.sequence` for more information.
+        :param str event_description: Which event this sequence of behaviors
+            should apply to - the default event is authentication.
+
+        :return: the ID of the created behavior
+        :rtype: `str`
         """
-        return "/mimic/v1.1/behaviors/{0}".format(event_description)
+        endpoint = identity_endpoint.replace(
+            "/identity/v2.0",
+            "/mimic/v1.1/IdentityControlAPI/behaviors/{0}".format(
+                event_description))
+        return _sequenced_behaviors(self.test_case, self.pool, endpoint,
+                                    criteria, behaviors, self.treq)
 
 
 @attributes(["pool",
