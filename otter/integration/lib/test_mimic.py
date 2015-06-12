@@ -19,7 +19,7 @@ def _get_fake_test_case(expected_old_treq, expected_new_treq):
                     args[i] = expected_new_treq
             for k in kwargs:
                 if kwargs[k] == expected_old_treq:
-                    kwargs[i] = expected_new_treq
+                    kwargs[k] = expected_new_treq
             return args[0](*args[1:], **kwargs)
     return FakeTestCase()
 
