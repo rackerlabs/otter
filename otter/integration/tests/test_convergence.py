@@ -27,7 +27,7 @@ from otter.integration.lib.autoscale import (
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
 from otter.integration.lib.identity import IdentityV2
-from otter.integration.lib.mimic import MimicCLB, MimicNova
+from otter.integration.lib.mimic import MimicCLB, MimicIdentity, MimicNova
 from otter.integration.lib.nova import (
     NovaServer, delete_servers, wait_for_servers)
 from otter.integration.lib.resources import TestResources
@@ -1047,6 +1047,41 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                     'status': Equals("ACTIVE")
                 }),
             ), timeout=600)
+
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
+    @tag("CATC-026")
+    def test_recover_from_identity_auth_failures(self):
+        """
+        CATC-026
+
+        Identity returns a 401 1/3 the time, a 500 1/3 the time, and a success
+        1/3 of the time.  Otter retries and recovers and there should be no
+        outward sign that anything is broken.
+        """
+        mimic_identity = MimicIdentity(pool=self.helper.pool, test_case=self)
+        group, _ = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=2,
+            max_entities=10
+        )
+
+        d = mimic_identity.sequenced_behaviors(
+            endpoint,
+            criteria=[{"username": username + ".*"}],
+            behaviors=[
+                {"name": "fail",
+                 "parameters": {"code": 500,
+                                "message": "Authentication failed."}},
+                {"name": "fail",
+                 "parameters": {"code": 400,
+                                "message": "Invalid credentials."}},
+                {"name": "default"}
+            ])
+        d.addCallback(
+            lambda _: self.helper.start_group_and_wait(group, self.rcs,
+                                                       desired=5))
+        d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
+                      matcher=HasLength(5), timeout=600)
+        return d
 
 
 def _catc_tags(start_num, end_num):
