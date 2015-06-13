@@ -1063,9 +1063,12 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         CATC-026
 
         Identity, when someone attempts to impersonate the test user, will
-        return a 401 1/3 the time, a 500 1/3 the time, and a success
-        1/3 of the time.  Otter retries and recovers and there should be no
-        outward sign that anything is broken.
+        first fail with a 401, then fail with a 500, then succeed, over and
+        over in a loop.  (Otter will probably only make a single cycle through
+        the sequence, but it shouldn't make a difference either way.)
+
+        Otter retries and recovers and there should be no outward sign that
+        anything is broken.
 
         Note that this uses a tenant that hopefully has not been used before.
         This is to prevent the case where Otter has cached the creds already,
