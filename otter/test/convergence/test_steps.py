@@ -586,9 +586,7 @@ class StepAsEffectTests(SynchronousTestCase):
         # Fail on 404 or 422 PENDING_DELETE
         self.assertEqual(
             get_result(StubResponse(404, {}), ''),
-            (StepResult.FAILURE,
-             [ErrorReason.Exception(
-                 (APIError, matches(IsInstance(APIError)), ANY))]))
+            (StepResult.FAILURE, [any_api_error]))
         self.assertEqual(
             get_result(
                 StubResponse(422, {}),
