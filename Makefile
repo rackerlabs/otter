@@ -70,11 +70,12 @@ TRIAL_OPTIONS_UNIT=${TRIAL_OPTIONS} --jobs 4
 
 unit:
 ifneq ($(JENKINS_URL), )
-	trial ${TRIAL_OPTIONS_UNIT} --reporter=subunit ${UNITTESTS} \
+	PYRSISTENT_NO_C_EXTENSION=true trial ${TRIAL_OPTIONS_UNIT} \
+		--reporter=subunit ${UNITTESTS} \
 		| subunit-1to2 | tee subunit-output.txt
 	tail -n +4 subunit-output.txt | subunit2junitxml > test-report.xml
 else
-	trial ${TRIAL_OPTIONS_UNIT} ${UNITTESTS}
+	PYRSISTENT_NO_C_EXTENSION=true trial ${TRIAL_OPTIONS_UNIT} ${UNITTESTS}
 endif
 
 integration:
