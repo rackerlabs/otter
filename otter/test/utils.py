@@ -3,6 +3,7 @@ Mixins and utilities to be used for testing.
 """
 import json
 import os
+import sys
 from functools import partial, wraps
 from inspect import getargspec
 
@@ -821,6 +822,14 @@ def get_fake_service_request_performer(stub_response):
 def raise_(e):
     """Raise the exception. Useful for lambdas."""
     raise e
+
+
+def raise_to_exc_info(e):
+    """Raise an exception, and get the exc_info that results."""
+    try:
+        raise e
+    except type(e):
+        return sys.exc_info()
 
 
 class TestStep(object):
