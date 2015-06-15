@@ -93,7 +93,8 @@ else
 endif
 
 coverage:
-	coverage run --source=${CODEDIR} --branch `which trial` \
+	PYRSISTENT_NO_C_EXTENSION=true coverage run --source=${CODEDIR} \
+		--branch `which trial` \
 	    ${TRIAL_OPTIONS} ${UNITTESTS}
 
 coverage-html: coverage
