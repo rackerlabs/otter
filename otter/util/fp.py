@@ -4,6 +4,8 @@
 
 from copy import deepcopy
 
+from pyrsistent import PMap, freeze, thaw
+
 from toolz.itertoolz import groupby
 
 
@@ -86,3 +88,42 @@ def assoc_obj(o, **k):
     new_o = deepcopy(o)
     new_o.__dict__.update(k)
     return new_o
+
+
+def set_in(old_dict, keys, new_value):
+    """
+    Take the old dictionary and traverses the dictionary via the list of
+    keys.  The returned dictionary will be the same as the old dictionary,
+    but with the resultant value set as ``new_value``.
+
+    Note that if more than 1 key is passed, and any of the keys (except for the
+    last) do not already exist, raises KeyError or IndexError.
+
+    Note that the new value does not need to be a pyrsistent data structure -
+    this function will freeze everything first.
+
+    :param dict old_dict: The dictionary to change values for.
+    :param iterable keys: An ordered collection of keys
+    :param new_value: The value to set the keys to
+
+    :return: A copy of the old dictionary as PMap, with the new value.
+    """
+    if len(keys) < 1:
+        raise ValueError("Must provide one or more keys")
+
+    if isinstance(old_dict, PMap):
+        new_mutable = thaw(old_dict)
+    else:
+        new_mutable = deepcopy(old_dict)
+
+    to_change = new_mutable
+    for k in keys[:-1]:
+        # If there is no mapping, or the value isn't a dict, make the
+        # valeu be a dictionary
+        if not isinstance(to_change.get(k), dict):
+            to_change[k] = {}
+        to_change = to_change[k]
+
+    to_change[keys[-1]] = new_value
+
+    return freeze(new_mutable)
