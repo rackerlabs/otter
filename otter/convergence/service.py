@@ -167,7 +167,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
                                        status=ScalingGroupStatus.ERROR))
         yield cf_err(
             'group-status-error', status=ScalingGroupStatus.ERROR.name,
-            reasons='; '.join(present_reasons(all_reasons)))
+            reasons='; '.join(sorted(present_reasons(all_reasons))))
 
     yield do_return(worst_status)
 

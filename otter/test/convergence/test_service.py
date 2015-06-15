@@ -20,7 +20,7 @@ from pyrsistent import freeze, pbag, pset, s
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.cloud_client import TenantScope
+from otter.cloud_client import NoSuchCLBError, TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.model import (
@@ -51,6 +51,7 @@ from otter.test.utils import (
     mock_group, mock_log,
     noop,
     raise_,
+    raise_to_exc_info,
     test_dispatcher,
     transform_eq,
     unwrap_wrapped_effect)
@@ -818,14 +819,21 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """
         gacd = self._get_gacd_func(self.group.uuid)
 
+        exc_info = raise_to_exc_info(NoSuchCLBError(lb_id=u'nolb1'))
+        exc_info2 = raise_to_exc_info(NoSuchCLBError(lb_id=u'nolb2'))
+
         def plan(*args, **kwargs):
             return pbag([
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
                 ConvergeLater(reasons=[ErrorReason.Other('mywish')]),
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                TestStep(Effect(Constant((StepResult.FAILURE,
-                                          [ErrorReason.Other('bad')])))),
-                TestStep(Effect(Constant((StepResult.SUCCESS, []))))
+                TestStep(Effect(Constant(
+                    (StepResult.FAILURE,
+                     [ErrorReason.Exception(exc_info)])))),
+                TestStep(Effect(Constant(
+                    (StepResult.FAILURE,
+                     [ErrorReason.Exception(exc_info2)])))),
+                TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
             ])
 
         eff = execute_convergence(self.tenant_id, self.group_id,
@@ -841,8 +849,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ERROR),
              noop),
-            (Log('group-status-error', dict(isError=True, cloud_feed=True,
-                                            status='ERROR', reasons='')),
+            (Log('group-status-error',
+                 dict(isError=True, cloud_feed=True,
+                      status='ERROR',
+                      reasons='Cloud Load Balancer does not exist: nolb1; '
+                              'Cloud Load Balancer does not exist: nolb2')),
              noop)
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
