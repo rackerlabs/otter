@@ -1,6 +1,7 @@
 """
 Twisted Application plugin for otter API nodes.
 """
+import os
 
 from copy import deepcopy
 from functools import partial
@@ -48,6 +49,11 @@ from otter.util.config import config_value, set_config_data
 from otter.util.cqlbatch import TimingOutCQLClient
 from otter.util.deferredutils import timeout_deferred
 from otter.util.zkpartitioner import Partitioner
+
+assert os.environ.get("PYRSISTENT_NO_C_EXTENSION"), (
+    "The environment variable PYRSISTENT_NO_C_EXTENSION must be set to "
+    "a non-empty string because the C extension sometimes causes segfaults "
+    "in otter.")
 
 
 class Options(usage.Options):
