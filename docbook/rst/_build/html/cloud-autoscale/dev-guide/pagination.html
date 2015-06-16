@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rackspace Developer Center</title>
+  <link href="http://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700,800" rel="stylesheet" type='text/css'>
+
+  <!-- drc styles: -->
+  <link rel="stylesheet" href="https://c2a32ff18d23c8f567f0-e44b0df73868b5d567b1e58e01681d15.ssl.cf5.rackcdn.com/main-ebdad849435665c9fe9a22d338a57bf6.css">
+
+  <!-- local styles: -->
+  <link rel="stylesheet" href="../../_static/localsphinx.css">
+
+  <link href="/atom.xml" rel="alternate" title="Rackspace Developer Portal" type="application/atom+xml">
+ <!-- Start Visual Website Optimizer Asynchronous Code -->
+<script type='text/javascript'>
+var _vwo_code=(function(){
+var account_id=45237,
+settings_tolerance=2000,
+library_tolerance=2500,
+use_existing_jquery=false,
+// DO NOT EDIT BELOW THIS LINE
+f=false,d=document;return{use_existing_jquery:function(){return use_existing_jquery;},library_tolerance:function(){return library_tolerance;},finish:function(){if(!f){f=true;var a=d.getElementById('_vis_opt_path_hides');if(a)a.parentNode.removeChild(a);}},finished:function(){return f;},load:function(a){var b=d.createElement('script');b.src=a;b.type='text/javascript';b.innerText;b.onerror=function(){_vwo_code.finish();};d.getElementsByTagName('head')[0].appendChild(b);},init:function(){settings_timer=setTimeout('_vwo_code.finish()',settings_tolerance);this.load('//dev.visualwebsiteoptimizer.com/j.php?a='+account_id+'&u='+encodeURIComponent(d.URL)+'&r='+Math.random());var a=d.createElement('style'),b='body{opacity:0 !important;filter:alpha(opacity=0) !important;background:none !important;}',h=d.getElementsByTagName('head')[0];a.setAttribute('id','_vis_opt_path_hides');a.setAttribute('type','text/css');if(a.styleSheet)a.styleSheet.cssText=b;else a.appendChild(d.createTextNode(b));h.appendChild(a);return settings_timer;}};}());_vwo_settings_timer=_vwo_code.init();
+</script>
+<!-- End Visual Website Optimizer Asynchronous Code -->
+</head>
+<div id="header" class="navbar navbar-fixed-top navbar-inverse navbar-default">
+    <div class="container">
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar-collapse-btn">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand new-landing-sprite rs-developer-logo" href="/"></a>
+        </div>
+        <div class="collapse navbar-collapse" id="navbar-collapse-btn">
+            <ul class="nav navbar-nav navbar-right">
+                <li><a href="/sdks/">SDKs</a></li>
+                <li><a href="/databases/">Databases</a></li>
+                <li><a href="/docs/">API Docs</a></li>
+                <li><a href="/blog/">Blog</a></li>
+                <li class="dropdown">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">Community <b class="caret"></b></a>
+                    <ul class="dropdown-menu">
+                        <li><a href="https://community.rackspace.com/developers/default">Developer Forum</a></li>
+                        <li><a href="/community/">Outreach &amp; Events</a></li>
+                        <li><a href="https://github.com/rackerlabs/developer.rackspace.com">This site on github</a></li>
+                    </ul>
+                </li>
+                <li class="dropdown">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">Help <b class="caret"></b></a>
+                    <ul class="dropdown-menu">
+                        <!--<li><a href="#">Developer-to-Developer Support</a></li>-->
+                        <li><a href="http://www.rackspace.com/knowledge_center/">Knowledge Center</a></li>
+                        <li><a href="http://status.rackspace.com">System Health Status</a></li>
+                    </ul>
+                </li>
+                <li class="dropdown">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">Login <b class="caret"></b></a>
+                    <ul class="dropdown-menu">
+                        <li><a href="https://my.rackspace.com/portal/auth/login">MyRackspace Portal</a></li>
+                        <li><a href="https://mycloud.rackspace.com">Cloud Control Panel</a></li>
+                        <li><a href="https://manage.rackspacecloud.com/pages/Login.jsp">Cloud Sites Control Panel</a>
+                        </li>
+                        <li><a href="https://apps.rackspace.com">Rackspace Webmail Login</a></li>
+                        <li><a href="https://cp.rackspace.com">Email Admin Login</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="/signup" class="btn btn-default" id="btn-get-started">Sign up for $50/month credit</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+<div class="title-header">
+  <div class="inner">
+    <span class="headline">Rackspace Developer Center</span>
+  </div>
+</div>
+<div class="container body-container">
+  <div class="row">
+    <div class="col-md-9 col-md-push-3 docs-content bodycontent">
+      <div class="document">
+  <div class="documentwrapper">
+      <div class="body" role="main">
+
+  <div class="section" id="pagination">
+<h1>Pagination<a class="headerlink" href="#pagination" title="Permalink to this headline">#</a></h1>
+<p>The Auto Scale API supports pagination of items that are returned in API
+call responses. Pagination enables users to view all responses even if
+the number of items returned in the response body is longer than what
+fits on one page.</p>
+<p>The pagination limit for the Auto Scale API is 100. This means you can
+view 100 items at a time.</p>
+<p>For example, if you want to get a list of all the scaling groups, and
+there are more than 100 groups, you see the first 100 groups on one page
+and then a link at the bottom of the page that takes you to the next
+page, which contains the next 100 items.</p>
+<p>A pagination limit that is set beyond 100 is defaulted to 100. And a
+limit that is set to smaller than 1 is defaulted to 1.</p>
+<p>The Auto Scale API paginates the following items:</p>
+<ul class="simple">
+<li>scaling groups</li>
+<li>scaling policies</li>
+<li>webhooks</li>
+</ul>
+<p>Use the <code class="docutils literal"><span class="pre">limit</span></code> and <code class="docutils literal"><span class="pre">marker</span></code> parameters to navigate the collection of items that are returned in the request.</p>
+<ul class="simple">
+<li>Limit is the maximum number of items that can be returned on one page. If the
+client submits a request with a limit beyond the 100 items supported by Auto Scale, the response returns
+the <code class="docutils literal"><span class="pre">413</span> <span class="pre">overLimit</span></code> error code.</li>
+<li>Marker is the ID of the last item in the previous list. Items are sorted by create time in descending
+order. When a create time is not available, items are sorted by ID. If the request includes an invalid
+ID, the response returns the``400 badRequest`` error code.</li>
+</ul>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The <code class="docutils literal"><span class="pre">limit</span></code> and <code class="docutils literal"><span class="pre">marker</span></code> parameters are optional.</p>
+</div>
+<div class="section" id="paginating-group-lists">
+<h2>Paginating group lists<a class="headerlink" href="#paginating-group-lists" title="Permalink to this headline">#</a></h2>
+<p>When you submit a request for a group manifest, you receive a list of
+all the available scaling groups and associated policies. However, the
+response body only lists 100, or whatever number of responses per page
+you configure using the <code class="docutils literal"><span class="pre">limit</span></code> parameter. If there are more results
+available than what you specified in the <code class="docutils literal"><span class="pre">limit</span></code> parameter, a <code class="docutils literal"><span class="pre">next</span></code>
+link is provided in the <code class="docutils literal"><span class="pre">rel</span></code> in the response body. This is shown in
+the following example that sets the <code class="docutils literal"><span class="pre">limit</span></code> parameter value to <code class="docutils literal"><span class="pre">2</span></code> to list
+two responses per page.</p>
+<div class="code highlight-python"><div class="highlight"><pre>$ curl -H &quot;x-auth-token: ${AUTHTOKEN}&quot; /
+ https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups?limit=2 | python -m json.tool
+</pre></div>
+</div>
+<p><strong>Example: Paginating group lists example</strong></p>
+<div class="code highlight-python"><div class="highlight"><pre><span class="p">{</span>
+    <span class="s">&quot;groups&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s">&quot;id&quot;</span><span class="p">:</span> <span class="s">&quot;1bb9d1e7-d7d2-4a87-baa3-8902fbfc8f02&quot;</span><span class="p">,</span>
+            <span class="s">&quot;links&quot;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span>
+                    <span class="s">&quot;href&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/1bb9d1e7-d7d2-4a87-baa3-8902fbfc8f02/&quot;</span><span class="p">,</span>
+                    <span class="s">&quot;rel&quot;</span><span class="p">:</span> <span class="s">&quot;self&quot;</span>
+                <span class="p">}</span>
+            <span class="p">],</span>
+            <span class="s">&quot;state&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s">&quot;active&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                <span class="s">&quot;activeCapacity&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s">&quot;desiredCapacity&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s">&quot;name&quot;</span><span class="p">:</span> <span class="s">&quot;test_sgroup711740&quot;</span><span class="p">,</span>
+                <span class="s">&quot;paused&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+                <span class="s">&quot;pendingCapacity&quot;</span><span class="p">:</span> <span class="mi">0</span>
+            <span class="p">}</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s">&quot;id&quot;</span><span class="p">:</span> <span class="s">&quot;d8a0ed6a-c1cd-4578-85e9-ebe88291791d&quot;</span><span class="p">,</span>
+            <span class="s">&quot;links&quot;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span>
+                    <span class="s">&quot;href&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/d8a0ed6a-c1cd-4578-85e9-ebe88291791d/&quot;</span><span class="p">,</span>
+                    <span class="s">&quot;rel&quot;</span><span class="p">:</span> <span class="s">&quot;self&quot;</span>
+                <span class="p">}</span>
+            <span class="p">],</span>
+            <span class="s">&quot;state&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s">&quot;active&quot;</span><span class="p">:</span> <span class="p">[],</span>
+                <span class="s">&quot;activeCapacity&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s">&quot;desiredCapacity&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s">&quot;name&quot;</span><span class="p">:</span> <span class="s">&quot;test_sgroup453884&quot;</span><span class="p">,</span>
+                <span class="s">&quot;paused&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+                <span class="s">&quot;pendingCapacity&quot;</span><span class="p">:</span> <span class="mi">0</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">],</span>
+    <span class="s">&quot;groups_links&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s">&quot;href&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/?limit=2&amp;marker=d8a0ed6a-c1cd-4578-85e9-ebe88291791d&quot;</span><span class="p">,</span>
+            <span class="s">&quot;rel&quot;</span><span class="p">:</span> <span class="s">&quot;next&quot;</span>
+        <span class="p">}</span>
+    <span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>For Auto Scale, the <code class="docutils literal"><span class="pre">limit</span></code> value range is <code class="docutils literal"><span class="pre">1</span> <span class="pre">-</span> <span class="pre">100</span></code> inclusive.
+If you set the value to a number greater than 100, it defaults to <code class="docutils literal"><span class="pre">100</span></code>.
+Set it to less tan 1, and it defaults to <code class="docutils literal"><span class="pre">1</span></code>.</p>
+<p>If you provide an invalid query argument for <code class="docutils literal"><span class="pre">limit</span></code>, the response returns a
+<code class="docutils literal"><span class="pre">400</span></code> message. The <code class="docutils literal"><span class="pre">marker</span></code> parameter specifies the last seen
+group ID. When you click on the link that is returned, all the groups
+displayed will have group Ids that are greater than
+<code class="docutils literal"><span class="pre">f82bb000-f451-40c8-9dc3-6919097d2f7e</span></code>.</p>
+</div>
+<div class="section" id="paginating-policy-lists">
+<h2>Paginating policy lists<a class="headerlink" href="#paginating-policy-lists" title="Permalink to this headline">#</a></h2>
+<p>When you submit a request to obtain all the policies associated with a
+scaling group, a list of policies is returned. However, the response
+body only lists 100, or whatever number of responses per page you
+configure using the <code class="docutils literal"><span class="pre">limit</span></code> parameter. If there are more results
+available than what you specified in the <code class="docutils literal"><span class="pre">limit</span></code> parameter, a <code class="docutils literal"><span class="pre">next</span></code>
+link is provided in the <code class="docutils literal"><span class="pre">rel</span></code> in the response body. This is shown in
+the following example that sets the <code class="docutils literal"><span class="pre">limit</span></code> parameter value to <code class="docutils literal"><span class="pre">2</span></code> to list
+two responses per page.</p>
+<div class="code highlight-python"><div class="highlight"><pre>$ curl -H &quot;x-auth-token: ${AUTHTOKEN}&quot;  \
+https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies?limit=2 | python -m json.tool
+</pre></div>
+</div>
+<p><strong>Example: Paginating policy lists example</strong></p>
+<div class="code highlight-python"><div class="highlight"><pre><span class="p">{</span>
+    <span class="s">&quot;policies&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s">&quot;change&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+            <span class="s">&quot;cooldown&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+            <span class="s">&quot;id&quot;</span><span class="p">:</span> <span class="s">&quot;25adccf9-0077-4510-b37d-90a48c9dc08f&quot;</span><span class="p">,</span>
+            <span class="s">&quot;links&quot;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span>
+                    <span class="s">&quot;href&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/25adccf9-0077-4510-b37d-90a48c9dc08f/&quot;</span><span class="p">,</span>
+                    <span class="s">&quot;rel&quot;</span><span class="p">:</span> <span class="s">&quot;self&quot;</span>
+                <span class="p">}</span>
+            <span class="p">],</span>
+            <span class="s">&quot;name&quot;</span><span class="p">:</span> <span class="s">&quot;scale up by 10&quot;</span><span class="p">,</span>
+            <span class="s">&quot;type&quot;</span><span class="p">:</span> <span class="s">&quot;webhook&quot;</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s">&quot;args&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s">&quot;cron&quot;</span><span class="p">:</span> <span class="s">&quot;0 */2 * * *&quot;</span>
+            <span class="p">},</span>
+            <span class="s">&quot;change&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+            <span class="s">&quot;cooldown&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+            <span class="s">&quot;id&quot;</span><span class="p">:</span> <span class="s">&quot;2d321cd2-b873-4865-9941-5ea6783fd58c&quot;</span><span class="p">,</span>
+            <span class="s">&quot;links&quot;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span>
+                    <span class="s">&quot;href&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/2d321cd2-b873-4865-9941-5ea6783fd58c/&quot;</span><span class="p">,</span>
+                    <span class="s">&quot;rel&quot;</span><span class="p">:</span> <span class="s">&quot;self&quot;</span>
+                <span class="p">}</span>
+            <span class="p">],</span>
+            <span class="s">&quot;name&quot;</span><span class="p">:</span> <span class="s">&quot;Schedule policy to run repeately&quot;</span><span class="p">,</span>
+            <span class="s">&quot;type&quot;</span><span class="p">:</span> <span class="s">&quot;schedule&quot;</span>
+        <span class="p">}</span>
+    <span class="p">],</span>
+    <span class="s">&quot;policies_links&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s">&quot;href&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/?limit=2&amp;marker=2d321cd2-b873-4865-9941-5ea6783fd58c&quot;</span><span class="p">,</span>
+            <span class="s">&quot;rel&quot;</span><span class="p">:</span> <span class="s">&quot;next&quot;</span>
+        <span class="p">}</span>
+    <span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal"><span class="pre">marker</span></code> parameter points to the last seen policy ID. When you
+click on the link that is returned, all the policies displayed will have
+policy Ids that are greater than <code class="docutils literal"><span class="pre">f82bb000-f451-40c8-9dc3-6919097d2f7e</span></code>.</p>
+</div>
+<div class="section" id="paginating-webhook-lists">
+<h2>Paginating webhook lists<a class="headerlink" href="#paginating-webhook-lists" title="Permalink to this headline">#</a></h2>
+<p>When you submit a request to obtain all the webhooks associated with a
+policy, a list of webhooks is returned. However, the response body only
+lists 100, or whatever number of responses per page you configure using
+the <code class="docutils literal"><span class="pre">limit</span></code> parameter. If there are more results available than what
+you specified in the <code class="docutils literal"><span class="pre">limit</span></code> parameter, a <code class="docutils literal"><span class="pre">next</span></code> link is provided in
+the <code class="docutils literal"><span class="pre">rel</span></code> in the response body. This is shown in
+the following example that sets the <code class="docutils literal"><span class="pre">limit</span></code> parameter value to <code class="docutils literal"><span class="pre">2</span></code> to list
+two responses per page.</p>
+<div class="code highlight-python"><div class="highlight"><pre>$ curl -H &quot;x-auth-token: ${AUTHTOKEN}&quot; \
+ https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/25adccf9-0077-4510-b37d-90a48c9dc08f/webhooks?limit=2 | python -m json.tool
+</pre></div>
+</div>
+<p><strong>Example: Paginating webhook lists example</strong></p>
+<div class="code highlight-python"><div class="highlight"><pre><span class="p">{</span>
+    <span class="s">&quot;webhooks&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s">&quot;id&quot;</span><span class="p">:</span> <span class="s">&quot;012d0b95-8185-4955-be00-cee9bc25d177&quot;</span><span class="p">,</span>
+            <span class="s">&quot;links&quot;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span>
+                    <span class="s">&quot;href&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/25adccf9-0077-4510-b37d-90a48c9dc08f/webhooks/012d0b95-8185-4955-be00-cee9bc25d177/&quot;</span><span class="p">,</span>
+                    <span class="s">&quot;rel&quot;</span><span class="p">:</span> <span class="s">&quot;self&quot;</span>
+                <span class="p">},</span>
+                <span class="p">{</span>
+                    <span class="s">&quot;href&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/3ae6d5b89b471fd6ac2d8496e19bea1ae6e766c83869903de745bf7ae3fbfd45/&quot;</span><span class="p">,</span>
+                    <span class="s">&quot;rel&quot;</span><span class="p">:</span> <span class="s">&quot;capability&quot;</span>
+                <span class="p">}</span>
+            <span class="p">],</span>
+            <span class="s">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{},</span>
+            <span class="s">&quot;name&quot;</span><span class="p">:</span> <span class="s">&quot;webhook3&quot;</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s">&quot;id&quot;</span><span class="p">:</span> <span class="s">&quot;a5aefc55-1ac8-41a0-8d70-7ee30f56af69&quot;</span><span class="p">,</span>
+            <span class="s">&quot;links&quot;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span>
+                    <span class="s">&quot;href&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/25adccf9-0077-4510-b37d-90a48c9dc08f/webhooks/a5aefc55-1ac8-41a0-8d70-7ee30f56af69/&quot;</span><span class="p">,</span>
+                    <span class="s">&quot;rel&quot;</span><span class="p">:</span> <span class="s">&quot;self&quot;</span>
+                <span class="p">},</span>
+                <span class="p">{</span>
+                    <span class="s">&quot;href&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/ad1cad8361963cc350ac0f1fc4edd2cacc24e0d77eee03b8c0cfaf7feeec7ac3/&quot;</span><span class="p">,</span>
+                    <span class="s">&quot;rel&quot;</span><span class="p">:</span> <span class="s">&quot;capability&quot;</span>
+                <span class="p">}</span>
+            <span class="p">],</span>
+            <span class="s">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{},</span>
+            <span class="s">&quot;name&quot;</span><span class="p">:</span> <span class="s">&quot;webhook1&quot;</span>
+        <span class="p">}</span>
+    <span class="p">],</span>
+    <span class="s">&quot;webhooks_links&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s">&quot;href&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.autoscale.api.rackspacecloud.com/v1.0/851153/groups/f3af279b-10d7-4a26-aead-98c00bff260f/policies/25adccf9-0077-4510-b37d-90a48c9dc08f/webhooks/?limit=2&amp;marker=a5aefc55-1ac8-41a0-8d70-7ee30f56af69&quot;</span><span class="p">,</span>
+            <span class="s">&quot;rel&quot;</span><span class="p">:</span> <span class="s">&quot;next&quot;</span>
+        <span class="p">}</span>
+    <span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal"><span class="pre">marker</span></code> parameter points to the last seen webhook ID. When you
+click on the link that is provided in the response body, all the
+webhooks displayed will have webhook Ids that are greater than
+<code class="docutils literal"><span class="pre">f82bb000-f451-40c8-9dc3-6919097d2f7e</span></code>.</p>
+</div>
+</div>
+
+
+</div>
+
+  <div class="toctree-wrapper compound">
+<ul class="simple">
+</ul>
+</div>
+
+
+      </div>
+<div class="clearer"></div>
+</div>
+    </div>
+    <div class="col-md-3 col-md-pull-9 sidebar">
+<ul>
+  <li><a href="/" class="back">&laquo; Developer Home</a></li>
+</ul>
+<ul>
+  
+<a href="date-time-format.html"><<</a>
+
+|
+
+<a href="server-flavors.html">>></a>
+
+  <li><span class="sidebarheader">Contents</span></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="additional-resources.html">Additional resources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pricing-and-service-level.html">Pricing and service level</a></li>
+<li class="toctree-l1"><a class="reference internal" href="document-change-history.html">Document change history</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting-help.html">Getting help</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="concepts.html">Auto Scale concepts</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="general-API-information.html">General API information</a></li>
+<li class="toctree-l1"><a class="reference internal" href="role-based-access-control.html">Role based access control (RBAC)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="service-endpoints.html">Service access endpoints</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contract-version.html">Contract versions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="request-response-types.html">Request and response types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="limits.html">Limits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="date-time-format.html">Date and time format</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="">Pagination</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#paginating-group-lists">Paginating group lists</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#paginating-policy-lists">Paginating policy lists</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#paginating-webhook-lists">Paginating webhook lists</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="server-flavors.html">Server flavors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faults.html">Faults</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+</ul>
+
+
+      <div class="callout">
+  <span class="sidebarheader">Need Help?</span>
+
+  <p>
+    E-mail <a href="mailto:sdk-support@rackspace.com">sdk-support@rackspace.com</a>,<br>
+    tweet <a href="https://twitter.com/rackspace">@rackspace</a>,
+    chat with us in #rackspace on Freenode,
+    or post in <a href="https://community.rackspace.com/developers/default">our developer forum</a>.
+  </p>
+</div>
+
+<div class="callout">
+  <span class="sidebarheader">Found a bug? Caught a typo?</span>
+  <p>File a <a href="https://github.com/rackerlabs/developer.rackspace.com/issues/new">bug report</a> or submit a <a target="blank" href="https://github.com/rackerlabs/developer.rackspace.com">pull request</a> on our developer site Github repo.</p>
+</div>
+
+<div class="callout">
+  <span class="sidebarheader">Want To Stay Up To Date?</span>
+  <p>Subscribe to our developer blog <a href="/atom.xml">RSS</a> feed.</p>
+</div>
+    </div>
+  </div>
+</div>
+<div class="basement">
+    <div class="container">
+        <img src="https://c2a32ff18d23c8f567f0-e44b0df73868b5d567b1e58e01681d15.ssl.cf5.rackcdn.com/rackerpowered-logo-79838459d447e1e48dd93c76549bdf74.png" alt="Racker Powered">
+        <ul>
+            <li>©2015 Rackspace, US Inc.</li>
+            <li><a href="http://www.rackspace.com/about/">About Rackspace</a></li>
+            <li><a href="http://ir.rackspace.com/">Investors</a></li>
+            <li><a href="http://www.rackertalent.com">Careers</a></li>
+            <li><a href="http://www.rackspace.com/information/legal/privacystatement">Privacy Statement</a></li>
+            <li><a href="http://www.rackspace.com/information/legal/websiteterms">Website Terms</a></li>
+            <li><a href="http://www.rackspace.com/information/legal/copyrights_trademarks">Trademarks</a></li>
+        </ul>
+    </div>
+</div>
+<script src="https://c2a32ff18d23c8f567f0-e44b0df73868b5d567b1e58e01681d15.ssl.cf5.rackcdn.com/app-b899e84f641d7962050ed3d62a3d53a7.js"></script>
+
+  <!-- analytics -->
+<script type="text/javascript">
+   var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-35639070-1']);
+    _gaq.push(['_setDomainName', 'rackspace.com']);
+    _gaq.push(['_trackPageview']);
+
+   (function () {
+       var ga = document.createElement('script');
+       ga.type = 'text/javascript';
+       ga.async = true;
+       ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+        var s = document.getElementsByTagName('script')[0];
+        s.parentNode.insertBefore(ga, s);
+   })();
+ </script>
+
+ <!-- Tealium -->
+ <script type="text/javascript" src="https://tags.tiqcdn.com/utag/rackspace/developer/prod/utag.js"></script>
+
+ <!-- Google Code for Rackspace Blog Page Visitors (Global Tag) -->
+<!-- Remarketing tags may not be associated with personally identifiable information or placed on pages related to sensitive categories. For instructions on adding this tag and more information on the above requirements, read the setup guide: google.com/ads/remarketingsetup -->
+<script type="text/javascript">
+    /* <![CDATA[ */
+    var google_conversion_id = 1040066332;
+    var google_conversion_label = "wFI2CI7LnQQQnM747wM";
+    var google_custom_params = window.google_tag_params;
+    var google_remarketing_only = true;
+    /* ]]> */
+</script>
+<script type="text/javascript" src="//www.googleadservices.com/pagead/conversion.js">
+</script>
+<noscript>
+    <div style="display:inline;">
+        <img height="1" width="1" style="border-style:none;" alt="" src="//googleads.g.doubleclick.net/pagead/viewthroughconversion/1040066332/?value=0&amp;label=wFI2CI7LnQQQnM747wM&amp;guid=ON&amp;script=0"/>
+    </div>
+</noscript>
+</body>
+</html>
