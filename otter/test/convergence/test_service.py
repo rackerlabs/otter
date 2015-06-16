@@ -705,7 +705,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         step = TestStep(Effect(Constant(
             (StepResult.RETRY, [
                 ErrorReason.Exception(exc_info),
-                ErrorReason.Other('foo'),
+                ErrorReason.String('foo'),
                 ErrorReason.Structured({'foo': 'bar'})]))))
 
         def plan(*args, **kwargs):
@@ -803,7 +803,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         def plan(*args, **kwargs):
             return pbag([
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                ConvergeLater(reasons=[ErrorReason.Other('mywish')]),
+                ConvergeLater(reasons=[ErrorReason.String('mywish')]),
                 TestStep(Effect(Constant((StepResult.SUCCESS, []))))])
 
         eff = execute_convergence(self.tenant_id, self.group_id,
@@ -825,7 +825,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         def plan(*args, **kwargs):
             return pbag([
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                ConvergeLater(reasons=[ErrorReason.Other('mywish')]),
+                ConvergeLater(reasons=[ErrorReason.String('mywish')]),
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
                 TestStep(Effect(Constant(
                     (StepResult.FAILURE,

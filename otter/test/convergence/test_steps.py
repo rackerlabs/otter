@@ -133,7 +133,7 @@ class CreateServerTests(SynchronousTestCase):
         self.assertEqual(
             resolve_effect(eff, (StubResponse(202, {}), {"server": {}})),
             (StepResult.RETRY,
-             [ErrorReason.Other('waiting for server to become active')]))
+             [ErrorReason.String('waiting for server to become active')]))
 
     def test_create_server_400_parseable_failures(self):
         """
@@ -169,7 +169,7 @@ class CreateServerTests(SynchronousTestCase):
             self.assertEqual(
                 resolve_effect(eff, service_request_error_response(api_error),
                                is_error=True),
-                (StepResult.FAILURE, [ErrorReason.Other(message)]))
+                (StepResult.FAILURE, [ErrorReason.String(message)]))
 
     def test_create_server_400_unrecognized_failures_retry(self):
         """
@@ -232,7 +232,7 @@ class CreateServerTests(SynchronousTestCase):
             self.assertEqual(
                 resolve_effect(eff, service_request_error_response(api_error),
                                is_error=True),
-                (StepResult.FAILURE, [ErrorReason.Other(message)]))
+                (StepResult.FAILURE, [ErrorReason.String(message)]))
 
     def test_create_server_403_plaintext_parseable_failures(self):
         """
@@ -264,7 +264,7 @@ class CreateServerTests(SynchronousTestCase):
             self.assertEqual(
                 resolve_effect(eff, service_request_error_response(api_error),
                                is_error=True),
-                (StepResult.FAILURE, [ErrorReason.Other(message)]))
+                (StepResult.FAILURE, [ErrorReason.String(message)]))
 
     def test_create_server_403_unrecognized_failures_retry(self):
         """
@@ -334,8 +334,8 @@ class DeleteServerTests(SynchronousTestCase):
         self.assertEqual(
             resolve_effect(eff, (None, {})),
             (StepResult.RETRY,
-             [ErrorReason.Other('must re-gather after deletion in order to '
-                                'update the active cache')]))
+             [ErrorReason.String('must re-gather after deletion in order to '
+                                 'update the active cache')]))
 
     def test_delete_and_verify_del_404(self):
         """
@@ -546,8 +546,8 @@ class StepAsEffectTests(SynchronousTestCase):
         self.assertEqual(
             get_result(StubResponse(202, {}), ''),
             (StepResult.RETRY,
-             [ErrorReason.Other('must re-gather after adding to CLB in order '
-                                'to update the active cache')]))
+             [ErrorReason.String('must re-gather after adding to CLB in order '
+                                 'to update the active cache')]))
 
         self.assertEqual(
             get_result(
@@ -559,8 +559,8 @@ class StepAsEffectTests(SynchronousTestCase):
                     "code": 422
                 }),
             (StepResult.RETRY,
-             [ErrorReason.Other('must re-gather after adding to CLB in order '
-                                'to update the active cache')]))
+             [ErrorReason.String('must re-gather after adding to CLB in order '
+                                 'to update the active cache')]))
 
     def test_add_nodes_to_clb_failure_response_codes(self):
         """
@@ -967,7 +967,7 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
         self.assertEqual(
             res,
             (StepResult.RETRY,
-             [ErrorReason.Other(
+             [ErrorReason.String(
               'must re-gather after adding to LB in order to update the '
               'active cache')]))
 

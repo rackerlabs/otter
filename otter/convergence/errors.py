@@ -50,4 +50,4 @@ class structure_reason(object):
             'exception': serialize_to_jsonable(exc_info[1]),
             'traceback': ''.join(traceback.format_exception(*exc_info))}
     Structured = identity
-    Other = identity
+    String = identity

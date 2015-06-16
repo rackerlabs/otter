@@ -139,7 +139,7 @@ class CreateServer(object):
             active.
             """
             return StepResult.RETRY, [
-                ErrorReason.Other('waiting for server to become active')]
+                ErrorReason.String('waiting for server to become active')]
 
         def report_failure(result):
             """
@@ -152,7 +152,7 @@ class CreateServer(object):
             if err_type == APIError:
                 message = _parse_nova_user_error(error)
                 if message is not None:
-                    return StepResult.FAILURE, [ErrorReason.Other(message)]
+                    return StepResult.FAILURE, [ErrorReason.String(message)]
 
             return StepResult.RETRY, [ErrorReason.Exception(result)]
 
@@ -228,7 +228,7 @@ class DeleteServer(object):
 
         def report_success(result):
             return StepResult.RETRY, [
-                ErrorReason.Other(
+                ErrorReason.String(
                     'must re-gather after deletion in order to update the '
                     'active cache')]
 
@@ -340,7 +340,7 @@ class AddNodesToCLB(object):
 
         def report_success(result):
             return StepResult.RETRY, [
-                ErrorReason.Other(
+                ErrorReason.String(
                     'must re-gather after adding to CLB in order to update '
                     'the active cache')]
 
@@ -566,8 +566,8 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
 
     if response.code == 201:  # All done!
         return StepResult.RETRY, [
-            ErrorReason.Other('must re-gather after adding to LB in order to '
-                              'update the active cache')]
+            ErrorReason.String('must re-gather after adding to LB in order to '
+                               'update the active cache')]
 
     failure_reasons = []
     to_retry = pset(attempted_pairs)

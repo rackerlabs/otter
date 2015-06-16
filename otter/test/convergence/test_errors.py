@@ -12,7 +12,7 @@ class PresentReasonsTests(SynchronousTestCase):
     """Tests for :func:`present_reasons`."""
     def test_present_other(self):
         """non-Exceptions are not presented."""
-        self.assertEqual(present_reasons([ErrorReason.Other('foo')]), [])
+        self.assertEqual(present_reasons([ErrorReason.String('foo')]), [])
 
     def test_present_arbitrary_exception(self):
         """Arbitrary exceptions are not presented."""
@@ -49,9 +49,9 @@ class StructureReasonsTests(SynchronousTestCase):
              'traceback': expected_tb}
         )
 
-    def test_other(self):
-        """Other values get unwrapped."""
-        self.assertEqual(structure_reason(ErrorReason.Other('foo')), 'foo')
+    def test_string(self):
+        """String values get unwrapped."""
+        self.assertEqual(structure_reason(ErrorReason.String('foo')), 'foo')
 
     def test_structured(self):
         """Structured values get unwrapped."""
