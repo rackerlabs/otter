@@ -442,12 +442,13 @@ class Converger(MultiService):
         """
         :param log: a bound log
         :param dispatcher: The dispatcher to use to perform effects.
-        :param partitioner_factory: Callable of (log, callback) which should
-            create an :obj:`Partitioner` to distribute the buckets.
         :param int buckets: the number of logical `buckets` which are be
             shared between all Otter nodes running this service. The buckets
             will be partitioned up between nodes to detirmine which nodes
             should work on which groups.
+        :param partitioner_factory: Callable of (all_buckets, log, callback)
+            which should create an :obj:`Partitioner` to distribute the
+            buckets.
         :param number build_timeout: number of seconds to wait for servers to
             be in building before it's is timed out and deleted
         :param callable converge_all_groups: like :func:`converge_all_groups`,
@@ -456,8 +457,10 @@ class Converger(MultiService):
         MultiService.__init__(self)
         self.log = log.bind(otter_service='converger')
         self._dispatcher = dispatcher
-        self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
         self._buckets = range(num_buckets)
+        self.partitioner = partitioner_factory(
+            buckets=self._buckets, log=self.log,
+            got_buckets=self.buckets_acquired)
         self.partitioner.setServiceParent(self)
         self.currently_converging = Reference(pset())
         self.build_timeout = build_timeout

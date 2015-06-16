@@ -303,17 +303,14 @@ def setup_converger(parent, kz_client, dispatcher, interval, build_timeout):
     Create a Converger service, which has a Partitioner as a child service, so
     that if the Converger is stopped, the partitioner is also stopped.
     """
-    converger_buckets = range(1, 10)
     partitioner_factory = partial(
         Partitioner,
-        kz_client,
-        interval,
-        CONVERGENCE_PARTITIONER_PATH,
-        converger_buckets,
-        15,  # time boundary
+        kz_client=kz_client,
+        interval=interval,
+        partitioner_path=CONVERGENCE_PARTITIONER_PATH,
+        time_boundary=15,  # time boundary
     )
-    cvg = Converger(log, dispatcher, converger_buckets, partitioner_factory,
-                    build_timeout)
+    cvg = Converger(log, dispatcher, 10, partitioner_factory, build_timeout)
     cvg.setServiceParent(parent)
     watch_children(kz_client, CONVERGENCE_DIRTY_DIR, cvg.divergent_changed)
 
