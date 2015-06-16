@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Run cafe-runner in multiple processes
 
