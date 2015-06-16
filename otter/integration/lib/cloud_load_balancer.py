@@ -11,7 +11,7 @@ from testtools.matchers import MatchesPredicateWithParams
 import treq
 
 from twisted.internet import reactor
-from twisted.python.log import msg
+from twisted.python.log import msg, err
 
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import check_success, headers
@@ -127,7 +127,7 @@ class CloudLoadBalancer(object):
         :param TestResources rcs: The resources used to make appropriate API
             calls with.
         """
-        return self.delete(rcs)
+        return self.delete(rcs).addErrback(err)
 
     def start(self, rcs, test):
         """Creates the cloud load balancer and launches it in the cloud.
