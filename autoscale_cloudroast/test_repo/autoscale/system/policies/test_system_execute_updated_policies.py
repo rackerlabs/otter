@@ -34,7 +34,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             execute_policy=True)
         self.resources.add(self.group, self.empty_scaling_group)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_update_policy_from_change_to_desired_capacity_scale_down(self):
         """
         Update the existing scale up policy from change to desired capacity,
@@ -58,7 +58,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.group.launchConfiguration.server.name,
             self.group.groupConfiguration.minEntities)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_update_policy_from_change_to_desired_capacity_scale_up(self):
         """
         Update the existing scale up policy from change to desired capacity,
@@ -80,7 +80,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=upd_desired_capacity)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_update_policy_desired_capacity_below_minentities(self):
         """
         Update a scale up via 'change', to a scale down policy via
@@ -102,7 +102,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_update_policy_desired_capacity_over_25(self):
         """
         Update the desired capacity to scale up by setting desired capacity >
@@ -124,7 +124,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=26)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_update_scale_up_to_scale_down(self):
         """
         Update a scale up policy to scale down by the same change and execute
@@ -147,7 +147,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.group.launchConfiguration.server.name,
             self.group.groupConfiguration.minEntities)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_update_minentities_and_scale_down(self):
         """
         Create a scaling group with min entities > 0, scale up (setup) update

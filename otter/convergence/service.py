@@ -445,17 +445,18 @@ class Converger(MultiService):
     - we ensure we don't execute convergence for the same group concurrently.
     """
 
-    def __init__(self, log, dispatcher, buckets, partitioner_factory,
+    def __init__(self, log, dispatcher, num_buckets, partitioner_factory,
                  build_timeout, converge_all_groups=converge_all_groups):
         """
         :param log: a bound log
         :param dispatcher: The dispatcher to use to perform effects.
-        :param buckets: collection of logical `buckets` which are shared
-            between all Otter nodes running this service. Will be partitioned
-            up between nodes to detirmine which nodes should work on which
-            groups.
-        :param partitioner_factory: Callable of (log, callback) which should
-            create an :obj:`Partitioner` to distribute the buckets.
+        :param int buckets: the number of logical `buckets` which are be
+            shared between all Otter nodes running this service. The buckets
+            will be partitioned up between nodes to detirmine which nodes
+            should work on which groups.
+        :param partitioner_factory: Callable of (all_buckets, log, callback)
+            which should create an :obj:`Partitioner` to distribute the
+            buckets.
         :param number build_timeout: number of seconds to wait for servers to
             be in building before it's is timed out and deleted
         :param callable converge_all_groups: like :func:`converge_all_groups`,
@@ -464,8 +465,10 @@ class Converger(MultiService):
         MultiService.__init__(self)
         self.log = log.bind(otter_service='converger')
         self._dispatcher = dispatcher
-        self._buckets = buckets
-        self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
+        self._buckets = range(num_buckets)
+        self.partitioner = partitioner_factory(
+            buckets=self._buckets, log=self.log,
+            got_buckets=self.buckets_acquired)
         self.partitioner.setServiceParent(self)
         self.currently_converging = Reference(pset())
         self.build_timeout = build_timeout
@@ -480,6 +483,14 @@ class Converger(MultiService):
             error=lambda e: err(
                 exc_info_to_failure(e), 'converge-all-groups-error'))
 
+    def _with_conv_runid(self, eff):
+        """
+        Return Effect wrapped with converger_run_id log field
+        """
+        return Effect(Func(uuid.uuid1)).on(str).on(
+            lambda uid: with_log(eff, otter_service='converger',
+                                 converger_run_id=uid))
+
     def buckets_acquired(self, my_buckets):
         """
         Get dirty flags from zookeeper and run convergence with them.
@@ -488,10 +499,7 @@ class Converger(MultiService):
         """
         ceff = Effect(GetChildren(CONVERGENCE_DIRTY_DIR)).on(
             partial(self._converge_all, my_buckets))
-        eff = Effect(Func(uuid.uuid1)).on(
-            lambda uid: with_log(ceff, otter_service='converger',
-                                 converger_run_id=uid))
-        return perform(self._dispatcher, eff)
+        return perform(self._dispatcher, self._with_conv_runid(ceff))
 
     def divergent_changed(self, children):
         """
@@ -509,7 +517,7 @@ class Converger(MultiService):
         if set(my_buckets).intersection(changed_buckets):
             # the return value is ignored, but we return this for testing
             eff = self._converge_all(my_buckets, children)
-            return perform(self._dispatcher, eff)
+            return perform(self._dispatcher, self._with_conv_runid(eff))
 
 # We're using a global for now because it's difficult to thread a new parameter
 # all the way through the REST objects to the controller code, where this

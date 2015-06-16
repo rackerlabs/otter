@@ -1,6 +1,8 @@
 """
 Tests for :obj:`otter.test.utils`.
 """
+from pyrsistent import pvector
+
 from twisted.trial.unittest import SynchronousTestCase
 
 from zope.interface import Attribute, Interface
@@ -135,7 +137,7 @@ class IMockTests(SynchronousTestCase):
                 im.one
 
         im = iMock(_ITest3, spec=spec)
-        self.assertEqual(im.spec, spec)
+        self.assertEqual(im.spec, pvector(spec))
 
     def test_extra_attributes_and_config_passed_to_mock(self):
         """
