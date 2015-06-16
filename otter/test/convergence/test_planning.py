@@ -11,7 +11,6 @@ from otter.convergence.model import (
     CLBNodeType,
     DRAINING_METADATA,
     DesiredGroupState,
-    NovaServer,
     RCv3Description,
     RCv3Node,
     ServerState)
@@ -26,6 +25,7 @@ from otter.convergence.steps import (
     DeleteServer,
     RemoveNodesFromCLB,
     SetMetadataItemOnServer)
+from otter.test.utils import server
 
 
 def copy_clb_desc(clb_desc, condition=CLBNodeCondition.ENABLED, weight=1):
@@ -487,13 +487,6 @@ class ConvergeLBStateTests(SynchronousTestCase):
                     address_configs=s(('1.1.1.1',
                                        CLBDescription(lb_id='5', port=8081))))
                 ]))
-
-
-def server(id, state, created=0, image_id='image', flavor_id='flavor',
-           **kwargs):
-    """Convenience for creating a :obj:`NovaServer`."""
-    return NovaServer(id=id, state=state, created=created, image_id=image_id,
-                      flavor_id=flavor_id, json=pmap({'id': id}), **kwargs)
 
 
 class DrainAndDeleteServerTests(SynchronousTestCase):

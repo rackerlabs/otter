@@ -34,6 +34,7 @@ from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
 
 from otter.cloud_client import concretize_service_request
+from otter.convergence.model import NovaServer
 from otter.log.bound import BoundLog
 from otter.models.interface import IScalingGroup
 from otter.supervisor import ISupervisor
@@ -864,3 +865,11 @@ class Cache(object):
 
     def delete_servers(self):
         return Effect(self.ids("ds"))
+
+
+def server(id, state, created=0, image_id='image', flavor_id='flavor',
+           json=None, **kwargs):
+    """Convenience for creating a :obj:`NovaServer`."""
+    return NovaServer(id=id, state=state, created=created, image_id=image_id,
+                      flavor_id=flavor_id,
+                      json=json or pmap({'id': id}), **kwargs)

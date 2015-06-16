@@ -43,7 +43,6 @@ from otter.convergence.model import (
     CLBNode,
     CLBNodeCondition,
     CLBNodeType,
-    NovaServer,
     RCv3Description,
     RCv3Node,
     ServerState)
@@ -54,7 +53,8 @@ from otter.test.utils import (
     patch,
     resolve_effect,
     resolve_retry_stubs,
-    resolve_stubs
+    resolve_stubs,
+    server
 )
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
@@ -752,20 +752,13 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
             get_rcv3_contents=_constant_as_eff((), rcv3_nodes))
 
         expected_servers = [
-            NovaServer(id='a',
-                       state=ServerState.ACTIVE,
-                       image_id='image',
-                       flavor_id='flavor',
-                       created=0,
-                       servicenet_address='10.0.0.1',
-                       links=freeze([{'href': 'link1', 'rel': 'self'}])),
-            NovaServer(id='b',
-                       state=ServerState.ACTIVE,
-                       image_id='image',
-                       flavor_id='flavor',
-                       created=1,
-                       servicenet_address='10.0.0.2',
-                       links=freeze([{'href': 'link2', 'rel': 'self'}]))
+            server('a', ServerState.ACTIVE, servicenet_address='10.0.0.1',
+                   links=freeze([{'href': 'link1', 'rel': 'self'}]),
+                   json=freeze(self.servers[0])),
+            server('b', ServerState.ACTIVE, created=1,
+                   servicenet_address='10.0.0.2',
+                   links=freeze([{'href': 'link2', 'rel': 'self'}]),
+                   json=freeze(self.servers[1]))
         ]
         self.assertEqual(resolve_stubs(eff),
                          (expected_servers, clb_nodes + rcv3_nodes))

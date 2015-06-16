@@ -189,7 +189,7 @@ def _lbs_from_metadata(metadata):
              Attribute('servicenet_address',
                        default_value='',
                        instance_of=basestring),
-             Attribute('json', instance_of=PMap)])
+             Attribute('json', instance_of=PMap, default_factory=pmap)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
