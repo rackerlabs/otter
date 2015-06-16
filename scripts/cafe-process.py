@@ -24,6 +24,7 @@ def get_root():
 
 
 def get_cafe_args(packages, modules, excludes):
+    excludes = [] if excludes is None else excludes
     if modules:
         proc_args = []
         if packages:
