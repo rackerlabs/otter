@@ -93,18 +93,19 @@ class ConvergerTests(SynchronousTestCase):
 
     def setUp(self):
         self.log = mock_log()
-        self.buckets = range(10)
+        self.num_buckets = 10
 
     def _converger(self, converge_all_groups, dispatcher=None):
         if dispatcher is None:
             dispatcher = _get_dispatcher()
         return Converger(
-            self.log, dispatcher, self.buckets,
+            self.log, dispatcher, self.num_buckets,
             self._pfactory, build_timeout=3600,
             converge_all_groups=converge_all_groups)
 
-    def _pfactory(self, log, callable):
-        self.fake_partitioner = FakePartitioner(log, callable)
+    def _pfactory(self, buckets, log, got_buckets):
+        self.assertEqual(buckets, range(self.num_buckets))
+        self.fake_partitioner = FakePartitioner(log, got_buckets)
         return self.fake_partitioner
 
     def _log_sequence(self, intents):
@@ -137,7 +138,7 @@ class ConvergerTests(SynchronousTestCase):
                 transform_eq(lambda cc: cc is converger.currently_converging,
                              True),
                 my_buckets,
-                self.buckets,
+                range(self.num_buckets),
                 ['flag1', 'flag2'],
                 3600),
                 lambda i: 'foo')

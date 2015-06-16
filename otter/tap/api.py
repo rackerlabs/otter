@@ -1,6 +1,7 @@
 """
 Twisted Application plugin for otter API nodes.
 """
+import os
 
 from copy import deepcopy
 from functools import partial
@@ -48,6 +49,11 @@ from otter.util.config import config_value, set_config_data
 from otter.util.cqlbatch import TimingOutCQLClient
 from otter.util.deferredutils import timeout_deferred
 from otter.util.zkpartitioner import Partitioner
+
+assert os.environ.get("PYRSISTENT_NO_C_EXTENSION"), (
+    "The environment variable PYRSISTENT_NO_C_EXTENSION must be set to "
+    "a non-empty string because the C extension sometimes causes segfaults "
+    "in otter.")
 
 
 class Options(usage.Options):
@@ -303,17 +309,14 @@ def setup_converger(parent, kz_client, dispatcher, interval, build_timeout):
     Create a Converger service, which has a Partitioner as a child service, so
     that if the Converger is stopped, the partitioner is also stopped.
     """
-    converger_buckets = range(10)
     partitioner_factory = partial(
         Partitioner,
-        kz_client,
-        interval,
-        CONVERGENCE_PARTITIONER_PATH,
-        converger_buckets,
-        15,  # time boundary
+        kz_client=kz_client,
+        interval=interval,
+        partitioner_path=CONVERGENCE_PARTITIONER_PATH,
+        time_boundary=15,  # time boundary
     )
-    cvg = Converger(log, dispatcher, converger_buckets, partitioner_factory,
-                    build_timeout)
+    cvg = Converger(log, dispatcher, 10, partitioner_factory, build_timeout)
     cvg.setServiceParent(parent)
     watch_children(kz_client, CONVERGENCE_DIRTY_DIR, cvg.divergent_changed)
 
