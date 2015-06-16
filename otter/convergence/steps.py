@@ -22,7 +22,7 @@ from otter.cloud_client import (
     set_nova_metadata_item)
 from otter.constants import ServiceType
 from otter.convergence.model import StepResult
-from otter.util.fp import predicate_any
+from otter.util.fp import predicate_any, set_in
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.retry import (
@@ -55,7 +55,7 @@ def set_server_name(server_config_args, name_suffix):
         name = '{0}-{1}'.format(name, name_suffix)
     else:
         name = name_suffix
-    return server_config_args.set_in(('server', 'name'), name)
+    return set_in(server_config_args, ('server', 'name'), name)
 
 
 def _forbidden_plaintext(message):

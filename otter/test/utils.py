@@ -38,6 +38,7 @@ from otter.log.bound import BoundLog
 from otter.models.interface import IScalingGroup
 from otter.supervisor import ISupervisor
 from otter.util.deferredutils import DeferredPool
+from otter.util.fp import set_in
 from otter.util.retry import Retry
 
 
@@ -219,7 +220,7 @@ def iMock(*ifaces, **kwargs):
     for k, v in list(kwargs.iteritems()):
         result = k.split('.', 1)
         if result[0] in all_names:
-            attribute_kwargs = attribute_kwargs.set_in(result, v)
+            attribute_kwargs = set_in(attribute_kwargs, result, v)
             kwargs.pop(k)
 
     kwargs.pop('spec', None)

@@ -9,6 +9,7 @@ from otter.convergence.model import (
     CLBDescription,
     DesiredGroupState,
     generate_metadata)
+from otter.util.fp import set_in
 
 
 def tenant_is_enabled(tenant_id, get_config_value):
@@ -76,8 +77,8 @@ def prepare_server_launch_config(group_id, server_config, lb_descriptions):
     :param iterable lb_descriptions: iterable of
         :class:`ILBDescription` providers
     """
-    updated_metadata = freeze(merge(
+    updated_metadata = merge(
         get_in(('server', 'metadata'), server_config, {}),
-        generate_metadata(group_id, lb_descriptions)))
+        generate_metadata(group_id, lb_descriptions))
 
-    return server_config.set_in(('server', 'metadata'), updated_metadata)
+    return set_in(server_config, ('server', 'metadata'), updated_metadata)
