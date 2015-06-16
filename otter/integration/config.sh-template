@@ -25,7 +25,7 @@ export AS_REGION=IAD
 # Mimic defaults to using ORD as the region
 #export AS_REGION=ORD
 
-# This is the test tenant ID that is enabled for convergence in mimic.
+# This is the test tenant ID that is enabled for convergence in otter.
 export AS_CONVERGENCE_TENANT=000000
 
 # Use this to set the verbosity of the convergence tests.
@@ -52,3 +52,12 @@ export AS_CLB_SC_KEY=cloudLoadBalancers
 
 # Uncomment this if you are running tests against Mimic.
 # export AS_USING_MIMIC=true
+
+# Uncomment this to change the default value of the otter build timeout for
+# testing
+# export AS_BUILD_TIMEOUT_SECONDS=30
+
+# This is a test tenant that is enabled for convergence in Otter.  This will
+# only be used for testing against mimic, to test otter reaction to auth
+# errors.  A random username and password will be generated for it.
+export AS_CONVERGENCE_TENANT_FOR_AUTH_ERRORS=000010

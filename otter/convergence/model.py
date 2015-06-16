@@ -5,9 +5,14 @@ representation across the different phases of convergence.
 import json
 import re
 
+import attr
+from attr.validators import instance_of
+
 from characteristic import Attribute, attributes
 
 from pyrsistent import PSet, freeze, pmap, pset, pvector
+
+from sumtypes import constructor, sumtype
 
 from toolz.dicttoolz import get_in
 from toolz.itertoolz import groupby
@@ -16,6 +21,7 @@ from twisted.python.constants import NamedConstant, Names
 
 from zope.interface import Attribute as IAttribute, Interface, implementer
 
+from otter.util.fp import set_in
 from otter.util.timestamp import timestamp_to_epoch
 
 
@@ -112,6 +118,14 @@ class StepResult(Names):
     """
 
 
+@sumtype
+class ErrorReason(object):
+    """A reason for a step to be in a RETRY or FAILURE state."""
+    Exception = constructor('exc_info')
+    String = constructor(reason=attr.ib(validator=instance_of((unicode, str))))
+    Structured = constructor('structure')
+
+
 def get_service_metadata(service_name, metadata):
     """
     Obtain all the metadata associated with a particular service from Nova
@@ -130,7 +144,8 @@ def get_service_metadata(service_name, metadata):
             m = key_pattern.match(k)
             if m:
                 subkeys = m.groupdict()['subkeys']
-                as_metadata = as_metadata.set_in(
+                as_metadata = set_in(
+                    as_metadata,
                     [sk for sk in subkeys.split(':') if sk],
                     v)
     return as_metadata

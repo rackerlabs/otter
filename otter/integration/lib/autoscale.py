@@ -95,6 +95,11 @@ def create_scaling_group_dict(
                 "server": {
                     "flavorRef": flavor_ref,
                     "imageRef": image_ref,
+                    "networks": [
+                        {
+                            "uuid": "11111111-1111-1111-1111-111111111111"
+                        }
+                    ]
                 }
             }
         },
@@ -314,6 +319,12 @@ class ScalingGroup(object):
             return self.treq.content(resp).addCallback(
                 lambda _: (resp.code, None))
 
+        def debug_print(resp_tuple):
+            if verbosity > 0:
+                print('ScalingGroup.get_scaling_group_state response: ')
+                pp.pprint(resp_tuple)
+            return resp_tuple
+
         return (
             self.treq.get(
                 "%s/groups/%s/state" % (
@@ -323,6 +334,7 @@ class ScalingGroup(object):
                 pool=self.pool
             ).addCallback(check_success, success_codes)
             .addCallback(decide)
+            .addCallback(debug_print)
         )
 
     def start(self, rcs, test):
@@ -452,6 +464,8 @@ class ScalingGroup(object):
                 msg("Waiting for desired group state.\nMismatch: {}"
                     .format(mismatch.describe()))
                 raise TransientRetryError(mismatch.describe())
+            msg("Success: desired group state reached:\n{}\nmatches:\n{}"
+                .format(group_state['group'], matcher))
             return rcs
 
         def poll():
