@@ -483,22 +483,12 @@ class GetRCv3ContentsTests(SynchronousTestCase):
         Set up an empty dictionary of intents to fake responses, and set up
         the dispatcher.
         """
-        @sync_performer
-        def unwrap_retry(_, retry_intent):
-            self.assertEqual(
-                retry_intent.should_retry,
-                ShouldDelayAndRetry(
-                    can_retry=retry_times(5),
-                    next_interval=exponential_backoff_interval(2)))
-            return retry_intent.effect
-
         eq_dispatcher = EQDispatcher
         if callable(service_request_mappings[0][-1]):
             eq_dispatcher = EQFDispatcher
 
         return ComposedDispatcher([
             TypeDispatcher({
-                Retry: unwrap_retry,
                 ParallelEffects: perform_parallel_async
             }),
             eq_dispatcher(service_request_mappings)

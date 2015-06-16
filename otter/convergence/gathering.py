@@ -201,23 +201,17 @@ def get_rcv3_contents():
     """
     Get Rackspace Cloud Load Balancer contents as list of `RCv3Node`.
     """
-    eff = retry_effect(
-        service_request(ServiceType.RACKCONNECT_V3,
-                        'GET', 'load_balancer_pools'),
-        retry_times(5), exponential_backoff_interval(2))
+    eff = service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                          'load_balancer_pools')
 
     def on_listing_pools(lblist_result):
         _, body = lblist_result
         return parallel([
-            retry_effect(
-                service_request(ServiceType.RACKCONNECT_V3, 'GET',
-                                append_segments('load_balancer_pools',
-                                                lb_pool['id'], 'nodes')),
-                retry_times(5), exponential_backoff_interval(2)
-            ).on(
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            append_segments('load_balancer_pools',
+                                            lb_pool['id'], 'nodes')).on(
                 partial(on_listing_nodes,
                         RCv3Description(lb_id=lb_pool['id'])))
-
             for lb_pool in body
         ])
 
