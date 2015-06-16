@@ -16,6 +16,7 @@ from twisted.python.constants import NamedConstant, Names
 
 from zope.interface import Attribute as IAttribute, Interface, implementer
 
+from otter.util.fp import set_in
 from otter.util.timestamp import timestamp_to_epoch
 
 
@@ -130,7 +131,8 @@ def get_service_metadata(service_name, metadata):
             m = key_pattern.match(k)
             if m:
                 subkeys = m.groupdict()['subkeys']
-                as_metadata = as_metadata.set_in(
+                as_metadata = set_in(
+                    as_metadata,
                     [sk for sk in subkeys.split(':') if sk],
                     v)
     return as_metadata
