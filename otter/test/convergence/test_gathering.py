@@ -10,8 +10,7 @@ from effect import (
     Effect,
     ParallelEffects,
     TypeDispatcher,
-    sync_perform,
-    sync_performer)
+    sync_perform)
 
 from effect.async import perform_parallel_async
 from effect.testing import EQDispatcher, EQFDispatcher, Stub
@@ -47,7 +46,7 @@ from otter.test.utils import (
     resolve_stubs
 )
 from otter.util.retry import (
-    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
+    ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import timestamp_to_epoch
 
 
