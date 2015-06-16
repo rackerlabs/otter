@@ -150,7 +150,7 @@ def get_clb_contents():
                 description=CLBDescription(
                     lb_id=str(_id),
                     port=node['port'],
-                    weight=node['weight'],
+                    weight=node.get('weight', 1),
                     condition=CLBNodeCondition.lookupByName(node['condition']),
                     type=CLBNodeType.lookupByName(node['type'])))
             for _id, nodes in zip(ids, all_lb_nodes) for node in nodes]
