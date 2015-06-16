@@ -18,7 +18,8 @@ class Response(object):
         self.code = code
 
 
-def get_fake_treq(test_case, method, url, expected_args_and_kwargs, response):
+def get_fake_treq(test_case, method, url, expected_args_and_kwargs, response,
+                  _treq=None):
     """
     Return a fake treq object that would return the given response given
     the correct request made.
@@ -41,7 +42,7 @@ def get_fake_treq(test_case, method, url, expected_args_and_kwargs, response):
             test_case.assertEqual(resp, response_object)
             return succeed(json.loads(str_response_body))
 
-    _treq = FakeTreq()
+    _treq = _treq or FakeTreq()
 
     setattr(_treq, method.lower(), requester)
 
@@ -85,8 +86,12 @@ class NovaServerTestCase(SynchronousTestCase):
         server = self.get_server('delete', 'novaurl/servers/server_id',
                                  ((), self.expected_kwargs),
                                  Response(204), "delete response")
+        get_fake_treq(
+            self, 'get', 'novaurl/servers/server_id',
+            ((), self.expected_kwargs), (Response(404), 'resp'), server.treq)
         d = server.delete(self.rcs)
-        self.assertEqual('delete response', self.successResultOf(d))
+        #self.assertNoResult(d)
+        self.assertIsNone(self.successResultOf(d))
 
     def test_list_metadata(self):
         """
