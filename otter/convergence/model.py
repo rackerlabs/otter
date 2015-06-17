@@ -5,9 +5,14 @@ representation across the different phases of convergence.
 import json
 import re
 
+import attr
+from attr.validators import instance_of
+
 from characteristic import Attribute, attributes
 
 from pyrsistent import PSet, freeze, pmap, pset, pvector
+
+from sumtypes import constructor, sumtype
 
 from toolz.dicttoolz import get_in
 from toolz.itertoolz import groupby
@@ -111,6 +116,14 @@ class StepResult(Names):
     """
     The step failed. Retrying convergence won't help.
     """
+
+
+@sumtype
+class ErrorReason(object):
+    """A reason for a step to be in a RETRY or FAILURE state."""
+    Exception = constructor('exc_info')
+    String = constructor(reason=attr.ib(validator=instance_of((unicode, str))))
+    Structured = constructor('structure')
 
 
 def get_service_metadata(service_name, metadata):
