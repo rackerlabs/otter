@@ -464,7 +464,7 @@ class GetCLBContentsTests(SynchronousTestCase):
                 {'id': '21', 'port': 20, 'address': 'a21',
                  'weight': 3, 'condition': 'ENABLED', 'type': 'PRIMARY'},
                 {'id': '22', 'port': 20, 'address': 'a22',
-                 'weight': 3, 'condition': 'DRAINING', 'type': 'PRIMARY'}]},
+                 'condition': 'DRAINING', 'type': 'PRIMARY'}]},
             ('GET', 'loadbalancers/1/nodes/11.atom', False): '11feed',
             ('GET', 'loadbalancers/2/nodes/22.atom', False): '22feed'
         }
@@ -536,7 +536,7 @@ class GetCLBContentsTests(SynchronousTestCase):
                      address='a22',
                      drained_at=2.0,
                      description=make_desc(lb_id='2',
-                                           weight=3,
+                                           weight=1,
                                            condition=draining))])
 
     def test_no_lb(self):

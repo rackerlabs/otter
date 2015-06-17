@@ -5,6 +5,7 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 :obj:`Converger`.
 """
 
+import operator
 import uuid
 from datetime import datetime
 from functools import partial
@@ -29,6 +30,7 @@ from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
+from otter.convergence.errors import present_reasons, structure_reason
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
@@ -141,13 +143,18 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         yield do_return(StepResult.SUCCESS)
     results = yield steps_to_effect(steps)
 
+    all_reasons = reduce(operator.add, (x[1] for x in results))
     severity = [StepResult.FAILURE, StepResult.RETRY, StepResult.SUCCESS]
     priority = sorted(results,
                       key=lambda (status, reasons): severity.index(status))
     worst_status = priority[0][0]
+    results_to_log = zip(
+        steps,
+        [(result, map(structure_reason, reasons))
+         for result, reasons in results])
     yield msg('execute-convergence-results',
-              results=zip(steps, results),
-              worst_status=worst_status)
+              results=results_to_log,
+              worst_status=worst_status.name)
 
     cache = cache_class(tenant_id, group_id)
     if worst_status == StepResult.SUCCESS:
@@ -172,7 +179,8 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))
         yield cf_err(
-            'group-status-error', status=ScalingGroupStatus.ERROR.name)
+            'group-status-error', status=ScalingGroupStatus.ERROR.name,
+            reasons='; '.join(sorted(present_reasons(all_reasons))))
 
     yield do_return(worst_status)
 
