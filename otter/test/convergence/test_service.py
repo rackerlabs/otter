@@ -575,7 +575,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.gsgi_result = (self.group, self.manifest)
         self.now = datetime(1970, 1, 1)
         self.expected_intents = [(gsgi, self.gsgi_result),
-                                 (Func(datetime.now), self.now)]
+                                 (Func(datetime.utcnow), self.now)]
         self.log = mock_log()
 
     def _get_dispatcher(self, expected_intents=None):
@@ -765,7 +765,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         del_group = DeleteGroup(tenant_id=self.tenant_id,
                                 group_id=self.group_id)
         self.state.status = ScalingGroupStatus.DELETING
-        exp_intents = [(Func(datetime.now), self.now),
+        exp_intents = [(Func(datetime.utcnow), self.now),
                        (del_group, None),
                        (self.gsgi, (self.group, self.manifest)),
                        ("cachedstenant-idgroup-id", None)]
@@ -793,7 +793,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                   get_all_convergence_data=gacd, plan=fplan)
         disp = self._get_dispatcher(
             [(self.gsgi, (self.group, self.manifest)),
-             (Func(datetime.now), self.now)])
+             (Func(datetime.utcnow), self.now)])
         # This succeeded without DeleteGroup performer being there ensuring
         # that it was not called
         self.assertEqual(sync_perform(disp, eff), StepResult.RETRY)
@@ -846,7 +846,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                   get_all_convergence_data=gacd)
 
         sequence = SequenceDispatcher([
-            (Func(datetime.now), lambda i: self.now),
+            (Func(datetime.utcnow), lambda i: self.now),
             (self.gsgi, lambda i: self.gsgi_result),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
@@ -882,7 +882,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                   get_all_convergence_data=gacd)
 
         sequence = SequenceDispatcher([
-            (Func(datetime.now), lambda i: self.now),
+            (Func(datetime.utcnow), lambda i: self.now),
             (self.gsgi, lambda i: self.gsgi_result),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
