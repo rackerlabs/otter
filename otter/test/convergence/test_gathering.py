@@ -100,18 +100,6 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         """Save basic reused data."""
         self.servers = [{'id': i} for i in range(9)]
 
-    def req(self, query_params=None):
-        """
-        Return the service request with the given query parameters
-        """
-        if query_params is None:
-            query_params = {'limit': 10}
-
-        url = "servers/detail?{}".format(
-            "&".join(["{}={}".format(k, v) for k, v in
-                      query_params.items()]))
-        return (ServiceType.CLOUD_SERVERS, 'GET', url)
-
     def test_get_all_without_link_to_next_page(self):
         """
         `get_all_server_details` will not fetch again if first does not have
