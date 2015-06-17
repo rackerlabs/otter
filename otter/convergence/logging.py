@@ -16,7 +16,7 @@ from otter.convergence.steps import (
 from otter.log.cloudfeeds import cf_msg
 
 
-# Comments: - it kinda sucks that we're using separate effects for all of
+# - it kinda sucks that we're using separate effects for all of
 # these, maybe? CF has an API for sending a bunch of events at once and it'd be
 # good to use it. OTOH it could also be implemented at the logging observer
 # layer by using a "nagle".
