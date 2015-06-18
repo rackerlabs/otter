@@ -8,7 +8,16 @@ import os
 from functools import wraps
 
 from testtools.matchers import (
-    AllMatch, ContainsDict, Equals, MatchesAll, MatchesSetwise, NotEquals)
+    AfterPreprocessing,
+    AllMatch,
+    ContainsDict,
+    Equals,
+    GreaterThan,
+    LessThan,
+    MatchesAll,
+    MatchesSetwise,
+    NotEquals
+)
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
@@ -1269,7 +1278,6 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 "See #881.")
         return (name, wrapper)
 
-    @skip_me("Mimic does not support CLB limits, skipped pending Mimic #291")
     @tag("CATC-019")
     def test_scale_over_lb_limit(self):
         """
@@ -1289,7 +1297,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
         LB_max = 25
         group_max = 30
 
-        group = self.helper.create_group(
+        group, _ = self.helper.create_group(
             image_ref=image_ref, flavor_ref=flavor_ref, min_entities=1,
             max_entities=group_max)
 
@@ -1305,13 +1313,14 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             .addCallback(scale_up_to_group_max.execute)
             .addCallback(
                 group.wait_for_state,
-                MatchesAll(
-                    ContainsDict({
-                        'pendingCapacity': Equals(0),
-                        'desiredCapacity': Equals(group_max),
-                        'status': Equals("ERROR")
-                    }),
-                    HasActive(LB_max)),
+                ContainsDict({
+                    'pendingCapacity': GreaterThan(group_max - LB_max - 1),
+                    'desiredCapacity': Equals(group_max),
+                    'status': Equals("ERROR"),
+                    'active': AfterPreprocessing(
+                        len, MatchesAll(GreaterThan(LB_max - 6),
+                                        LessThan(group_max)))
+                }),
                 timeout=600
             )
         )
