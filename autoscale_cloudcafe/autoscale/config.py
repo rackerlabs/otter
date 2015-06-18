@@ -357,3 +357,10 @@ class AutoscaleConfig(ConfigSectionInterface):
         Specify whether this configuration is against a mimic instance.
         """
         return self.get('mimic', 'false').lower() == 'true'
+
+    @property
+    def convergence(self):
+        """
+        Specify whether this configuration is with a convergence tenant.
+        """
+        return self.get('convergence', 'false').lower() == 'true'
