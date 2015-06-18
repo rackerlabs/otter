@@ -882,3 +882,10 @@ def server(id, state, created=0, image_id='image', flavor_id='flavor',
     return NovaServer(id=id, state=state, created=created, image_id=image_id,
                       flavor_id=flavor_id,
                       json=json or pmap({'id': id}), **kwargs)
+
+
+def get_dispatcher(sequence):
+    """ Get dispatcher with given sequence in it """
+    return ComposedDispatcher([
+        sequence, base_dispatcher,
+        TypeDispatcher({ParallelEffects: perform_parallel_async})])
