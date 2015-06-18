@@ -993,7 +993,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                       matcher=HasLength(2), timeout=600)
         return d
 
-    @skip_me("Skipped until this error transition is fixed in Otter #1510")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-024")
     @inlineCallbacks
