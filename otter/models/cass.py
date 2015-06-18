@@ -3,16 +3,17 @@ Cassandra implementation of the store for the front-end scaling groups engine
 """
 
 import functools
-import itertools
 import json
 import time
 import uuid
 import weakref
 from datetime import datetime
+from itertools import cycle, takewhile
 
 from characteristic import attributes
 
-from effect import Effect, TypeDispatcher, parallel
+from effect import Constant, Effect, TypeDispatcher, parallel
+from effect.do import do, do_return
 
 from jsonschema import ValidationError
 
@@ -22,7 +23,7 @@ from pyrsistent import freeze
 
 from silverberg.client import ConsistencyLevel
 
-from toolz.dicttoolz import keymap
+from toolz.dicttoolz import keymap, merge
 
 from twisted.internet import defer
 
@@ -37,6 +38,7 @@ from otter.models.interface import (
     IAdmin,
     IScalingGroup,
     IScalingGroupCollection,
+    IScalingGroupServersCache,
     IScalingScheduleCollection,
     NoSuchPolicyError,
     NoSuchScalingGroupError,
@@ -1385,7 +1387,7 @@ class CassScalingGroupCollection:
         Set round-robin list of buckets that will be used to store scheduled
         events.
         """
-        self.buckets = itertools.cycle(buckets)
+        self.buckets = cycle(buckets)
 
     def create_scaling_group(self, log, tenant_id, config, launch,
                              policies=None):
@@ -1726,7 +1728,7 @@ class CassScalingGroupServersCache(object):
         if len(rows) == 0:
             yield do_return(([], None))
         last_update = rows[0]['last_update']
-        rows = take_while(lambda r: r['last_update'] == last_update, rows)
+        rows = takewhile(lambda r: r['last_update'] == last_update, rows)
         yield do_return(([json.loads(r['server_blob']) for r in rows],
                          last_update))
 
