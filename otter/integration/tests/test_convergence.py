@@ -997,7 +997,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                       matcher=HasLength(2), timeout=600)
         return d
 
-    @skip_me("Autoscale does not yet handle Nova over-quota errors: #1470")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-025")
     @inlineCallbacks
