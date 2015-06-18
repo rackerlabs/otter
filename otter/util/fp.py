@@ -119,3 +119,16 @@ def set_in(mapping, keys, new_value):
     else:
         child = mapping.get(keys[0], pmap())
         return mapping.set(keys[0], set_in(child, keys[1:], new_value))
+
+
+def take_while(pred, items):
+    """
+    Returns the longest prefix (possibly empty) of items of elements that
+    satisfy pred. Similar to `takeWhile` in Haskell
+
+    :param callable pred: item -> Bool predicate function
+    :param list items: List of items to extract from
+    """
+    for item in items:
+        if pred(item):
+            yield item
