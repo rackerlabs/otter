@@ -11,6 +11,7 @@ from otter.convergence.model import (
     CLBNodeType,
     DRAINING_METADATA,
     DesiredGroupState,
+    ErrorReason,
     RCv3Description,
     RCv3Node,
     ServerState)
@@ -797,7 +798,9 @@ class ConvergeTests(SynchronousTestCase):
                 set([server('abc', ServerState.BUILD)]),
                 set(),
                 0),
-            pbag([ConvergeLater(reasons=['building servers'])]))
+            pbag([
+                ConvergeLater(
+                    reasons=[ErrorReason.String('building servers')])]))
 
     def test_delete_nodes_in_error_state(self):
         """

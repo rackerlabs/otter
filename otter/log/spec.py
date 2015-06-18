@@ -45,6 +45,22 @@ def error_event(event, failure, why):
             "why": why, "original_event": event, "message": ()}
 
 
+class MsgTypeNotFound(Exception):
+    """
+    Raised when msg_type is not found
+    """
+
+
+def try_msg_types(*tries):
+    """
+    Try series of msg_types
+    """
+    for msg_type in tries:
+        if msg_type in msg_types:
+            return msg_types[msg_type], msg_type
+    raise MsgTypeNotFound
+
+
 def get_validated_event(event):
     """
     Validate event's message as per msg_types and error details as
@@ -53,26 +69,26 @@ def get_validated_event(event):
     :return: Validated event
     :raises: `ValueError` or `TypeError` if `event_dict` is not valid
     """
-    # Is this message speced?
-    if event.get('isError', False):
-        msg_type = event.get("why", None)
-        msg = msg_types.get(msg_type, None)
-        if msg is None:
-            return event
-        validate_error(event)
-        event['why'] = msg
-    else:
+    try:
         # message is tuple of strings
-        msg_type = ''.join(event["message"])
-        msg = msg_types.get(msg_type, None)
-        if msg is None:
-            return event
-        event["message"] = (msg, )
+        message = ''.join(event.get("message", []))
 
-    # TODO: Validate non-primitive fields
+        # Is this message speced?
+        if event.get('isError', False):
+            expanded, msg_type = try_msg_types(event.get("why", None), message)
+            validate_error(event)
+            event['why'] = expanded
+            if message:
+                event['message'] = (expanded,)
+        else:
+            expanded, msg_type = try_msg_types(message)
+            event["message"] = (expanded, )
 
-    event["otter_msg_type"] = msg_type
-    return event
+        # TODO: Validate non-primitive fields
+        event["otter_msg_type"] = msg_type
+        return event
+    except MsgTypeNotFound:
+        return event
 
 
 def SpecificationObserverWrapper(observer,
