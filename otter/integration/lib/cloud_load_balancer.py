@@ -178,6 +178,40 @@ class CloudLoadBalancer(object):
                 [202, 404] if success_codes is None else success_codes)
         ).addCallback(lambda _: rcs)
 
+    def list_nodes(self, rcs):
+        """
+        Get all the nodes on the load balancer.
+
+        :param rcs: a :class:`otter.integration.lib.resources.TestResources`
+            instance
+
+        :return: the JSON response from the load balancer, which looks like::
+
+            {
+                "nodes": [
+                    {
+                        "id": ...
+                    },
+                    {
+                        "id": ...
+                    },
+                    ...
+                ]
+            }
+
+        """
+        d = self.treq.get(
+            "{0}/loadbalancers/{1}/nodes".format(
+                str(rcs.endpoints["loadbalancers"]),
+                self.clb_id
+            ),
+            headers=headers(str(rcs.token)),
+            pool=self.pool
+        )
+        d.addCallback(check_success, [200])
+        d.addCallback(self.treq.json_content)
+        return d
+
     def wait_for_nodes(self, rcs, matcher, timeout, period=10, clock=None):
         """
         Wait for the nodes on the load balancer to reflect a certain state,
@@ -211,26 +245,14 @@ class CloudLoadBalancer(object):
         ```
         """
         def check(nodes):
-            mismatch = matcher.match(nodes['nodes'])
+            mismatch = matcher.match(nodes["nodes"])
             if mismatch:
                 msg("Waiting for CLB node state for CLB {}.\nMismatch: {}"
                     .format(self.clb_id, mismatch.describe()))
                 raise TransientRetryError(mismatch.describe())
 
         def poll():
-            return (
-                self.treq.get(
-                    "{0}/loadbalancers/{1}/nodes".format(
-                        str(rcs.endpoints["loadbalancers"]),
-                        self.clb_id
-                    ),
-                    headers=headers(str(rcs.token)),
-                    pool=self.pool
-                )
-                .addCallback(check_success, [200])
-                .addCallback(self.treq.json_content)
-                .addCallback(check)
-            )
+            return self.list_nodes(rcs).addCallback(check)
 
         return retry_and_timeout(
             poll, timeout,
@@ -240,6 +262,42 @@ class CloudLoadBalancer(object):
             deferred_description="Waiting for nodes to reach state {0}".format(
                 str(matcher))
         )
+
+    def update_node(self, rcs, node_id, weight=None, condition=None,
+                    type=None):
+        """
+        Update a node's attributes.  At least one of the optional parameters
+        must be provided.
+
+        :param rcs: a :class:`otter.integration.lib.resources.TestResources`
+            instance
+
+        :param node_id: The node ID to modify
+        :type node_id: `str` or `int`
+
+        :param int weight: The weight to change the node to
+        :param str condition: The condition to change the node to - one of
+            ENABLED, DISBABLED, or DRAINING.
+        :param str type: The type to change the node to - one of PRIMARY or
+            SECONDARY
+
+        :return: An empty string if successful.
+        """
+        data = [("weight", weight), ("condition", condition), ("type", type)]
+        data = {k: v for k, v in data if v is not None}
+
+        d = self.treq.put(
+            "{0}/loadbalancers/{1}/nodes/{2}".format(
+                str(rcs.endpoints["loadbalancers"]),
+                self.clb_id, node_id
+            ),
+            json.dumps({"node": data}),
+            headers=headers(str(rcs.token)),
+            pool=self.pool
+        )
+        d.addCallback(check_success, [202])
+        d.addCallback(self.treq.content)
+        return d
 
 
 HasLength = MatchesPredicateWithParams(
