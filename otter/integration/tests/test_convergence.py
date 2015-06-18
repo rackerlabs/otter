@@ -1021,7 +1021,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                 {"name": "default"},
                 {"name": "fail",
                  "parameters": {"code": 400, "message": message_400,
-                                "type": "bad_request"}}
+                                "type": "BadRequest"}}
             ])
 
         yield group.start(self.rcs, self)
