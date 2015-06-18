@@ -181,7 +181,6 @@ class CloudLoadBalancer(object):
     def list_nodes(self, rcs):
         """
         Get all the nodes on the load balancer.
-        But this function just returns the list of dictionaries.
 
         :param rcs: a :class:`otter.integration.lib.resources.TestResources`
             instance
