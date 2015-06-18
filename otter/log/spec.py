@@ -48,8 +48,8 @@ msg_types = {
     "convergence-remove-rcv3-nodes":
         "Removing servers from RCv3 LB {lb_id}: {servers}",
     "group-status-active": "Group's status is changed to ACTIVE",
-    "group-status-error": "Group's status is changed to ERROR",
-
+    "group-status-error":
+        "Group's status is changed to ERROR. Reasons: {reasons}",
 }
 
 
