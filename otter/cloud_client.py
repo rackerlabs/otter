@@ -322,17 +322,19 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
 
 _CLB_PENDING_UPDATE_PATTERN = re.compile(
     "^Load Balancer '\d+' has a status of 'PENDING_UPDATE' and is considered "
-    "immutable.$")
+    "immutable\.$")
 _CLB_DELETED_PATTERN = re.compile(
     "^(Load Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
-    "The load balancer is deleted and) considered immutable.$")
+    "The load balancer is deleted and) considered immutable\.$")
 _CLB_NO_SUCH_NODE_PATTERN = re.compile(
     "^Node with id #\d+ not found for loadbalancer #\d+$")
 _CLB_NO_SUCH_LB_PATTERN = re.compile(
     "^Load balancer not found.$")
 _CLB_DUPLICATE_NODES_PATTERN = re.compile(
     "^Duplicate nodes detected. One or more nodes already configured "
-    "on load balancer.$")
+    "on load balancer\.$")
+_CLB_NODE_LIMIT_PATTERN = re.compile(
+    "^Nodes must not exceed \d+ per load balancer\.$")
 
 
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
@@ -383,6 +385,15 @@ class CLBDuplicateNodesError(Exception):
     """
 
 
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBNodeLimitError(Exception):
+    """
+    Error to be raised only when adding one or more nodes to a CLB: adding
+    that number of nodes would exceed the maximum number of nodes allowed on
+    the CLB.
+    """
+
+
 def add_clb_nodes(lb_id, nodes):
     """
     Generate effect to add one or more nodes to a load balancer.
@@ -417,13 +428,15 @@ def add_clb_nodes(lb_id, nodes):
         data={'nodes': nodes},
         success_pred=has_code(202))
 
-    def _check_duplicate_nodes(api_error_code, json_body):
-        if (api_error_code == 422 and _CLB_DUPLICATE_NODES_PATTERN.match(
-                json_body.get('message', ''))):
+    def _check_other_errors(api_error_code, message):
+        if (api_error_code == 422 and
+                _CLB_DUPLICATE_NODES_PATTERN.match(message)):
             raise CLBDuplicateNodesError(lb_id=lb_id)
+        elif api_error_code == 413 and _CLB_NODE_LIMIT_PATTERN.match(message):
+            raise CLBNodeLimitError(lb_id=lb_id)
 
     parse_err = partial(_process_clb_api_error, lb_id=lb_id,
-                        extra_parsing=_check_duplicate_nodes)
+                        extra_parsing=_check_other_errors)
 
     return eff.on(error=catch(APIError, parse_err))
 
@@ -453,9 +466,8 @@ def change_clb_node(lb_id, node_id, condition, weight):
         data={'condition': condition, 'weight': weight},
         success_pred=has_code(202))
 
-    def _check_no_such_node(api_error_code, json_body):
-        if (api_error_code == 404 and _CLB_NO_SUCH_NODE_PATTERN.match(
-                json_body.get('message', ''))):
+    def _check_no_such_node(api_error_code, message):
+        if api_error_code == 404 and _CLB_NO_SUCH_NODE_PATTERN.match(message):
             raise NoSuchCLBNodeError(lb_id=lb_id, node_id=node_id)
 
     parse_err = partial(_process_clb_api_error, lb_id=lb_id,
@@ -483,7 +495,8 @@ def _process_clb_api_error(exc_info, lb_id, extra_parsing):
     message = try_json_with_keys(api_error.body, ['message'])
 
     if message:
-        if api_error.code == 413:
+        if (api_error.code == 413 and
+                not _CLB_NODE_LIMIT_PATTERN.match(message)):
             raise CLBRateLimitError(message, lb_id=lb_id)
 
         generic_mappings = [
@@ -496,7 +509,7 @@ def _process_clb_api_error(exc_info, lb_id, extra_parsing):
                 raise exc_type(message, lb_id=lb_id)
 
         # No generic exceptions were raised - try the extra_parsing.
-        extra_parsing(api_error.code, try_json_with_keys(api_error.body, []))
+        extra_parsing(api_error.code, message)
 
     # No? Re-raise, then
     six.reraise(*exc_info)

@@ -29,6 +29,7 @@ from otter.auth import Authenticate, InvalidateToken
 from otter.cloud_client import (
     CLBDeletedError,
     CLBDuplicateNodesError,
+    CLBNodeLimitError,
     CLBPendingUpdateError,
     CLBRateLimitError,
     NoSuchCLBError,
@@ -671,6 +672,19 @@ class CLBClientTests(SynchronousTestCase):
         self.assertEqual(
             cm.exception,
             CLBDuplicateNodesError(msg, lb_id=self.lb_id))
+
+        # CLBNodeLimitError failure
+        msg = "Nodes must not exceed 25 per load balancer."
+        limit = stub_pure_response(
+            json.dumps({'message': msg, 'code': 413}), 413)
+        dispatcher = EQFDispatcher([(
+            expected.intent, service_request_eqf(limit))])
+
+        with self.assertRaises(CLBNodeLimitError) as cm:
+            sync_perform(dispatcher, eff)
+        self.assertEqual(
+            cm.exception,
+            CLBNodeLimitError(msg, lb_id=self.lb_id))
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)

@@ -15,6 +15,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.cloud_client import (
     CLBDeletedError,
     CLBDuplicateNodesError,
+    CLBNodeLimitError,
     CLBPendingUpdateError,
     CLBRateLimitError,
     NoSuchCLBError,
@@ -581,6 +582,7 @@ class StepAsEffectTests(SynchronousTestCase):
         result is a failure.
         """
         terminals = (CLBDeletedError(lb_id=u"12345"),
+                     CLBNodeLimitError(lb_id=u"12345"),
                      NoSuchCLBError(lb_id=u"12345"),
                      APIError(code=503, body="You're out of luck."),
                      TypeError("You did something wrong in your code."))
