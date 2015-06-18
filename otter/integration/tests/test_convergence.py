@@ -993,6 +993,55 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                       matcher=HasLength(2), timeout=600)
         return d
 
+
+
+
+
+
+
+
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
+    @tag("CATC-024")
+    @inlineCallbacks
+    def test_various_nova_40xs(self):
+        """
+        CATC-024
+
+
+        """
+        group, server_name_prefix = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=3, max_entities=10,
+            server_name_prefix="nova_400s"
+        )
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+
+        message_400 = "Can not find requested image"
+
+        yield mimic_nova.sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": server_name_prefix + ".*"}],
+            behaviors=[
+                {"name": "default"},
+                {"name": "fail",
+                 "parameters": {"code": 400, "message": message_400,
+                                "type": "bad_request"}}
+            ])
+
+        yield group.start(self.rcs, self)
+        yield group.wait_for_state(
+            self.rcs,
+            MatchesAll(
+                ContainsDict({
+                    'desiredCapacity': Equals(3),
+                    'status': Equals("ERROR")
+                }),
+            ), timeout=600)
+
+
+
+
+
     @skip_me("Autoscale does not yet handle Nova over-quota errors: #1470")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-025")
@@ -1419,6 +1468,22 @@ class ConvergenceTestsWith2CLBs(unittest.TestCase):
         if "CATC-020" in getattr(method, 'tags', ()):
             return (name.replace("all_loadbalancers", "one_loadbalancer"),
                     method)
+
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
+    @tag("CATC-022")
+    def test_handle_clb_error_in_one_of_multiple(self):
+        """
+        Multiple cloud load balancers, one goes into Err/Invalid before
+        scale up
+            - Create a group with 2 CLBs & non-min servers
+            - Use mimic to cause one of the load balancers to go into ERROR
+            - Attempt to scale up
+            - Confirm that group enters error state
+            - Fix LB
+            - Trigger Convergence
+            - Confirm expected state
+
+        """
 
 
 copy_test_methods(
