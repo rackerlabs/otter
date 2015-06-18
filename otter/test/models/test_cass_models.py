@@ -30,6 +30,8 @@ from twisted.internet import defer
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
+from txeffect import deferred_performer
+
 from otter.json_schema import group_examples
 from otter.models.cass import (
     CQLQueryExecute,
@@ -39,6 +41,7 @@ from otter.models.cass import (
     WeakLocks,
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
+    get_cql_dispatcher,
     perform_cql_query,
     serialize_json_data,
     verified_view
@@ -116,14 +119,14 @@ def _cassandrify_data(list_of_dicts):
     return _de_identify(list_of_dicts)
 
 
-class PerformTests(SynchronousTestCase):
+class EffectTests(SynchronousTestCase):
     """
-    Tests for :func:`perform_cql_query` function
+    Tests for :func:`perform_cql_query` and :func:`get_cql_dispatcher`
     """
 
     def test_perform_cql_query(self):
         """
-        Calls given connection's execute
+        `perform_cql_query` calls given connection's execute
         """
         conn = mock.Mock(spec=CQLClient)
         conn.execute.return_value = defer.succeed('ret')
@@ -136,6 +139,24 @@ class PerformTests(SynchronousTestCase):
         self.assertEqual(r, 'ret')
         conn.execute.assert_called_once_with(
             'query', {'w': 2}, ConsistencyLevel.ONE)
+
+    @mock.patch('otter.models.cass.perform_cql_query')
+    def test_cql_disp(self, mock_pcq):
+        """
+        The :obj:`CQLQueryExecute` performer is called with
+        dispatcher returned from get_cql_dispatcher
+        """
+
+        @deferred_performer
+        def performer(c, d, i):
+            return defer.succeed('p' + c)
+
+        mock_pcq.side_effect = performer
+
+        dispatcher = get_cql_dispatcher('conn')
+        intent = CQLQueryExecute(query='q', params='p', consistency_level=1)
+        eff = Effect(intent)
+        self.assertEqual(sync_perform(dispatcher, eff), 'pconn')
 
 
 class SerialJsonDataTestCase(SynchronousTestCase):
