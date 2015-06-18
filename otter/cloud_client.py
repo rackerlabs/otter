@@ -329,7 +329,7 @@ _CLB_DELETED_PATTERN = re.compile(
 _CLB_NO_SUCH_NODE_PATTERN = re.compile(
     "^Node with id #\d+ not found for loadbalancer #\d+$")
 _CLB_NO_SUCH_LB_PATTERN = re.compile(
-    "^Load balancer not found.$")
+    "^Load balancer not found\.$")
 _CLB_DUPLICATE_NODES_PATTERN = re.compile(
     "^Duplicate nodes detected. One or more nodes already configured "
     "on load balancer\.$")
