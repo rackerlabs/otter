@@ -330,6 +330,9 @@ _CLB_NO_SUCH_NODE_PATTERN = re.compile(
     "^Node with id #\d+ not found for loadbalancer #\d+$")
 _CLB_NO_SUCH_LB_PATTERN = re.compile(
     "^Load balancer not found.$")
+_CLB_DUPLICATE_NODES_PATTERN = re.compile(
+    "^Duplicate nodes detected. One or more nodes already configured "
+    "on load balancer.$")
 
 
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
@@ -370,6 +373,59 @@ class CLBRateLimitError(Exception):
     """
     Error to be raised when CLB returns 413 (rate limiting).
     """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBDuplicateNodesError(Exception):
+    """
+    Error to be raised only when adding one or more nodes to a CLB whose
+    address and port are mapped on the CLB.
+    """
+
+
+def add_clb_nodes(lb_id, nodes):
+    """
+    Generate effect to add one or more nodes to a load balancer.
+
+    Note: This is not correctly documented in the load balancer documentation -
+    it is documented as "Add Node" (singular), but the examples show multiple
+    nodes being added.
+
+    :param str lb_id: The load balancer ID to add the nodes to
+    :param list nodes: A list of node dictionaries that each look like::
+
+        {
+            "address": "valid ip address",
+            "port": 80,
+            "condition": "ENABLED",
+            "weight": 1,
+            "type": "PRIMARY"
+        }
+
+        (weight and type are optional)
+
+    :return: :class:`ServiceRequest` effect
+
+    :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
+        :class:`NoSuchCLBError`, :class:`CLBDuplicateNodesError`,
+        :class:`APIError`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'POST',
+        append_segments('loadbalancers', lb_id, 'nodes'),
+        data={'nodes': nodes},
+        success_pred=has_code(202))
+
+    def _check_duplicate_nodes(api_error_code, json_body):
+        if (api_error_code == 422 and _CLB_DUPLICATE_NODES_PATTERN.match(
+                json_body.get('message', ''))):
+            raise CLBDuplicateNodesError(lb_id=lb_id)
+
+    parse_err = partial(_process_clb_api_error, lb_id=lb_id,
+                        extra_parsing=_check_duplicate_nodes)
+
+    return eff.on(error=catch(APIError, parse_err))
 
 
 def change_clb_node(lb_id, node_id, condition, weight):

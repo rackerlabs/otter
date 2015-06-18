@@ -28,6 +28,7 @@ from txeffect import perform
 from otter.auth import Authenticate, InvalidateToken
 from otter.cloud_client import (
     CLBDeletedError,
+    CLBDuplicateNodesError,
     CLBPendingUpdateError,
     CLBRateLimitError,
     NoSuchCLBError,
@@ -42,6 +43,7 @@ from otter.cloud_client import (
     _perform_throttle,
     _serialize_and_delay,
     add_bind_service,
+    add_clb_nodes,
     change_clb_node,
     concretize_service_request,
     get_cloud_client_dispatcher,
@@ -591,8 +593,8 @@ class CLBClientTests(SynchronousTestCase):
 
     def test_change_clb_node(self):
         """
-        Produce a request for modifying a load balancer, which returns a
-        successful result on 202.
+        Produce a request for modifying a node on a load balancer, which
+        returns a successful result on 202.
 
         Parse the common CLB errors, and :class:`NoSuchCLBNodeError`.
         """
@@ -626,6 +628,49 @@ class CLBClientTests(SynchronousTestCase):
         self.assertEqual(
             cm.exception,
             NoSuchCLBNodeError(msg, lb_id=self.lb_id, node_id=u'1234'))
+
+        # all the common failures
+        self.assert_parses_common_clb_errors(expected.intent, eff)
+
+    def test_add_clb_nodes(self):
+        """
+        Produce a request for adding nodes to a load balancer, which returns
+        a successful result on a 202.
+
+        Parse the common CLB errors, and a :class:`CLBDuplicateNodesError`.
+        """
+        nodes = [{"address": "1.1.1.1", "port": 80, "condition": "ENABLED"},
+                 {"address": "1.1.1.2", "port": 80, "condition": "ENABLED"},
+                 {"address": "1.1.1.5", "port": 81, "condition": "ENABLED"}]
+
+        eff = add_clb_nodes(lb_id=self.lb_id, nodes=nodes)
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'POST',
+            'loadbalancers/{0}/nodes'.format(self.lb_id),
+            data={'nodes': nodes},
+            success_pred=has_code(202))
+
+        # success
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(stub_pure_response('', 202)))])
+        self.assertEqual(sync_perform(dispatcher, eff),
+                         stub_pure_response(None, 202))
+
+        # CLBDuplicateNodesError failure
+        msg = ("Duplicate nodes detected. One or more nodes already "
+               "configured on load balancer.")
+        duplicate_nodes = stub_pure_response(
+            json.dumps({'message': msg, 'code': 422}), 422)
+        dispatcher = EQFDispatcher([(
+            expected.intent, service_request_eqf(duplicate_nodes))])
+
+        with self.assertRaises(CLBDuplicateNodesError) as cm:
+            sync_perform(dispatcher, eff)
+        self.assertEqual(
+            cm.exception,
+            CLBDuplicateNodesError(msg, lb_id=self.lb_id))
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)
