@@ -993,13 +993,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                       matcher=HasLength(2), timeout=600)
         return d
 
-
-
-
-
-
-
-
+    @skip_me("Skipped until this error transition is fixed in Otter #1510")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-024")
     @inlineCallbacks
@@ -1007,6 +1001,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         """
         CATC-024
 
+        Validate that an autoscale group transitions to an ERROR state when
+        a scaling operation results in a 400: BadRequest response from Nova.
 
         """
         group, server_name_prefix = self.helper.create_group(
@@ -1037,10 +1033,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                     'status': Equals("ERROR")
                 }),
             ), timeout=600)
-
-
-
-
 
     @skip_me("Autoscale does not yet handle Nova over-quota errors: #1470")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
