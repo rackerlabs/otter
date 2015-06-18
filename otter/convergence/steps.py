@@ -343,8 +343,15 @@ class AddNodesToCLB(object):
             err_type, error, traceback = result
             status = StepResult.FAILURE
 
-            if err_type in (CLBDuplicateNodesError, CLBRateLimitError,
-                            CLBPendingUpdateError):
+            known_retryable = err_type in (CLBDuplicateNodesError,
+                                           CLBRateLimitError,
+                                           CLBPendingUpdateError)
+            unknown_nonterminal = (
+                err_type == APIError and not 400 <= error.code < 500)
+
+            # we want to retry on known retryable errors, or APIErrors that
+            # are not terminal like maybe 500 or 503 errors.
+            if known_retryable or unknown_nonterminal:
                 status = StepResult.RETRY
 
             return status, [ErrorReason.Exception(result)]

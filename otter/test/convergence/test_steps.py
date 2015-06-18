@@ -560,11 +560,13 @@ class StepAsEffectTests(SynchronousTestCase):
     def test_add_nodes_to_clb_non_terminal_failures(self):
         """
         :obj:`AddNodesToCLB` retries if the CLB is temporarily locked, or if
-        the request was rate-limited, or if there were duplicate nodes.
+        the request was rate-limited, or if there were duplicate nodes, or if
+        there was an API error and the error is unknown but not a 4xx.
         """
         non_terminals = (CLBDuplicateNodesError(lb_id=u"12345"),
                          CLBPendingUpdateError(lb_id=u"12345"),
-                         CLBRateLimitError(lb_id=u"12345"))
+                         CLBRateLimitError(lb_id=u"12345"),
+                         APIError(code=500, body="oops!"))
         eff = self._add_one_node_to_clb()
 
         for exc in non_terminals:
@@ -578,13 +580,14 @@ class StepAsEffectTests(SynchronousTestCase):
     def test_add_nodes_to_clb_terminal_failures(self):
         """
         :obj:`AddNodesToCLB` retries if the CLB is not found or deleted, or
-        if there is any other error, the error is propagated up and the
-        result is a failure.
+        if there is any other 4xx error, or if there is a non-API error, then
+        the error is propagated up and the result is a failure.
         """
         terminals = (CLBDeletedError(lb_id=u"12345"),
                      CLBNodeLimitError(lb_id=u"12345"),
                      NoSuchCLBError(lb_id=u"12345"),
-                     APIError(code=503, body="You're out of luck."),
+                     APIError(code=403, body="You're out of luck."),
+                     APIError(code=422, body="Oh look another 422."),
                      TypeError("You did something wrong in your code."))
         eff = self._add_one_node_to_clb()
 
