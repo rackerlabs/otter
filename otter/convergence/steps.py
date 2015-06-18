@@ -17,9 +17,9 @@ from twisted.python.constants import NamedConstant
 from zope.interface import Interface, implementer
 
 from otter.cloud_client import (
+    CLBDuplicateNodesError,
     CLBPendingUpdateError,
     CLBRateLimitError,
-    CLBDuplicateNodesError,
     add_clb_nodes,
     has_code,
     service_request,
