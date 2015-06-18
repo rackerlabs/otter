@@ -288,7 +288,8 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         asmetakey = "rax:autoscale:group:id"
         cache = [
             {'id': 'a', 'metadata': {asmetakey: "gid"}},
-            {'id': 'b', 'metadata': {asmetakey: "gid"}}]
+            {'id': 'b', 'metadata': {asmetakey: "gid"}},
+            {'id': 'd', 'metadata': {asmetakey: "gid"}}]
         changes = [
             {'id': 'a', 'b': 'c', 'metadata': {asmetakey: "gid"}},
             {'id': 'd', 'metadata': {"changed": "yes"}}]
