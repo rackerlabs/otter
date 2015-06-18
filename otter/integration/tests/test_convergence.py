@@ -1461,22 +1461,6 @@ class ConvergenceTestsWith2CLBs(unittest.TestCase):
             return (name.replace("all_loadbalancers", "one_loadbalancer"),
                     method)
 
-    @skip_if(not_mimic, "This requires Mimic for error injection.")
-    @tag("CATC-022")
-    def test_handle_clb_error_in_one_of_multiple(self):
-        """
-        Multiple cloud load balancers, one goes into Err/Invalid before
-        scale up
-            - Create a group with 2 CLBs & non-min servers
-            - Use mimic to cause one of the load balancers to go into ERROR
-            - Attempt to scale up
-            - Confirm that group enters error state
-            - Fix LB
-            - Trigger Convergence
-            - Confirm expected state
-
-        """
-
 
 copy_test_methods(
     ConvergenceTestsWith1CLB, ConvergenceTestsWith2CLBs,
