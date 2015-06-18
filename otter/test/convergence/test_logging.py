@@ -7,10 +7,11 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence.logging import log_steps
 from otter.convergence.model import (
-    CLBDescription, CLBNodeCondition, CLBNodeType)
+    CLBDescription, CLBNodeCondition, CLBNodeType, ErrorReason)
 from otter.convergence.steps import (
     AddNodesToCLB, BulkAddToRCv3, BulkRemoveFromRCv3, ChangeCLBNode,
-    CreateServer, DeleteServer, RemoveNodesFromCLB, SetMetadataItemOnServer)
+    ConvergeLater, CreateServer, DeleteServer, RemoveNodesFromCLB,
+    SetMetadataItemOnServer)
 from otter.log.intents import Log
 from otter.test.utils import noop, test_dispatcher
 
@@ -27,6 +28,13 @@ class LogStepsTests(SynchronousTestCase):
         sequence = SequenceDispatcher([(intent, noop) for intent in intents])
         with sequence.consume():
             sync_perform(test_dispatcher(sequence), log_steps(steps))
+
+    def test_unhandled_steps(self):
+        """
+        Arbitrary unhandled steps return an effect that performs no logging.
+        """
+        steps = pbag([ConvergeLater([ErrorReason.String("foo")])])
+        self.assert_logs(steps, [])
 
     def test_create_servers(self):
         """Logs :obj:`CreateServer`."""
