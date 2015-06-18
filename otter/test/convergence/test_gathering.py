@@ -10,7 +10,6 @@ from effect import (
     Effect,
     ParallelEffects,
     TypeDispatcher,
-    base_dispatcher,
     sync_perform,
     sync_performer)
 
@@ -48,6 +47,7 @@ from otter.convergence.model import (
     ServerState)
 from otter.test.utils import (
     Cache,
+    get_dispatcher,
     intent_func,
     noop,
     patch,
@@ -240,8 +240,8 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             ("cachegstidgid", lambda i: (object(), None)),
             (("all-as",), lambda i: {} if empty else {"gid": current}),
             (("cacheistidgid", self.now, current, True), noop)])
+        disp = get_dispatcher(sequence)
         with sequence.consume():
-            disp = ComposedDispatcher([sequence, base_dispatcher])
             self.assertEqual(
                 sync_perform(disp, self._invoke()), current)
 
@@ -264,8 +264,8 @@ class GetScalingGroupServersTests(SynchronousTestCase):
              lambda i: {'gid': as_servers} if as_srvs else {}),
             (("all-as",), lambda i: {"gid": current} if cur_srvs else {}),
             (("cacheistidgid", self.now, servers, True), noop)])
+        disp = get_dispatcher(sequence)
         with sequence.consume():
-            disp = ComposedDispatcher([sequence, base_dispatcher])
             self.assertEqual(
                 sync_perform(disp, self._invoke()), servers)
 
@@ -296,8 +296,8 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         sequence = SequenceDispatcher([
             ("cachegstidgid", lambda i: (cache, last_update)),
             (("alls", last_update), lambda i: changes)])
+        disp = get_dispatcher(sequence)
         with sequence.consume():
-            disp = ComposedDispatcher([sequence, base_dispatcher])
             self.assertEqual(
                 self.freeze(sync_perform(disp, self._invoke())),
                 self.freeze([cache[1], changes[0]]))

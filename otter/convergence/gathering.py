@@ -141,6 +141,13 @@ def server_of_group(group_id, server):
     return group_id_from_metadata(server.get('metadata', {})) == group_id
 
 
+def group_servers(group_id, grouped_servers):
+    """
+    Return servers of a group defaulting to empty if not found
+    """
+    return grouped_servers.get(group_id, [])
+
+
 @do
 def get_scaling_group_servers(tenant_id, group_id, now,
                               cache_class=CassScalingGroupServersCache,
@@ -156,6 +163,7 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     :return: Servers as list of dicts
     :rtype: Effect
     """
+
     cache = cache_class(tenant_id, group_id)
     cached_servers, last_update = yield cache.get_servers()
     if last_update is None:
@@ -163,8 +171,9 @@ def get_scaling_group_servers(tenant_id, group_id, now,
         yield cache.insert_servers(now, servers, True)
     elif now - last_update >= timedelta(days=30):
         last_update = now - timedelta(days=30)
-        changes = (yield all_as_servers(last_update)).get(group_id, [])
-        current = (yield all_as_servers()).get(group_id, [])
+        changes, current = yield parallel([
+            all_as_servers(last_update).on(partial(group_servers, group_id)),
+            all_as_servers().on(partial(group_servers, group_id))])
         servers = merge_servers(changes, current)
         yield cache.insert_servers(now, servers, True)
     else:
