@@ -8,7 +8,7 @@ from functools import partial, wraps
 from inspect import getargspec
 
 from effect import (
-    ComposedDispatcher, ParallelEffects, TypeDispatcher,
+    ComposedDispatcher, Effect, ParallelEffects, TypeDispatcher,
     base_dispatcher, sync_perform, sync_performer)
 from effect.async import perform_parallel_async
 from effect.testing import (
@@ -35,6 +35,7 @@ from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
 
 from otter.cloud_client import concretize_service_request
+from otter.convergence.model import NovaServer
 from otter.log.bound import BoundLog
 from otter.models.interface import IScalingGroup
 from otter.supervisor import ISupervisor
@@ -845,3 +846,46 @@ class TestStep(object):
 def noop(_):
     """Ignore input and return None."""
     pass
+
+
+def intent_func(fname):
+    """
+    Return function that returns Effect of tuple of fname and its args. Useful
+    in writing tests that expect intent based on args
+    """
+    return lambda *a: Effect((fname,) + a)
+
+
+class Cache(object):
+    """ IScalingGroupServersCache impl for testing """
+
+    def __init__(self, tid, gid):
+        self.tid = tid
+        self.gid = gid
+
+    def ids(self, s):
+        return "cache" + s + self.tid + self.gid
+
+    def get_servers(self):
+        return Effect(self.ids("gs"))
+
+    def insert_servers(self, time, servers, clear):
+        return Effect((self.ids("is"), time, servers, clear))
+
+    def delete_servers(self):
+        return Effect(self.ids("ds"))
+
+
+def server(id, state, created=0, image_id='image', flavor_id='flavor',
+           json=None, **kwargs):
+    """Convenience for creating a :obj:`NovaServer`."""
+    return NovaServer(id=id, state=state, created=created, image_id=image_id,
+                      flavor_id=flavor_id,
+                      json=json or pmap({'id': id}), **kwargs)
+
+
+def get_dispatcher(sequence):
+    """ Get dispatcher with given sequence in it """
+    return ComposedDispatcher([
+        sequence, base_dispatcher,
+        TypeDispatcher({ParallelEffects: perform_parallel_async})])

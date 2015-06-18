@@ -10,7 +10,7 @@ from attr.validators import instance_of
 
 from characteristic import Attribute, attributes
 
-from pyrsistent import PSet, freeze, pmap, pset, pvector
+from pyrsistent import PMap, PSet, freeze, pmap, pset, pvector
 
 from sumtypes import constructor, sumtype
 
@@ -201,7 +201,8 @@ def _lbs_from_metadata(metadata):
              Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
              Attribute('servicenet_address',
                        default_value='',
-                       instance_of=basestring)])
+                       instance_of=basestring),
+             Attribute('json', instance_of=PMap, default_factory=pmap)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -253,7 +254,8 @@ class NovaServer(object):
             flavor_id=server_json['flavor']['id'],
             links=freeze(server_json['links']),
             desired_lbs=_lbs_from_metadata(metadata),
-            servicenet_address=_servicenet_address(server_json))
+            servicenet_address=_servicenet_address(server_json),
+            json=freeze(server_json))
 
 
 def group_id_from_metadata(metadata):
