@@ -485,15 +485,17 @@ class AutoscaleFixture(BaseTestFixture):
                     return server_list
 
             self.fail(
-                'Waited {0} secs for desired capacity/active server list to '
-                'reach the server count of {1}. Has desired capacity {2} on '
-                'the group {3} and {4} servers on the account. '
-                'Filtering by server_name={server_name}'.format(
+                'Waited {0} secs for desired capacity and actual number of '
+                'building or active servers to reach the server count of {1}. '
+                'Has desired capacity {2} on the group {3} and {4} servers on '
+                'the account. Filtering by server_name={server_name}'.format(
                     elapsed_time,
                     desired_capacity,
                     group_state.desiredCapacity, group_id,
                     len(server_list),
-                    server_name=server_name))
+                    server_name=(
+                        '<name from launch config>' if server_name is None
+                        else server_name)))
 
         return self.autoscale_behaviors.retry(
             check_servers, timeout=120, interval_time=5, time_scale=time_scale)

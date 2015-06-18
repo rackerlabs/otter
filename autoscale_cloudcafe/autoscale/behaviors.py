@@ -488,6 +488,14 @@ class AutoscaleBehaviors(BaseBehavior):
             # max out mimic waiting to 60 seconds, no matter what the timeout
             timeout = min(timeout, 60)
 
+        # convergence against a real system can take a little longer
+        elif (self.autoscale_config.convergence and
+                not self.autoscale_config.mimic):
+            # scale up because convergence takes longer - no longer than 15
+            # minutes though.
+            scale_up_factor = 2
+            timeout = min(timeout * scale_up_factor, 900)
+
         # retry uses millseconds, not seconds
         @retry(wait_fixed=interval_time * 1000, stop_max_delay=timeout * 1000)
         @wraps(callable)
