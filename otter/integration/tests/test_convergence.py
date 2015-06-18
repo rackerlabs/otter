@@ -998,6 +998,45 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         return d
 
     @skip_if(not_mimic, "This requires Mimic for error injection.")
+    @tag("CATC-024")
+    @inlineCallbacks
+    def test_recovers_from_nova_intermittent_errors(self):
+        """
+        CATC-024
+
+        Nova will return 401 (unauthorized), then a 500 (compute fault),
+        then succeed (over and over) on every create server call.
+
+        Autoscale should be able to recover from these failures by retrying.
+        """
+        group, server_name_prefix = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=2, max_entities=10,
+            server_name_prefix="intermittent-errors"
+        )
+
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        yield mimic_nova.sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": server_name_prefix + ".*"}],
+            behaviors=[
+                {"name": "fail",
+                 "parameters": {"code": 401,  # simulate 401-no-body errors
+                                "type": "string",
+                                "message": ""}},
+                {"name": "fail",
+                 "parameters": {"code": 500,
+                                "type": "computeFault",
+                                "message": "Oops!."}},
+                {"name": "default"}
+            ])
+
+        group, _ = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=2,
+            max_entities=10)
+        yield self.helper.start_group_and_wait(group, self.rcs, desired=5)
+
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-025")
     @inlineCallbacks
     def test_recovers_from_nova_over_quota_error(self):

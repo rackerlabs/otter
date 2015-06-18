@@ -16,17 +16,10 @@ msg_types = {
         "Fatal error while converging group {scaling_group_id}."),
     "converge-non-fatal-error": (
         "Non-fatal error while converging group {scaling_group_id}"),
-    "cf-add-failure": "Failed to add event to cloud feeds",
-    "cf-unsuitable-message": (
-        "Tried to add unsuitable message in cloud feeds: "
-        "{unsuitable_message}"),
     "delete-server": "Deleting {server_id} server",
     "execute-convergence": "Executing convergence",
     "execute-convergence-results": (
         "Got result of {worst_status} after executing convergence"),
-    "group-status-active": "Group's status is changed to ACTIVE",
-    "group-status-error":
-        "Group's status is changed to ERROR. Reasons: {reasons}",
     "launch-servers": "Launching {num_servers} servers",
     "mark-clean-success": "Marked group {scaling_group_id} clean",
     "mark-clean-failure": "Failed to mark group {scaling_group_id} clean",
@@ -34,6 +27,29 @@ msg_types = {
     "mark-dirty-failure": "Failed to mark group {scaling_group_id} dirty",
     "remove-server-clb": ("Removing server {server_id} with IP address "
                           "{ip_address} from CLB {clb_id}"),
+
+    # CF-published log messages
+    "cf-add-failure": "Failed to add event to cloud feeds",
+    "cf-unsuitable-message": (
+        "Tried to add unsuitable message in cloud feeds: "
+        "{unsuitable_message}"),
+    "convergence-create-servers":
+        "Creating {num_servers} with config {server_config}",
+    "convergence-delete-servers": "Deleting {servers}",
+    "convergence-add-clb-nodes":
+        "Adding IPs to CLB {lb_id}: {addresses}",
+    "convergence-remove-clb-nodes":
+        "Removing nodes from CLB {lb_id}: {nodes}",
+    "convergence-change-clb-nodes":
+        "Changing nodes on CLB {lb_id}: nodes={nodes}, type={type}, "
+        "condition={condition}, weight={weight}",
+    "convergence-add-rcv3-nodes":
+        "Adding servers to RCv3 LB {lb_id}: {servers}",
+    "convergence-remove-rcv3-nodes":
+        "Removing servers from RCv3 LB {lb_id}: {servers}",
+    "group-status-active": "Group's status is changed to ACTIVE",
+    "group-status-error":
+        "Group's status is changed to ERROR. Reasons: {reasons}",
 }
 
 

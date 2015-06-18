@@ -32,6 +32,7 @@ from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.errors import present_reasons, structure_reason
 from otter.convergence.gathering import get_all_convergence_data
+from otter.convergence.logging import log_steps
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
@@ -161,6 +162,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     desired_group_state = get_desired_group_state(
         group_id, launch_config, desired_capacity)
     steps = plan(desired_group_state, servers, lb_nodes, now, build_timeout)
+    yield log_steps(steps)
     active = determine_active(servers, lb_nodes)
     yield msg('execute-convergence',
               servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
