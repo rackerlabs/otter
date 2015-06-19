@@ -13,7 +13,8 @@ from effect import (
     sync_perform)
 
 from effect.async import perform_parallel_async
-from effect.testing import EQDispatcher, EQFDispatcher, Stub
+from effect.testing import (
+    EQDispatcher, EQFDispatcher, Stub)
 
 from pyrsistent import freeze
 
@@ -69,14 +70,15 @@ def resolve_svcreq(eff, result, service_type,
     return resolve_effect(eff, result)
 
 
-def svc_request_args(changes_since, limit):
+def svc_request_args(**params):
     """
     Return service request args with formatted changes_since argument in it
     """
-    params = urlencode([('changes_since', changes_since.isoformat() + 'Z'),
-                        ('limit', limit)])
+    changes_since = params.get('changes-since', None)
+    if changes_since is not None:
+        params['changes-since'] = changes_since.isoformat() + 'Z'
     return (ServiceType.CLOUD_SERVERS, 'GET',
-            'servers/detail?{}'.format(params))
+            'servers/detail?{}'.format(urlencode(sorted(params.items()))))
 
 
 class GetAllServerDetailsTests(SynchronousTestCase):
@@ -88,18 +90,6 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         """Save basic reused data."""
         self.servers = [{'id': i} for i in range(9)]
 
-    def req(self, query_params=None):
-        """
-        Return the service request with the given query parameters
-        """
-        if query_params is None:
-            query_params = {'limit': 10}
-
-        url = "servers/detail?{}".format(
-            "&".join(["{}={}".format(k, v) for k, v in
-                      query_params.items()]))
-        return (ServiceType.CLOUD_SERVERS, 'GET', url)
-
     def test_get_all_without_link_to_next_page(self):
         """
         `get_all_server_details` will not fetch again if first does not have
@@ -110,7 +100,8 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         body = {'servers': self.servers}
         eff = get_all_server_details(batch_size=10)
         svcreq = resolve_retry_stubs(eff)
-        result = resolve_svcreq(svcreq, (fake_response, body), *self.req())
+        result = resolve_svcreq(
+            svcreq, (fake_response, body), *svc_request_args(limit=10))
         self.assertEqual(result, self.servers)
 
     def test_get_all_ignores_non_next_links(self):
@@ -124,7 +115,8 @@ class GetAllServerDetailsTests(SynchronousTestCase):
                     'href': 'https://ignoreme/path?bleh=1', 'rel': 'prev'}]}
         eff = get_all_server_details(batch_size=10)
         svcreq = resolve_retry_stubs(eff)
-        result = resolve_svcreq(svcreq, (fake_response, body), *self.req())
+        result = resolve_svcreq(
+            svcreq, (fake_response, body), *svc_request_args(limit=10))
         self.assertEqual(result, self.servers)
 
     def test_get_all_with_link_to_next_page(self):
@@ -140,7 +132,8 @@ class GetAllServerDetailsTests(SynchronousTestCase):
                 'servers_links': [{
                     'href': 'https://ignoreme/path?limit=10&marker=9',
                     'rel': 'next'}]}
-        result = resolve_svcreq(svcreq, (fake_response, body), *self.req())
+        result = resolve_svcreq(
+            svcreq, (fake_response, body), *svc_request_args(limit=10))
         self.assertIsInstance(result, Effect)
 
         # next request, because previous had a next link
@@ -149,15 +142,16 @@ class GetAllServerDetailsTests(SynchronousTestCase):
                 'servers_links': [{
                     'href': 'https://ignoreme/path?limit=10&marker=19',
                     'rel': 'next'}]}
-        result = resolve_svcreq(next_req, (fake_response, body),
-                                *self.req({'limit': 10, 'marker': 9}))
+        result = resolve_svcreq(
+            next_req, (fake_response, body),
+            *svc_request_args(limit=10, marker=9))
         self.assertIsInstance(result, Effect)
 
         # third request, because previous had a next link
         next_req = resolve_retry_stubs(result)
         body = {'servers': []}
         result = resolve_svcreq(next_req, (fake_response, body),
-                                *self.req({'limit': 10, 'marker': 19}))
+                                *svc_request_args(limit=10, marker=19))
 
         self.assertEqual(result, servers)
 
@@ -175,7 +169,8 @@ class GetAllServerDetailsTests(SynchronousTestCase):
                 'servers_links': [{
                     'href': 'https://ignoreme/path?anything=1',
                     'rel': 'next'}]}
-        result = resolve_svcreq(svcreq, (fake_response, body), *self.req())
+        result = resolve_svcreq(svcreq, (fake_response, body),
+                                *svc_request_args(limit=10))
         self.assertIsInstance(result, Effect)
 
         # next request, because previous had a next link
@@ -186,7 +181,7 @@ class GetAllServerDetailsTests(SynchronousTestCase):
                     'rel': 'next'}]}
         self.assertRaises(UnexpectedBehaviorError,
                           resolve_svcreq, next_req, (fake_response, body),
-                          *self.req({'anything': 1}))
+                          *svc_request_args(anything=1))
 
     def test_with_changes_since(self):
         """
@@ -199,7 +194,8 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         eff = get_all_server_details(changes_since=since, batch_size=10)
         svcreq = resolve_retry_stubs(eff)
         result = resolve_svcreq(
-            svcreq, (fake_response, body), *svc_request_args(since, 10))
+            svcreq, (fake_response, body),
+            *svc_request_args(**{'changes-since': since, 'limit': 10}))
         self.assertEqual(result, self.servers)
 
     def test_retry(self):
@@ -231,7 +227,8 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         fake_response = object()
         body = {'servers': []}
         result = resolve_svcreq(
-            eff, (fake_response, body), *svc_request_args(since, 100))
+            eff, (fake_response, body),
+            *svc_request_args(**{'changes-since': since, 'limit': 100}))
         self.assertEqual(result, {})
 
     def test_filters_no_metadata(self):
