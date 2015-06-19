@@ -713,11 +713,14 @@ def unwrap_wrapped_effect(intent_class, kwargs,
     return (intent_class(effect=mock.ANY, **kwargs), function)
 
 
-def test_dispatcher():
-    return ComposedDispatcher([
+def test_dispatcher(disp=None):
+    disps = [
         base_dispatcher,
         TypeDispatcher({ParallelEffects: perform_parallel_async}),
-    ])
+    ]
+    if disp is not None:
+        disps.append(disp)
+    return ComposedDispatcher(disps)
 
 
 def defaults_by_name(fn):

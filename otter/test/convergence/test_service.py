@@ -15,7 +15,7 @@ from kazoo.recipe.partitioner import PartitionState
 
 import mock
 
-from pyrsistent import freeze, pbag, pset, s
+from pyrsistent import freeze, pbag, pmap, pset, s
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
@@ -33,7 +33,7 @@ from otter.convergence.service import (
     converge_one_group,
     determine_active, execute_convergence, get_my_divergent_groups,
     non_concurrently)
-from otter.convergence.steps import ConvergeLater
+from otter.convergence.steps import ConvergeLater, CreateServer
 from otter.log.intents import BoundFields, Log, LogErr, get_log_dispatcher
 from otter.models.intents import (
     DeleteGroup,
@@ -735,6 +735,39 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              noop),
             (Log(msg='execute-convergence-results', fields=expected_fields),
              noop),
+        ])
+
+        dispatcher = ComposedDispatcher([
+            base_dispatcher,
+            TypeDispatcher({ParallelEffects: perform_parallel_async}),
+            sequence])
+
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
+
+    def test_log_steps(self):
+        """The steps to be executed are logged to cloud feeds."""
+        step = CreateServer(server_config=pmap({"foo": "bar"}))
+
+        def plan(*args, **kwargs):
+            return pbag([step])
+
+        gacd = self._get_gacd_func(self.group.uuid)
+        eff = execute_convergence(self.tenant_id, self.group_id,
+                                  build_timeout=3600,
+                                  get_all_convergence_data=gacd,
+                                  plan=plan)
+
+        sequence = SequenceDispatcher([
+            (self.gsgi, lambda i: (self.group, self.manifest)),
+            (Log('convergence-create-servers',
+                 fields={'num_servers': 1, 'server_config': {'foo': 'bar'},
+                         'cloud_feed': True}),
+             noop),
+            (Log('execute-convergence', fields=mock.ANY), noop),
+            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
+             noop),
+            (Log('execute-convergence-results', fields=mock.ANY), noop),
         ])
 
         dispatcher = ComposedDispatcher([
