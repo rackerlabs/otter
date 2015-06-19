@@ -1711,19 +1711,19 @@ class CassScalingGroupServersCache(object):
     """
 
     def __init__(self, tenant_id, group_id):
-        self.tenant_id = tenant_id
-        self.group_id = group_id
+        self.tenantId = tenant_id
+        self.groupId = group_id
         self.table = "servers_cache"
-        self.params = {"tenant_id": tenant_id, "group_id": group_id}
+        self.params = {"tenantId": self.tenantId, "groupId": self.groupId}
 
     @do
     def get_servers(self):
         """
         See :method:`IScalingGroupServersCache.get_servers`
         """
-        query = ("SELECT server_blob, last_update FROM {cf} "
-                 "WHERE tenant_id=:tenant_id AND group_id=:group_id "
-                 "ORDER BY last_update DESC;")
+        query = ('SELECT server_blob, last_update FROM {cf} '
+                 'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
+                 'ORDER BY last_update DESC;')
         rows = yield cql_eff(query.format(cf=self.table), self.params)
         if len(rows) == 0:
             yield do_return(([], None))
@@ -1738,10 +1738,10 @@ class CassScalingGroupServersCache(object):
         """
         if len(servers) == 0:
             return Effect(Constant(None))
-        query = ("INSERT INTO {cf} (tenant_id, group_id, last_update, "
-                 "server_id, server_blob) "
-                 "VALUES(:tenant_id, :group_id, :last_update, :server_id{i}, "
-                 ":server_blob{i});")
+        query = ('INSERT INTO {cf} ("tenantId", "groupId", last_update, '
+                 'server_id, server_blob) '
+                 'VALUES(:tenantId, :groupId, :last_update, :server_id{i}, '
+                 ':server_blob{i});')
         params = merge(self.params, {"last_update": last_update})
         queries = []
         for i, server in enumerate(servers):
@@ -1758,9 +1758,9 @@ class CassScalingGroupServersCache(object):
         """
         See :method:`IScalingGroupServersCache.delete_servers`
         """
-        query = ("DELETE FROM {cf} WHERE tenant_id=:tenant_id AND "
-                 "group_id=:group_id;")
-        return cql_eff(query.format(cf=self.table), self.params)
+        return cql_eff(
+            _cql_delete_all_in_group.format(cf=self.table, name=''),
+            self.params)
 
 
 @implementer(IAdmin)

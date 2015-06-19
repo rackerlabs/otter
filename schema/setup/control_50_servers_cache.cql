@@ -1,8 +1,8 @@
 USE @@KEYSPACE@@;
 
 CREATE TABLE servers_cache (
-    tenant_id ascii,
-    group_id ascii,
+    "tenantId" ascii,
+    "groupId" ascii,
     last_update timestamp,
     server_id ascii,
     server_blob ascii,

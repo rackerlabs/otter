@@ -9,8 +9,7 @@ from datetime import datetime
 from functools import partial
 
 from effect import (
-    ComposedDispatcher, Constant, Effect, ParallelEffects, TypeDispatcher,
-    base_dispatcher, sync_perform)
+    Constant, Effect, ParallelEffects, TypeDispatcher, sync_perform)
 from effect.testing import SequenceDispatcher, resolve_effect
 
 from jsonschema import ValidationError
@@ -71,7 +70,8 @@ from otter.test.utils import (
     LockMixin,
     matches,
     mock_log,
-    patch)
+    patch,
+    test_dispatcher)
 from otter.util.config import set_config_data
 from otter.util.timestamp import from_timestamp
 
@@ -3667,7 +3667,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
     def setUp(self):
         self.tenant_id = 'tid'
         self.group_id = 'gid'
-        self.params = {"tenant_id": self.tenant_id, "group_id": self.group_id}
+        self.params = {"tenantId": self.tenant_id, "groupId": self.group_id}
         self.cache = CassScalingGroupServersCache(
             self.tenant_id, self.group_id)
         self.dt = datetime(2010, 10, 20, 10, 0, 0)
@@ -3675,12 +3675,12 @@ class CassGroupServersCacheTests(SynchronousTestCase):
     def _test_get_servers(self, query_result, exp_result):
         sequence = SequenceDispatcher([
             (CQLQueryExecute(
-                query=("SELECT server_blob, last_update FROM servers_cache "
-                       "WHERE tenant_id=:tenant_id AND group_id=:group_id "
-                       "ORDER BY last_update DESC;"),
+                query=('SELECT server_blob, last_update FROM servers_cache '
+                       'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
+                       'ORDER BY last_update DESC;'),
                 params=self.params, consistency_level=ConsistencyLevel.ONE),
              lambda i: query_result)])
-        dispatcher = ComposedDispatcher([sequence, base_dispatcher])
+        dispatcher = test_dispatcher(sequence)
         with sequence.consume():
             self.assertEqual(
                 sync_perform(dispatcher, self.cache.get_servers()),
@@ -3716,15 +3716,15 @@ class CassGroupServersCacheTests(SynchronousTestCase):
 
     def _test_insert_servers(self, eff):
         query = (
-            "BEGIN BATCH "
-            "INSERT INTO servers_cache (tenant_id, group_id, last_update, "
-            "server_id, server_blob) "
-            "VALUES(:tenant_id, :group_id, :last_update, :server_id0, "
-            ":server_blob0); "
-            "INSERT INTO servers_cache (tenant_id, group_id, last_update, "
-            "server_id, server_blob) "
-            "VALUES(:tenant_id, :group_id, :last_update, :server_id1, "
-            ":server_blob1); APPLY BATCH;")
+            'BEGIN BATCH '
+            'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
+            'server_id, server_blob) '
+            'VALUES(:tenantId, :groupId, :last_update, :server_id0, '
+            ':server_blob0); '
+            'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
+            'server_id, server_blob) '
+            'VALUES(:tenantId, :groupId, :last_update, :server_id1, '
+            ':server_blob1); APPLY BATCH;')
         self.params.update(
             {"server_id0": "a", "server_blob0": '{"id": "a"}',
              "server_id1": "b", "server_blob1": '{"id": "b"}',
@@ -3771,8 +3771,8 @@ class CassGroupServersCacheTests(SynchronousTestCase):
             self.cache.delete_servers(),
             Effect(
                 CQLQueryExecute(
-                    query=("DELETE FROM servers_cache WHERE "
-                           "tenant_id=:tenant_id AND group_id=:group_id;"),
+                    query=('DELETE FROM servers_cache WHERE '
+                           '"tenantId" = :tenantId AND "groupId" = :groupId'),
                     params=self.params,
                     consistency_level=ConsistencyLevel.ONE)))
 
