@@ -671,6 +671,7 @@ class CassScalingGroup(object):
         self.webhooks_table = "policy_webhooks"
         self.webhooks_keys_table = "webhook_keys"
         self.event_table = "scaling_schedule_v2"
+        self.servers_cache_table = "servers_cache"
 
     def with_timestamp(self, func):
         """
@@ -1274,7 +1275,8 @@ class CassScalingGroup(object):
 
             queries.extend([
                 _cql_delete_all_in_group.format(cf=table, name='') for table in
-                (self.policies_table, self.webhooks_table)])
+                (self.policies_table, self.webhooks_table,
+                 self.servers_cache_table)])
             queries.append(_cql_delete_group.format(cf=self.group_table))
             params.update({'tenantId': self.tenant_id,
                            'groupId': self.uuid,

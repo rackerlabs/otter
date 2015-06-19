@@ -1953,6 +1953,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'DELETE FROM policy_webhooks '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
 
+            'DELETE FROM servers_cache '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+
             'DELETE FROM scaling_group USING TIMESTAMP :ts '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
 
@@ -1998,6 +2001,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
 
             'DELETE FROM policy_webhooks '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+
+            'DELETE FROM servers_cache '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
 
             'DELETE FROM scaling_group USING TIMESTAMP :ts '
