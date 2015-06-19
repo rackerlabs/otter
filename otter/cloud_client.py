@@ -501,7 +501,7 @@ class NovaRateLimitError(Exception):
 
 
 @attributes([])
-class NovaComputFaultError(Exception):
+class NovaComputeFaultError(Exception):
     """
     Exception to be raised when there is a service failure from Nova.
     """
@@ -521,7 +521,7 @@ def set_nova_metadata_item(server_id, key, value):
     Succeed on 200.
 
     :raise: :class:`NoSuchServer`, :class:`MetadataOverLimit`,
-        :class:`NovaRateLimitError`, :class:`NovaComputFaultError`,
+        :class:`NovaRateLimitError`, :class:`NovaComputeFaultError`,
         :class:`APIError`
     """
     eff = service_request(
@@ -554,7 +554,7 @@ def get_server_details(server_id):
     Succeed on 200.
 
     :raise: :class:`NoSuchServer`, :class:`NovaRateLimitError`,
-        :class:`NovaComputFaultError`, :class:`APIError`
+        :class:`NovaComputeFaultError`, :class:`APIError`
     """
     eff = service_request(
         ServiceType.CLOUD_SERVERS,
@@ -575,5 +575,5 @@ def get_server_details(server_id):
 
 _nova_standard_errors = [
     (413, ('overLimit', 'message'), None, NovaRateLimitError),
-    (500, ('computeFault', 'message'), None, NovaComputFaultError)
+    (500, ('computeFault', 'message'), None, NovaComputeFaultError)
 ]
