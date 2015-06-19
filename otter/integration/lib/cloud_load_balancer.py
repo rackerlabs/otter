@@ -299,6 +299,28 @@ class CloudLoadBalancer(object):
         d.addCallback(self.treq.content)
         return d
 
+    def delete_nodes(self, rcs, node_ids):
+        """
+        Delete one or more nodes from a load balancer.
+
+        :param rcs: a :class:`otter.integration.lib.resources.TestResources`
+            instance
+
+        :param list node_ids: A list of `int` node ids to delete.
+
+        :return: An empty string if successful.
+        """
+        d = self.treq.delete(
+            "{0}/loadbalancers/{1}/nodes".format(
+                str(rcs.endpoints["loadbalancers"]), self.clb_id),
+            params=[('id', node_id) for node_id in node_ids],
+            headers=headers(str(rcs.token)),
+            pool=self.pool
+        )
+        d.addCallback(check_success, [202])
+        d.addCallback(self.treq.content)
+        return d
+
 
 HasLength = MatchesPredicateWithParams(
     lambda items, length: len(items) == length,

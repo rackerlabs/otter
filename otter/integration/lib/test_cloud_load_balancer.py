@@ -68,6 +68,19 @@ class CLBTests(SynchronousTestCase):
         d = clb.update_node(self.rcs, 54321, weight=5)
         self.assertEqual('', self.successResultOf(d))
 
+    def test_delete_nodes(self):
+        """
+        Deleting one or more nodes calls the right endpoint and succeeds on
+        202.
+        """
+        self.expected_kwargs['params'] = [("id", 11111), ("id", 22222)]
+        clb = self.get_clb(
+            'delete', 'clburl/loadbalancers/12345/nodes',
+            ((), self.expected_kwargs),
+            Response(202), '')
+        d = clb.delete_nodes(self.rcs, (11111, 22222))
+        self.assertEqual('', self.successResultOf(d))
+
 
 class WaitForNodesTestCase(SynchronousTestCase):
     """
