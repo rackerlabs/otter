@@ -10,7 +10,63 @@ from otter.integration.lib.cloud_load_balancer import (
     ContainsAllIPs,
     ExcludesAllIPs,
     HasLength)
+from otter.integration.lib.test_nova import Response, get_fake_treq
 from otter.util.deferredutils import TimedOutError
+from otter.util.http import headers
+
+
+class _FakeRCS(object):
+    endpoints = {'loadbalancers': 'clburl'}
+    token = "token"
+
+
+class CLBTests(SynchronousTestCase):
+    """
+    Tests for the :class:`CloudLoadBalancer` API calls.
+    """
+    def setUp(self):
+        """
+        Set up fake pool, treq, responses, and RCS.
+        """
+        self.pool = object()
+        self.rcs = _FakeRCS()
+        self.server_id = 'server_id'
+        self.expected_kwargs = {
+            'headers': headers('token'),
+            'pool': self.pool
+        }
+
+    def get_clb(self, method, url, treq_args_kwargs, response, str_body):
+        """
+        Stub out treq, and return a cloud load balancer
+        """
+        clb = CloudLoadBalancer(
+            pool=self.pool,
+            treq=get_fake_treq(self, method, url, treq_args_kwargs,
+                               (response, str_body)))
+        clb.clb_id = 12345
+        return clb
+
+    def test_list_nodes(self):
+        """
+        Listing nodes calls the right endpoint and succeeds on 200.
+        """
+        clb = self.get_clb('get', 'clburl/loadbalancers/12345/nodes',
+                           ((), self.expected_kwargs),
+                           Response(200), '{"nodes": []}')
+        d = clb.list_nodes(self.rcs)
+        self.assertEqual({'nodes': []}, self.successResultOf(d))
+
+    def test_update_node(self):
+        """
+        Update node calls the right endpoint and succeeds on 202.
+        """
+        clb = self.get_clb(
+            'put', 'clburl/loadbalancers/12345/nodes/54321',
+            (('{"node": {"weight": 5}}',), self.expected_kwargs),
+            Response(202), '')
+        d = clb.update_node(self.rcs, 54321, weight=5)
+        self.assertEqual('', self.successResultOf(d))
 
 
 class WaitForNodesTestCase(SynchronousTestCase):
@@ -26,13 +82,6 @@ class WaitForNodesTestCase(SynchronousTestCase):
         self.clock = Clock()
         self.get_calls = 0
 
-        class FakeRCS(object):
-            endpoints = {'loadbalancers': 'clburl'}
-            token = "token"
-
-        class Resp(object):
-            code = 200
-
         class FakeTreq(object):
             @classmethod
             def get(cls, url, headers, pool):
@@ -42,13 +91,13 @@ class WaitForNodesTestCase(SynchronousTestCase):
                 self.assertEqual(['clburl', 'loadbalancers', 'clb_id',
                                   'nodes'],
                                  url.split('/'))
-                return succeed(Resp())
+                return succeed(Response(200))
 
             @classmethod
             def json_content(cls, resp):
                 return succeed(self.nodes)
 
-        self.rcs = FakeRCS()
+        self.rcs = _FakeRCS()
         self.clb = CloudLoadBalancer(pool=self.pool, treq=FakeTreq)
         self.clb.clb_id = 'clb_id'
 

@@ -10,8 +10,7 @@ from effect import (
     Effect,
     ParallelEffects,
     TypeDispatcher,
-    sync_perform,
-    sync_performer)
+    sync_perform)
 
 from effect.async import perform_parallel_async
 from effect.testing import EQDispatcher, EQFDispatcher, Stub
@@ -47,7 +46,7 @@ from otter.test.utils import (
     resolve_stubs
 )
 from otter.util.retry import (
-    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
+    ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import timestamp_to_epoch
 
 
@@ -350,7 +349,7 @@ class GetCLBContentsTests(SynchronousTestCase):
                 {'id': '21', 'port': 20, 'address': 'a21',
                  'weight': 3, 'condition': 'ENABLED', 'type': 'PRIMARY'},
                 {'id': '22', 'port': 20, 'address': 'a22',
-                 'weight': 3, 'condition': 'DRAINING', 'type': 'PRIMARY'}]},
+                 'condition': 'DRAINING', 'type': 'PRIMARY'}]},
             ('GET', 'loadbalancers/1/nodes/11.atom', False): '11feed',
             ('GET', 'loadbalancers/2/nodes/22.atom', False): '22feed'
         }
@@ -422,7 +421,7 @@ class GetCLBContentsTests(SynchronousTestCase):
                      address='a22',
                      drained_at=2.0,
                      description=make_desc(lb_id='2',
-                                           weight=3,
+                                           weight=1,
                                            condition=draining))])
 
     def test_no_lb(self):
@@ -483,22 +482,12 @@ class GetRCv3ContentsTests(SynchronousTestCase):
         Set up an empty dictionary of intents to fake responses, and set up
         the dispatcher.
         """
-        @sync_performer
-        def unwrap_retry(_, retry_intent):
-            self.assertEqual(
-                retry_intent.should_retry,
-                ShouldDelayAndRetry(
-                    can_retry=retry_times(5),
-                    next_interval=exponential_backoff_interval(2)))
-            return retry_intent.effect
-
         eq_dispatcher = EQDispatcher
         if callable(service_request_mappings[0][-1]):
             eq_dispatcher = EQFDispatcher
 
         return ComposedDispatcher([
             TypeDispatcher({
-                Retry: unwrap_retry,
                 ParallelEffects: perform_parallel_async
             }),
             eq_dispatcher(service_request_mappings)

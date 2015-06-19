@@ -27,7 +27,7 @@ from otter.integration.lib.autoscale import (
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
 from otter.integration.lib.identity import IdentityV2
-from otter.integration.lib.mimic import MimicCLB, MimicNova
+from otter.integration.lib.mimic import MimicCLB, MimicIdentity, MimicNova
 from otter.integration.lib.nova import (
     NovaServer, delete_servers, wait_for_servers)
 from otter.integration.lib.resources import TestResources
@@ -46,6 +46,10 @@ otter_key = os.environ.get('AS_AUTOSCALE_SC_KEY', 'autoscale')
 otter_url = os.environ.get('AS_AUTOSCALE_LOCAL_URL')
 nova_key = os.environ.get('AS_NOVA_SC_KEY', 'cloudServersOpenStack')
 clb_key = os.environ.get('AS_CLB_SC_KEY', 'cloudLoadBalancers')
+
+# if this is None, the test will be skipped
+convergence_tenant_auth_errors = os.environ.get(
+    'AS_CONVERGENCE_TENANT_FOR_AUTH_ERRORS')
 
 # these are the service names for mimic control planes
 mimic_nova_key = os.environ.get("MIMICNOVA_SC_KEY", 'cloudServersBehavior')
@@ -868,7 +872,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             criteria=[{"server_name": server_name_prefix + ".*"}],
             behaviors=[
                 {"name": "build",
-                 "parameters": {"duration": otter_build_timeout * 2}},
+                 "parameters": {"duration": otter_build_timeout * 3000}},
                 {"name": "default"},
                 {"name": "default"}
             ])
@@ -996,6 +1000,45 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
     @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-024")
     @inlineCallbacks
+    def test_recovers_from_nova_intermittent_errors(self):
+        """
+        CATC-024
+
+        Nova will return 401 (unauthorized), then a 500 (compute fault),
+        then succeed (over and over) on every create server call.
+
+        Autoscale should be able to recover from these failures by retrying.
+        """
+        group, server_name_prefix = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=2, max_entities=10,
+            server_name_prefix="intermittent-errors"
+        )
+
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        yield mimic_nova.sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": server_name_prefix + ".*"}],
+            behaviors=[
+                {"name": "fail",
+                 "parameters": {"code": 401,  # simulate 401-no-body errors
+                                "type": "string",
+                                "message": ""}},
+                {"name": "fail",
+                 "parameters": {"code": 500,
+                                "type": "computeFault",
+                                "message": "Oops!."}},
+                {"name": "default"}
+            ])
+
+        group, _ = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=2,
+            max_entities=10)
+        yield self.helper.start_group_and_wait(group, self.rcs, desired=5)
+
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
+    @tag("CATC-024")
+    @inlineCallbacks
     def test_various_nova_40xs(self):
         """
         CATC-024
@@ -1087,6 +1130,71 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                     'status': Equals("ACTIVE")
                 }),
             ), timeout=600)
+
+    @skip_if(lambda: not convergence_tenant_auth_errors,
+             "If a convergence tenant for auth error testing is not provided, "
+             "this test is invalid.")
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
+    @tag("CATC-026")
+    @inlineCallbacks
+    def test_recover_from_identity_auth_failures(self):
+        """
+        CATC-026
+
+        Identity, when someone attempts to impersonate the test user, will
+        first fail with a 401, then fail with a 500, then succeed, over and
+        over in a loop.  (Otter will probably only make a single cycle through
+        the sequence, but it shouldn't make a difference either way.)
+
+        Otter retries and recovers and there should be no outward sign that
+        anything is broken.
+
+        Note that this uses a tenant that hopefully has not been used before.
+        This is to prevent the case where Otter has cached the creds already,
+        and won't actually impersonate the user again.
+
+        Also, this way this test is independent of (will not break) any other
+        test.
+
+        If the tenant is not provided, this test is skipped.
+        """
+        # re-authenticate as this new user, not the original user
+        rcs = TestResources()
+        new_username = random_string()
+        identity = IdentityV2(
+            auth=auth, username=new_username, password="random_password",
+            endpoint=endpoint, pool=self.helper.pool,
+            convergence_tenant_override=convergence_tenant_auth_errors
+        )
+        yield identity.authenticate_user(
+            rcs,
+            resources={
+                "otter": (otter_key, otter_url),
+                "nova": (nova_key,)
+            },
+            region=region
+        )
+
+        # inject behavior errors for this user, so that when otter
+        # impersonates, it gets failures
+        mimic_identity = MimicIdentity(pool=self.helper.pool, test_case=self)
+        yield mimic_identity.sequenced_behaviors(
+            endpoint,
+            criteria=[{"username": new_username + ".*"}],
+            behaviors=[
+                {"name": "fail",
+                 "parameters": {"code": 500,
+                                "message": "Authentication failed."}},
+                {"name": "fail",
+                 "parameters": {"code": 401,
+                                "message": "Invalid credentials."}},
+                {"name": "default"}
+            ])
+
+        group, _ = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=2,
+            max_entities=10)
+        yield self.helper.start_group_and_wait(group, rcs, desired=5)
 
 
 def _catc_tags(start_num, end_num):
@@ -1322,7 +1430,6 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             )
         )
 
-    @skip_me("Skipped until this error transition is fixed in Otter #1475")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-023")
     def test_scale_up_when_pending_delete(self):

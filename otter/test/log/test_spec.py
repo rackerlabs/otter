@@ -85,6 +85,17 @@ class GetValidatedEventTests(SynchronousTestCase):
         e = {'isError': True, 'a': 'b'}
         self.assertEqual(get_validated_event(e), e)
 
+    def test_error_no_why_but_message(self):
+        """
+        When error-based event does not have "why", then its message is tried
+        """
+        e = {'isError': True, 'a': 'b', "message": ('delete-server',)}
+        self.assertEqual(
+            get_validated_event(e),
+            {'message': ('Deleting {server_id} server',), 'isError': True,
+             'why': 'Deleting {server_id} server',
+             'a': 'b', 'otter_msg_type': 'delete-server'})
+
     def test_msg_not_found(self):
         """
         Event is not changed if msg_type is not found

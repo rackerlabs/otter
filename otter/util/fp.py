@@ -4,6 +4,8 @@
 
 from copy import deepcopy
 
+from pyrsistent import freeze, pmap
+
 from toolz.itertoolz import groupby
 
 
@@ -86,3 +88,47 @@ def assoc_obj(o, **k):
     new_o = deepcopy(o)
     new_o.__dict__.update(k)
     return new_o
+
+
+def set_in(mapping, keys, new_value):
+    """
+    Take the old dictionary and traverses the dictionary via the list of
+    keys.  The returned dictionary will be the same as the old dictionary,
+    but with the resultant value set as ``new_value``.
+
+    Note that if more than 1 key is passed, and any of the keys (except for the
+    last) do not already exist, raises KeyError or IndexError.
+
+    Note that the new value does not need to be a pyrsistent data structure -
+    this function will freeze everything first.
+
+    :param dict mapping: The dictionary to change values for.
+    :param iterable keys: An ordered collection of keys
+    :param new_value: The value to set the keys to
+
+    :return: A copy of the old dictionary as PMap, with the new value.
+    """
+    if len(keys) < 1:
+        raise ValueError("Must provide one or more keys")
+
+    if isinstance(mapping, dict):
+        mapping = freeze(mapping)
+
+    if len(keys) == 1:
+        return mapping.set(keys[0], freeze(new_value))
+    else:
+        child = mapping.get(keys[0], pmap())
+        return mapping.set(keys[0], set_in(child, keys[1:], new_value))
+
+
+def take_while(pred, items):
+    """
+    Returns the longest prefix (possibly empty) of items of elements that
+    satisfy pred. Similar to `takeWhile` in Haskell
+
+    :param callable pred: item -> Bool predicate function
+    :param list items: List of items to extract from
+    """
+    for item in items:
+        if pred(item):
+            yield item

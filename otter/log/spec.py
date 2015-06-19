@@ -16,16 +16,10 @@ msg_types = {
         "Fatal error while converging group {scaling_group_id}."),
     "converge-non-fatal-error": (
         "Non-fatal error while converging group {scaling_group_id}"),
-    "cf-add-failure": "Failed to add event to cloud feeds",
-    "cf-unsuitable-message": (
-        "Tried to add unsuitable message in cloud feeds: "
-        "{unsuitable_message}"),
     "delete-server": "Deleting {server_id} server",
     "execute-convergence": "Executing convergence",
     "execute-convergence-results": (
         "Got result of {worst_status} after executing convergence"),
-    "group-status-active": "Group's status is changed to ACTIVE",
-    "group-status-error": "Group's status is changed to ERROR",
     "launch-servers": "Launching {num_servers} servers",
     "mark-clean-success": "Marked group {scaling_group_id} clean",
     "mark-clean-failure": "Failed to mark group {scaling_group_id} clean",
@@ -33,6 +27,29 @@ msg_types = {
     "mark-dirty-failure": "Failed to mark group {scaling_group_id} dirty",
     "remove-server-clb": ("Removing server {server_id} with IP address "
                           "{ip_address} from CLB {clb_id}"),
+
+    # CF-published log messages
+    "cf-add-failure": "Failed to add event to cloud feeds",
+    "cf-unsuitable-message": (
+        "Tried to add unsuitable message in cloud feeds: "
+        "{unsuitable_message}"),
+    "convergence-create-servers":
+        "Creating {num_servers} with config {server_config}",
+    "convergence-delete-servers": "Deleting {servers}",
+    "convergence-add-clb-nodes":
+        "Adding IPs to CLB {lb_id}: {addresses}",
+    "convergence-remove-clb-nodes":
+        "Removing nodes from CLB {lb_id}: {nodes}",
+    "convergence-change-clb-nodes":
+        "Changing nodes on CLB {lb_id}: nodes={nodes}, type={type}, "
+        "condition={condition}, weight={weight}",
+    "convergence-add-rcv3-nodes":
+        "Adding servers to RCv3 LB {lb_id}: {servers}",
+    "convergence-remove-rcv3-nodes":
+        "Removing servers from RCv3 LB {lb_id}: {servers}",
+    "group-status-active": "Group's status is changed to ACTIVE",
+    "group-status-error":
+        "Group's status is changed to ERROR. Reasons: {reasons}",
 }
 
 
@@ -44,6 +61,22 @@ def error_event(event, failure, why):
             "why": why, "original_event": event, "message": ()}
 
 
+class MsgTypeNotFound(Exception):
+    """
+    Raised when msg_type is not found
+    """
+
+
+def try_msg_types(*tries):
+    """
+    Try series of msg_types
+    """
+    for msg_type in tries:
+        if msg_type in msg_types:
+            return msg_types[msg_type], msg_type
+    raise MsgTypeNotFound
+
+
 def get_validated_event(event):
     """
     Validate event's message as per msg_types and error details as
@@ -52,26 +85,26 @@ def get_validated_event(event):
     :return: Validated event
     :raises: `ValueError` or `TypeError` if `event_dict` is not valid
     """
-    # Is this message speced?
-    if event.get('isError', False):
-        msg_type = event.get("why", None)
-        msg = msg_types.get(msg_type, None)
-        if msg is None:
-            return event
-        validate_error(event)
-        event['why'] = msg
-    else:
+    try:
         # message is tuple of strings
-        msg_type = ''.join(event["message"])
-        msg = msg_types.get(msg_type, None)
-        if msg is None:
-            return event
-        event["message"] = (msg, )
+        message = ''.join(event.get("message", []))
 
-    # TODO: Validate non-primitive fields
+        # Is this message speced?
+        if event.get('isError', False):
+            expanded, msg_type = try_msg_types(event.get("why", None), message)
+            validate_error(event)
+            event['why'] = expanded
+            if message:
+                event['message'] = (expanded,)
+        else:
+            expanded, msg_type = try_msg_types(message)
+            event["message"] = (expanded, )
 
-    event["otter_msg_type"] = msg_type
-    return event
+        # TODO: Validate non-primitive fields
+        event["otter_msg_type"] = msg_type
+        return event
+    except MsgTypeNotFound:
+        return event
 
 
 def SpecificationObserverWrapper(observer,

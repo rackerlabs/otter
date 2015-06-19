@@ -21,8 +21,8 @@ from otter.cloud_client import (
     service_request,
     set_nova_metadata_item)
 from otter.constants import ServiceType
-from otter.convergence.model import StepResult
-from otter.util.fp import predicate_any
+from otter.convergence.model import ErrorReason, StepResult
+from otter.util.fp import predicate_any, set_in
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.retry import (
@@ -38,7 +38,12 @@ class IStep(Interface):
     """
 
     def as_effect():
-        """Return an Effect which performs this step."""
+        """
+        Return an Effect which performs this step.
+
+        :return: A two-tuple of a :obj:`StepResult` and a list of
+        :obj:`ErrorReason`s.
+        """
 
 
 def set_server_name(server_config_args, name_suffix):
@@ -55,7 +60,7 @@ def set_server_name(server_config_args, name_suffix):
         name = '{0}-{1}'.format(name, name_suffix)
     else:
         name = name_suffix
-    return server_config_args.set_in(('server', 'name'), name)
+    return set_in(server_config_args, ('server', 'name'), name)
 
 
 def _forbidden_plaintext(message):
@@ -73,6 +78,7 @@ _NOVA_403_RACKCONNECT_NETWORK_REQUIRED = _forbidden_plaintext(
 
 
 def _parse_nova_user_error(api_error):
+    # TODO: Move this to cloud_client.py
     """
     Parse API errors for user failures on creating a server.
 
@@ -132,7 +138,8 @@ class CreateServer(object):
             a while, and we need to retry convergence to ensure it goes into
             active.
             """
-            return StepResult.RETRY, ['waiting for server to become active']
+            return StepResult.RETRY, [
+                ErrorReason.String('waiting for server to become active')]
 
         def report_failure(result):
             """
@@ -145,9 +152,9 @@ class CreateServer(object):
             if err_type == APIError:
                 message = _parse_nova_user_error(error)
                 if message is not None:
-                    return StepResult.FAILURE, [message]
+                    return StepResult.FAILURE, [ErrorReason.String(message)]
 
-            return StepResult.RETRY, [error]
+            return StepResult.RETRY, [ErrorReason.Exception(result)]
 
         return eff.on(got_name).on(success=report_success,
                                    error=report_failure)
@@ -221,8 +228,9 @@ class DeleteServer(object):
 
         def report_success(result):
             return StepResult.RETRY, [
-                'must re-gather after deletion in order to update the active '
-                'cache']
+                ErrorReason.String(
+                    'must re-gather after deletion in order to update the '
+                    'active cache')]
 
         return eff.on(success=report_success)
 
@@ -332,8 +340,9 @@ class AddNodesToCLB(object):
 
         def report_success(result):
             return StepResult.RETRY, [
-                'must re-gather after adding to CLB in order to update the '
-                'active cache']
+                ErrorReason.String(
+                    'must re-gather after adding to CLB in order to update '
+                    'the active cache')]
 
         def report_api_failure(result):
             """
@@ -342,12 +351,14 @@ class AddNodesToCLB(object):
             """
             err_type, error, traceback = result
             if error.code == 404:
-                return StepResult.FAILURE, [error]
+                return StepResult.FAILURE, [
+                    ErrorReason.Exception(result)]
             if error.code == 422:
                 message = try_json_with_keys(error.body, ("message",))
                 if message and _CLB_DELETED_PATTERN.search(message):
-                    return StepResult.FAILURE, [error]
-            return StepResult.RETRY, [error]
+                    return StepResult.FAILURE, [
+                        ErrorReason.Exception(result)]
+            return StepResult.RETRY, [ErrorReason.Exception(result)]
 
         return eff.on(success=report_success,
                       error=catch(APIError, report_api_failure))
@@ -460,9 +471,10 @@ def _clb_check_change_node_retry_on_404(step, result):
     """
     When updating a node results in a 404, convergence should be retried.
     """
-    return StepResult.RETRY, [{'reason': 'CLB node not found',
-                               'lb': step.lb_id,
-                               'node': step.node_id}]
+    return StepResult.RETRY, [
+        ErrorReason.Structured({'reason': 'CLB node not found',
+                                'lb': step.lb_id,
+                                'node': step.node_id})]
 
 
 _clb_check_change_node_handlers = {
@@ -554,8 +566,8 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
 
     if response.code == 201:  # All done!
         return StepResult.RETRY, [
-            'must re-gather after adding to LB in order to update the active '
-            'cache']
+            ErrorReason.String('must re-gather after adding to LB in order to '
+                               'update the active cache')]
 
     failure_reasons = []
     to_retry = pset(attempted_pairs)

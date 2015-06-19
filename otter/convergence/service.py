@@ -5,6 +5,7 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 :obj:`Converger`.
 """
 
+import operator
 import time
 import uuid
 from functools import partial
@@ -29,7 +30,9 @@ from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
+from otter.convergence.errors import present_reasons, structure_reason
 from otter.convergence.gathering import get_all_convergence_data
+from otter.convergence.logging import log_steps
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
@@ -127,6 +130,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     desired_group_state = get_desired_group_state(
         group_id, launch_config, desired_capacity)
     steps = plan(desired_group_state, servers, lb_nodes, now, build_timeout)
+    yield log_steps(steps)
     active = determine_active(servers, lb_nodes)
     yield msg('execute-convergence',
               servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
@@ -138,13 +142,18 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         yield do_return(StepResult.SUCCESS)
     results = yield steps_to_effect(steps)
 
+    all_reasons = reduce(operator.add, (x[1] for x in results))
     severity = [StepResult.FAILURE, StepResult.RETRY, StepResult.SUCCESS]
     priority = sorted(results,
                       key=lambda (status, reasons): severity.index(status))
     worst_status = priority[0][0]
+    results_to_log = zip(
+        steps,
+        [(result, map(structure_reason, reasons))
+         for result, reasons in results])
     yield msg('execute-convergence-results',
-              results=zip(steps, results),
-              worst_status=worst_status)
+              results=results_to_log,
+              worst_status=worst_status.name)
 
     if worst_status == StepResult.SUCCESS:
         if group_state.status == ScalingGroupStatus.DELETING:
@@ -159,7 +168,8 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))
         yield cf_err(
-            'group-status-error', status=ScalingGroupStatus.ERROR.name)
+            'group-status-error', status=ScalingGroupStatus.ERROR.name,
+            reasons='; '.join(sorted(present_reasons(all_reasons))))
 
     yield do_return(worst_status)
 
@@ -437,17 +447,18 @@ class Converger(MultiService):
     - we ensure we don't execute convergence for the same group concurrently.
     """
 
-    def __init__(self, log, dispatcher, buckets, partitioner_factory,
+    def __init__(self, log, dispatcher, num_buckets, partitioner_factory,
                  build_timeout, converge_all_groups=converge_all_groups):
         """
         :param log: a bound log
         :param dispatcher: The dispatcher to use to perform effects.
-        :param buckets: collection of logical `buckets` which are shared
-            between all Otter nodes running this service. Will be partitioned
-            up between nodes to detirmine which nodes should work on which
-            groups.
-        :param partitioner_factory: Callable of (log, callback) which should
-            create an :obj:`Partitioner` to distribute the buckets.
+        :param int buckets: the number of logical `buckets` which are be
+            shared between all Otter nodes running this service. The buckets
+            will be partitioned up between nodes to detirmine which nodes
+            should work on which groups.
+        :param partitioner_factory: Callable of (all_buckets, log, callback)
+            which should create an :obj:`Partitioner` to distribute the
+            buckets.
         :param number build_timeout: number of seconds to wait for servers to
             be in building before it's is timed out and deleted
         :param callable converge_all_groups: like :func:`converge_all_groups`,
@@ -456,8 +467,10 @@ class Converger(MultiService):
         MultiService.__init__(self)
         self.log = log.bind(otter_service='converger')
         self._dispatcher = dispatcher
-        self._buckets = buckets
-        self.partitioner = partitioner_factory(self.log, self.buckets_acquired)
+        self._buckets = range(num_buckets)
+        self.partitioner = partitioner_factory(
+            buckets=self._buckets, log=self.log,
+            got_buckets=self.buckets_acquired)
         self.partitioner.setServiceParent(self)
         self.currently_converging = Reference(pset())
         self.build_timeout = build_timeout
