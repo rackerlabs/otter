@@ -74,7 +74,7 @@ def svc_request_args(**params):
     """
     Return service request args with formatted changes_since argument in it
     """
-    changes_since = params.get('changes-since', None)
+    changes_since = params.pop('changes_since', None)
     if changes_since is not None:
         params['changes-since'] = changes_since.isoformat() + 'Z'
     return (ServiceType.CLOUD_SERVERS, 'GET',
@@ -195,7 +195,7 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         svcreq = resolve_retry_stubs(eff)
         result = resolve_svcreq(
             svcreq, (fake_response, body),
-            *svc_request_args(**{'changes-since': since, 'limit': 10}))
+            *svc_request_args(changes_since=since, limit=10))
         self.assertEqual(result, self.servers)
 
     def test_retry(self):
@@ -228,7 +228,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         body = {'servers': []}
         result = resolve_svcreq(
             eff, (fake_response, body),
-            *svc_request_args(**{'changes-since': since, 'limit': 100}))
+            *svc_request_args(changes_since=since, limit=100))
         self.assertEqual(result, {})
 
     def test_filters_no_metadata(self):
