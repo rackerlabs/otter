@@ -16,6 +16,7 @@ class Response(object):
     """Fake response object"""
     def __init__(self, code):
         self.code = code
+        self.headers = {}
 
 
 def get_fake_treq(test_case, method, url, expected_args_and_kwargs, response):

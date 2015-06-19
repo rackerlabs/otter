@@ -1,4 +1,6 @@
 """Tests for :mod:`otter.integration.lib.cloud_load_balancer`"""
+import json
+
 from testtools.matchers import Equals
 
 from twisted.internet.defer import succeed
@@ -12,7 +14,7 @@ from otter.integration.lib.cloud_load_balancer import (
     HasLength)
 from otter.integration.lib.test_nova import Response, get_fake_treq
 from otter.util.deferredutils import TimedOutError
-from otter.util.http import headers
+from otter.util.http import APIError, headers
 
 
 class _FakeRCS(object):
@@ -68,18 +70,81 @@ class CLBTests(SynchronousTestCase):
         d = clb.update_node(self.rcs, 54321, weight=5)
         self.assertEqual('', self.successResultOf(d))
 
-    def test_delete_nodes(self):
+    def test_delete_nodes_retries_until_success(self):
         """
         Deleting one or more nodes calls the right endpoint and succeeds on
         202.
         """
+        clock = Clock()
+        self.expected_kwargs['params'] = [("id", 11111), ("id", 22222)]
+        main_treq_args = ['delete', 'clburl/loadbalancers/12345/nodes',
+                          ((), self.expected_kwargs)]
+
+        pending_update = {
+            "message": ("Load Balancer '12345' has a status of "
+                        "'PENDING_UPDATE' and is considered immutable."),
+            "code": 422
+        }
+
+        clb = self.get_clb(
+            *(main_treq_args + [Response(422), json.dumps(pending_update)]))
+
+        d = clb.delete_nodes(self.rcs, (11111, 22222), clock=clock)
+        self.assertNoResult(d)
+        clock.pump([3])
+        self.assertNoResult(d)
+
+        clb.treq = get_fake_treq(
+            *([self] + main_treq_args + [(Response(202), "")]))
+
+        clock.pump([3])
+        self.assertEqual(self.successResultOf(d), "")
+
+    def test_delete_nodes_retries_until_timeout(self):
+        """
+        If the CLB is in PENDING_UPDATE state, retries executing the delete
+        every 3 seconds until it times out at 60 seconds.
+        """
+        clock = Clock()
+        pending_update = {
+            "message": ("Load Balancer '12345' has a status of "
+                        "'PENDING_UPDATE' and is considered immutable."),
+            "code": 422
+        }
         self.expected_kwargs['params'] = [("id", 11111), ("id", 22222)]
         clb = self.get_clb(
             'delete', 'clburl/loadbalancers/12345/nodes',
             ((), self.expected_kwargs),
-            Response(202), '')
-        d = clb.delete_nodes(self.rcs, (11111, 22222))
-        self.assertEqual('', self.successResultOf(d))
+            Response(422), json.dumps(pending_update))
+
+        d = clb.delete_nodes(self.rcs, (11111, 22222), clock=clock)
+
+        self.assertNoResult(d)
+        clock.pump([3])
+        self.assertNoResult(d)
+        clock.pump([3] * 19)
+        self.failureResultOf(d, TimedOutError)
+
+    def test_delete_nodes_fails_on_non_422_PENDING_UDPATE(self):
+        """
+        If the CLB is in PENDING_UPDATE state, retries executing the delete
+        every 3 seconds until it times out at 60 seconds.
+        """
+        clock = Clock()
+        pending_update = {
+            "message": ("Load Balancer '12345' has a status of "
+                        "'PENDING_DELETE' and is considered immutable."),
+            "code": 422
+        }
+        self.expected_kwargs['params'] = [("id", 11111), ("id", 22222)]
+        clb = self.get_clb(
+            'delete', 'clburl/loadbalancers/12345/nodes',
+            ((), self.expected_kwargs),
+            Response(422), json.dumps(pending_update))
+
+        d = clb.delete_nodes(self.rcs, (11111, 22222), clock=clock)
+
+        self.failureResultOf(d, APIError)
 
 
 class WaitForNodesTestCase(SynchronousTestCase):
