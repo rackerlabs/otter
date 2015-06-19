@@ -423,6 +423,18 @@ class TimestampTests(SynchronousTestCase):
             timestamp.timestamp_to_epoch('2015-05-01T04:51:12.078580Z'),
             1430455872.078580)
 
+    def test_datetime_to_epoch(self):
+        """
+        `datetime_to_epoch` returns EPOCH seconds for given datetime
+        """
+        self.assertEqual(
+            timestamp.datetime_to_epoch(datetime(1970, 1, 1, 0, 0, 0)),
+            0.0)
+        self.assertEqual(
+            timestamp.datetime_to_epoch(
+                datetime(2015, 5, 1, 4, 51, 12, 78580)),
+            1430455872.078580)
+
 
 class ConfigTest(SynchronousTestCase):
     """
