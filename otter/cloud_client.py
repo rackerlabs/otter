@@ -500,6 +500,13 @@ class NovaRateLimitError(Exception):
     """
 
 
+@attributes([])
+class NovaComputFaultError(Exception):
+    """
+    Exception to be raised when there is a service failure from Nova.
+    """
+
+
 _MAX_METADATA_PATTERN = re.compile('^Maximum number of metadata items .*$')
 
 
