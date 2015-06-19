@@ -8,7 +8,7 @@ from functools import partial, wraps
 from inspect import getargspec
 
 from effect import (
-    ComposedDispatcher, ParallelEffects, TypeDispatcher,
+    ComposedDispatcher, Effect, ParallelEffects, TypeDispatcher,
     base_dispatcher, sync_perform, sync_performer)
 from effect.async import perform_parallel_async
 from effect.testing import (
@@ -848,3 +848,31 @@ class TestStep(object):
 def noop(_):
     """Ignore input and return None."""
     pass
+
+
+def intent_func(fname):
+    """
+    Return function that returns Effect of tuple of fname and its args. Useful
+    in writing tests that expect intent based on args
+    """
+    return lambda *a: Effect((fname,) + a)
+
+
+class Cache(object):
+    """ IScalingGroupServersCache impl for testing """
+
+    def __init__(self, tid, gid):
+        self.tid = tid
+        self.gid = gid
+
+    def ids(self, s):
+        return "cache" + s + self.tid + self.gid
+
+    def get_servers(self):
+        return Effect(self.ids("gs"))
+
+    def insert_servers(self, time, servers, clear):
+        return Effect((self.ids("is"), time, servers, clear))
+
+    def delete_servers(self):
+        return Effect(self.ids("ds"))

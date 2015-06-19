@@ -6,8 +6,8 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 """
 
 import operator
-import time
 import uuid
+from datetime import datetime
 from functools import partial
 from hashlib import sha1
 
@@ -32,15 +32,16 @@ from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.errors import present_reasons, structure_reason
 from otter.convergence.gathering import get_all_convergence_data
-from otter.convergence.logging import log_steps
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, with_log
+from otter.models.cass import CassScalingGroupServersCache
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.fp import assoc_obj
+from otter.util.timestamp import datetime_to_epoch
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 
@@ -94,7 +95,7 @@ def _update_active(scaling_group, active):
 @do
 def execute_convergence(tenant_id, group_id, build_timeout,
                         get_all_convergence_data=get_all_convergence_data,
-                        plan=plan):
+                        plan=plan, cache_class=CassScalingGroupServersCache):
     """
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
@@ -114,7 +115,8 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     # fetching of the scaling group info from cassandra.
     sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
                                         group_id=group_id))
-    gather_eff = get_all_convergence_data(group_id)
+    now_dt = yield Effect(Func(datetime.utcnow))
+    gather_eff = get_all_convergence_data(tenant_id, group_id, now_dt)
     try:
         data = yield parallel([sg_eff, gather_eff])
     except FirstError as fe:
@@ -123,17 +125,16 @@ def execute_convergence(tenant_id, group_id, build_timeout,
 
     group_state = manifest['state']
     launch_config = manifest['launchConfiguration']
-    now = yield Effect(Func(time.time))
 
     desired_capacity = (0 if group_state.status == ScalingGroupStatus.DELETING
                         else group_state.desired)
     desired_group_state = get_desired_group_state(
         group_id, launch_config, desired_capacity)
-    steps = plan(desired_group_state, servers, lb_nodes, now, build_timeout)
-    yield log_steps(steps)
+    steps = plan(desired_group_state, servers, lb_nodes,
+                 datetime_to_epoch(now_dt), build_timeout)
     active = determine_active(servers, lb_nodes)
     yield msg('execute-convergence',
-              servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
+              servers=servers, lb_nodes=lb_nodes, steps=steps, now=now_dt,
               desired=desired_group_state, active=active)
     # Since deleting groups are not publicly visible
     if group_state.status != ScalingGroupStatus.DELETING:
@@ -155,15 +156,25 @@ def execute_convergence(tenant_id, group_id, build_timeout,
               results=results_to_log,
               worst_status=worst_status.name)
 
+    cache = cache_class(tenant_id, group_id)
     if worst_status == StepResult.SUCCESS:
         if group_state.status == ScalingGroupStatus.DELETING:
             # servers have been deleted. Delete the group for real
             yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
+            # Delete the cache too
+            yield cache.delete_servers()
         elif group_state.status == ScalingGroupStatus.ERROR:
             yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                            status=ScalingGroupStatus.ACTIVE))
             yield cf_msg('group-status-active',
                          status=ScalingGroupStatus.ACTIVE.name)
+        else:
+            # Clear servers cache and update it with latest servers
+            yield cache.insert_servers(
+                now_dt,
+                [thaw(s.json) for s in servers
+                 if s.state != ServerState.DELETED],
+                True)
     elif worst_status == StepResult.FAILURE:
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))
