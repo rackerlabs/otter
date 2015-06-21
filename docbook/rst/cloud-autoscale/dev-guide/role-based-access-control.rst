@@ -33,7 +33,7 @@ how to perform the following tasks:
 
 -  `Create account users`_
 
--  `Assign roles to account users`__
+-  `Assign roles to account users`_
 
 -  `Delete roles from account users`_
 
@@ -60,17 +60,17 @@ permissions.
 
 **Table: Auto Scale Product Roles and Capabilities**
 
-+--------------------------------------+--------------------------------------+
-| Role Name                            | Role Permissions                     |
-+======================================+======================================+
-| ``autoscale:admin``                  | This role provides Create, Read,     |
-|                                      | Update, and Delete permissions in    |
-|                                      | Auto Scale, where access is granted  |
-+--------------------------------------+--------------------------------------+
-| ``autoscale:observer``               | This role provides Read permission   |
-|                                      | in Auto Scale, where access is       |
-|                                      | granted                              |
-+--------------------------------------+--------------------------------------+
++--------------------------------------+-------------------------------------+
+| Role Name                            | Role Permissions                    |
++======================================+=====================================+
+| ``autoscale:admin``                  | This role provides Create, Read,    |
+|                                      | Update, and Delete permissions in   |
+|                                      | Auto Scale, where access is granted |
++--------------------------------------+-------------------------------------+
+| ``autoscale:observer``               | This role provides Read permission  |
+|                                      | in Auto Scale, where access is      |
+|                                      | granted                             |
++--------------------------------------+-------------------------------------+
 
 
 Additionally, two multiproduct roles apply to all products. Users with
@@ -80,16 +80,16 @@ permissions.
 
 **Table: Multiproduct (Global) Roles and Capabilities**
 
-+--------------------------------------+--------------------------------------+
-| Role Name                            | Role Permissions                     |
-+======================================+======================================+
-| ``admin``                            | Create, Read, Update, and Delete     |
-|                                      | permissions across multiple          |
-|                                      | products, where access is granted    |
-+--------------------------------------+--------------------------------------+
-| ``observer``                         | Read permission across multiple      |
-|                                      | products, where access is granted    |
-+--------------------------------------+--------------------------------------+
++--------------------------------------+-------------------------------------+
+| Role Name                            | Role Permissions                    |
++======================================+=====================================+
+| ``admin``                            | Create, Read, Update, and Delete    |
+|                                      | permissions across multiple         |
+|                                      | products, where access is granted   |
++--------------------------------------+-------------------------------------+
+| ``observer``                         | Read permission across multiple     |
+|                                      | products, where access is granted   |
++--------------------------------------+-------------------------------------+
 
 .. _autoscale-dg-resolve-role-conflicts:
 
