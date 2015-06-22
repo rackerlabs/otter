@@ -219,7 +219,7 @@ class NovaServer(object):
     :ivar str flavor_id: The ID of the flavor the server was launched with
     :ivar PSet desired_lbs: An immutable mapping of load balancer IDs to lists
         of :class:`CLBDescription` instances.
-    :var dict json: JSON dict received fro mNova from which this server
+    :var dict json: JSON dict received from Nova from which this server
         is created
     """
 
