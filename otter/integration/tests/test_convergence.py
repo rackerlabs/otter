@@ -1041,7 +1041,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             max_entities=10)
         yield self.helper.start_group_and_wait(group, self.rcs, desired=5)
 
-    @skip_me("Autoscale does not yet handle Nova over-quota errors: #1470")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-025")
     @inlineCallbacks

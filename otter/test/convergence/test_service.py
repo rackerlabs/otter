@@ -894,7 +894,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         with sequence.consume():
             self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
 
-    def test_reactivate_group_on_success(self):
+    def test_reactivate_group_on_success_after_steps(self):
         """
         When the group started in ERROR state, and convergence succeeds, the
         group is put back into ACTIVE.
@@ -907,6 +907,35 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         eff = execute_convergence(self.tenant_id, self.group_id,
                                   build_timeout=3600, plan=plan,
+                                  get_all_convergence_data=gacd)
+
+        sequence = SequenceDispatcher([
+            (self.gsgi, lambda i: self.gsgi_result),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
+             noop),
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            (UpdateGroupStatus(scaling_group=self.group,
+                               status=ScalingGroupStatus.ACTIVE),
+             noop),
+            (Log('group-status-active',
+                 dict(cloud_feed=True, status='ACTIVE')), noop)
+        ])
+        dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), StepResult.SUCCESS)
+
+    def test_reactivate_group_on_success_with_no_steps(self):
+        """
+        When the group started in ERROR state, and convergence succeeds, the
+        group is put back into ACTIVE, even if there were no steps to execute.
+        """
+        gacd = self._get_gacd_func(self.group.uuid)
+        self.manifest['state'].status = ScalingGroupStatus.ERROR
+
+        eff = execute_convergence(self.tenant_id, self.group_id,
+                                  build_timeout=3600,
+                                  plan=lambda *a, **k: pbag([]),
                                   get_all_convergence_data=gacd)
 
         sequence = SequenceDispatcher([
