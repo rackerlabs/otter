@@ -9,8 +9,8 @@ Summary of Changes
 March 17, 2015
 
 -  Updated `Identity
-   endpoints <authentication.html#identityendpoints>`__\ section.
-   Changed launchConfiguration loadBalancerId attribute type to
+   endpoints <authentication.html#identityendpoints>`_ section.
+   Changed ``launchConfiguration`` ``loadBalancerId`` attribute type to
    "String."
 
 January 30, 2015

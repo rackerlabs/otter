@@ -6,7 +6,7 @@ Additional resources
 Rackspace Auto Scale is an open-source project. You can see and
 contribute to source code by using the `AutoScale github repository`_.
 
--  To learn about working with Rackspace services through APIs, visit
+-  To learn about working with Rackspace services through APIs, visit the
    `Rackspace API Documentation`_.
 
 -  For background information and exercises, see the `Rackspace Auto
@@ -15,7 +15,7 @@ contribute to source code by using the `AutoScale github repository`_.
 -  To learn about working with Rackspace services through the Rackspace
    Cloud Control Panel, visit the `Rackspace Knowledge Center`_.
 
--  To see all the Rackspace API operations in one place, see the 
+-  To view all the Rackspace API operations in one place, go to 
    `api.rackspace.com`_. Use the links
    on the left to see the different product API references.
 

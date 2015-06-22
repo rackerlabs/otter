@@ -17,7 +17,7 @@ section in the *Rackspace Cloud Servers Developer's Guide*.
 ..  note:: 
 
     - The Standard Instance flavors are being phased out. Do not use them when adding servers.
-    - Server flavor names have been and modified
+    - The Server flavor names have been recently modified:
         - Performance 1 flavors are now General Purpose v1 flavors
         - Performance 2 flavors are now I/O v1 flavors
 
