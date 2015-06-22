@@ -241,6 +241,8 @@ class NovaServer(object):
         :return: :obj:`NovaServer` instance
         """
         server_state = ServerState.lookupByName(server_json['status'])
+        if server_json.get("OS-EXT-STS:task_state", "") == "deleting":
+            server_state = ServerState.DELETED
         metadata = server_json.get('metadata', {})
 
         if (server_state in (ServerState.ACTIVE, ServerState.BUILD) and

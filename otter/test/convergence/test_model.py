@@ -560,6 +560,24 @@ class ToNovaServerTests(SynchronousTestCase):
                            links=freeze(self.links[0]),
                            json=freeze(self.servers[0])))
 
+    def test_deleting_server(self):
+        """
+        A server whose "OS-EXT-STS:task_state" is "deleting" will be considered
+        as DELETED
+        """
+        self.servers[0]["OS-EXT-STS:task_state"] = "deleting"
+        self.assertEqual(
+            NovaServer.from_server_details_json(self.servers[0]),
+            NovaServer(id='a',
+                       state=ServerState.DELETED,
+                       image_id='valid_image',
+                       flavor_id='valid_flavor',
+                       created=self.createds[0][1],
+                       desired_lbs=pset(),
+                       servicenet_address='',
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
+
 
 class IPAddressTests(SynchronousTestCase):
     """
