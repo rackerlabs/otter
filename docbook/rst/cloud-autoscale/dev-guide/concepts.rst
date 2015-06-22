@@ -68,29 +68,15 @@ if your configuration uses a load balancer.
 When you create a scaling group, you specify the details for group
 configurations and launch configurations.
 
-+----------------------+-----------------------------------------------------------------+
-| Configuration        | Description                                                     |
-+========================================================================================+
-| Group Configuration  | Outlines the basic elements of the Auto Scale configuration.    |
-|                      | The group configuration manages how many servers                |
-|                      | can participate in the scaling group. It sets a minimum         |
-|                      | and maximum limit for the number of entities that can be        |
-|                      | used in the scaling process. It also specifies information      |
-|                      | related to load balancers.                                      |
-+----------------------+-----------------------------------------------------------------+
-| Launch Configuration | Creates a blueprint for how new servers will be created.        |
-|                      |  The launch configuration specifies what type of                |
-|                      |  server image will be started on launch, what flavor            |
-|                      |  the new server is, and which cloud load balancer or            |
-|                      | RackConnect v3 load balancer pool the new server connects to.   |
-|                      | Note: The ``launchConfiguration`` uses the **admin** user to    |
-|                      | scale up usually the first admin user found on the tenant.      |
-|                      | Only that particular **admin** user's SSH key pair names        |
-|                      | can be used in the launchConfiguration.                         |
-|                      | Note: The ``launchConfiguration`` update operation overwrites   |
-|                      |  all ``launchConfiguration`` settings.                          |
-+----------------------+-----------------------------------------------------------------+
-
++----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Configuration        | Description                                                                                                                                                                                                                                                                                                           |
++======================+=======================================================================================================================================================================================================================================================================================================================+
+| Group Configuration  | Outlines the basic elements of the Auto Scale configuration. The group configuration manages how many servers can participate in the scaling group. It sets a minimum and maximum limit for the number of entities that can be used in the scaling process. It also specifies information related to load balancers.  |
++----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Launch Configuration | Creates a blueprint for how new servers will be created. The launch configuration specifies what type of server image will be started on launch, what flavor the new server is, and which cloud load balancer or RackConnect v3 load balancer pool the new server connects to.                                        |
+|                      | Note: The launchConfiguration uses the admin user to scale up, usually the first admin user found on the tenant. Only that particular admin user's SSH key pair names can be used in the launchConfiguration.                                                                                                         |
+|                      | Note: The launchConfiguration update operation overwrites all launchConfiguration settings.                                                                                                                                                                                                                           |
++----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+                                                                                                                                                                                                                                                                                                        
 
 The ``launchConfiguration`` specifies the launch type along with server and load balancer configuration for the components to start based on the sp. Most launch configurations have both a server and a load balancer (can be RackConnect v3) configured as shown in the `Launch configuration examples`_ .
 
@@ -141,8 +127,8 @@ Client`_.
 ``name``
      Specifies a prefix to the name for created servers. The name of new
      servers will be automatically generated using the following formula:
-     [serverName]-AS[uniqueHash], and will look similar to the following:
-     [serverName]-AS12fabe. The name of new servers may be truncated to fit
+     ``[serverName]-AS[uniqueHash]``, and will look similar to the following:
+     ``[serverName]-AS12fabe``. The name of new servers may be truncated to fit
      within the limit of 255 characters.
 
 ``flavorRef``
@@ -152,11 +138,11 @@ Client`_.
     
 ``imageRef``
      Specifies the ID of the Cloud Server image to start, 
-     0d589460-f177-4b0f-81c1-8ab8903ac7d8 for example.
+     ``0d589460-f177-4b0f-81c1-8ab8903ac7d8`` for example.
 
 ``OS-DCF:diskConfig``
      Specifies how the disk on new servers is partitioned. Valid values are
-     ``AUTO``" or ``MANUAL``. For non-Rackspace server images, this value
+     ``AUTO`` or ``MANUAL``. For non-Rackspace server images, this value
      must always be ``MANUAL``. A non-Rackspace server image would be one
      that you imported using a non-Rackspace server. For more information,
      see the `Disk Configuration`_  documentation for 
@@ -514,10 +500,10 @@ To configure a webhook-based policy, you set the ``type``\ parameter to
      for the policy to implement—by either adding or removing servers as
      needed.
      
-The webhook object takes no ``args``\ parameter.
+The webhook object takes no ``args`` parameter.
 
 ..  note:: 
-    The ``change``, ``changePercent``, and ``desiredCapacity``\ parameters
+    The ``change``, ``changePercent``, and ``desiredCapacity`` parameters
     are mutually exclusive. You can only set one of them per policy.
     
 .. _autoscale-dg-schedule-based-policies:
@@ -531,7 +517,7 @@ You can define a scaling policy that is invoked by a preset schedule.
     The ``change``, ``changePercent``, and ``desiredCapacity`` parameters
     are mutually exclusive. You can only set one of them per policy.
 
-To configure a schedule-based policy, set the ``type``\ parameter to
+To configure a schedule-based policy, set the ``type`` parameter to
 "schedule" and then specify the parameter values.
 
 **Scheduled-based Policy parameter descriptions**
@@ -626,7 +612,7 @@ Using the min and max values with policies
 
 When setting up your scaling groups, you configure the minimum and
 maximum number of resources that are allowed. These values are specified
-in the ``minEntities``\ and ``maxEntities``\ parameters under group
+in the ``minEntities`` and ``maxEntities`` parameters under group
 configuration, and are invoked whenever you update your group
 configuration.
 
