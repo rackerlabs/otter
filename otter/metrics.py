@@ -41,20 +41,21 @@ from otter.util.fp import predicate_all
 metrics_log = otter_log.bind(system='otter.metrics')
 
 
+QUERY_GROUPS_OF_TENANTS = (
+    'SELECT '
+    '"tenantId", "groupId", desired, active, pending, created_at, status '
+    'FROM scaling_group WHERE "tenantId" IN ({tids})')
+
+
 @defer.inlineCallbacks
 def get_specific_scaling_groups(client, tenant_ids):
     tids = ', '.join("'{}'".format(tid) for tid in tenant_ids)
-    query = (
-        'SELECT '
-        '"tenantId", "groupId", desired, active, pending, created_at, status '
-        'FROM scaling_group WHERE "tenantId" IN ({tids})')
-    query = query.format(tids=tids)
-    print("query", query)
+    query = QUERY_GROUPS_OF_TENANTS.format(tids=tids)
     results = yield client.execute(query, {}, ConsistencyLevel.ONE)
     defer.returnValue(r for r in results
-                      if r['created_at'] is not None and
-                      r['desired'] is not None and
-                      r['status'] != 'DISABLED')
+                      if r.get('created_at') is not None and
+                      r.get('desired') is not None and
+                      r.get('status') != 'DISABLED')
 
 
 @defer.inlineCallbacks
