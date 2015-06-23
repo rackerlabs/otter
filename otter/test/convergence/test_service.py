@@ -1,4 +1,6 @@
+import sys
 import time
+import traceback
 import uuid
 
 from effect import (
@@ -18,11 +20,11 @@ from pyrsistent import freeze, pbag, pmap, pset, s
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.cloud_client import TenantScope
+from otter.cloud_client import NoSuchCLBError, TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.model import (
-    CLBDescription, CLBNode, NovaServer, ServerState, StepResult)
+    CLBDescription, CLBNode, ErrorReason, NovaServer, ServerState, StepResult)
 from otter.convergence.service import (
     ConcurrentError,
     ConvergenceStarter,
@@ -31,7 +33,7 @@ from otter.convergence.service import (
     converge_one_group,
     determine_active, execute_convergence, get_my_divergent_groups,
     non_concurrently)
-from otter.convergence.steps import ConvergeLater
+from otter.convergence.steps import ConvergeLater, CreateServer
 from otter.log.intents import BoundFields, Log, LogErr, get_log_dispatcher
 from otter.models.intents import (
     DeleteGroup,
@@ -49,6 +51,7 @@ from otter.test.utils import (
     mock_group, mock_log,
     noop,
     raise_,
+    raise_to_exc_info,
     test_dispatcher,
     transform_eq,
     unwrap_wrapped_effect)
@@ -659,7 +662,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              lambda i: None),
             (Log('execute-convergence-results',
                  {'results': [(steps[0], (StepResult.SUCCESS, []))],
-                  'worst_status': StepResult.SUCCESS}), lambda i: None)
+                  'worst_status': 'SUCCESS'}), lambda i: None)
         ])
         dispatcher = ComposedDispatcher([sequence, self._get_dispatcher()])
         with sequence.consume():
@@ -674,7 +677,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """
         gacd = self._get_gacd_func(self.group.uuid)
         for srv in self.servers:
-            srv.desired_lbs = pmap()
+            srv.desired_lbs = pset()
 
         eff = execute_convergence(self.tenant_id, self.group_id,
                                   build_timeout=3600,
@@ -692,6 +695,88 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         # And make sure that exception isn't wrapped in FirstError.
         e = self.assertRaises(RuntimeError, sync_perform, dispatcher, eff)
         self.assertEqual(str(e), 'foo')
+
+    def test_log_reasons(self):
+        """When a step doesn't succeed, useful information is logged."""
+        try:
+            1 / 0
+        except ZeroDivisionError:
+            exc_info = sys.exc_info()
+
+        step = TestStep(Effect(Constant(
+            (StepResult.RETRY, [
+                ErrorReason.Exception(exc_info),
+                ErrorReason.String('foo'),
+                ErrorReason.Structured({'foo': 'bar'})]))))
+
+        def plan(*args, **kwargs):
+            return pbag([step])
+
+        gacd = self._get_gacd_func(self.group.uuid)
+        eff = execute_convergence(self.tenant_id, self.group_id,
+                                  build_timeout=3600,
+                                  get_all_convergence_data=gacd,
+                                  plan=plan)
+
+        exc_msg = "ZeroDivisionError('integer division or modulo by zero',)"
+        tb_msg = ''.join(traceback.format_exception(*exc_info))
+        expected_fields = {
+            'results': [
+                (step, (StepResult.RETRY,
+                        [{'exception': exc_msg,
+                          'traceback': tb_msg},
+                         'foo',
+                         {'foo': 'bar'}]))],
+            'worst_status': 'RETRY'}
+        sequence = SequenceDispatcher([
+            (self.gsgi, lambda i: (self.group, self.manifest)),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
+             noop),
+            (Log(msg='execute-convergence-results', fields=expected_fields),
+             noop),
+        ])
+
+        dispatcher = ComposedDispatcher([
+            base_dispatcher,
+            TypeDispatcher({ParallelEffects: perform_parallel_async}),
+            sequence])
+
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
+
+    def test_log_steps(self):
+        """The steps to be executed are logged to cloud feeds."""
+        step = CreateServer(server_config=pmap({"foo": "bar"}))
+
+        def plan(*args, **kwargs):
+            return pbag([step])
+
+        gacd = self._get_gacd_func(self.group.uuid)
+        eff = execute_convergence(self.tenant_id, self.group_id,
+                                  build_timeout=3600,
+                                  get_all_convergence_data=gacd,
+                                  plan=plan)
+
+        sequence = SequenceDispatcher([
+            (self.gsgi, lambda i: (self.group, self.manifest)),
+            (Log('convergence-create-servers',
+                 fields={'num_servers': 1, 'server_config': {'foo': 'bar'},
+                         'cloud_feed': True}),
+             noop),
+            (Log('execute-convergence', fields=mock.ANY), noop),
+            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
+             noop),
+            (Log('execute-convergence-results', fields=mock.ANY), noop),
+        ])
+
+        dispatcher = ComposedDispatcher([
+            base_dispatcher,
+            TypeDispatcher({ParallelEffects: perform_parallel_async}),
+            sequence])
+
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
 
     def test_deleting_group(self):
         """
@@ -752,7 +837,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         def plan(*args, **kwargs):
             return pbag([
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                ConvergeLater(reasons=['mywish']),
+                ConvergeLater(reasons=[ErrorReason.String('mywish')]),
                 TestStep(Effect(Constant((StepResult.SUCCESS, []))))])
 
         eff = execute_convergence(self.tenant_id, self.group_id,
@@ -768,13 +853,21 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """
         gacd = self._get_gacd_func(self.group.uuid)
 
+        exc_info = raise_to_exc_info(NoSuchCLBError(lb_id=u'nolb1'))
+        exc_info2 = raise_to_exc_info(NoSuchCLBError(lb_id=u'nolb2'))
+
         def plan(*args, **kwargs):
             return pbag([
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                ConvergeLater(reasons=['mywish']),
+                ConvergeLater(reasons=[ErrorReason.String('mywish')]),
                 TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                TestStep(Effect(Constant((StepResult.FAILURE, ['bad'])))),
-                TestStep(Effect(Constant((StepResult.SUCCESS, []))))
+                TestStep(Effect(Constant(
+                    (StepResult.FAILURE,
+                     [ErrorReason.Exception(exc_info)])))),
+                TestStep(Effect(Constant(
+                    (StepResult.FAILURE,
+                     [ErrorReason.Exception(exc_info2)])))),
+                TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
             ])
 
         eff = execute_convergence(self.tenant_id, self.group_id,
@@ -790,15 +883,18 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ERROR),
              noop),
-            (Log('group-status-error', dict(isError=True, cloud_feed=True,
-                                            status='ERROR')),
+            (Log('group-status-error',
+                 dict(isError=True, cloud_feed=True,
+                      status='ERROR',
+                      reasons='Cloud Load Balancer does not exist: nolb1; '
+                              'Cloud Load Balancer does not exist: nolb2')),
              noop)
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
         with sequence.consume():
             self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
 
-    def test_reactivate_group_on_success(self):
+    def test_reactivate_group_on_success_after_steps(self):
         """
         When the group started in ERROR state, and convergence succeeds, the
         group is put back into ACTIVE.
@@ -811,6 +907,35 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         eff = execute_convergence(self.tenant_id, self.group_id,
                                   build_timeout=3600, plan=plan,
+                                  get_all_convergence_data=gacd)
+
+        sequence = SequenceDispatcher([
+            (self.gsgi, lambda i: self.gsgi_result),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
+             noop),
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            (UpdateGroupStatus(scaling_group=self.group,
+                               status=ScalingGroupStatus.ACTIVE),
+             noop),
+            (Log('group-status-active',
+                 dict(cloud_feed=True, status='ACTIVE')), noop)
+        ])
+        dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), StepResult.SUCCESS)
+
+    def test_reactivate_group_on_success_with_no_steps(self):
+        """
+        When the group started in ERROR state, and convergence succeeds, the
+        group is put back into ACTIVE, even if there were no steps to execute.
+        """
+        gacd = self._get_gacd_func(self.group.uuid)
+        self.manifest['state'].status = ScalingGroupStatus.ERROR
+
+        eff = execute_convergence(self.tenant_id, self.group_id,
+                                  build_timeout=3600,
+                                  plan=lambda *a, **k: pbag([]),
                                   get_all_convergence_data=gacd)
 
         sequence = SequenceDispatcher([

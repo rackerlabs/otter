@@ -3,6 +3,7 @@ Mixins and utilities to be used for testing.
 """
 import json
 import os
+import sys
 from functools import partial, wraps
 from inspect import getargspec
 
@@ -34,6 +35,7 @@ from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
 
 from otter.cloud_client import concretize_service_request
+from otter.convergence.model import NovaServer
 from otter.log.bound import BoundLog
 from otter.models.interface import IScalingGroup
 from otter.supervisor import ISupervisor
@@ -712,11 +714,14 @@ def unwrap_wrapped_effect(intent_class, kwargs,
     return (intent_class(effect=mock.ANY, **kwargs), function)
 
 
-def test_dispatcher():
-    return ComposedDispatcher([
+def test_dispatcher(disp=None):
+    disps = [
         base_dispatcher,
         TypeDispatcher({ParallelEffects: perform_parallel_async}),
-    ])
+    ]
+    if disp is not None:
+        disps.append(disp)
+    return ComposedDispatcher(disps)
 
 
 def defaults_by_name(fn):
@@ -824,6 +829,14 @@ def raise_(e):
     raise e
 
 
+def raise_to_exc_info(e):
+    """Raise an exception, and get the exc_info that results."""
+    try:
+        raise e
+    except type(e):
+        return sys.exc_info()
+
+
 class TestStep(object):
     """A fake step that returns a canned Effect."""
     def __init__(self, effect):
@@ -836,3 +849,11 @@ class TestStep(object):
 def noop(_):
     """Ignore input and return None."""
     pass
+
+
+def server(id, state, created=0, image_id='image', flavor_id='flavor',
+           json=None, **kwargs):
+    """Convenience for creating a :obj:`NovaServer`."""
+    return NovaServer(id=id, state=state, created=created, image_id=image_id,
+                      flavor_id=flavor_id,
+                      json=json or pmap({'id': id}), **kwargs)

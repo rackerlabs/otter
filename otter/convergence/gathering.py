@@ -48,15 +48,16 @@ def get_all_server_details(changes_since=None, batch_size=100):
     url = append_segments('servers', 'detail')
     query = {'limit': batch_size}
     if changes_since is not None:
-        query['changes_since'] = '{0}Z'.format(changes_since.isoformat())
+        query['changes-since'] = '{0}Z'.format(changes_since.isoformat())
 
     last_link = []
 
     def get_server_details(query_params):
+        params = sorted(query_params.items())
         eff = retry_effect(
             service_request(ServiceType.CLOUD_SERVERS, 'GET',
                             "{}?{}".format(url,
-                                           urlencode(query_params, True))),
+                                           urlencode(params, True))),
             retry_times(5), exponential_backoff_interval(2))
         return eff.on(continue_)
 
@@ -150,7 +151,7 @@ def get_clb_contents():
                 description=CLBDescription(
                     lb_id=str(_id),
                     port=node['port'],
-                    weight=node['weight'],
+                    weight=node.get('weight', 1),
                     condition=CLBNodeCondition.lookupByName(node['condition']),
                     type=CLBNodeType.lookupByName(node['type'])))
             for _id, nodes in zip(ids, all_lb_nodes) for node in nodes]
@@ -201,23 +202,17 @@ def get_rcv3_contents():
     """
     Get Rackspace Cloud Load Balancer contents as list of `RCv3Node`.
     """
-    eff = retry_effect(
-        service_request(ServiceType.RACKCONNECT_V3,
-                        'GET', 'load_balancer_pools'),
-        retry_times(5), exponential_backoff_interval(2))
+    eff = service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                          'load_balancer_pools')
 
     def on_listing_pools(lblist_result):
         _, body = lblist_result
         return parallel([
-            retry_effect(
-                service_request(ServiceType.RACKCONNECT_V3, 'GET',
-                                append_segments('load_balancer_pools',
-                                                lb_pool['id'], 'nodes')),
-                retry_times(5), exponential_backoff_interval(2)
-            ).on(
+            service_request(ServiceType.RACKCONNECT_V3, 'GET',
+                            append_segments('load_balancer_pools',
+                                            lb_pool['id'], 'nodes')).on(
                 partial(on_listing_nodes,
                         RCv3Description(lb_id=lb_pool['id'])))
-
             for lb_pool in body
         ])
 

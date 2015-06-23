@@ -11,7 +11,7 @@ from otter.convergence.model import (
     CLBNodeType,
     DRAINING_METADATA,
     DesiredGroupState,
-    NovaServer,
+    ErrorReason,
     RCv3Description,
     RCv3Node,
     ServerState)
@@ -26,6 +26,7 @@ from otter.convergence.steps import (
     DeleteServer,
     RemoveNodesFromCLB,
     SetMetadataItemOnServer)
+from otter.test.utils import server
 
 
 def copy_clb_desc(clb_desc, condition=CLBNodeCondition.ENABLED, weight=1):
@@ -489,13 +490,6 @@ class ConvergeLBStateTests(SynchronousTestCase):
                 ]))
 
 
-def server(id, state, created=0, image_id='image', flavor_id='flavor',
-           **kwargs):
-    """Convenience for creating a :obj:`NovaServer`."""
-    return NovaServer(id=id, state=state, created=created, image_id=image_id,
-                      flavor_id=flavor_id, **kwargs)
-
-
 class DrainAndDeleteServerTests(SynchronousTestCase):
     """
     Tests for :func:`converge` having to do with deleting draining servers,
@@ -804,7 +798,9 @@ class ConvergeTests(SynchronousTestCase):
                 set([server('abc', ServerState.BUILD)]),
                 set(),
                 0),
-            pbag([ConvergeLater(reasons=['building servers'])]))
+            pbag([
+                ConvergeLater(
+                    reasons=[ErrorReason.String('building servers')])]))
 
     def test_delete_nodes_in_error_state(self):
         """

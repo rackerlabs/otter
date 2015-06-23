@@ -19,3 +19,4 @@ toolz==0.7.1
 pyrsistent==0.10.3
 singledispatch==3.4.0.3
 six==1.9.0
+sumtypes==0.1a4

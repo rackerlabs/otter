@@ -23,6 +23,7 @@ from otter.convergence.model import (
     CLBDescription,
     CLBNodeCondition,
     CLBNodeType,
+    ErrorReason,
     StepResult)
 from otter.convergence.steps import (
     AddNodesToCLB,
@@ -35,15 +36,16 @@ from otter.convergence.steps import (
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
     UnexpectedServerStatus,
-    _clb_check_change_node,
-    _clb_check_change_node_handlers,
     _RCV3_LB_DOESNT_EXIST_PATTERN,
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_ALREADY_A_MEMBER_PATTERN,
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
-    delete_and_verify,
+    _clb_check_change_node,
+    _clb_check_change_node_handlers,
     _rcv3_check_bulk_add,
-    _rcv3_check_bulk_delete)
+    _rcv3_check_bulk_delete,
+    delete_and_verify,
+)
 from otter.test.utils import (
     StubResponse,
     get_fake_service_request_performer,
@@ -130,7 +132,8 @@ class CreateServerTests(SynchronousTestCase):
 
         self.assertEqual(
             resolve_effect(eff, (StubResponse(202, {}), {"server": {}})),
-            (StepResult.RETRY, ['waiting for server to become active']))
+            (StepResult.RETRY,
+             [ErrorReason.String('waiting for server to become active')]))
 
     def test_create_server_400_parseable_failures(self):
         """
@@ -166,7 +169,7 @@ class CreateServerTests(SynchronousTestCase):
             self.assertEqual(
                 resolve_effect(eff, service_request_error_response(api_error),
                                is_error=True),
-                (StepResult.FAILURE, [message]))
+                (StepResult.FAILURE, [ErrorReason.String(message)]))
 
     def test_create_server_400_unrecognized_failures_retry(self):
         """
@@ -189,10 +192,12 @@ class CreateServerTests(SynchronousTestCase):
 
         for message in invalid_400s:
             api_error = APIError(code=400, body=message, headers={})
+            exc_info = service_request_error_response(api_error)
             self.assertEqual(
-                resolve_effect(eff, service_request_error_response(api_error),
+                resolve_effect(eff, exc_info,
                                is_error=True),
-                (StepResult.RETRY, [api_error]))
+                (StepResult.RETRY,
+                 [ErrorReason.Exception(exc_info)]))
 
     def test_create_server_403_json_parseable_failures(self):
         """
@@ -227,7 +232,7 @@ class CreateServerTests(SynchronousTestCase):
             self.assertEqual(
                 resolve_effect(eff, service_request_error_response(api_error),
                                is_error=True),
-                (StepResult.FAILURE, [message]))
+                (StepResult.FAILURE, [ErrorReason.String(message)]))
 
     def test_create_server_403_plaintext_parseable_failures(self):
         """
@@ -259,7 +264,7 @@ class CreateServerTests(SynchronousTestCase):
             self.assertEqual(
                 resolve_effect(eff, service_request_error_response(api_error),
                                is_error=True),
-                (StepResult.FAILURE, [message]))
+                (StepResult.FAILURE, [ErrorReason.String(message)]))
 
     def test_create_server_403_unrecognized_failures_retry(self):
         """
@@ -282,10 +287,11 @@ class CreateServerTests(SynchronousTestCase):
 
         for message in invalid_403s:
             api_error = APIError(code=403, body=message, headers={})
+            exc_info = service_request_error_response(api_error)
             self.assertEqual(
-                resolve_effect(eff, service_request_error_response(api_error),
+                resolve_effect(eff, exc_info,
                                is_error=True),
-                (StepResult.RETRY, [api_error]))
+                (StepResult.RETRY, [ErrorReason.Exception(exc_info)]))
 
     def test_create_server_non_400_or_403_failures(self):
         """
@@ -298,10 +304,11 @@ class CreateServerTests(SynchronousTestCase):
         eff = resolve_effect(eff, 'random-name')
 
         api_error = APIError(code=500, body="this is a 500", headers={})
+        exc_info = service_request_error_response(api_error)
         self.assertEqual(
-            resolve_effect(eff, service_request_error_response(api_error),
+            resolve_effect(eff, exc_info,
                            is_error=True),
-            (StepResult.RETRY, [api_error]))
+            (StepResult.RETRY, [ErrorReason.Exception(exc_info)]))
 
 
 class DeleteServerTests(SynchronousTestCase):
@@ -326,9 +333,9 @@ class DeleteServerTests(SynchronousTestCase):
 
         self.assertEqual(
             resolve_effect(eff, (None, {})),
-            (StepResult.RETRY, [
-                'must re-gather after deletion in order to update the active '
-                'cache']))
+            (StepResult.RETRY,
+             [ErrorReason.String('must re-gather after deletion in order to '
+                                 'update the active cache')]))
 
     def test_delete_and_verify_del_404(self):
         """
@@ -539,8 +546,8 @@ class StepAsEffectTests(SynchronousTestCase):
         self.assertEqual(
             get_result(StubResponse(202, {}), ''),
             (StepResult.RETRY,
-             ['must re-gather after adding to CLB in order to update the '
-              'active cache']))
+             [ErrorReason.String('must re-gather after adding to CLB in order '
+                                 'to update the active cache')]))
 
         self.assertEqual(
             get_result(
@@ -552,8 +559,8 @@ class StepAsEffectTests(SynchronousTestCase):
                     "code": 422
                 }),
             (StepResult.RETRY,
-             ['must re-gather after adding to CLB in order to update the '
-              'active cache']))
+             [ErrorReason.String('must re-gather after adding to CLB in order '
+                                 'to update the active cache')]))
 
     def test_add_nodes_to_clb_failure_response_codes(self):
         """
@@ -573,9 +580,13 @@ class StepAsEffectTests(SynchronousTestCase):
                 }),
                 request)
 
+        any_api_error = ErrorReason.Exception(
+            (APIError, matches(IsInstance(APIError)), ANY))
+
         # Fail on 404 or 422 PENDING_DELETE
-        self.assertEqual(get_result(StubResponse(404, {}), ''),
-                         (StepResult.FAILURE, [matches(IsInstance(APIError))]))
+        self.assertEqual(
+            get_result(StubResponse(404, {}), ''),
+            (StepResult.FAILURE, [any_api_error]))
         self.assertEqual(
             get_result(
                 StubResponse(422, {}),
@@ -584,7 +595,7 @@ class StepAsEffectTests(SynchronousTestCase):
                                "'PENDING_DELETE' and is considered immutable.",
                     "code": 422
                 }),
-            (StepResult.FAILURE, [matches(IsInstance(APIError))]))
+            (StepResult.FAILURE, [any_api_error]))
         self.assertEqual(
             get_result(
                 StubResponse(422, {}),
@@ -593,7 +604,7 @@ class StepAsEffectTests(SynchronousTestCase):
                                "immutable.",
                     "code": 422
                 }),
-            (StepResult.FAILURE, [matches(IsInstance(APIError))]))
+            (StepResult.FAILURE, [any_api_error]))
 
         # Retry on other API errors
         self.assertEqual(
@@ -604,11 +615,11 @@ class StepAsEffectTests(SynchronousTestCase):
                                "'PENDING_UPDATE' and is considered immutable.",
                     "code": 422
                 }),
-            (StepResult.RETRY, [matches(IsInstance(APIError))]))
+            (StepResult.RETRY, [any_api_error]))
         self.assertEqual(get_result(StubResponse(413, {}), ''),
-                         (StepResult.RETRY, [matches(IsInstance(APIError))]))
+                         (StepResult.RETRY, [any_api_error]))
         self.assertEqual(get_result(StubResponse(500, {}), ''),
-                         (StepResult.RETRY, [matches(IsInstance(APIError))]))
+                         (StepResult.RETRY, [any_api_error]))
 
         # Any unknown errors are propogated
         self.assertRaises(
@@ -828,9 +839,11 @@ class CLBCheckChangeNodeTests(SynchronousTestCase):
         result = _clb_check_change_node(self.example_step, (response, body))
         self.assertEqual(
             result,
-            (StepResult.RETRY, [{"reason": "CLB node not found",
-                                 "node": self.example_step.node_id,
-                                 "lb": self.example_step.lb_id}]))
+            (StepResult.RETRY,
+             [ErrorReason.Structured(
+                 {"reason": "CLB node not found",
+                  "node": self.example_step.node_id,
+                  "lb": self.example_step.lb_id})]))
 
 
 _RCV3_TEST_DATA = {
@@ -954,8 +967,9 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
         self.assertEqual(
             res,
             (StepResult.RETRY,
-             ['must re-gather after adding to LB in order to update the '
-              'active cache']))
+             [ErrorReason.String(
+              'must re-gather after adding to LB in order to update the '
+              'active cache')]))
 
     def test_try_again(self):
         """

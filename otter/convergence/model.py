@@ -5,9 +5,14 @@ representation across the different phases of convergence.
 import json
 import re
 
+import attr
+from attr.validators import instance_of
+
 from characteristic import Attribute, attributes
 
-from pyrsistent import PSet, freeze, pmap, pset, pvector
+from pyrsistent import PMap, PSet, freeze, pmap, pset, pvector
+
+from sumtypes import constructor, sumtype
 
 from toolz.dicttoolz import get_in
 from toolz.itertoolz import groupby
@@ -113,6 +118,14 @@ class StepResult(Names):
     """
 
 
+@sumtype
+class ErrorReason(object):
+    """A reason for a step to be in a RETRY or FAILURE state."""
+    Exception = constructor('exc_info')
+    String = constructor(reason=attr.ib(validator=instance_of((unicode, str))))
+    Structured = constructor('structure')
+
+
 def get_service_metadata(service_name, metadata):
     """
     Obtain all the metadata associated with a particular service from Nova
@@ -188,7 +201,8 @@ def _lbs_from_metadata(metadata):
              Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
              Attribute('servicenet_address',
                        default_value='',
-                       instance_of=basestring)])
+                       instance_of=basestring),
+             Attribute('json', instance_of=PMap, default_factory=pmap)])
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -203,9 +217,10 @@ class NovaServer(object):
         the server is on the ServiceNet network
     :ivar str image_id: The ID of the image the server was launched with
     :ivar str flavor_id: The ID of the flavor the server was launched with
-
     :ivar PSet desired_lbs: An immutable mapping of load balancer IDs to lists
         of :class:`CLBDescription` instances.
+    :var dict json: JSON dict received from Nova from which this server
+        is created
     """
 
     def __init__(self):
@@ -226,6 +241,8 @@ class NovaServer(object):
         :return: :obj:`NovaServer` instance
         """
         server_state = ServerState.lookupByName(server_json['status'])
+        if server_json.get("OS-EXT-STS:task_state", "") == "deleting":
+            server_state = ServerState.DELETED
         metadata = server_json.get('metadata', {})
 
         if (server_state in (ServerState.ACTIVE, ServerState.BUILD) and
@@ -240,7 +257,8 @@ class NovaServer(object):
             flavor_id=server_json['flavor']['id'],
             links=freeze(server_json['links']),
             desired_lbs=_lbs_from_metadata(metadata),
-            servicenet_address=_servicenet_address(server_json))
+            servicenet_address=_servicenet_address(server_json),
+            json=freeze(server_json))
 
 
 def group_id_from_metadata(metadata):
