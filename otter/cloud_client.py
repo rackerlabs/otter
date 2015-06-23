@@ -474,13 +474,12 @@ def add_clb_nodes(lb_id, nodes):
 
     @_only_json_api_errors
     def _parse_known_errors(code, json_body):
-        _match_errors(
-            [(422, ("message",), _CLB_DUPLICATE_NODES_PATTERN,
-              partial(CLBDuplicateNodesError, lb_id=lb_id)),
-             (413, ("message",), _CLB_NODE_LIMIT_PATTERN,
-              partial(CLBNodeLimitError(lb_id=lb_id)))],
-            code,
-            json_body)
+        mappings = map(
+            _expand_clb_matches,
+            [(422, _CLB_DUPLICATE_NODES_PATTERN, CLBDuplicateNodesError),
+             (413, _CLB_NODE_LIMIT_PATTERN, CLBNodeLimitError)],
+            lb_id)
+        _match_errors(mappings, code, json_body)
         _process_clb_api_error(code, json_body, lb_id)
 
     return eff.on(error=_parse_known_errors)
@@ -515,12 +514,35 @@ def change_clb_node(lb_id, node_id, condition, weight):
     def _parse_known_errors(code, json_body):
         _process_clb_api_error(code, json_body, lb_id)
         _match_errors(
-            [(404, ("message",), _CLB_NO_SUCH_NODE_PATTERN,
-              partial(NoSuchCLBNodeError, lb_id=lb_id, node_id=node_id))],
+            [_expand_clb_matches(
+                (404, _CLB_NO_SUCH_NODE_PATTERN, NoSuchCLBNodeError),
+                lb_id=lb_id, node_id=node_id)],
             code,
             json_body)
 
     return eff.on(error=_parse_known_errors)
+
+
+def _expand_clb_matches(matches_tuple, lb_id, node_id=None):
+    """
+    All CLB messages have only the keys ("message",), and the exception tpye
+    takes a load balancer ID and maybe a node ID.  So expand a tuple that looks
+    like:
+
+    (code, pattern, exc_type)
+
+    to
+
+    (code, ("message",), pattern, partial(exc_type, lb_id=lb_id))
+
+    and maybe the partial will include the node ID too if it's provided.
+    """
+    params = {"lb_id": lb_id}
+    if node_id is not None:
+        params["node_id"] = node_id
+
+    code, pattern, exc_type = matches_tuple
+    return (code, ("message",), pattern, partial(exc_type, **params))
 
 
 def _process_clb_api_error(api_error_code, json_body, lb_id):
@@ -535,15 +557,14 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
     :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
         :class:`NoSuchCLBError`, :class:`APIError` by itself
     """
-    mappings = [(413, None, CLBRateLimitError),  #TODO: add NOT node limit error
-                (422, _CLB_DELETED_PATTERN, CLBDeletedError),
-                (422, _CLB_PENDING_UPDATE_PATTERN, CLBPendingUpdateError),
-                (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)]
-    return _match_errors(
-        [(code, ("message",), pattern, partial(exc, lb_id=lb_id))
-         for code, pattern, exc in mappings],
-        api_error_code,
-        json_body)
+    mappings = map(
+        _expand_clb_matches,
+        [(413, None, CLBRateLimitError),  #TODO: add NOT node limit error
+         (422, _CLB_DELETED_PATTERN, CLBDeletedError),
+         (422, _CLB_PENDING_UPDATE_PATTERN, CLBPendingUpdateError),
+         (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)],
+        lb_id)
+    return _match_errors(mappings, api_error_code, json_body)
 
 
 # ----- Nova requests and error parsing -----
