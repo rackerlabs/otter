@@ -390,7 +390,7 @@ class CollectMetricsTests(SynchronousTestCase):
                        'cloudLoadBalancers': 'clb', 'rackconnect': 'rc'}
 
         self.dispatcher = base_dispatcher
-        self.get_full_dispatcher = lambda r, auth, log, cfgs: self.dispatcher
+        self.get_legacy_dispatcher = lambda r, auth, log, cfgs: self.dispatcher
 
     def _fake_perform(self, dispatcher, effect):
         """
@@ -408,7 +408,7 @@ class CollectMetricsTests(SynchronousTestCase):
         _reactor = mock.Mock()
         d = collect_metrics(_reactor, self.config,
                             perform=self._fake_perform,
-                            get_full_dispatcher=self.get_full_dispatcher)
+                            get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
@@ -428,7 +428,7 @@ class CollectMetricsTests(SynchronousTestCase):
         client = mock.Mock(spec=['disconnect'])
         d = collect_metrics(mock.Mock(), self.config, client=client,
                             perform=self._fake_perform,
-                            get_full_dispatcher=self.get_full_dispatcher)
+                            get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
         self.assertFalse(self.connect_cass_servers.called)
         self.assertFalse(client.disconnect.called)
@@ -440,7 +440,7 @@ class CollectMetricsTests(SynchronousTestCase):
         _reactor, auth = mock.Mock(), mock.Mock()
         d = collect_metrics(_reactor, self.config, authenticator=auth,
                             perform=self._fake_perform,
-                            get_full_dispatcher=self.get_full_dispatcher)
+                            get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
         self.get_all_metrics.assert_called_once_with(
             self.dispatcher, self.groups, _print=False)

@@ -32,13 +32,29 @@ from otter.auth import generate_authenticator
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType, get_service_configs
 from otter.convergence.gathering import get_scaling_group_servers
-from otter.effect_dispatcher import get_full_dispatcher
+from otter.effect_dispatcher import get_legacy_dispatcher
 from otter.log import log as otter_log
 from otter.util.fp import predicate_all
 
 
 # TODO: Remove this and pass it from service to other functions
 metrics_log = otter_log.bind(system='otter.metrics')
+
+
+@defer.inlineCallbacks
+def get_specific_scaling_groups(client, tenant_ids):
+    tids = ', '.join("'{}'".format(tid) for tid in tenant_ids)
+    query = (
+        'SELECT '
+        '"tenantId", "groupId", desired, active, pending, created_at, status '
+        'FROM scaling_group WHERE "tenantId" IN ({tids})')
+    query = query.format(tids=tids)
+    print("query", query)
+    results = yield client.execute(query, {}, ConsistencyLevel.ONE)
+    defer.returnValue(r for r in results
+                      if r['created_at'] is not None and
+                      r['desired'] is not None and
+                      r['status'] != 'DISABLED')
 
 
 @defer.inlineCallbacks
@@ -243,7 +259,7 @@ def connect_cass_servers(reactor, config):
 def collect_metrics(reactor, config, client=None, authenticator=None,
                     _print=False,
                     perform=perform,
-                    get_full_dispatcher=get_full_dispatcher):
+                    get_legacy_dispatcher=get_legacy_dispatcher):
     """
     Start collecting the metrics
 
@@ -260,18 +276,25 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
 
     :return: :class:`Deferred` with None
     """
+    convergence_tids = None
+    if config.get('convergence-tenants', []):
+        convergence_tids = config['convergence-tenants']
     _client = client or connect_cass_servers(reactor, config['cassandra'])
     authenticator = authenticator or generate_authenticator(reactor,
                                                             config['identity'])
     service_configs = get_service_configs(config)
 
-    dispatcher = get_full_dispatcher(reactor, authenticator, metrics_log,
-                                     service_configs)
+    dispatcher = get_legacy_dispatcher(reactor, authenticator, metrics_log,
+                                       service_configs)
 
     # calculate metrics
-    cass_groups = yield get_scaling_groups(
-        _client, props=['status'],
-        group_pred=lambda g: g['status'] != 'DISABLED')
+    if convergence_tids:
+        cass_groups = yield get_specific_scaling_groups(
+            _client, tenant_ids=convergence_tids)
+    else:
+        cass_groups = yield get_scaling_groups(
+            _client, props=['status'],
+            group_pred=lambda g: g['status'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
         dispatcher, cass_groups, _print=_print)
 
