@@ -338,7 +338,7 @@ _CLB_DUPLICATE_NODES_PATTERN = re.compile(
     "on load balancer\.$")
 _CLB_NODE_LIMIT_PATTERN = re.compile(
     "^Nodes must not exceed \d+ per load balancer\.$")
-_CLB_OVER_LIMIT_PATTERN = re.compile("^OverLimit Retry...$")
+_CLB_OVER_LIMIT_PATTERN = re.compile("^OverLimit Retry\.{3}$")
 
 
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
