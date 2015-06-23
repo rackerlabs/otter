@@ -453,6 +453,7 @@ class TestConvergence(unittest.TestCase):
         This will strip them of their association with Autoscale.
         """
         self.removed_ids = ids
+        self.addCleanup(delete_servers, ids, rcs, self.helper.pool)
         return gatherResults([
             NovaServer(id=_id, pool=self.helper.pool).update_metadata({}, rcs)
             for _id in ids]).addCallback(lambda _: rcs)
