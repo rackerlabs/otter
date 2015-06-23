@@ -393,6 +393,9 @@ class CollectMetricsTests(SynchronousTestCase):
         self.connect_cass_servers.return_value = self.client
 
         self.groups = mock.Mock()
+        self.get_specific_scaling_groups = patch(
+            self, 'otter.metrics.get_specific_scaling_groups',
+            return_value=succeed(self.groups))
         self.get_scaling_groups = patch(
             self, 'otter.metrics.get_scaling_groups',
             return_value=succeed(self.groups))
@@ -439,6 +442,28 @@ class CollectMetricsTests(SynchronousTestCase):
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
         self.get_scaling_groups.assert_called_once_with(
             self.client, props=['status'], group_pred=IsCallable())
+        self.get_all_metrics.assert_called_once_with(
+            self.dispatcher, self.groups, _print=False)
+        self.add_to_cloud_metrics.assert_called_once_with(
+            self.config['metrics']['ttl'], 'r', 107, 26, 1,
+            log=metrics_log)
+        self.client.disconnect.assert_called_once_with()
+
+    def test_metrics_collected_convergence_tenants(self):
+        """
+        Metrics is collected after getting groups from cass and servers
+        from nova and it is added to blueflood
+        """
+        self.config['convergence-tenants'] = ['foo', 'bar']
+        _reactor = mock.Mock()
+        d = collect_metrics(_reactor, self.config,
+                            perform=self._fake_perform,
+                            get_legacy_dispatcher=self.get_legacy_dispatcher)
+        self.assertIsNone(self.successResultOf(d))
+
+        self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
+        self.get_specific_scaling_groups.assert_called_once_with(
+            self.client, tenant_ids=['foo', 'bar'])
         self.get_all_metrics.assert_called_once_with(
             self.dispatcher, self.groups, _print=False)
         self.add_to_cloud_metrics.assert_called_once_with(
