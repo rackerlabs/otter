@@ -456,6 +456,42 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             3600, converge_one_group=converge_one_group)
         self.assertEqual(sync_perform(_get_dispatcher(), result), None)
 
+    def test_ignore_disappearing_divergent_flag(self):
+        """
+        When the divergent flag disappears just as we're starting to converge,
+        the group does not get converged and None is returned as its result.
+
+        This happens when a concurrent convergence iteration is just finishing
+        up.
+        """
+        eff = self._converge_all_groups(['00_g1'])
+
+        def get_bound_sequence(tid, gid):
+            # since this GetStat is going to return None, no more effects will
+            # be run. This is the crux of what we're testing.
+            znode = '/groups/divergent/{}_{}'.format(tid, gid)
+            return [
+                (GetStat(path=znode), lambda i: None),
+                (Log('converge-divergent-flag-disappeared',
+                     fields={'znode': znode}),
+                 noop)]
+
+        sequence = SequenceDispatcher([
+            (ReadReference(ref=self.currently_converging),
+             lambda i: pset()),
+            (Log('converge-all-groups',
+                 dict(group_infos=[self.group_infos[0]],
+                      currently_converging=[])),
+             lambda i: None),
+            unwrap_wrapped_effect(
+                BoundFields, dict(fields={'tenant_id': '00',
+                                          'scaling_group_id': 'g1'}),
+                get_bound_sequence('00', 'g1')),
+        ])
+        dispatcher = test_dispatcher(sequence)
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), [None])
+
 
 class GetMyDivergentGroupsTests(SynchronousTestCase):
 
