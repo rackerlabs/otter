@@ -404,7 +404,10 @@ def converge_all_groups(currently_converging, my_buckets, all_buckets,
             # deleted, and then the deletion happens, and then our GetStat
             # happens. This basically means it happens when one convergence is
             # starting as another one for the same group is ending.
-            if stat is not None:
+            if stat is None:
+                return msg('converge-divergent-flag-disappeared',
+                           znode=dirty_flag)
+            else:
                 return Effect(TenantScope(
                     converge_one_group(currently_converging,
                                        tenant_id, group_id, stat.version,

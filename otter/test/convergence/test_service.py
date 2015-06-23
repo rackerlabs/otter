@@ -469,9 +469,12 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         def get_bound_sequence(tid, gid):
             # since this GetStat is going to return None, no more effects will
             # be run. This is the crux of what we're testing.
+            znode = '/groups/divergent/{}_{}'.format(tid, gid)
             return [
-                (GetStat(path='/groups/divergent/{}_{}'.format(tid, gid)),
-                 lambda i: None)]
+                (GetStat(path=znode), lambda i: None),
+                (Log('converge-divergent-flag-disappeared',
+                     fields={'znode': znode}),
+                 noop)]
 
         sequence = SequenceDispatcher([
             (ReadReference(ref=self.currently_converging),
