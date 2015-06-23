@@ -397,12 +397,19 @@ def converge_all_groups(currently_converging, my_buckets, all_buckets,
               currently_converging=list(cc))
 
     def converge(tenant_id, group_id, dirty_flag):
-        return Effect(GetStat(dirty_flag)).on(
-            lambda stat: Effect(TenantScope(
-                converge_one_group(currently_converging,
-                                   tenant_id, group_id, stat.version,
-                                   build_timeout),
-                tenant_id)))
+        def got_stat(stat):
+            # If the node disappeared, ignore it. `stat` will be None here only
+            # after the group is removed from currently_converging, but before
+            # the divergent flag is deleted. This happens when we're "noticing"
+            # a divergent flag just we're also finishing up a convergence
+            # process for the same group.
+            if stat is not None:
+                return Effect(TenantScope(
+                    converge_one_group(currently_converging,
+                                       tenant_id, group_id, stat.version,
+                                       build_timeout),
+                    tenant_id))
+        return Effect(GetStat(dirty_flag)).on(got_stat)
 
     effs = []
     for info in group_infos:
