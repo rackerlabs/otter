@@ -55,7 +55,7 @@ def get_specific_scaling_groups(client, tenant_ids):
     defer.returnValue(r for r in results
                       if r.get('created_at') is not None and
                       r.get('desired') is not None and
-                      r.get('status') != 'DISABLED')
+                      r.get('status') not in ('DISABLED', 'ERROR'))
 
 
 @defer.inlineCallbacks
@@ -277,9 +277,7 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
 
     :return: :class:`Deferred` with None
     """
-    convergence_tids = None
-    if config.get('convergence-tenants', []):
-        convergence_tids = config['convergence-tenants']
+    convergence_tids = config.get('convergence-tenants', None)
     _client = client or connect_cass_servers(reactor, config['cassandra'])
     authenticator = authenticator or generate_authenticator(reactor,
                                                             config['identity'])
@@ -289,7 +287,7 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
                                        service_configs)
 
     # calculate metrics
-    if convergence_tids:
+    if convergence_tids is not None:
         cass_groups = yield get_specific_scaling_groups(
             _client, tenant_ids=convergence_tids)
     else:
