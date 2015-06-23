@@ -15,7 +15,7 @@ from kazoo.recipe.partitioner import PartitionState
 
 import mock
 
-from pyrsistent import freeze, pbag, pset, s
+from pyrsistent import freeze, pbag, pmap, pset, s
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
@@ -33,7 +33,7 @@ from otter.convergence.service import (
     converge_one_group,
     determine_active, execute_convergence, get_my_divergent_groups,
     non_concurrently)
-from otter.convergence.steps import ConvergeLater
+from otter.convergence.steps import ConvergeLater, CreateServer
 from otter.log.intents import BoundFields, Log, LogErr, get_log_dispatcher
 from otter.models.intents import (
     DeleteGroup,
@@ -745,6 +745,39 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         with sequence.consume():
             self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
 
+    def test_log_steps(self):
+        """The steps to be executed are logged to cloud feeds."""
+        step = CreateServer(server_config=pmap({"foo": "bar"}))
+
+        def plan(*args, **kwargs):
+            return pbag([step])
+
+        gacd = self._get_gacd_func(self.group.uuid)
+        eff = execute_convergence(self.tenant_id, self.group_id,
+                                  build_timeout=3600,
+                                  get_all_convergence_data=gacd,
+                                  plan=plan)
+
+        sequence = SequenceDispatcher([
+            (self.gsgi, lambda i: (self.group, self.manifest)),
+            (Log('convergence-create-servers',
+                 fields={'num_servers': 1, 'server_config': {'foo': 'bar'},
+                         'cloud_feed': True}),
+             noop),
+            (Log('execute-convergence', fields=mock.ANY), noop),
+            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
+             noop),
+            (Log('execute-convergence-results', fields=mock.ANY), noop),
+        ])
+
+        dispatcher = ComposedDispatcher([
+            base_dispatcher,
+            TypeDispatcher({ParallelEffects: perform_parallel_async}),
+            sequence])
+
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
+
     def test_deleting_group(self):
         """
         If group's status is DELETING, plan will be generated to delete
@@ -861,7 +894,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         with sequence.consume():
             self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
 
-    def test_reactivate_group_on_success(self):
+    def test_reactivate_group_on_success_after_steps(self):
         """
         When the group started in ERROR state, and convergence succeeds, the
         group is put back into ACTIVE.
@@ -874,6 +907,35 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         eff = execute_convergence(self.tenant_id, self.group_id,
                                   build_timeout=3600, plan=plan,
+                                  get_all_convergence_data=gacd)
+
+        sequence = SequenceDispatcher([
+            (self.gsgi, lambda i: self.gsgi_result),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
+             noop),
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            (UpdateGroupStatus(scaling_group=self.group,
+                               status=ScalingGroupStatus.ACTIVE),
+             noop),
+            (Log('group-status-active',
+                 dict(cloud_feed=True, status='ACTIVE')), noop)
+        ])
+        dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), StepResult.SUCCESS)
+
+    def test_reactivate_group_on_success_with_no_steps(self):
+        """
+        When the group started in ERROR state, and convergence succeeds, the
+        group is put back into ACTIVE, even if there were no steps to execute.
+        """
+        gacd = self._get_gacd_func(self.group.uuid)
+        self.manifest['state'].status = ScalingGroupStatus.ERROR
+
+        eff = execute_convergence(self.tenant_id, self.group_id,
+                                  build_timeout=3600,
+                                  plan=lambda *a, **k: pbag([]),
                                   get_all_convergence_data=gacd)
 
         sequence = SequenceDispatcher([
