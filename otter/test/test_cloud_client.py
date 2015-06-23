@@ -547,8 +547,7 @@ class CLBClientTests(SynchronousTestCase):
              "considered immutable.", 422, CLBDeletedError),
             ("The load balancer is deleted and considered immutable.",
              422, CLBDeletedError),
-            ("Load balancer not found.", 404, NoSuchCLBError),
-            ("OverLimit Retry...", 413, CLBRateLimitError)
+            ("Load balancer not found.", 404, NoSuchCLBError)
         ]
 
         for msg, code, err in json_responses_and_errs:
@@ -562,6 +561,26 @@ class CLBClientTests(SynchronousTestCase):
                     eff)
             self.assertEqual(cm.exception, err(msg, lb_id=self.lb_id))
 
+        # OverLimit Retry is different because it's produced by repose
+        over_limit = stub_pure_response(
+            json.dumps({
+                "overLimit": {
+                    "message": "OverLimit Retry...",
+                    "code": 413,
+                    "retryAfter": "2015-06-13T22:30:10Z",
+                    "details": "Error Details..."
+                }
+            }),
+            413)
+        with self.assertRaises(CLBRateLimitError) as cm:
+            sync_perform(
+                EQFDispatcher([(intent, service_request_eqf(over_limit))]),
+                eff)
+        self.assertEqual(
+            cm.exception,
+            CLBRateLimitError("OverLimit Retry...", lb_id=self.lb_id))
+
+        # Ignored errors
         bad_resps = [
             stub_pure_response(
                 json.dumps({
@@ -580,6 +599,11 @@ class CLBClientTests(SynchronousTestCase):
                     'message': "Cloud load balancers is down",
                     'code': 500}),
                 500),
+            stub_pure_response(
+                json.dumps({
+                    'message': "this is not an over limit message",
+                    'code': 413}),
+                413),
             stub_pure_response("random repose error message", 404),
             stub_pure_response("random repose error message", 413)
         ]

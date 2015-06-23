@@ -338,6 +338,7 @@ _CLB_DUPLICATE_NODES_PATTERN = re.compile(
     "on load balancer\.$")
 _CLB_NODE_LIMIT_PATTERN = re.compile(
     "^Nodes must not exceed \d+ per load balancer\.$")
+_CLB_OVER_LIMIT_PATTERN = re.compile("^OverLimit Retry...$")
 
 
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
@@ -474,8 +475,7 @@ def add_clb_nodes(lb_id, nodes):
 
     @_only_json_api_errors
     def _parse_known_errors(code, json_body):
-        mappings = map(
-            _expand_clb_matches,
+        mappings = _expand_clb_matches(
             [(422, _CLB_DUPLICATE_NODES_PATTERN, CLBDuplicateNodesError),
              (413, _CLB_NODE_LIMIT_PATTERN, CLBNodeLimitError)],
             lb_id)
@@ -514,16 +514,16 @@ def change_clb_node(lb_id, node_id, condition, weight):
     def _parse_known_errors(code, json_body):
         _process_clb_api_error(code, json_body, lb_id)
         _match_errors(
-            [_expand_clb_matches(
-                (404, _CLB_NO_SUCH_NODE_PATTERN, NoSuchCLBNodeError),
-                lb_id=lb_id, node_id=node_id)],
+            _expand_clb_matches(
+                [(404, _CLB_NO_SUCH_NODE_PATTERN, NoSuchCLBNodeError)],
+                lb_id=lb_id, node_id=node_id),
             code,
             json_body)
 
     return eff.on(error=_parse_known_errors)
 
 
-def _expand_clb_matches(matches_tuple, lb_id, node_id=None):
+def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
     """
     All CLB messages have only the keys ("message",), and the exception tpye
     takes a load balancer ID and maybe a node ID.  So expand a tuple that looks
@@ -541,8 +541,8 @@ def _expand_clb_matches(matches_tuple, lb_id, node_id=None):
     if node_id is not None:
         params["node_id"] = node_id
 
-    code, pattern, exc_type = matches_tuple
-    return (code, ("message",), pattern, partial(exc_type, **params))
+    return [(m[0], ("message",), m[1], partial(m[2], **params))
+            for m in matches_tuples]
 
 
 def _process_clb_api_error(api_error_code, json_body, lb_id):
@@ -557,13 +557,16 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
     :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
         :class:`NoSuchCLBError`, :class:`APIError` by itself
     """
-    mappings = map(
-        _expand_clb_matches,
-        [(413, None, CLBRateLimitError),  #TODO: add NOT node limit error
-         (422, _CLB_DELETED_PATTERN, CLBDeletedError),
-         (422, _CLB_PENDING_UPDATE_PATTERN, CLBPendingUpdateError),
-         (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)],
-        lb_id)
+    mappings = (
+        # overLimit is different than the other CLB messages because it's
+        # produced by repose
+        [(413, ("overLimit", "message"), _CLB_OVER_LIMIT_PATTERN,
+          partial(CLBRateLimitError, lb_id=lb_id))] +
+        _expand_clb_matches(
+            [(422, _CLB_DELETED_PATTERN, CLBDeletedError),
+             (422, _CLB_PENDING_UPDATE_PATTERN, CLBPendingUpdateError),
+             (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)],
+            lb_id))
     return _match_errors(mappings, api_error_code, json_body)
 
 
