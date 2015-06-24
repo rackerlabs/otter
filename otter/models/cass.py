@@ -807,11 +807,11 @@ class CassScalingGroup(object):
 
         return d.addCallback(_unmarshal_state)
 
-    def modify_state(self, modifier_callable, modify_state_reason=None,
-                     *args, **kwargs):
+    def modify_state(self, modifier_callable, *args, **kwargs):
         """
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
+        modify_state_reason = kwargs.pop('modify_state_reason', None)
         log = self.log.bind(
             system='CassScalingGroup.modify_state',
             modify_state_reason=modify_state_reason)
