@@ -14,8 +14,9 @@ from otter.util.http import headers
 
 class Response(object):
     """Fake response object"""
-    def __init__(self, code):
+    def __init__(self, code, headers={}):
         self.code = code
+        self.headers = headers
 
 
 def get_fake_treq(test_case, method, url, expected_args_and_kwargs, response):
@@ -68,25 +69,44 @@ class NovaServerTestCase(SynchronousTestCase):
             'headers': headers('token'),
             'pool': self.pool
         }
+        self.clock = Clock()
 
     def get_server(self, method, url, treq_args_kwargs, response, str_body):
         """
         Stub out treq, and return a nova server with
         """
         return nova.NovaServer(id=self.server_id, pool=self.pool,
+                               clock=self.clock,
                                treq=get_fake_treq(self, method, url,
                                                   treq_args_kwargs,
                                                   (response, str_body)))
 
     def test_delete(self):
         """
-        Delete calls the right endpoint and succeeds on 204.
+        Delete calls the right endpoint and tries until it gets 404
         """
         server = self.get_server('delete', 'novaurl/servers/server_id',
                                  ((), self.expected_kwargs),
                                  Response(204), "delete response")
         d = server.delete(self.rcs)
-        self.assertEqual('delete response', self.successResultOf(d))
+        self.assertNoResult(d)
+        server.treq = get_fake_treq(
+            self, 'delete', 'novaurl/servers/server_id',
+            ((), self.expected_kwargs), (Response(404), 'resp'))
+        self.clock.advance(5)
+        self.successResultOf(d)
+
+    def test_delete_times_out(self):
+        """
+        Keeps trying to delete and eventually gives up after 120 seconds
+        """
+        server = self.get_server('delete', 'novaurl/servers/server_id',
+                                 ((), self.expected_kwargs),
+                                 Response(204), "delete response")
+        d = server.delete(self.rcs)
+        self.assertNoResult(d)
+        self.clock.pump([5] * 24)
+        self.failureResultOf(d)
 
     def test_list_metadata(self):
         """
