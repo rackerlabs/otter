@@ -895,7 +895,6 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         log.bind.assert_called_once_with(
             system='CassScalingGroup.modify_state')
         log.bind().bind.assert_called_once_with(category='locking')
-        self.assertEqual(log.bind().bind().msg.call_count, 4)
 
     def test_modify_state_propagates_modifier_error_and_does_not_save(self):
         """
@@ -2054,7 +2053,6 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         log.bind.assert_called_once_with(
             system='CassScalingGroup.delete_group')
         log.bind().bind.assert_called_once_with(category='locking')
-        self.assertEqual(log.bind().bind().msg.call_count, 4)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')

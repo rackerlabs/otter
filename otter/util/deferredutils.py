@@ -242,17 +242,16 @@ def with_lock(reactor, lock, func, log=None, acquire_timeout=None,
     if log:
         log = log.bind(lock_status="Acquiring",
                        lock=lock,
-                       locked_func=func,
-                       log_acquisition_tb=''.join(traceback.format_stack()))
+                       locked_func=func)
         log.msg('Starting lock acquisition')
     d = defer.maybeDeferred(lock.acquire)
     if acquire_timeout is not None:
         timeout_deferred(d, acquire_timeout, reactor, 'Lock acquisition')
     if log:
-        d.addCallback(log_with_time, reactor, log, reactor.seconds(),
-                      'Lock acquisition', 'acquire_time')
-        d.addErrback(log_with_time, reactor, log, reactor.seconds(),
-                     'Lock acquisition failed')
+        d.addCallback(log_with_time, reactor, log.bind(lock_status='Acquired'),
+                      reactor.seconds(), 'Lock acquisition', 'acquire_time')
+        d.addErrback(log_with_time, reactor, log.bind(lock_status='Failed'),
+                     reactor.seconds(), 'Lock acquisition failed')
 
     held = [True]
 
