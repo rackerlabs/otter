@@ -611,7 +611,8 @@ class WithLockTests(SynchronousTestCase):
 
         self.reactor.advance(10)
         f = self.failureResultOf(d, TimedOutError)
-        self.assertEqual(f.value.message, 'Lock acquisition timed out after 9 seconds.')
+        self.assertEqual(f.value.message,
+                         'Lock acquisition timed out after 9 seconds.')
         self.log.msg.assert_called_with(
             'Lock acquisition failed in 10.0 seconds', lock_status='Failed',
             **self.log_fields)
