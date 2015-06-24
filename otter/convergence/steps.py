@@ -17,6 +17,9 @@ from twisted.python.constants import NamedConstant
 from zope.interface import Interface, implementer
 
 from otter.cloud_client import (
+    CreateServerConfigurationError,
+    CreateServerOverQuoteError,
+    create_server,
     has_code,
     service_request,
     set_nova_metadata_item)
@@ -63,52 +66,6 @@ def set_server_name(server_config_args, name_suffix):
     return set_in(server_config_args, ('server', 'name'), name)
 
 
-def _forbidden_plaintext(message):
-    return re.compile(
-        "^403 Forbidden\n\nAccess was denied to this resource\.\n\n ({0})$"
-        .format(message))
-
-_NOVA_403_NO_PUBLIC_NETWORK = _forbidden_plaintext(
-    "Networks \(00000000-0000-0000-0000-000000000000\) not allowed")
-_NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED = _forbidden_plaintext(
-    "Networks \(00000000-0000-0000-0000-000000000000,"
-    "11111111-1111-1111-1111-111111111111\) required but missing")
-_NOVA_403_RACKCONNECT_NETWORK_REQUIRED = _forbidden_plaintext(
-    "Exactly 1 isolated network\(s\) must be attached")
-
-
-def _parse_nova_user_error(api_error):
-    # TODO: Move this to cloud_client.py
-    """
-    Parse API errors for user failures on creating a server.
-
-    :param api_error: The error returned from Nova
-    :type api_error: :class:`APIError`
-
-    :return: the nova message as to why the creation failed, if it was a user
-        failure.  None otherwise.
-    :rtype: `str` or `None`
-    """
-    if api_error.code == 400:
-        message = try_json_with_keys(api_error.body,
-                                     ("badRequest", "message"))
-        if message:
-            return message
-
-    elif api_error.code == 403:
-        message = try_json_with_keys(api_error.body,
-                                     ("forbidden", "message"))
-        if message:
-            return message
-
-        for pat in (_NOVA_403_RACKCONNECT_NETWORK_REQUIRED,
-                    _NOVA_403_NO_PUBLIC_NETWORK,
-                    _NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED):
-            m = pat.match(api_error.body)
-            if m:
-                return m.groups()[0]
-
-
 @implementer(IStep)
 @attributes([Attribute('server_config', instance_of=PMap)])
 class CreateServer(object):
@@ -124,13 +81,7 @@ class CreateServer(object):
 
         def got_name(random_name):
             server_config = set_server_name(self.server_config, random_name)
-            return service_request(
-                ServiceType.CLOUD_SERVERS,
-                'POST',
-                'servers',
-                data=thaw(server_config),
-                success_pred=has_code(202),
-                reauth_codes=(401,))
+            return create_server(thaw(server_config))
 
         def report_success(result):
             """
@@ -143,17 +94,24 @@ class CreateServer(object):
 
         def report_failure(result):
             """
-            If the failure is an APIError with a recognized user error,
-            return a :obj:`StepResult.FAILURE` along with that user error as
-            a message, otherwise return a :obj:`StepResult.RETRY` without
-            a message.
+            If the failure is a :class:`CreateServerConfigurationError` or a
+            :class:`CreateServerOverQuoteError`, or a :class:`APIError` with
+            a 4XX status code, return a :obj:`StepResult.FAILURE` along with
+            that error a areason.
+
+            Otherwise, all other errors are considered non-terminal and a
+            :obj:`StepResult.RETRY` is returned.
             """
             err_type, error, traceback = result
-            if err_type == APIError:
-                message = _parse_nova_user_error(error)
-                if message is not None:
-                    return StepResult.FAILURE, [ErrorReason.String(message)]
 
+            terminal_error = (
+                err_type in (CreateServerConfigurationError,
+                             CreateServerOverQuoteError) or
+                (err_type == APIError and 400 <= error.code < 500)
+            )
+
+            if terminal_error:
+                return StepResult.FAILURE, [ErrorReason.Exception(result)]
             return StepResult.RETRY, [ErrorReason.Exception(result)]
 
         return eff.on(got_name).on(success=report_success,
