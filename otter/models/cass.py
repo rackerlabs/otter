@@ -807,10 +807,12 @@ class CassScalingGroup(object):
 
         return d.addCallback(_unmarshal_state)
 
-    def modify_state(self, modifier_callable, *args, **kwargs):
+    def modify_state(self, modifier_callable, modify_state_log=None,
+                     *args, **kwargs):
         """
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
+        log = modify_state_log if modify_state_log is not None else self.log
         log = self.log.bind(system='CassScalingGroup.modify_state')
         consistency = DEFAULT_CONSISTENCY
 
@@ -845,7 +847,8 @@ class CassScalingGroup(object):
         local_lock = self.local_locks.get_lock(self.uuid)
         return local_lock.run(
             with_lock, self.reactor, lock, _modify_state,
-            log.bind(category='locking'), acquire_timeout=150,
+            log.bind(category='locking', lock_reason='modify_state'),
+            acquire_timeout=150,
             release_timeout=30)
 
     def update_status(self, status):
@@ -1317,7 +1320,7 @@ class CassScalingGroup(object):
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         d = with_lock(self.reactor, lock, _delete_group,
-                      log.bind(category='locking'),
+                      log.bind(category='locking', lock_reason='delete_group'),
                       acquire_timeout=150,
                       release_timeout=30)
         # Cleanup /locks/<groupID> znode as it will not be required anymore
@@ -1678,7 +1681,8 @@ class CassScalingGroupCollection:
         lock.acquire = functools.partial(lock.acquire, timeout=5)
         start_time = self.reactor.seconds()
         d = with_lock(self.reactor, lock, lambda: None,
-                      otter_log.bind(system='health_check'))
+                      otter_log.bind(system='health_check',
+                                     lock_reason='kazoo_health_check'))
 
         d.addCallback(lambda _:
                       self.kz_client.delete(lock_path, recursive=True))

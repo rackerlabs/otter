@@ -491,7 +491,10 @@ class _Job(object):
             self.log.err(f, 'Launching server failed', **_log_capacity(state))
             return state
 
-        d = self.scaling_group.modify_state(handle_failure)
+        d = self.scaling_group.modify_state(
+            handle_failure,
+            modify_state_log=self.scaling_group.log.bind(
+                modify_state_reason='supervisor job failed: removing job'))
 
         def ignore_error_if_group_deleted(f):
             f.trap(NoSuchScalingGroupError)
@@ -529,7 +532,10 @@ class _Job(object):
                                **_log_capacity(state))
             return state
 
-        d = self.scaling_group.modify_state(handle_success)
+        d = self.scaling_group.modify_state(
+            handle_success,
+            modify_state_log=self.scaling_group.log.bind(
+                modify_state_reason='supervisor job succeeded: adding active'))
 
         def delete_if_group_deleted(f):
             f.trap(NoSuchScalingGroupError)

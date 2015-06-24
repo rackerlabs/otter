@@ -188,17 +188,24 @@ def execute_event(store, log, event, deleted_policy_ids):
     :param store: `IScalingGroupCollection` provider
     :param log: A bound log for logging
     :param event: event dict to execute
-    :param deleted_policy_ids: Set of policy ids that are deleted. Policy id will be added
-                               to this if its scaling group or policy has been deleted
-    :return: a deferred with None. Any error occurred during execution is logged
+    :param deleted_policy_ids: Set of policy ids that are deleted. Policy id
+        will be added to this if its scaling group or policy has been deleted
+    :return: a deferred with None. Any error occurred during execution is
+        logged
     """
-    tenant_id, group_id, policy_id = event['tenantId'], event['groupId'], event['policyId']
-    log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id, policy_id=policy_id)
+    tenant_id = event['tenantId']
+    group_id = event['groupId']
+    policy_id = event['policyId']
+    log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id,
+                   policy_id=policy_id)
     log.msg('Scheduler executing policy {policy_id}')
     group = store.get_scaling_group(log, tenant_id, group_id)
-    d = group.modify_state(partial(maybe_execute_scaling_policy,
-                                   log, generate_transaction_id(),
-                                   policy_id=policy_id, version=event['version']))
+    d = group.modify_state(
+        partial(maybe_execute_scaling_policy,
+                log, generate_transaction_id(),
+                policy_id=policy_id, version=event['version']),
+        modify_state_log=group.log.bind(
+            modify_state_reason='scheduler.execute_event'))
     d.addErrback(ignore_and_log, CannotExecutePolicyError,
                  log, 'Scheduler cannot execute policy {policy_id}')
 

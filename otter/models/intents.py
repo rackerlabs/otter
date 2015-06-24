@@ -19,7 +19,13 @@ class ModifyGroupState(object):
 @deferred_performer
 def perform_modify_group_state(dispatcher, mgs_intent):
     """Perform a :obj:`ModifyGroupState`."""
-    return mgs_intent.scaling_group.modify_state(mgs_intent.modifier)
+    group = mgs_intent.scaling_group
+    # TODO: Ideally we'd get the bound log from any BoundLog wrapper intent
+    # here, but we'd need an Intent specifically for that
+    return group.modify_state(
+        mgs_intent.modifier,
+        modify_state_log=group.log.bind(
+            modify_state_reason='ModifyGroupState intent'))
 
 
 @attributes(['tenant_id', 'group_id'])
