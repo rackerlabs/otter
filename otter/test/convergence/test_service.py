@@ -54,7 +54,7 @@ from otter.test.utils import (
     raise_to_exc_info,
     test_dispatcher,
     transform_eq,
-    unwrap_wrapped_effect)
+    nested_sequence)
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 
@@ -116,10 +116,10 @@ class ConvergerTests(SynchronousTestCase):
         exp_uid = str(uid)
         return SequenceDispatcher([
             (Func(uuid.uuid1), lambda i: uid),
-            unwrap_wrapped_effect(
-                BoundFields, dict(fields={'otter_service': 'converger',
-                                          'converger_run_id': exp_uid}),
-                intents)
+            (BoundFields(effect=mock.ANY,
+                         fields={'otter_service': 'converger',
+                                 'converger_run_id': exp_uid}),
+             nested_sequence(intents)),
         ])
 
     def test_buckets_acquired(self):
@@ -398,14 +398,12 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             (Log('converge-all-groups',
                  dict(group_infos=self.group_infos, currently_converging=[])),
              lambda i: None),
-            unwrap_wrapped_effect(
-                BoundFields, dict(fields={'tenant_id': '00',
-                                          'scaling_group_id': 'g1'}),
-                get_bound_sequence('00', 'g1')),
-            unwrap_wrapped_effect(
-                BoundFields, dict(fields={'tenant_id': '01',
-                                          'scaling_group_id': 'g2'}),
-                get_bound_sequence('01', 'g2')),
+            (BoundFields(mock.ANY, fields={'tenant_id': '00',
+                                           'scaling_group_id': 'g1'}),
+             nested_sequence(get_bound_sequence('00', 'g1'))),
+            (BoundFields(mock.ANY, fields={'tenant_id': '01',
+                                           'scaling_group_id': 'g2'}),
+             nested_sequence(get_bound_sequence('01', 'g2'))),
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
 
@@ -483,10 +481,9 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                  dict(group_infos=[self.group_infos[0]],
                       currently_converging=[])),
              lambda i: None),
-            unwrap_wrapped_effect(
-                BoundFields, dict(fields={'tenant_id': '00',
-                                          'scaling_group_id': 'g1'}),
-                get_bound_sequence('00', 'g1')),
+            (BoundFields(mock.ANY, fields={'tenant_id': '00',
+                                           'scaling_group_id': 'g1'}),
+             nested_sequence(get_bound_sequence('00', 'g1'))),
         ])
         dispatcher = test_dispatcher(sequence)
         with sequence.consume():

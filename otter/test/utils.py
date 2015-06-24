@@ -6,11 +6,13 @@ import os
 import sys
 from functools import partial, wraps
 from inspect import getargspec
+from operator import attrgetter
 
 from effect import (
     ComposedDispatcher, ParallelEffects, TypeDispatcher,
     base_dispatcher, sync_perform, sync_performer)
 from effect.async import perform_parallel_async
+from effect.fold import sequence
 from effect.testing import (
     SequenceDispatcher,
     resolve_effect as eff_resolve_effect,
@@ -23,6 +25,8 @@ import mock
 from pyrsistent import freeze, pmap
 
 from testtools.matchers import MatchesException, Mismatch
+
+from toolz.functoolz import compose
 
 import treq
 
@@ -693,25 +697,62 @@ def resolve_stubs(eff):
     return eff_resolve_stubs(base_dispatcher, eff)
 
 
-def unwrap_wrapped_effect(intent_class, kwargs,
-                          wrapee_intents_and_performers):
+def perform_sequence(seq, eff, base_dispatcher=None):
     """
-    Helper function to perform an intent that wraps another effect.  This
-    produces an intent-function tuple, to be used in a
-    :class:`SequenceDispatcher`, that expects that the wrapped effect
-    has an intents and its performers provided by
-    `wrapee_intents_and_performers`.
+    Create a :obj:`SequenceDispatcher` with the given ``seq``, and perform
+    ``eff`` with it.
 
-    :param list wrapee_intents_and_performers: List of tuple of intent and
-        its performers
-    :return: Tuple of (outer intent, internal effect performer)
+    :param base_dispatcher: an optional dispatcher to *actually* perform with,
+        but still ensuring that ``seq`` is consumed.
     """
-    def function(wrapper_intent):
-        seq_dispatcher = SequenceDispatcher(wrapee_intents_and_performers)
-        with seq_dispatcher.consume():
-            return sync_perform(seq_dispatcher, wrapper_intent.effect)
+    seq_dispatcher = SequenceDispatcher(seq)
+    if base_dispatcher is None:
+        base_dispatcher = seq_dispatcher
+    with seq_dispatcher.consume():
+        return sync_perform(base_dispatcher, eff)
 
-    return (intent_class(effect=mock.ANY, **kwargs), function)
+
+def nested_sequence(seq, get_effect=attrgetter('effect'),
+                    base_dispatcher=None):
+    """
+    Return a function of Intent -> a that performs an effect retrieved from the
+    intent (by accessing its `effect` attribute, by default) with the given
+    intent-sequence.
+
+    A demonstration is best::
+
+        SequenceDispatcher([
+            (BoundFields(effect=mock.ANY, fields={...}),
+             nested_sequence([(SomeIntent(), perform_some_intent)]))
+        ])
+
+    The point is that sometimes you have an intent that wraps another effect,
+    and you want to ensure that the nested effects follow some sequence in the
+    context of that wrapper intent.
+
+    `get_effect` defaults to attrgetter('effect'), so you can override it if
+    your intent stores its nested effect in a different attribute. Or, more
+    interestingly, if it's something other than a single effect, e.g. for
+    ParallelEffects see the :func:`parallel_nested_sequence` function.
+
+    :param seq: sequence of intents like :obj:`SequenceDispatcher` takes
+    """
+    return compose(
+        partial(perform_sequence, seq, base_dispatcher=base_dispatcher),
+        get_effect)
+
+
+def nested_parallel(seq, base_dispatcher=None):
+    """
+    Return a two-tuple for use in a :obj:`SequenceDispatcher` which ensures
+    that all the intents in ``seq`` are performed in parallel.
+
+    :param seq: sequence of intents like :obj:`SequenceDispatcher` takes
+    :param base_dispatcher: optional a base dispatcher to use for actually
+        performing the child effects.
+    """
+    return (ParallelEffects(effects=mock.ANY),
+            nested_sequence(seq, get_effect=lambda i: sequence(i.effects)))
 
 
 def test_dispatcher(disp=None):
