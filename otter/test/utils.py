@@ -624,7 +624,7 @@ def mock_group(state, tenant_id='tenant', group_id='group'):
     group.pause_modify_state = False
     group.modify_state_values = []
 
-    def fake_modify_state(f, *args, **kwargs):
+    def fake_modify_state(f, modify_state_reason=None, *args, **kwargs):
         d = maybeDeferred(f, group, state, *args, **kwargs)
         d.addCallback(lambda r: group.modify_state_values.append(r))
         if group.pause_modify_state:
