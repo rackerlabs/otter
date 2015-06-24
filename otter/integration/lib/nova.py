@@ -37,27 +37,17 @@ class NovaServer(object):
         :param rcs: an instance of
             :class:`otter.integration.lib.resources.TestResources`
         """
-        d = self.treq.delete(
-            "{}/servers/{}".format(rcs.endpoints["nova"], self.id),
-            headers=headers(str(rcs.token)),
-            pool=self.pool)
-        d.addCallback(check_success, [204])
-        d.addCallback(self.treq.content)
-        d.addCallback(lambda _: self._wait_to_delete(rcs))
-        return d
-
-    def _wait_to_delete(self, rcs):
-        def is_deleted():
-            d = self.treq.get(
+        def try_delete():
+            d = self.treq.delete(
                 "{}/servers/{}".format(rcs.endpoints["nova"], self.id),
-                headers=headers(str(rcs.token)), pool=self.pool)
-            d.addCallback(check_success, [404])
+                headers=headers(str(rcs.token)),
+                pool=self.pool)
+            d.addCallback(check_success, [404], _treq=self.treq)
             d.addCallback(self.treq.content)
-            d.addCallback(lambda _: None)
             return d
 
         return retry_and_timeout(
-            is_deleted, 120,
+            try_delete, 120,
             can_retry=terminal_errors_except(APIError),
             next_interval=repeating_interval(5),
             clock=self.clock,
