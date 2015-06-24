@@ -231,7 +231,7 @@ def log_with_time(result, reactor, log, start, msg, time_kwarg=None):
     return result
 
 
-def with_lock(reactor, lock, func, log=None, acquire_timeout=None, release_timeout=None):
+def with_lock(reactor, lock, func, log=None, acquire_timeout=None, release_timeout=None, held_too_long=120):
     """
     Context manager for any lock object that contains acquire() and release() methods
     """
@@ -246,8 +246,13 @@ def with_lock(reactor, lock, func, log=None, acquire_timeout=None, release_timeo
         d.addErrback(log_with_time, reactor, log, reactor.seconds(),
                      'Lock acquisition failed')
 
+    import traceback
+
+    held_info = ["Starting acquire", traceback.print_stack()]
+
     def release_lock(result):
         if log:
+            held_info.append("Starting release %r" % (result,))
             log.msg('Starting lock release')
         d = defer.maybeDeferred(lock.release)
         if release_timeout is not None:
@@ -255,9 +260,19 @@ def with_lock(reactor, lock, func, log=None, acquire_timeout=None, release_timeo
         if log:
             d.addCallback(
                 log_with_time, reactor, log, reactor.seconds(), 'Lock release', 'release_time')
-        return d.addCallback(lambda _: result)
+        def finished_release(_):
+            held_info[:] = []
+            return result
+        return d.addCallback(finished_release)
 
-    def lock_acquired(_):
+    def check_still_acquired():
+        if held_info:
+            log.err(Exception("Lock held too long!"), )
+
+    def lock_acquired(acquire_result):
+        held_info.append("Acquired %r" % (acquire_result,))
+        if log:
+            reactor.callLater(held_too_long, check_still_acquired)
         d = defer.maybeDeferred(func).addBoth(release_lock)
         return d
 
