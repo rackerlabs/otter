@@ -234,13 +234,16 @@ def log_with_time(result, reactor, log, start, msg, time_kwarg=None):
 
 
 def with_lock(reactor, lock, func, log=None, acquire_timeout=None,
-              release_timeout=None, held_too_long=120,
-              lock_reason="<no lock reason passed>"):
+              release_timeout=None, held_too_long=120):
     """
     Context manager for any lock object that contains acquire() and release()
     methods
     """
     if log:
+        log = log.bind(lock_status="Acquiring",
+                       lock=lock,
+                       locked_func=func,
+                       log_acquisition_tb=''.join(traceback.format_stack()))
         log.msg('Starting lock acquisition')
     d = defer.maybeDeferred(lock.acquire)
     if acquire_timeout is not None:
@@ -251,38 +254,37 @@ def with_lock(reactor, lock, func, log=None, acquire_timeout=None,
         d.addErrback(log_with_time, reactor, log, reactor.seconds(),
                      'Lock acquisition failed')
 
-    held_info = ["Starting acquire", lock_reason, func,
-                 ''.join(traceback.format_stack())]
+    held = [True]
 
-    def release_lock(result):
+    def release_lock(result, log):
         if log:
-            held_info.append("Starting release %r" % (result,))
-            log.msg('Starting lock release')
+            log.msg('Starting lock release', lock_status="Releasing")
         d = defer.maybeDeferred(lock.release)
         if release_timeout is not None:
             timeout_deferred(d, release_timeout, reactor, 'Lock release')
         if log:
             d.addCallback(
-                log_with_time, reactor, log, reactor.seconds(),
+                log_with_time, reactor, log.bind(lock_status="Released"),
+                reactor.seconds(),
                 'Lock release', 'release_time')
 
         def finished_release(_):
-            held_info[:] = []
+            held[0] = False
             return result
         return d.addCallback(finished_release)
 
     def check_still_acquired():
-        if held_info:
-            log.err(Exception("Lock held too long!"), held_info=held_info)
+        if held[0]:
+            log.err(Exception("Lock held too long!"))
 
-    def lock_acquired(acquire_result):
-        held_info.append("Acquired %r" % (acquire_result,))
+    def lock_acquired(acquire_result, log):
         if log:
+            log = log.bind(lock_status="Acquired")
             reactor.callLater(held_too_long, check_still_acquired)
-        d = defer.maybeDeferred(func).addBoth(release_lock)
+        d = defer.maybeDeferred(func).addBoth(release_lock, log)
         return d
 
-    d.addCallback(lock_acquired)
+    d.addCallback(lock_acquired, log)
     return d
 
 
