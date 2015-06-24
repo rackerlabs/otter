@@ -2,6 +2,8 @@
 Deferred utilities
 """
 
+import traceback
+
 from twisted.internet import defer
 
 from otter.util.retry import retry
@@ -231,9 +233,12 @@ def log_with_time(result, reactor, log, start, msg, time_kwarg=None):
     return result
 
 
-def with_lock(reactor, lock, func, log=None, acquire_timeout=None, release_timeout=None, held_too_long=120):
+def with_lock(reactor, lock, func, log=None, acquire_timeout=None,
+              release_timeout=None, held_too_long=120,
+              lock_reason="<no lock reason passed>"):
     """
-    Context manager for any lock object that contains acquire() and release() methods
+    Context manager for any lock object that contains acquire() and release()
+    methods
     """
     if log:
         log.msg('Starting lock acquisition')
@@ -246,9 +251,8 @@ def with_lock(reactor, lock, func, log=None, acquire_timeout=None, release_timeo
         d.addErrback(log_with_time, reactor, log, reactor.seconds(),
                      'Lock acquisition failed')
 
-    import traceback
-
-    held_info = ["Starting acquire", traceback.print_stack()]
+    held_info = ["Starting acquire", lock_reason, func,
+                 ''.join(traceback.format_stack())]
 
     def release_lock(result):
         if log:
@@ -259,7 +263,9 @@ def with_lock(reactor, lock, func, log=None, acquire_timeout=None, release_timeo
             timeout_deferred(d, release_timeout, reactor, 'Lock release')
         if log:
             d.addCallback(
-                log_with_time, reactor, log, reactor.seconds(), 'Lock release', 'release_time')
+                log_with_time, reactor, log, reactor.seconds(),
+                'Lock release', 'release_time')
+
         def finished_release(_):
             held_info[:] = []
             return result
@@ -267,7 +273,7 @@ def with_lock(reactor, lock, func, log=None, acquire_timeout=None, release_timeo
 
     def check_still_acquired():
         if held_info:
-            log.err(Exception("Lock held too long!"), )
+            log.err(Exception("Lock held too long!"), held_info=held_info)
 
     def lock_acquired(acquire_result):
         held_info.append("Acquired %r" % (acquire_result,))
