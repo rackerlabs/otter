@@ -429,15 +429,15 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
             (BoundFields(mock.ANY, dict(tenant_id='01',
                                         scaling_group_id='g2')),
-             lambda i: i.effect),
-            (GetStat(path='/groups/divergent/01_g2'),
-             lambda i: ZNodeStatStub(version=5)),
-            (TenantScope(
-                Effect(('converge', '01', 'g2', 5, 3600)),
-                '01'),
-             lambda tscope: tscope.effect),
-            (('converge', '01', 'g2', 5, 3600),
-             lambda i: 'converged two!'),
+             nested_sequence([
+                (GetStat(path='/groups/divergent/01_g2'),
+                 lambda i: ZNodeStatStub(version=5)),
+                (TenantScope(mock.ANY, '01'),
+                 nested_sequence([
+                    (('converge', '01', 'g2', 5, 3600),
+                     lambda i: 'converged two!'),
+                 ])),
+             ]))
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
 
