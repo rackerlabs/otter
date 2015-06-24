@@ -807,13 +807,14 @@ class CassScalingGroup(object):
 
         return d.addCallback(_unmarshal_state)
 
-    def modify_state(self, modifier_callable, modify_state_log=None,
+    def modify_state(self, modifier_callable, modify_state_reason=None,
                      *args, **kwargs):
         """
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
-        log = modify_state_log if modify_state_log is not None else self.log
-        log = self.log.bind(system='CassScalingGroup.modify_state')
+        log = self.log.bind(
+            system='CassScalingGroup.modify_state',
+            modify_state_reason=modify_state_reason)
         consistency = DEFAULT_CONSISTENCY
 
         @self.with_timestamp

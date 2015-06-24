@@ -204,8 +204,7 @@ def execute_event(store, log, event, deleted_policy_ids):
         partial(maybe_execute_scaling_policy,
                 log, generate_transaction_id(),
                 policy_id=policy_id, version=event['version']),
-        modify_state_log=group.log.bind(
-            modify_state_reason='scheduler.execute_event'))
+        modify_state_reason='scheduler.execute_event')
     d.addErrback(ignore_and_log, CannotExecutePolicyError,
                  log, 'Scheduler cannot execute policy {policy_id}')
 

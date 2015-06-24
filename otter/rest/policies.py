@@ -375,8 +375,7 @@ class OtterPolicy(object):
             partial(controller.maybe_execute_scaling_policy,
                     self.log, transaction_id(request),
                     policy_id=self.policy_id),
-            modify_state_log=group.log.bind(
-                modify_state_reason='execute_policy'))
+            modify_state_reason='execute_policy')
         d.addCallback(lambda _: "{}")  # Return value TBD
         return d
 

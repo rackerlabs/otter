@@ -129,8 +129,7 @@ class OtterConfig(object):
         deferred.addCallback(
             lambda _: rec.modify_state(
                 _get_launch_and_obey_config_change,
-                modify_state_log=rec.log.bind(
-                    modify_state_reason='edit_config_for_scaling_group')))
+                modify_state_reason='edit_config_for_scaling_group'))
         return deferred
 
 

@@ -634,6 +634,7 @@ def mock_group(state, tenant_id='tenant', group_id='group'):
             return d
 
     group.modify_state.side_effect = fake_modify_state
+    group.log = mock_log()
     return group
 
 

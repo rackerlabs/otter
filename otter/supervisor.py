@@ -493,8 +493,7 @@ class _Job(object):
 
         d = self.scaling_group.modify_state(
             handle_failure,
-            modify_state_log=self.scaling_group.log.bind(
-                modify_state_reason='supervisor job failed: removing job'))
+            modify_state_reason='supervisor job failed: removing job')
 
         def ignore_error_if_group_deleted(f):
             f.trap(NoSuchScalingGroupError)
@@ -534,8 +533,7 @@ class _Job(object):
 
         d = self.scaling_group.modify_state(
             handle_success,
-            modify_state_log=self.scaling_group.log.bind(
-                modify_state_reason='supervisor job succeeded: adding active'))
+            modify_state_reason='supervisor job succeeded: adding active')
 
         def delete_if_group_deleted(f):
             f.trap(NoSuchScalingGroupError)

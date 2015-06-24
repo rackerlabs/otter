@@ -191,8 +191,7 @@ def delete_group(log, trans_id, group, force):
             # when executing policy
             d = group.modify_state(
                 check_and_delete,
-                modify_state_log=group.log.bind(
-                    modify_state_reason='delete_group'))
+                modify_state_reason='delete_group')
     else:
         if force:
             d = empty_group(log, trans_id, group)
@@ -248,7 +247,7 @@ def empty_group(log, trans_id, group):
                 trans_id,
                 group_info['groupConfiguration'],
                 launch_config=group_info['launchConfiguration']),
-            modify_state_log=group.log.bind(modify_state_reason='empty_group'))
+            modify_state_reason='empty_group')
         return d
 
     d.addCallback(modify_state)

@@ -388,8 +388,7 @@ class OtterGroups(object):
             d = group.modify_state(partial(
                 controller.obey_config_change, self.log,
                 transaction_id(request), config, launch_config=launch),
-                modify_state_log=group.log.bind(
-                    modify_state_reason='create_new_scaling_group'))
+                modify_state_reason='create_new_scaling_group')
             return d.addCallback(lambda _: result)
 
         deferred.addCallback(_do_obey_config_change)
@@ -728,6 +727,5 @@ class OtterServers(object):
                     transaction_id(request), server_id,
                     extract_bool_arg(request, 'replace', True),
                     extract_bool_arg(request, 'purge', True)),
-            modify_state_log=group.log.bind(
-                modify_state_reason='delete_server'))
+            modify_state_reason='delete_server')
         return d

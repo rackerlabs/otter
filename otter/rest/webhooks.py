@@ -374,8 +374,7 @@ class OtterExecute(object):
                 partial(controller.maybe_execute_scaling_policy,
                         bound_log, transaction_id(request),
                         policy_id=policy_id),
-                modify_state_log=group.log.bind(
-                    modify_state_reason='execute_webhook'))
+                modify_state_reason='execute_webhook')
 
         d.addCallback(execute_policy)
         d.addErrback(log_informational_webhook_failure)
