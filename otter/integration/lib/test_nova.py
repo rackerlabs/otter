@@ -105,9 +105,6 @@ class NovaServerTestCase(SynchronousTestCase):
                                  Response(204), "delete response")
         d = server.delete(self.rcs)
         self.assertNoResult(d)
-        server.treq = get_fake_treq(
-            self, 'delete', 'novaurl/servers/server_id',
-            ((), self.expected_kwargs), (Response(204), 'del resp'))
         self.clock.pump([5] * 24)
         self.failureResultOf(d)
 
