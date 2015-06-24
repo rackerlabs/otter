@@ -30,9 +30,9 @@ def _pending_update_to_transient(f):
     API failure is a 422 PENDING_UDPATE failure, and if so, re-raises a
     TransientRetryError instead.
     """
-    if f.check(APIError):
-        if f.value.code == 422 and 'PENDING_UPDATE' in f.value.body:
-            raise TransientRetryError()
+    f.trap(APIError)
+    if f.value.code == 422 and 'PENDING_UPDATE' in f.value.body:
+        raise TransientRetryError()
     return f
 
 
