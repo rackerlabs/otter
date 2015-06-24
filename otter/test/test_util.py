@@ -636,6 +636,17 @@ class WithLockTests(SynchronousTestCase):
         f = self.failureResultOf(d, TimedOutError)
         self.assertEqual(f.value.message, 'Lock release timed out after 9 seconds.')
 
+    def test_held_too_long(self):
+        """When the lock is held for some time, a log message is emitted."""
+        d = with_lock(self.reactor, self.lock, self.method, self.log)
+        self.assertNoResult(d)
+        self.acquire_d.callback(None)
+        self.method.assert_called_once_with()
+        self.reactor.advance(120)
+        self.log.msg.assert_called_with(
+            "Lock held for more than 120 seconds!", isError=True,
+            lock_status='Acquired', **self.log_fields)
+
 
 class DelayTests(SynchronousTestCase):
     """

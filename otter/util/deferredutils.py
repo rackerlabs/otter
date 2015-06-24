@@ -268,7 +268,8 @@ def with_lock(reactor, lock, func, log=default_log, acquire_timeout=None,
 
     def check_still_acquired(log):
         if held[0]:
-            log.err(Exception("Lock held too long!"))
+            log.msg("Lock held for more than %s seconds!" % (held_too_long,),
+                    isError=True)
 
     def lock_acquired(acquire_result, log):
         log = log.bind(lock_status="Acquired")
