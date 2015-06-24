@@ -384,13 +384,14 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         eff = self._converge_all_groups(['00_g1', '01_g2'])
 
         def get_bound_sequence(tid, gid):
-            tscope = TenantScope(Effect(('converge', tid, gid, 1, 3600)), tid)
             return [
                 (GetStat(path='/groups/divergent/{}_{}'.format(tid, gid)),
                  lambda i: ZNodeStatStub(version=1)),
-                (tscope, lambda i: i.effect),
-                (('converge', tid, gid, 1, 3600),
-                 lambda i: 'converged {}!'.format(tid))]
+                (TenantScope(mock.ANY, tid),
+                 nested_sequence([
+                     (('converge', tid, gid, 1, 3600),
+                      lambda i: 'converged {}!'.format(tid))])),
+            ]
 
         sequence = SequenceDispatcher([
             (ReadReference(ref=self.currently_converging),
