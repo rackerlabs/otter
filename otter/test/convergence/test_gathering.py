@@ -40,7 +40,6 @@ from otter.convergence.model import (
     CLBNode,
     CLBNodeCondition,
     CLBNodeType,
-    NovaServer,
     RCv3Description,
     RCv3Node,
     ServerState)

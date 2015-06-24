@@ -33,6 +33,7 @@ from otter.cloud_client import (
     NoSuchCLBError,
     NoSuchCLBNodeError,
     NoSuchServerError,
+    NovaComputeFaultError,
     NovaRateLimitError,
     ServerMetadataOverLimitError,
     ServiceRequest,
@@ -631,6 +632,19 @@ class CLBClientTests(SynchronousTestCase):
         self.assert_parses_common_clb_errors(expected.intent, eff)
 
 
+def _perform_one_request(intent, effect, response_code, response_body):
+    """
+    Perform a request effect using EQFDispatcher, providing the given
+    body and status code.
+    """
+    dispatcher = EQFDispatcher([(
+        intent,
+        service_request_eqf(
+            stub_pure_response(response_body, response_code))
+    )])
+    return sync_perform(dispatcher, effect)
+
+
 class NovaClientTests(SynchronousTestCase):
     """
     Tests for Nova client functions, such as :obj:`set_nova_metadata_item`.
@@ -654,7 +668,7 @@ class NovaClientTests(SynchronousTestCase):
     def assert_handles_no_such_server(self, intent, effect, server_id):
         """
         If the provided intent returns a response consistent with a server not
-        existing, then performing the effect will return a
+        existing, then performing the effect will raise a
         :class:`NoSuchServerError`.
         """
         message = "Server does not exist"
@@ -675,7 +689,7 @@ class NovaClientTests(SynchronousTestCase):
     def assert_handles_nova_rate_limiting(self, intent, effect):
         """
         If the provided intent returns a response consistent with Nova
-        rate-limiting requests, then performing the effect will return a
+        rate-limiting requests, then performing the effect will raise a
         :class:`NovaRateLimitError`.
         """
         failure_body = {
@@ -697,6 +711,28 @@ class NovaClientTests(SynchronousTestCase):
         self.assertEqual(cm.exception,
                          NovaRateLimitError("OverLimit Retry..."))
 
+    def assert_handles_nova_compute_fault(self, intent, effect):
+        """
+        If the provided intent returns a response consistent with a Nova
+        compute fault error, then performing the request will raise a
+        :class:`NovaComputeFaultError`
+        """
+        failure_body = {
+            "computeFault": {
+                "code": 500,
+                "message": ("The server has either erred or is incapable of "
+                            "performing the requested operation."),
+            }
+        }
+        with self.assertRaises(NovaComputeFaultError) as cm:
+            _perform_one_request(intent, effect, 500, json.dumps(failure_body))
+
+        self.assertEqual(
+            cm.exception,
+            NovaComputeFaultError(
+                "The server has either erred or is incapable of performing "
+                "the requested operation."))
+
     def test_set_nova_metadata_item_success(self):
         """
         Produce a request setting a metadata item on a Nova server, which
@@ -715,7 +751,7 @@ class NovaClientTests(SynchronousTestCase):
 
     def test_set_nova_metadata_item_too_many_metadata_items(self):
         """
-        Return a :class:`ServerMetadataOverLimitError` if there are too many
+        Raises a :class:`ServerMetadataOverLimitError` if there are too many
         metadata items on a server.
         """
         server_id, expected, real = self._setup_for_set_nova_metadata_item()
@@ -736,20 +772,16 @@ class NovaClientTests(SynchronousTestCase):
             ServerMetadataOverLimitError(message,
                                          server_id=six.text_type(server_id)))
 
-    def test_set_nova_metadata_item_no_such_server(self):
+    def test_set_nova_metadata_item_standard_errors(self):
         """
-        Return a :class:`NoSuchServerError` if the server doesn't exist.
+        Raise a :class:`NoSuchServerError` if the server doesn't exist.
+        Raise a :class:`NovaRateLimitError` if Nova starts rate-limiting
+        requests.
+        Raise a :class:`NovaComputeFaultError` if Nova fails.
         """
         server_id, expected, eff = self._setup_for_set_nova_metadata_item()
         self.assert_handles_no_such_server(expected.intent, eff, server_id)
-
-    def test_set_nova_metadata_rate_limiting(self):
-        """
-        Return a :class:`NovaRateLimitError` if Nova starts rate-limiting
-        requests.
-        """
-        server_id, expected, eff = self._setup_for_set_nova_metadata_item()
-        self.assert_handles_nova_rate_limiting(expected.intent, eff)
+        self.assert_handles_nova_compute_fault(expected.intent, eff)
 
     def _setup_for_get_server_details(self):
         """
@@ -788,3 +820,4 @@ class NovaClientTests(SynchronousTestCase):
         server_id, expected, eff = self._setup_for_get_server_details()
         self.assert_handles_no_such_server(expected.intent, eff, server_id)
         self.assert_handles_nova_rate_limiting(expected.intent, eff)
+        self.assert_handles_nova_compute_fault(expected.intent, eff)

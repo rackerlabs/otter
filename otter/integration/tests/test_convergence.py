@@ -43,7 +43,7 @@ region = os.environ['AS_REGION']
 # not throw an exception.  None is a valid value for convergence_tenant.
 convergence_tenant = os.environ.get('AS_CONVERGENCE_TENANT')
 otter_key = os.environ.get('AS_AUTOSCALE_SC_KEY', 'autoscale')
-otter_url = os.environ.get('AS_AUTOSCALE_LOCAL_URL')
+otter_local_url = os.environ.get('AS_AUTOSCALE_LOCAL_URL')
 nova_key = os.environ.get('AS_NOVA_SC_KEY', 'cloudServersOpenStack')
 clb_key = os.environ.get('AS_CLB_SC_KEY', 'cloudLoadBalancers')
 
@@ -65,6 +65,25 @@ def not_mimic():
     something truthy.
     """
     return not bool(os.environ.get("AS_USING_MIMIC", False))
+
+
+def mimic():
+    return not not_mimic()
+
+
+def get_resource_mapping():
+    """
+    Get resource mapping based on the environment settings
+    """
+    res = {'nova': (nova_key,), 'loadbalancers': (clb_key,)}
+    if otter_local_url is not None:
+        res['otter'] = ("badkey", otter_local_url)
+    else:
+        res['otter'] = (otter_key,)
+    if mimic():
+        res['mimic_nova'] = (mimic_nova_key,)
+        res['mimic_clb'] = (mimic_clb_key,)
+    return res
 
 
 class TestHelper(object):
@@ -286,10 +305,7 @@ class TestConvergence(unittest.TestCase):
         return (
             self.identity.authenticate_user(
                 rcs,
-                resources={
-                    "otter": (otter_key, otter_url),
-                    "nova": (nova_key,),
-                },
+                resources=get_resource_mapping(),
                 region=region,
             ).addCallback(self.scaling_group.start, self)
             .addCallback(self.untouchable_scaling_group.start, self)
@@ -351,10 +367,7 @@ class TestConvergence(unittest.TestCase):
         return (
             self.identity.authenticate_user(
                 rcs,
-                resources={
-                    "otter": (otter_key, otter_url),
-                    "nova": (nova_key,),
-                },
+                resources=get_resource_mapping(),
                 region=region,
             ).addCallback(self.scaling_group.start, self)
             .addCallback(self.scale_up_to_max.start, self)
@@ -419,11 +432,7 @@ class TestConvergence(unittest.TestCase):
             return (
                 self.identity.authenticate_user(
                     rcs,
-                    resources={
-                        "otter": (otter_key, otter_url),
-                        "nova": (nova_key,),
-                        "loadbalancers": (clb_key,)
-                    },
+                    resources=get_resource_mapping(),
                     region=region,
                 ).addCallback(self.clb.start, self)
                 .addCallback(self.clb.wait_for_state, "ACTIVE", 600)
@@ -442,6 +451,7 @@ class TestConvergence(unittest.TestCase):
         This will strip them of their association with Autoscale.
         """
         self.removed_ids = ids
+        self.addCleanup(delete_servers, ids, rcs, self.helper.pool)
         return gatherResults([
             NovaServer(id=_id, pool=self.helper.pool).update_metadata({}, rcs)
             for _id in ids]).addCallback(lambda _: rcs)
@@ -601,11 +611,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         )
         return self.identity.authenticate_user(
             self.rcs,
-            resources={
-                "otter": (otter_key, otter_url),
-                "nova": (nova_key,),
-                "mimic_nova": (mimic_nova_key,)
-            },
+            resources=get_resource_mapping(),
             region=region
         )
 
@@ -1034,7 +1040,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             max_entities=10)
         yield self.helper.start_group_and_wait(group, self.rcs, desired=5)
 
-    @skip_me("Autoscale does not yet handle Nova over-quota errors: #1470")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-025")
     @inlineCallbacks
@@ -1126,10 +1131,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         )
         yield identity.authenticate_user(
             rcs,
-            resources={
-                "otter": (otter_key, otter_url),
-                "nova": (nova_key,)
-            },
+            resources=get_resource_mapping(),
             region=region
         )
 
@@ -1214,13 +1216,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
         )
         return self.identity.authenticate_user(
             self.rcs,
-            resources={
-                "otter": (otter_key, otter_url),
-                "nova": (nova_key,),
-                "loadbalancers": (clb_key,),
-                "mimic_nova": (mimic_nova_key,),
-                "mimic_clb": (mimic_clb_key,)
-            },
+            resources=get_resource_mapping(),
             region=region
         ).addCallback(lambda _: gatherResults([
             clb.start(self.rcs, self)
@@ -1495,11 +1491,7 @@ class ConvergenceTestsWith2CLBs(unittest.TestCase):
         )
         return self.identity.authenticate_user(
             self.rcs,
-            resources={
-                "otter": (otter_key, otter_url),
-                "nova": (nova_key,),
-                "loadbalancers": (clb_key,)
-            },
+            resources=get_resource_mapping(),
             region=region
         ).addCallback(lambda _: gatherResults([
             clb.start(self.rcs, self)
