@@ -151,8 +151,7 @@ class ScalingGroup(object):
 
     def _endpoint(self, rcs):
         return "{}/groups/{}".format(
-            str(rcs.endpoints["otter"]), self.group_id
-
+            str(rcs.endpoints["otter"]), self.group_id)
 
     def set_launch_config(self, rcs, launch_config):
         """Changes the launch configuration used by the scaling group.
