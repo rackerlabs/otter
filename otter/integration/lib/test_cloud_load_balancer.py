@@ -22,6 +22,16 @@ class _FakeRCS(object):
     token = "token"
 
 
+pending_update_response = [
+    Response(422),
+    json.dumps({
+        "message": ("Load Balancer '12345' has a status of "
+                    "'PENDING_UPDATE' and is considered immutable."),
+        "code": 422
+    })
+]
+
+
 class CLBTests(SynchronousTestCase):
     """
     Tests for the :class:`CloudLoadBalancer` API calls.
@@ -59,94 +69,136 @@ class CLBTests(SynchronousTestCase):
         d = clb.list_nodes(self.rcs)
         self.assertEqual({'nodes': []}, self.successResultOf(d))
 
-    def test_update_node(self):
+    def assert_mutate_function_retries_until_success(
+            self, mutate_callable, expected_args, success_response,
+            expected_result):
         """
-        Update node calls the right endpoint and succeeds on 202.
-        """
-        clb = self.get_clb(
-            'put', 'clburl/loadbalancers/12345/nodes/54321',
-            (('{"node": {"weight": 5}}',), self.expected_kwargs),
-            Response(202), '')
-        d = clb.update_node(self.rcs, 54321, weight=5)
-        self.assertEqual('', self.successResultOf(d))
+        Assert that some CLB function that mutates the CLB will retry on
+        pending update until the function succeeds.
 
-    def test_delete_nodes_retries_until_success(self):
-        """
-        Deleting one or more nodes calls the right endpoint and succeeds on
-        202.
+        :param mutate_callable: a callable which takes a clb argument and
+            a clock argument - this callable should call the CLB's mutate
+            function with the required arguments and return the function's
+            return value.  For example:
+            ``lambda clb, clk: clb.update_node(..., clock=clk)``
+        :param expected_args: What are the expected treq arguments?  This
+            should be an array of
+            [method, url, (expected args, expected kwargs)]
+        :param success_response: a tuple of (Response, string response body)
+            which should be the successful response back from the API
+        :param expected_result: What is the expected successful result of the
+            function that is called by ``mutate_callable``
         """
         clock = Clock()
-        self.expected_kwargs['params'] = [("id", 11111), ("id", 22222)]
-        main_treq_args = ['delete', 'clburl/loadbalancers/12345/nodes',
-                          ((), self.expected_kwargs)]
+        clb = self.get_clb(*(expected_args + pending_update_response))
 
-        pending_update = {
-            "message": ("Load Balancer '12345' has a status of "
-                        "'PENDING_UPDATE' and is considered immutable."),
-            "code": 422
-        }
+        d = mutate_callable(clb, clock)
 
-        clb = self.get_clb(
-            *(main_treq_args + [Response(422), json.dumps(pending_update)]))
-
-        d = clb.delete_nodes(self.rcs, (11111, 22222), clock=clock)
         self.assertNoResult(d)
         clock.pump([3])
         self.assertNoResult(d)
 
         clb.treq = get_fake_treq(
-            *([self] + main_treq_args + [(Response(202), "")]))
+            *([self] + expected_args + [success_response]))
 
         clock.pump([3])
-        self.assertEqual(self.successResultOf(d), "")
+        self.assertEqual(self.successResultOf(d), expected_result)
 
-    def test_delete_nodes_retries_until_timeout(self):
+    def assert_mutate_function_retries_until_timeout(
+            self, mutate_callable, expected_args, timeout=60):
         """
-        If the CLB is in PENDING_UPDATE state, retries executing the delete
-        every 3 seconds until it times out at 60 seconds.
+        Assert that some CLB function that mutates the CLB will retry on
+        pending update until the function times out.
+
+        :param mutate_callable: a callable which takes a clb argument and
+            a clock argument - this callable should call the CLB's mutate
+            function with the required arguments and return the function's
+            return value.  For example:
+            ``lambda clb, clk: clb.update_node(..., clock=clk)``
+        :param expected_args: What are the expected treq arguments?  This
+            should be an array of
+            [method, url, (expected args, expected kwargs)]
+        :param int timeout: When does your function time out retrying?
         """
         clock = Clock()
-        pending_update = {
-            "message": ("Load Balancer '12345' has a status of "
-                        "'PENDING_UPDATE' and is considered immutable."),
-            "code": 422
-        }
-        self.expected_kwargs['params'] = [("id", 11111), ("id", 22222)]
-        clb = self.get_clb(
-            'delete', 'clburl/loadbalancers/12345/nodes',
-            ((), self.expected_kwargs),
-            Response(422), json.dumps(pending_update))
+        clb = self.get_clb(*(expected_args + pending_update_response))
 
-        d = clb.delete_nodes(self.rcs, (11111, 22222), clock=clock)
-
-        # Note that the timeout is 60 seconds, which is in
-        # cloud_load_balancer's delete function implementation
+        d = mutate_callable(clb, clock)
         self.assertNoResult(d)
+
+        for _ in range((timeout - 1)/3):
+            clock.pump([3])
+            self.assertNoResult(d)
+
         clock.pump([3])
-        self.assertNoResult(d)
-        clock.pump([3] * 19)
         self.failureResultOf(d, TimedOutError)
 
-    def test_delete_nodes_fails_on_non_422_PENDING_UDPATE(self):
+    def assert_mutate_function_does_not_retry_if_not_pending_update(
+            self, mutate_callable, expected_args):
         """
-        If the CLB is in PENDING_UPDATE state, retries executing the delete
-        every 3 seconds until it times out at 60 seconds.
+        Assert that some CLB function that mutates the CLB will not retry if
+        the error is not a pending update.
+
+        :param mutate_callable: a callable which takes a clb argument and
+            a clock argument - this callable should call the CLB's mutate
+            function with the required arguments and return the function's
+            return value.  For example:
+            ``lambda clb, clk: clb.update_node(..., clock=clk)``
+        :param expected_args: What are the expected treq arguments?  This
+            should be an array of
+            [method, url, (expected args, expected kwargs)]
         """
         clock = Clock()
-        pending_update = {
+        pending_delete = {
             "message": ("Load Balancer '12345' has a status of "
                         "'PENDING_DELETE' and is considered immutable."),
             "code": 422
         }
-        self.expected_kwargs['params'] = [("id", 11111), ("id", 22222)]
         clb = self.get_clb(
-            'delete', 'clburl/loadbalancers/12345/nodes',
-            ((), self.expected_kwargs),
-            Response(422), json.dumps(pending_update))
-
-        d = clb.delete_nodes(self.rcs, (11111, 22222), clock=clock)
-
+            *(expected_args + [Response(422), json.dumps(pending_delete)]))
+        d = mutate_callable(clb, clock)
         self.failureResultOf(d, APIError)
+
+    def test_update_node(self):
+        """
+        Update node calls the right endpoint, succeeds on 202, and retries
+        on pending update for 60 seconds.
+        """
+        main_treq_args = ['put', 'clburl/loadbalancers/12345/nodes/54321',
+                          (('{"node": {"weight": 5}}',), self.expected_kwargs)]
+
+        def update(clb, clock):
+            return clb.update_node(self.rcs, 54321, weight=5, clock=clock)
+
+        self.assert_mutate_function_retries_until_success(
+            update, main_treq_args, (Response(202), ""), "")
+
+        self.assert_mutate_function_retries_until_timeout(
+            update, main_treq_args, 60)
+
+        self.assert_mutate_function_does_not_retry_if_not_pending_update(
+            update, main_treq_args)
+
+    def test_delete_node_retries_until_success(self):
+        """
+        Deleting one or more nodes calls the right endpoint, succeeds on
+        202, and retries on pending update for 60 seconds.
+        """
+        self.expected_kwargs['params'] = [("id", 11111), ("id", 22222)]
+        main_treq_args = ['delete', 'clburl/loadbalancers/12345/nodes',
+                          ((), self.expected_kwargs)]
+
+        def delete(clb, clock):
+            return clb.delete_nodes(self.rcs, (11111, 22222), clock=clock)
+
+        self.assert_mutate_function_retries_until_success(
+            delete, main_treq_args, (Response(202), ""), "")
+
+        self.assert_mutate_function_retries_until_timeout(
+            delete, main_treq_args, 60)
+
+        self.assert_mutate_function_does_not_retry_if_not_pending_update(
+            delete, main_treq_args)
 
 
 class WaitForNodesTestCase(SynchronousTestCase):

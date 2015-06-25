@@ -65,11 +65,20 @@ class CloudLoadBalancer(object):
         scaling group.  See also the lib.autoscale.create_scaling_group_dict
         function for more details.
         """
-
         return {
             "port": 80,
             "loadBalancerId": self.clb_id,
         }
+
+    def endpoint(self, rcs):
+        """
+        :param TestResources rcs: The resources used to make appropriate API
+            calls with.
+
+        :return: this load balancer's endpoint
+        """
+        return "{0}/loadbalancers/{1}".format(
+            str(rcs.endpoints['loadbalancers']), self.clb_id)
 
     def get_state(self, rcs):
         """Returns the current state of the cloud load balancer.
@@ -81,10 +90,7 @@ class CloudLoadBalancer(object):
         """
         return (
             self.treq.get(
-                "%s/loadbalancers/%s" % (
-                    str(rcs.endpoints["loadbalancers"]),
-                    self.clb_id
-                ),
+                self.endpoint(rcs),
                 headers=headers(str(rcs.token)),
                 pool=self.pool,
             )
@@ -184,10 +190,7 @@ class CloudLoadBalancer(object):
         """
         return (
             self.treq.delete(
-                "%s/loadbalancers/%s" % (
-                    str(rcs.endpoints["loadbalancers"]),
-                    self.clb_id
-                ),
+                self.endpoint(rcs),
                 headers=headers(str(rcs.token)),
                 pool=self.pool
             ).addCallback(
@@ -219,10 +222,7 @@ class CloudLoadBalancer(object):
 
         """
         d = self.treq.get(
-            "{0}/loadbalancers/{1}/nodes".format(
-                str(rcs.endpoints["loadbalancers"]),
-                self.clb_id
-            ),
+            "{0}/nodes".format(self.endpoint(rcs)),
             headers=headers(str(rcs.token)),
             pool=self.pool
         )
@@ -282,7 +282,7 @@ class CloudLoadBalancer(object):
         )
 
     def update_node(self, rcs, node_id, weight=None, condition=None,
-                    type=None):
+                    type=None, clock=None):
         """
         Update a node's attributes.  At least one of the optional parameters
         must be provided.
@@ -304,18 +304,24 @@ class CloudLoadBalancer(object):
         data = [("weight", weight), ("condition", condition), ("type", type)]
         data = {k: v for k, v in data if v is not None}
 
-        d = self.treq.put(
-            "{0}/loadbalancers/{1}/nodes/{2}".format(
-                str(rcs.endpoints["loadbalancers"]),
-                self.clb_id, node_id
-            ),
-            json.dumps({"node": data}),
-            headers=headers(str(rcs.token)),
-            pool=self.pool
+        def really_change():
+            d = self.treq.put(
+                "{0}/nodes/{1}".format(self.endpoint(rcs), node_id),
+                json.dumps({"node": data}),
+                headers=headers(str(rcs.token)),
+                pool=self.pool
+            )
+            d.addCallback(check_success, [202], _treq=self.treq)
+            d.addCallbacks(self.treq.content, _pending_update_to_transient)
+            return d
+
+        return retry_and_timeout(
+            really_change, 60,
+            can_retry=terminal_errors_except(TransientRetryError),
+            next_interval=repeating_interval(3),
+            clock=clock or reactor,
+            deferred_description="Trying to change node {0}".format(node_id)
         )
-        d.addCallback(check_success, [202], _treq=self.treq)
-        d.addCallback(self.treq.content)
-        return d
 
     def delete_nodes(self, rcs, node_ids, clock=None):
         """
@@ -330,8 +336,7 @@ class CloudLoadBalancer(object):
         """
         def really_delete():
             d = self.treq.delete(
-                "{0}/loadbalancers/{1}/nodes".format(
-                    str(rcs.endpoints["loadbalancers"]), self.clb_id),
+                "{0}/nodes".format(self.endpoint(rcs)),
                 params=[('id', node_id) for node_id in node_ids],
                 headers=headers(str(rcs.token)),
                 pool=self.pool
