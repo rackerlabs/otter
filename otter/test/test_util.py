@@ -540,7 +540,7 @@ class WithLockTests(SynchronousTestCase):
         self.reactor.advance(120)
         self.assertNotIn(
             self.too_long_message,
-            (call[1][0] for call in self.log.msg.mock_calls) )
+            (call[1][0] for call in self.log.msg.mock_calls))
 
     def test_acquire_release_no_log(self):
         """
