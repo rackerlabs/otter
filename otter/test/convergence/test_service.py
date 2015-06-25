@@ -317,7 +317,22 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version),
              lambda i: raise_(BadVersionError())),
-            (LogErr(CheckFailureValue(BadVersionError()), 'mark-clean-failure',
+            (Log('mark-clean-skipped',
+                 dict(path='/groups/divergent/tenant-id_g1',
+                      dirty_version=self.version)), lambda i: None)
+        ])
+        self._verify_sequence(sequence)
+
+    def test_delete_node_other_error(self):
+        """When marking clean raises arbitrary errors, an error is logged."""
+        sequence = SequenceDispatcher([
+            (('ec', self.tenant_id, self.group_id, 3600),
+             lambda i: StepResult.SUCCESS),
+            (DeleteNode(path='/groups/divergent/tenant-id_g1',
+                        version=self.version),
+             lambda i: raise_(ZeroDivisionError())),
+            (LogErr(CheckFailureValue(ZeroDivisionError()),
+                    'mark-clean-failure',
                     dict(path='/groups/divergent/tenant-id_g1',
                          dirty_version=self.version)), lambda i: None)
         ])
