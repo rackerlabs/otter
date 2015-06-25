@@ -748,6 +748,23 @@ def nested_sequence(seq, get_effect=attrgetter('effect'),
         get_effect)
 
 
+def nested_parallel(parallel, fallback_dispatcher=base_dispatcher):
+    """
+    Return a two-tuple for use in a :obj:`SequenceDispatcher` which ensures
+    that all the intents in ``parallel`` are performed in parallel. Note that
+    the items in ``parallel`` must match the order that they're given to the
+    :func:`effect.parallel` function, since the order of inputs affects the
+    order of results.
+
+    :param parallel: sequence of (intent, (intent -> result) function), like
+        what :obj:`SequenceDispatcher` accepts.
+    :param fallback_dispatcher: an optional dispatcher to compose onto the
+        sequence dispatcher.
+    """
+    return (ParallelEffects(effects=mock.ANY),
+            nested_sequence(seq, get_effect=lambda i: sequence(i.effects)))
+
+
 def test_dispatcher(disp=None):
     disps = [
         base_dispatcher,
