@@ -119,6 +119,8 @@ class CLBTests(SynchronousTestCase):
 
         d = clb.delete_nodes(self.rcs, (11111, 22222), clock=clock)
 
+        # Note that the timeout is 60 seconds, which is in
+        # cloud_load_balancer's delete function implementation
         self.assertNoResult(d)
         clock.pump([3])
         self.assertNoResult(d)
