@@ -12,6 +12,9 @@ msg_types = {
                        "to CLB {clb_id}"),
     "converge-all-groups": "Attempting to converge all dirty groups",
     "converge-all-groups-error": "Error while converging all groups",
+    "converge-divergent-flag-disappeared":
+        "Divergent flag {znode} disappeared when trying to start convergence. "
+        "This should be harmless.",
     "converge-fatal-error": (
         "Fatal error while converging group {scaling_group_id}."),
     "converge-non-fatal-error": (

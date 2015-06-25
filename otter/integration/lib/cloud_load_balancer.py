@@ -127,7 +127,10 @@ class CloudLoadBalancer(object):
         :param TestResources rcs: The resources used to make appropriate API
             calls with.
         """
-        return self.delete(rcs)
+        # TODO: Ideally .addErrback(err) should do the job but doing it
+        # causes the error to get propogated to trial after logging it
+        return self.delete(rcs).addErrback(
+            lambda f: msg("error deleting clb: {}".format(f)))
 
     def start(self, rcs, test):
         """Creates the cloud load balancer and launches it in the cloud.

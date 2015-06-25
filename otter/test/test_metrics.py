@@ -29,11 +29,13 @@ from otter.metrics import (
     GroupMetrics,
     MetricsService,
     Options,
+    QUERY_GROUPS_OF_TENANTS,
     add_to_cloud_metrics,
     collect_metrics,
     get_all_metrics,
     get_all_metrics_effects,
     get_scaling_groups,
+    get_specific_scaling_groups,
     get_tenant_metrics,
     makeService,
     metrics_log,
@@ -49,6 +51,30 @@ from otter.test.utils import (
     patch,
     resolve_effect,
 )
+
+
+class GetSpecificScalingGroupsTests(SynchronousTestCase):
+    """Tests for :func:`get_specific_scaling_groups`."""
+
+    def test_query(self):
+        def _exec(query, params, c):
+            return succeed(exec_args[(query, freeze(params))])
+        client = mock.Mock(spec=CQLClient)
+        rows = [
+            {'created_at': '0', 'desired': 'some', 'status': 'ACTIVE'},
+            {'desired': 'some', 'status': 'ACTIVE'},  # no created_at
+            {'created_at': '0', 'status': 'ACTIVE'},  # no desired
+            {'created_at': '0', 'desired': 'some'},   # no status
+            {'created_at': '0', 'desired': 'some', 'status': 'DISABLED'},
+            {'created_at': '0', 'desired': 'some', 'status': 'ERROR'}]
+        expected_query = QUERY_GROUPS_OF_TENANTS.format(tids="'foo', 'bar'")
+        exec_args = {(expected_query, freeze({})): rows}
+
+        client.execute.side_effect = _exec
+
+        results = self.successResultOf(
+            get_specific_scaling_groups(client, ['foo', 'bar']))
+        self.assertEqual(list(results), [rows[0], rows[3]])
 
 
 class GetScalingGroupsTests(SynchronousTestCase):
@@ -368,6 +394,9 @@ class CollectMetricsTests(SynchronousTestCase):
         self.connect_cass_servers.return_value = self.client
 
         self.groups = mock.Mock()
+        self.get_specific_scaling_groups = patch(
+            self, 'otter.metrics.get_specific_scaling_groups',
+            return_value=succeed(self.groups))
         self.get_scaling_groups = patch(
             self, 'otter.metrics.get_scaling_groups',
             return_value=succeed(self.groups))
@@ -390,7 +419,7 @@ class CollectMetricsTests(SynchronousTestCase):
                        'cloudLoadBalancers': 'clb', 'rackconnect': 'rc'}
 
         self.dispatcher = base_dispatcher
-        self.get_full_dispatcher = lambda r, auth, log, cfgs: self.dispatcher
+        self.get_legacy_dispatcher = lambda r, auth, log, cfgs: self.dispatcher
 
     def _fake_perform(self, dispatcher, effect):
         """
@@ -408,12 +437,34 @@ class CollectMetricsTests(SynchronousTestCase):
         _reactor = mock.Mock()
         d = collect_metrics(_reactor, self.config,
                             perform=self._fake_perform,
-                            get_full_dispatcher=self.get_full_dispatcher)
+                            get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
         self.get_scaling_groups.assert_called_once_with(
             self.client, props=['status'], group_pred=IsCallable())
+        self.get_all_metrics.assert_called_once_with(
+            self.dispatcher, self.groups, _print=False)
+        self.add_to_cloud_metrics.assert_called_once_with(
+            self.config['metrics']['ttl'], 'r', 107, 26, 1,
+            log=metrics_log)
+        self.client.disconnect.assert_called_once_with()
+
+    def test_metrics_collected_convergence_tenants(self):
+        """
+        Metrics is collected after getting groups from cass and servers
+        from nova and it is added to blueflood
+        """
+        self.config['convergence-tenants'] = ['foo', 'bar']
+        _reactor = mock.Mock()
+        d = collect_metrics(_reactor, self.config,
+                            perform=self._fake_perform,
+                            get_legacy_dispatcher=self.get_legacy_dispatcher)
+        self.assertIsNone(self.successResultOf(d))
+
+        self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
+        self.get_specific_scaling_groups.assert_called_once_with(
+            self.client, tenant_ids=['foo', 'bar'])
         self.get_all_metrics.assert_called_once_with(
             self.dispatcher, self.groups, _print=False)
         self.add_to_cloud_metrics.assert_called_once_with(
@@ -428,7 +479,7 @@ class CollectMetricsTests(SynchronousTestCase):
         client = mock.Mock(spec=['disconnect'])
         d = collect_metrics(mock.Mock(), self.config, client=client,
                             perform=self._fake_perform,
-                            get_full_dispatcher=self.get_full_dispatcher)
+                            get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
         self.assertFalse(self.connect_cass_servers.called)
         self.assertFalse(client.disconnect.called)
@@ -440,7 +491,7 @@ class CollectMetricsTests(SynchronousTestCase):
         _reactor, auth = mock.Mock(), mock.Mock()
         d = collect_metrics(_reactor, self.config, authenticator=auth,
                             perform=self._fake_perform,
-                            get_full_dispatcher=self.get_full_dispatcher)
+                            get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
         self.get_all_metrics.assert_called_once_with(
             self.dispatcher, self.groups, _print=False)
