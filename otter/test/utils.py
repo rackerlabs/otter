@@ -12,7 +12,6 @@ from effect import (
     ComposedDispatcher, ParallelEffects, TypeDispatcher,
     base_dispatcher, sync_perform, sync_performer)
 from effect.async import perform_parallel_async
-from effect.fold import sequence
 from effect.testing import (
     SequenceDispatcher,
     resolve_effect as eff_resolve_effect,
@@ -744,21 +743,9 @@ def nested_sequence(seq, get_effect=attrgetter('effect'),
         sequence dispatcher.
     """
     return compose(
-        partial(perform_sequence, seq, fallback_dispatcher=fallback_dispatcher),
+        partial(perform_sequence, seq,
+                fallback_dispatcher=fallback_dispatcher),
         get_effect)
-
-
-def nested_parallel(seq, fallback_dispatcher=base_dispatcher):
-    """
-    Return a two-tuple for use in a :obj:`SequenceDispatcher` which ensures
-    that all the intents in ``seq`` are performed in parallel.
-
-    :param seq: sequence of intents like :obj:`SequenceDispatcher` takes
-    :param fallback_dispatcher: an optional dispatcher to compose onto the
-        sequence dispatcher.
-    """
-    return (ParallelEffects(effects=mock.ANY),
-            nested_sequence(seq, get_effect=lambda i: sequence(i.effects)))
 
 
 def test_dispatcher(disp=None):
