@@ -502,6 +502,11 @@ class WithLockTests(SynchronousTestCase):
         self.log = mock_log()
         self.log_fields = {'lock': self.lock, 'locked_func': self.method}
 
+        # This is shared between multiple tests, and used in negative
+        # assertions. Centralizing the definition means that if the message
+        # changes the negative assertions will also be updated.
+        self.too_long_message = "Lock held for more than 120 seconds!"
+
     def test_acquire_release(self):
         """
         Acquires, calls method, releases and returns method's result. Logs time taken
@@ -529,6 +534,13 @@ class WithLockTests(SynchronousTestCase):
             release_time=3.0, lock_status='Released', **self.log_fields)
 
         self.assertEqual(self.successResultOf(d), 'result')
+
+        # And since the release successfully happened, the "held too long" log
+        # message will _not_ be emitted
+        self.reactor.advance(120)
+        self.assertNotIn(
+            self.too_long_message,
+            (call[1][0] for call in self.log.msg.mock_calls) )
 
     def test_acquire_release_no_log(self):
         """
@@ -645,8 +657,8 @@ class WithLockTests(SynchronousTestCase):
         self.method.assert_called_once_with()
         self.reactor.advance(120)
         self.log.msg.assert_called_with(
-            "Lock held for more than 120 seconds!", isError=True,
-            lock_status='Acquired', **self.log_fields)
+            self.too_long_message,
+            isError=True, lock_status='Acquired', **self.log_fields)
 
 
 class DelayTests(SynchronousTestCase):
