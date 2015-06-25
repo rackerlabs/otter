@@ -697,7 +697,7 @@ def resolve_stubs(eff):
     return eff_resolve_stubs(base_dispatcher, eff)
 
 
-def perform_sequence(seq, eff, fallback_dispatcher=None):
+def perform_sequence(seq, eff, fallback_dispatcher=base_dispatcher):
     """
     Create a :obj:`SequenceDispatcher` with the given ``seq``, and perform
     ``eff`` with it.
@@ -715,7 +715,7 @@ def perform_sequence(seq, eff, fallback_dispatcher=None):
 
 
 def nested_sequence(seq, get_effect=attrgetter('effect'),
-                    fallback_dispatcher=None):
+                    fallback_dispatcher=base_dispatcher):
     """
     Return a function of Intent -> a that performs an effect retrieved from the
     intent (by accessing its `effect` attribute, by default) with the given
@@ -748,7 +748,7 @@ def nested_sequence(seq, get_effect=attrgetter('effect'),
         get_effect)
 
 
-def nested_parallel(seq, fallback_dispatcher=None):
+def nested_parallel(seq, fallback_dispatcher=base_dispatcher):
     """
     Return a two-tuple for use in a :obj:`SequenceDispatcher` which ensures
     that all the intents in ``seq`` are performed in parallel.
