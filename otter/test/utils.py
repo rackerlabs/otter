@@ -697,23 +697,25 @@ def resolve_stubs(eff):
     return eff_resolve_stubs(base_dispatcher, eff)
 
 
-def perform_sequence(seq, eff, base_dispatcher=None):
+def perform_sequence(seq, eff, fallback_dispatcher=None):
     """
     Create a :obj:`SequenceDispatcher` with the given ``seq``, and perform
     ``eff`` with it.
 
-    :param base_dispatcher: an optional dispatcher to *actually* perform with,
-        but still ensuring that ``seq`` is consumed.
+    :param fallback_dispatcher: an optional dispatcher to compose onto the
+        sequence dispatcher.
     """
-    seq_dispatcher = SequenceDispatcher(seq)
-    if base_dispatcher is None:
-        base_dispatcher = seq_dispatcher
-    with seq_dispatcher.consume():
-        return sync_perform(base_dispatcher, eff)
+    sequence = SequenceDispatcher(seq)
+    if fallback_dispatcher is not None:
+        dispatcher = ComposedDispatcher([sequence, fallback_dispatcher])
+    else:
+        dispatcher = sequence
+    with sequence.consume():
+        return sync_perform(dispatcher, eff)
 
 
 def nested_sequence(seq, get_effect=attrgetter('effect'),
-                    base_dispatcher=None):
+                    fallback_dispatcher=None):
     """
     Return a function of Intent -> a that performs an effect retrieved from the
     intent (by accessing its `effect` attribute, by default) with the given
@@ -736,20 +738,24 @@ def nested_sequence(seq, get_effect=attrgetter('effect'),
     ParallelEffects see the :func:`parallel_nested_sequence` function.
 
     :param seq: sequence of intents like :obj:`SequenceDispatcher` takes
+    :param get_effect: callable to get the inner effect from the wrapper
+        intent.
+    :param fallback_dispatcher: an optional dispatcher to compose onto the
+        sequence dispatcher.
     """
     return compose(
-        partial(perform_sequence, seq, base_dispatcher=base_dispatcher),
+        partial(perform_sequence, seq, fallback_dispatcher=fallback_dispatcher),
         get_effect)
 
 
-def nested_parallel(seq, base_dispatcher=None):
+def nested_parallel(seq, fallback_dispatcher=None):
     """
     Return a two-tuple for use in a :obj:`SequenceDispatcher` which ensures
     that all the intents in ``seq`` are performed in parallel.
 
     :param seq: sequence of intents like :obj:`SequenceDispatcher` takes
-    :param base_dispatcher: optional a base dispatcher to use for actually
-        performing the child effects.
+    :param fallback_dispatcher: an optional dispatcher to compose onto the
+        sequence dispatcher.
     """
     return (ParallelEffects(effects=mock.ANY),
             nested_sequence(seq, get_effect=lambda i: sequence(i.effects)))
