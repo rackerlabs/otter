@@ -189,7 +189,9 @@ def delete_group(log, trans_id, group, force):
             # Delete only if desired is 0 which must be done with a lock to
             # ensure desired is not getting modified by another thread/node
             # when executing policy
-            d = group.modify_state(check_and_delete)
+            d = group.modify_state(
+                check_and_delete,
+                modify_state_reason='delete_group')
     else:
         if force:
             d = empty_group(log, trans_id, group)
@@ -244,7 +246,8 @@ def empty_group(log, trans_id, group):
                 log,
                 trans_id,
                 group_info['groupConfiguration'],
-                launch_config=group_info['launchConfiguration']))
+                launch_config=group_info['launchConfiguration']),
+            modify_state_reason='empty_group')
         return d
 
     d.addCallback(modify_state)

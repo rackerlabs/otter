@@ -1017,7 +1017,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         server is deleted
         """
         self.group.modify_state.side_effect = (
-            lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
+            lambda *args, **kw:
+                fail(NoSuchScalingGroupError('tenant', 'group')))
         d = Deferred()
         self.del_job.return_value.start.return_value = d
 
@@ -1036,7 +1037,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         audit logged as a "server.deletable" event.
         """
         self.group.modify_state.side_effect = (
-            lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
+            lambda *args, **kw:
+                fail(NoSuchScalingGroupError('tenant', 'group')))
 
         self.job.start(self.mock_launch)
         self.completion_deferred.callback({'id': 'yay'})
@@ -1058,7 +1060,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         failure can be ignored (not logged)
         """
         self.group.modify_state.side_effect = (
-            lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
+            lambda *args, **kw:
+                fail(NoSuchScalingGroupError('tenant', 'group')))
 
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
@@ -1070,7 +1073,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         is logged
         """
         self.group.modify_state.side_effect = (
-            lambda *args: fail(DummyException('e')))
+            lambda *args, **kw: fail(DummyException('e')))
 
         self.job.start(self.mock_launch)
         self.completion_deferred.callback({'id': 'active'})
