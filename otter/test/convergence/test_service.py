@@ -525,9 +525,6 @@ class GetMyDivergentGroupsTests(SynchronousTestCase):
 
 def _get_dispatcher():
     return ComposedDispatcher([
-        TypeDispatcher({
-            ParallelEffects: perform_parallel_async,
-        }),
         reference_dispatcher,
         base_dispatcher,
     ])
