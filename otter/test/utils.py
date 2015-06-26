@@ -10,7 +10,7 @@ from operator import attrgetter
 
 from effect import (
     ComposedDispatcher, ParallelEffects, TypeDispatcher,
-    base_dispatcher, sync_perform, sync_performer)
+    base_dispatcher, sync_perform)
 from effect.async import perform_parallel_async
 from effect.testing import (
     SequenceDispatcher,
@@ -37,7 +37,6 @@ from twisted.python.failure import Failure
 from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
 
-from otter.cloud_client import concretize_service_request
 from otter.convergence.model import NovaServer
 from otter.log.bound import BoundLog
 from otter.models.interface import IScalingGroup
@@ -818,45 +817,6 @@ def transform_eq(transformer, rhs):
                 self.comparisons, rhs)
 
     return TransformedEq()
-
-
-def get_fake_service_request_performer(stub_response):
-    """
-    For sanity's sake, attempt to fake performing a service request, including
-    predicate handlers, so we can also test the predicate handlers.
-
-    :param service_request: the :class:`ServiceRequest` to "perform"
-    :param stub_response: a tuple of (:class:`StubResponse`, string body),
-        supposedly the "response" of an http request
-    """
-    if not isinstance(stub_response, basestring):
-        try:
-            stub_response = (stub_response[0], json.dumps(stub_response[-1]))
-        except TypeError:
-            stub_response = (stub_response[0], str(stub_response[-1]))
-
-    @sync_performer
-    def the_performer(_, service_request_intent):
-        service_configs = mock.MagicMock()
-        service_configs.__getitem__.return_value = {
-            'name': 'service_name',
-            'region': 'region',
-            'url': 'http://url'
-        }
-        eff = concretize_service_request(
-            authenticator=mock.MagicMock(),
-            log=mock.MagicMock(),
-            service_configs=service_configs,
-            throttler=lambda stype, method: None,
-            tenant_id='000000',
-            service_request=service_request_intent)
-
-        # "authenticate"
-        eff = resolve_effect(eff, ('token', []))
-        # make request
-        return resolve_effect(eff, stub_response)
-
-    return the_performer
 
 
 def raise_(e):
