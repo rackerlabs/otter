@@ -603,6 +603,17 @@ def get_client_ts(reactor):
     return defer.succeed(int(reactor.seconds() * 1000000))
 
 
+def _check_deleting(group, get_deleting=False):
+    """
+    Given a single group from reading the scaling group table, and whether
+    a deleting group should be returns, either returns the group or raises
+    a :class:`NoSuchScalingGroupError`.
+    """
+    if not get_deleting and group['deleting']:
+        raise NoSuchScalingGroupError(group['tenantId'], group['groupId'])
+    return group
+
+
 @implementer(IScalingGroup)
 class CassScalingGroup(object):
     """
@@ -720,11 +731,6 @@ class CassScalingGroup(object):
             }
             return m
 
-        def check_deleting(group):
-            if not get_deleting and group['deleting']:
-                raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
-            return group
-
         view_query = _cql_view_manifest.format(
             cf=self.group_table)
         del_query = _cql_delete_all_in_group.format(
@@ -735,7 +741,7 @@ class CassScalingGroup(object):
                           DEFAULT_CONSISTENCY,
                           NoSuchScalingGroupError(self.tenant_id, self.uuid),
                           self.log)
-        d.addCallback(check_deleting)
+        d.addCallback(_check_deleting, get_deleting)
         d.addCallback(_generate_manifest_group_part)
 
         if with_policies:
@@ -800,12 +806,8 @@ class CassScalingGroup(object):
                           NoSuchScalingGroupError(self.tenant_id, self.uuid),
                           self.log)
 
-        def check_deleting(group):
-            if not get_deleting and group['deleting']:
-                raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
-            return group
-
-        return d.addCallback(check_deleting).addCallback(_unmarshal_state)
+        d.addCallback(_check_deleting, get_deleting)
+        return d.addCallback(_unmarshal_state)
 
     def modify_state(self, modifier_callable, *args, **kwargs):
         """
