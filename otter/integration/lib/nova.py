@@ -10,7 +10,7 @@ from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 from twisted.python.log import msg
 
 from otter.util.deferredutils import retry_and_timeout
-from otter.util.http import check_success, headers
+from otter.util.http import APIError, check_success, headers
 from otter.util.retry import (
     TransientRetryError,
     repeating_interval,
@@ -19,7 +19,8 @@ from otter.util.retry import (
 
 
 @attributes(["id", "pool",
-             Attribute("treq", default_value=treq)])
+             Attribute("treq", default_value=treq),
+             Attribute("clock", default_value=reactor)])
 class NovaServer(object):
     """
     Represents an existing server in Nova.
@@ -36,11 +37,22 @@ class NovaServer(object):
         :param rcs: an instance of
             :class:`otter.integration.lib.resources.TestResources`
         """
-        return self.treq.delete(
-            "{}/servers/{}".format(rcs.endpoints["nova"], self.id),
-            headers=headers(str(rcs.token)),
-            pool=self.pool
-        ).addCallback(check_success, [204]).addCallback(self.treq.content)
+        def try_delete():
+            d = self.treq.delete(
+                "{}/servers/{}".format(rcs.endpoints["nova"], self.id),
+                headers=headers(str(rcs.token)),
+                pool=self.pool)
+            d.addCallback(check_success, [404], _treq=self.treq)
+            d.addCallback(self.treq.content)
+            return d
+
+        return retry_and_timeout(
+            try_delete, 120,
+            can_retry=terminal_errors_except(APIError),
+            next_interval=repeating_interval(5),
+            clock=self.clock,
+            deferred_description=(
+                "Waiting for server {} to get deleted".format(self.id)))
 
     def list_metadata(self, rcs):
         """

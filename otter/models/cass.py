@@ -153,11 +153,6 @@ _cql_insert_group_state = (
     '"policyTouched", paused, desired) VALUES(:tenantId, :groupId, :active, '
     ':pending, :groupTouched, :policyTouched, :paused, :desired) '
     'USING TIMESTAMP :ts')
-_cql_view_group_state = (
-    'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at, status '
-    'FROM {cf} '
-    'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND deleting=false;')
 
 # --- Event related queries
 _cql_insert_group_event = (
@@ -608,6 +603,17 @@ def get_client_ts(reactor):
     return defer.succeed(int(reactor.seconds() * 1000000))
 
 
+def _check_deleting(group, get_deleting=False):
+    """
+    Given a single group from reading the scaling group table, and whether
+    a deleting group should be returns, either returns the group or raises
+    a :class:`NoSuchScalingGroupError`.
+    """
+    if not get_deleting and group['deleting']:
+        raise NoSuchScalingGroupError(group['tenantId'], group['groupId'])
+    return group
+
+
 @implementer(IScalingGroup)
 class CassScalingGroup(object):
     """
@@ -725,11 +731,6 @@ class CassScalingGroup(object):
             }
             return m
 
-        def check_deleting(group):
-            if not get_deleting and group['deleting']:
-                raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
-            return group
-
         view_query = _cql_view_manifest.format(
             cf=self.group_table)
         del_query = _cql_delete_all_in_group.format(
@@ -740,7 +741,7 @@ class CassScalingGroup(object):
                           DEFAULT_CONSISTENCY,
                           NoSuchScalingGroupError(self.tenant_id, self.uuid),
                           self.log)
-        d.addCallback(check_deleting)
+        d.addCallback(_check_deleting, get_deleting)
         d.addCallback(_generate_manifest_group_part)
 
         if with_policies:
@@ -788,14 +789,14 @@ class CassScalingGroup(object):
         return d.addCallback(lambda group:
                              _jsonloads_data(group['launch_config']))
 
-    def view_state(self, consistency=None):
+    def view_state(self, consistency=None, get_deleting=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_state`
         """
         if consistency is None:
             consistency = DEFAULT_CONSISTENCY
 
-        view_query = _cql_view_group_state.format(cf=self.group_table)
+        view_query = _cql_view_manifest.format(cf=self.group_table)
         del_query = _cql_delete_all_in_group.format(
             cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
@@ -805,13 +806,17 @@ class CassScalingGroup(object):
                           NoSuchScalingGroupError(self.tenant_id, self.uuid),
                           self.log)
 
+        d.addCallback(_check_deleting, get_deleting)
         return d.addCallback(_unmarshal_state)
 
     def modify_state(self, modifier_callable, *args, **kwargs):
         """
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
-        log = self.log.bind(system='CassScalingGroup.modify_state')
+        modify_state_reason = kwargs.pop('modify_state_reason', None)
+        log = self.log.bind(
+            system='CassScalingGroup.modify_state',
+            modify_state_reason=modify_state_reason)
         consistency = DEFAULT_CONSISTENCY
 
         @self.with_timestamp
@@ -845,7 +850,8 @@ class CassScalingGroup(object):
         local_lock = self.local_locks.get_lock(self.uuid)
         return local_lock.run(
             with_lock, self.reactor, lock, _modify_state,
-            log.bind(category='locking'), acquire_timeout=150,
+            log.bind(category='locking', lock_reason='modify_state'),
+            acquire_timeout=150,
             release_timeout=30)
 
     def update_status(self, status):
@@ -1288,7 +1294,8 @@ class CassScalingGroup(object):
             return b.execute(self.connection)
 
         def _maybe_delete(state):
-            if len(state.active) + len(state.pending) > 0:
+            if (state.status != ScalingGroupStatus.DELETING and
+                    len(state.active) + len(state.pending) > 0):
                 raise GroupNotEmptyError(self.tenant_id, self.uuid)
 
             d = self._naive_list_all_webhooks()
@@ -1296,7 +1303,7 @@ class CassScalingGroup(object):
             return d
 
         def _delete_group():
-            d = self.view_state()
+            d = self.view_state(get_deleting=True)
             d.addCallback(_maybe_delete)
             return d
 
@@ -1317,7 +1324,7 @@ class CassScalingGroup(object):
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         d = with_lock(self.reactor, lock, _delete_group,
-                      log.bind(category='locking'),
+                      log.bind(category='locking', lock_reason='delete_group'),
                       acquire_timeout=150,
                       release_timeout=30)
         # Cleanup /locks/<groupID> znode as it will not be required anymore
@@ -1678,7 +1685,8 @@ class CassScalingGroupCollection:
         lock.acquire = functools.partial(lock.acquire, timeout=5)
         start_time = self.reactor.seconds()
         d = with_lock(self.reactor, lock, lambda: None,
-                      otter_log.bind(system='health_check'))
+                      otter_log.bind(system='health_check',
+                                     lock_reason='kazoo_health_check'))
 
         d.addCallback(lambda _:
                       self.kz_client.delete(lock_path, recursive=True))

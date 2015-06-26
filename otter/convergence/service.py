@@ -11,10 +11,11 @@ import uuid
 from functools import partial
 from hashlib import sha1
 
-from effect import Effect, FirstError, Func, parallel
+from effect import Effect, FirstError, Func, catch, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
 
+from kazoo.exceptions import BadVersionError
 from kazoo.recipe.partitioner import PartitionState
 
 from pyrsistent import pset
@@ -268,6 +269,13 @@ def delete_divergent_flag(tenant_id, group_id, version):
     path = CONVERGENCE_DIRTY_DIR + '/' + flag
     return Effect(DeleteNode(path=path, version=version)).on(
         success=lambda r: msg('mark-clean-success'),
+        # BadVersionError shouldn't be logged as an error because it's an
+        # expected occurrence any time convergence is requested multiple times
+        # rapidly.
+        error=catch(
+            BadVersionError, lambda e: msg('mark-clean-skipped',
+                                           path=path, dirty_version=version))
+    ).on(
         error=lambda e: err(exc_info_to_failure(e), 'mark-clean-failure',
                             path=path, dirty_version=version))
 

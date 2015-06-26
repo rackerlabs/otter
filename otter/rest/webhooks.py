@@ -368,10 +368,13 @@ class OtterExecute(object):
                                       scaling_group_id=group_id,
                                       policy_id=policy_id)
             logl[0] = bound_log
-            group = self.store.get_scaling_group(bound_log, tenant_id, group_id)
-            return group.modify_state(partial(controller.maybe_execute_scaling_policy,
-                                              bound_log, transaction_id(request),
-                                              policy_id=policy_id))
+            group = self.store.get_scaling_group(bound_log, tenant_id,
+                                                 group_id)
+            return group.modify_state(
+                partial(controller.maybe_execute_scaling_policy,
+                        bound_log, transaction_id(request),
+                        policy_id=policy_id),
+                modify_state_reason='execute_webhook')
 
         d.addCallback(execute_policy)
         d.addErrback(log_informational_webhook_failure)

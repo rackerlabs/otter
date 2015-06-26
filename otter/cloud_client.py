@@ -325,14 +325,20 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
 
 _CLB_PENDING_UPDATE_PATTERN = re.compile(
     "^Load Balancer '\d+' has a status of 'PENDING_UPDATE' and is considered "
-    "immutable.$")
+    "immutable\.$")
 _CLB_DELETED_PATTERN = re.compile(
     "^(Load Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
-    "The load balancer is deleted and) considered immutable.$")
+    "The load balancer is deleted and) considered immutable\.$")
 _CLB_NO_SUCH_NODE_PATTERN = re.compile(
     "^Node with id #\d+ not found for loadbalancer #\d+$")
 _CLB_NO_SUCH_LB_PATTERN = re.compile(
-    "^Load balancer not found.$")
+    "^Load balancer not found\.$")
+_CLB_DUPLICATE_NODES_PATTERN = re.compile(
+    "^Duplicate nodes detected. One or more nodes already configured "
+    "on load balancer\.$")
+_CLB_NODE_LIMIT_PATTERN = re.compile(
+    "^Nodes must not exceed \d+ per load balancer\.$")
+_CLB_OVER_LIMIT_PATTERN = re.compile("^OverLimit Retry\.{3}$")
 
 
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
@@ -372,6 +378,23 @@ class NoSuchCLBNodeError(Exception):
 class CLBRateLimitError(Exception):
     """
     Error to be raised when CLB returns 413 (rate limiting).
+    """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBDuplicateNodesError(Exception):
+    """
+    Error to be raised only when adding one or more nodes to a CLB whose
+    address and port are mapped on the CLB.
+    """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBNodeLimitError(Exception):
+    """
+    Error to be raised only when adding one or more nodes to a CLB: adding
+    that number of nodes would exceed the maximum number of nodes allowed on
+    the CLB.
     """
 
 
@@ -416,6 +439,52 @@ def _only_json_api_errors(f):
     return catch(APIError, try_parsing)
 
 
+def add_clb_nodes(lb_id, nodes):
+    """
+    Generate effect to add one or more nodes to a load balancer.
+
+    Note: This is not correctly documented in the load balancer documentation -
+    it is documented as "Add Node" (singular), but the examples show multiple
+    nodes being added.
+
+    :param str lb_id: The load balancer ID to add the nodes to
+    :param list nodes: A list of node dictionaries that each look like::
+
+        {
+            "address": "valid ip address",
+            "port": 80,
+            "condition": "ENABLED",
+            "weight": 1,
+            "type": "PRIMARY"
+        }
+
+        (weight and type are optional)
+
+    :return: :class:`ServiceRequest` effect
+
+    :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
+        :class:`NoSuchCLBError`, :class:`CLBDuplicateNodesError`,
+        :class:`APIError`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'POST',
+        append_segments('loadbalancers', lb_id, 'nodes'),
+        data={'nodes': nodes},
+        success_pred=has_code(202))
+
+    @_only_json_api_errors
+    def _parse_known_errors(code, json_body):
+        mappings = _expand_clb_matches(
+            [(422, _CLB_DUPLICATE_NODES_PATTERN, CLBDuplicateNodesError),
+             (413, _CLB_NODE_LIMIT_PATTERN, CLBNodeLimitError)],
+            lb_id)
+        _match_errors(mappings, code, json_body)
+        _process_clb_api_error(code, json_body, lb_id)
+
+    return eff.on(error=_parse_known_errors)
+
+
 def change_clb_node(lb_id, node_id, condition, weight):
     """
     Generate effect to change a node on a load balancer.
@@ -445,12 +514,35 @@ def change_clb_node(lb_id, node_id, condition, weight):
     def _parse_known_errors(code, json_body):
         _process_clb_api_error(code, json_body, lb_id)
         _match_errors(
-            [(404, ("message",), _CLB_NO_SUCH_NODE_PATTERN,
-              partial(NoSuchCLBNodeError, lb_id=lb_id, node_id=node_id))],
+            _expand_clb_matches(
+                [(404, _CLB_NO_SUCH_NODE_PATTERN, NoSuchCLBNodeError)],
+                lb_id=lb_id, node_id=node_id),
             code,
             json_body)
 
     return eff.on(error=_parse_known_errors)
+
+
+def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
+    """
+    All CLB messages have only the keys ("message",), and the exception tpye
+    takes a load balancer ID and maybe a node ID.  So expand a tuple that looks
+    like:
+
+    (code, pattern, exc_type)
+
+    to
+
+    (code, ("message",), pattern, partial(exc_type, lb_id=lb_id))
+
+    and maybe the partial will include the node ID too if it's provided.
+    """
+    params = {"lb_id": lb_id}
+    if node_id is not None:
+        params["node_id"] = node_id
+
+    return [(m[0], ("message",), m[1], partial(m[2], **params))
+            for m in matches_tuples]
 
 
 def _process_clb_api_error(api_error_code, json_body, lb_id):
@@ -465,15 +557,17 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
     :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
         :class:`NoSuchCLBError`, :class:`APIError` by itself
     """
-    mappings = [(413, None, CLBRateLimitError),
-                (422, _CLB_DELETED_PATTERN, CLBDeletedError),
-                (422, _CLB_PENDING_UPDATE_PATTERN, CLBPendingUpdateError),
-                (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)]
-    return _match_errors(
-        [(code, ("message",), pattern, partial(exc, lb_id=lb_id))
-         for code, pattern, exc in mappings],
-        api_error_code,
-        json_body)
+    mappings = (
+        # overLimit is different than the other CLB messages because it's
+        # produced by repose
+        [(413, ("overLimit", "message"), _CLB_OVER_LIMIT_PATTERN,
+          partial(CLBRateLimitError, lb_id=lb_id))] +
+        _expand_clb_matches(
+            [(422, _CLB_DELETED_PATTERN, CLBDeletedError),
+             (422, _CLB_PENDING_UPDATE_PATTERN, CLBPendingUpdateError),
+             (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)],
+            lb_id))
+    return _match_errors(mappings, api_error_code, json_body)
 
 
 # ----- Nova requests and error parsing -----
