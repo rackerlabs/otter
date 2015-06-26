@@ -117,7 +117,7 @@ _rcv3_lb = {
             "description": (
                 "What type of a load balancer is in use"),
             "required": True,
-            "pattern": "^\s*RackConnectV3\s*$"
+            "pattern": "^RackConnectV3$"
         }
     },
     "additionalProperties": False
@@ -151,7 +151,7 @@ _clb_lb = {
             "description": (
                 "What type of a load balancer is in use"),
             "required": False,
-            "pattern": "^\s*CloudLoadBalancer\s*$"
+            "pattern": "^CloudLoadBalancer$"
         }
     },
     "additionalProperties": False
