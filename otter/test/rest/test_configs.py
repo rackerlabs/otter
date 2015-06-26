@@ -205,7 +205,8 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
             'metadata': {}
         }
 
-        self.mock_group.modify_state.assert_called_once_with(mock.ANY)
+        self.mock_group.modify_state.assert_called_once_with(
+            mock.ANY, modify_state_reason='edit_config_for_scaling_group')
         mock_controller.obey_config_change.assert_called_once_with(
             mock.ANY, "transaction-id", expected_config, self.mock_group,
             self.mock_state, 'launch')

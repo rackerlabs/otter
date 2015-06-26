@@ -149,6 +149,10 @@ class ScalingGroup(object):
         injecting stubs during tests.
     """
 
+    def _endpoint(self, rcs):
+        return "{}/groups/{}".format(
+            str(rcs.endpoints["otter"]), self.group_id)
+
     def set_launch_config(self, rcs, launch_config):
         """Changes the launch configuration used by the scaling group.
 
@@ -259,7 +263,10 @@ class ScalingGroup(object):
         """
         Trigger convergence on a group
         """
-        return self.update_group_config(rcs)
+        d = self.treq.post(
+            "{}/converge".format(self._endpoint(rcs)),
+            headers=headers(str(rcs.token)), pool=self.pool)
+        return d.addCallback(check_success, [204])
 
     def stop(self, rcs):
         """Clean up a scaling group.  Although safe to call yourself, you
