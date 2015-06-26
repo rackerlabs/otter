@@ -19,7 +19,11 @@ class ModifyGroupState(object):
 @deferred_performer
 def perform_modify_group_state(dispatcher, mgs_intent):
     """Perform a :obj:`ModifyGroupState`."""
-    return mgs_intent.scaling_group.modify_state(mgs_intent.modifier)
+    group = mgs_intent.scaling_group
+    # TODO: put modify_state_reason on intent
+    return group.modify_state(
+        mgs_intent.modifier,
+        modify_state_reason='ModifyGroupState intent')
 
 
 @attributes(['tenant_id', 'group_id'])

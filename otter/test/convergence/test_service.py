@@ -54,7 +54,7 @@ from otter.test.utils import (
     raise_to_exc_info,
     test_dispatcher,
     transform_eq,
-    unwrap_wrapped_effect)
+    nested_sequence)
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 
@@ -116,10 +116,10 @@ class ConvergerTests(SynchronousTestCase):
         exp_uid = str(uid)
         return SequenceDispatcher([
             (Func(uuid.uuid1), lambda i: uid),
-            unwrap_wrapped_effect(
-                BoundFields, dict(fields={'otter_service': 'converger',
-                                          'converger_run_id': exp_uid}),
-                intents)
+            (BoundFields(effect=mock.ANY,
+                         fields={'otter_service': 'converger',
+                                 'converger_run_id': exp_uid}),
+             nested_sequence(intents)),
         ])
 
     def test_buckets_acquired(self):
@@ -317,7 +317,22 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version),
              lambda i: raise_(BadVersionError())),
-            (LogErr(CheckFailureValue(BadVersionError()), 'mark-clean-failure',
+            (Log('mark-clean-skipped',
+                 dict(path='/groups/divergent/tenant-id_g1',
+                      dirty_version=self.version)), lambda i: None)
+        ])
+        self._verify_sequence(sequence)
+
+    def test_delete_node_other_error(self):
+        """When marking clean raises arbitrary errors, an error is logged."""
+        sequence = SequenceDispatcher([
+            (('ec', self.tenant_id, self.group_id, 3600),
+             lambda i: StepResult.SUCCESS),
+            (DeleteNode(path='/groups/divergent/tenant-id_g1',
+                        version=self.version),
+             lambda i: raise_(ZeroDivisionError())),
+            (LogErr(CheckFailureValue(ZeroDivisionError()),
+                    'mark-clean-failure',
                     dict(path='/groups/divergent/tenant-id_g1',
                          dirty_version=self.version)), lambda i: None)
         ])
@@ -384,13 +399,14 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         eff = self._converge_all_groups(['00_g1', '01_g2'])
 
         def get_bound_sequence(tid, gid):
-            tscope = TenantScope(Effect(('converge', tid, gid, 1, 3600)), tid)
             return [
                 (GetStat(path='/groups/divergent/{}_{}'.format(tid, gid)),
                  lambda i: ZNodeStatStub(version=1)),
-                (tscope, lambda i: i.effect),
-                (('converge', tid, gid, 1, 3600),
-                 lambda i: 'converged {}!'.format(tid))]
+                (TenantScope(mock.ANY, tid),
+                 nested_sequence([
+                     (('converge', tid, gid, 1, 3600),
+                      lambda i: 'converged {}!'.format(tid))])),
+            ]
 
         sequence = SequenceDispatcher([
             (ReadReference(ref=self.currently_converging),
@@ -398,14 +414,12 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             (Log('converge-all-groups',
                  dict(group_infos=self.group_infos, currently_converging=[])),
              lambda i: None),
-            unwrap_wrapped_effect(
-                BoundFields, dict(fields={'tenant_id': '00',
-                                          'scaling_group_id': 'g1'}),
-                get_bound_sequence('00', 'g1')),
-            unwrap_wrapped_effect(
-                BoundFields, dict(fields={'tenant_id': '01',
-                                          'scaling_group_id': 'g2'}),
-                get_bound_sequence('01', 'g2')),
+            (BoundFields(mock.ANY, fields={'tenant_id': '00',
+                                           'scaling_group_id': 'g1'}),
+             nested_sequence(get_bound_sequence('00', 'g1'))),
+            (BoundFields(mock.ANY, fields={'tenant_id': '01',
+                                           'scaling_group_id': 'g2'}),
+             nested_sequence(get_bound_sequence('01', 'g2'))),
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
 
@@ -430,15 +444,15 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
             (BoundFields(mock.ANY, dict(tenant_id='01',
                                         scaling_group_id='g2')),
-             lambda i: i.effect),
-            (GetStat(path='/groups/divergent/01_g2'),
-             lambda i: ZNodeStatStub(version=5)),
-            (TenantScope(
-                Effect(('converge', '01', 'g2', 5, 3600)),
-                '01'),
-             lambda tscope: tscope.effect),
-            (('converge', '01', 'g2', 5, 3600),
-             lambda i: 'converged two!'),
+             nested_sequence([
+                (GetStat(path='/groups/divergent/01_g2'),
+                 lambda i: ZNodeStatStub(version=5)),
+                (TenantScope(mock.ANY, '01'),
+                 nested_sequence([
+                    (('converge', '01', 'g2', 5, 3600),
+                     lambda i: 'converged two!'),
+                 ])),
+             ]))
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
 
@@ -455,6 +469,41 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             self.currently_converging, self.my_buckets, self.all_buckets, [],
             3600, converge_one_group=converge_one_group)
         self.assertEqual(sync_perform(_get_dispatcher(), result), None)
+
+    def test_ignore_disappearing_divergent_flag(self):
+        """
+        When the divergent flag disappears just as we're starting to converge,
+        the group does not get converged and None is returned as its result.
+
+        This happens when a concurrent convergence iteration is just finishing
+        up.
+        """
+        eff = self._converge_all_groups(['00_g1'])
+
+        def get_bound_sequence(tid, gid):
+            # since this GetStat is going to return None, no more effects will
+            # be run. This is the crux of what we're testing.
+            znode = '/groups/divergent/{}_{}'.format(tid, gid)
+            return [
+                (GetStat(path=znode), lambda i: None),
+                (Log('converge-divergent-flag-disappeared',
+                     fields={'znode': znode}),
+                 noop)]
+
+        sequence = SequenceDispatcher([
+            (ReadReference(ref=self.currently_converging),
+             lambda i: pset()),
+            (Log('converge-all-groups',
+                 dict(group_infos=[self.group_infos[0]],
+                      currently_converging=[])),
+             lambda i: None),
+            (BoundFields(mock.ANY, fields={'tenant_id': '00',
+                                           'scaling_group_id': 'g1'}),
+             nested_sequence(get_bound_sequence('00', 'g1'))),
+        ])
+        dispatcher = test_dispatcher(sequence)
+        with sequence.consume():
+            self.assertEqual(sync_perform(dispatcher, eff), [None])
 
 
 class GetMyDivergentGroupsTests(SynchronousTestCase):

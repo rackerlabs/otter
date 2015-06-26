@@ -12,6 +12,9 @@ msg_types = {
                        "to CLB {clb_id}"),
     "converge-all-groups": "Attempting to converge all dirty groups",
     "converge-all-groups-error": "Error while converging all groups",
+    "converge-divergent-flag-disappeared":
+        "Divergent flag {znode} disappeared when trying to start convergence. "
+        "This should be harmless.",
     "converge-fatal-error": (
         "Fatal error while converging group {scaling_group_id}."),
     "converge-non-fatal-error": (
@@ -21,6 +24,9 @@ msg_types = {
     "execute-convergence-results": (
         "Got result of {worst_status} after executing convergence"),
     "launch-servers": "Launching {num_servers} servers",
+    "mark-clean-skipped": (
+        "Not marking group {scaling_group_id} clean because another "
+        "convergence was requested."),
     "mark-clean-success": "Marked group {scaling_group_id} clean",
     "mark-clean-failure": "Failed to mark group {scaling_group_id} clean",
     "mark-dirty-success": "Marked group {scaling_group_id} dirty",

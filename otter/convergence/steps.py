@@ -17,8 +17,12 @@ from twisted.python.constants import NamedConstant
 from zope.interface import Interface, implementer
 
 from otter.cloud_client import (
+    CLBDuplicateNodesError,
+    CLBPendingUpdateError,
+    CLBRateLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
+    add_clb_nodes,
     create_server,
     has_code,
     service_request,
@@ -216,9 +220,6 @@ class SetMetadataItemOnServer(object):
         return eff.on(success=lambda _: (StepResult.SUCCESS, []))
 
 
-_CLB_DUPLICATE_NODES_PATTERN = re.compile(
-    "^Duplicate nodes detected. One or more nodes already configured "
-    "on load balancer.$")
 _CLB_PENDING_UPDATE_PATTERN = re.compile(
     "^Load Balancer '\d+' has a status of 'PENDING_UPDATE' and is considered "
     "immutable.$")
@@ -270,31 +271,21 @@ class AddNodesToCLB(object):
     :ivar iterable address_configs: A collection of two-tuples of address and
         :obj:`CLBDescription`.
 
-    Succeed unconditionally on 202 and 413 (over limit, so try again later).
+    Retry if successful (to re-gather to update the active cache) or if there
+    was a non-terminal failure (if there were duplicate nodes, if the CLB is
+    in PENDING_UDPATE, or if the CLB rate-limited the request).  These can
+    all be fixed in the next convergence cycle.
 
-    Succeed conditionally on 422 if duplicate nodes are detected - the
-    duplicate codes are not enumerated, so just try again the next convergence
-    cycle.
-
-    Succeed conditionally on 422 if the load balancer is in PENDING_UPDATE
-    state, which happens because CLB locks for a few seconds and cannot be
-    changed again after an update - can be fixed next convergence cycle.
+    Fail otherwise.
     """
-
     def as_effect(self):
         """Produce a :obj:`Effect` to add nodes to CLB"""
-        eff = service_request(
-            ServiceType.CLOUD_LOAD_BALANCERS,
-            'POST',
-            append_segments('loadbalancers', str(self.lb_id), "nodes"),
-            data={'nodes': [{'address': address, 'port': lbc.port,
-                             'condition': lbc.condition.name,
-                             'weight': lbc.weight,
-                             'type': lbc.type.name}
-                            for address, lbc in self.address_configs]},
-            success_pred=predicate_any(
-                has_code(202),
-                _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN)))
+        eff = add_clb_nodes(
+            self.lb_id,
+            [{'address': address, 'port': lbc.port,
+              'condition': lbc.condition.name, 'weight': lbc.weight,
+              'type': lbc.type.name}
+             for address, lbc in self.address_configs])
 
         def report_success(result):
             return StepResult.RETRY, [
@@ -308,18 +299,22 @@ class AddNodesToCLB(object):
             Otherwise, retry.
             """
             err_type, error, traceback = result
-            if error.code == 404:
-                return StepResult.FAILURE, [
-                    ErrorReason.Exception(result)]
-            if error.code == 422:
-                message = try_json_with_keys(error.body, ("message",))
-                if message and _CLB_DELETED_PATTERN.search(message):
-                    return StepResult.FAILURE, [
-                        ErrorReason.Exception(result)]
-            return StepResult.RETRY, [ErrorReason.Exception(result)]
+            status = StepResult.FAILURE
 
-        return eff.on(success=report_success,
-                      error=catch(APIError, report_api_failure))
+            known_retryable = err_type in (CLBDuplicateNodesError,
+                                           CLBRateLimitError,
+                                           CLBPendingUpdateError)
+            unknown_nonterminal = (
+                err_type == APIError and not 400 <= error.code < 500)
+
+            # we want to retry on known retryable errors, or APIErrors that
+            # are not terminal like maybe 500 or 503 errors.
+            if known_retryable or unknown_nonterminal:
+                status = StepResult.RETRY
+
+            return status, [ErrorReason.Exception(result)]
+
+        return eff.on(success=report_success, error=report_api_failure)
 
 
 @implementer(IStep)

@@ -110,6 +110,10 @@ class TestHelper(object):
         if self.clbs:
             kwargs['use_lbs'] = [clb.scaling_group_spec() for clb in self.clbs]
 
+        kwargs.setdefault("image_ref", image_ref)
+        kwargs.setdefault("flavor_ref", flavor_ref)
+        kwargs.setdefault("min_entities", 0)
+
         server_name_prefix = "{}-{}".format(
             random_string(), reactor.seconds())
         if "server_name_prefix" in kwargs:
@@ -453,6 +457,7 @@ class TestConvergence(unittest.TestCase):
         This will strip them of their association with Autoscale.
         """
         self.removed_ids = ids
+        self.addCleanup(delete_servers, ids, rcs, self.helper.pool)
         return gatherResults([
             NovaServer(id=_id, pool=self.helper.pool).update_metadata({}, rcs)
             for _id in ids]).addCallback(lambda _: rcs)
@@ -1042,6 +1047,47 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         yield self.helper.start_group_and_wait(group, self.rcs, desired=5)
 
     @skip_if(not_mimic, "This requires Mimic for error injection.")
+    @tag("CATC-024")
+    @inlineCallbacks
+    def test_various_nova_40xs(self):
+        """
+        CATC-024
+
+        Validate that an autoscale group transitions to an ERROR state when
+        a scaling operation results in a 400: BadRequest response from Nova.
+
+        """
+        group, server_name_prefix = self.helper.create_group(
+            image_ref=image_ref, flavor_ref=flavor_ref,
+            min_entities=3, max_entities=10,
+            server_name_prefix="nova_400s"
+        )
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+
+        message_400 = "Can not find requested image"
+
+        yield mimic_nova.sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": server_name_prefix + ".*"}],
+            behaviors=[
+                {"name": "default"},
+                {"name": "fail",
+                 "parameters": {"code": 400, "message": message_400,
+                                "type": "badRequest"}}
+            ])
+
+        yield group.start(self.rcs, self)
+        yield group.wait_for_state(
+            self.rcs,
+            MatchesAll(
+                ContainsDict({
+                    'desiredCapacity': Equals(3),
+                    'status': Equals("ERROR")
+                }),
+            ), timeout=600)
+
+    @skip_me("Autoscale does not yet handle Nova over-quota errors: #1470")
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-025")
     @inlineCallbacks
     def test_recovers_from_nova_over_quota_error(self):
@@ -1470,6 +1516,53 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 timeout=600
             )
         )
+
+    @tag("LBSH")
+    @inlineCallbacks
+    def test_oob_deleted_clb_node(self):
+        """
+        If an autoscaled server is removed from the CLB out of band its
+        supposed to be on, Otter will put it back.
+
+        1. Create a scaling group with 1 CLB and 1 server
+        2. Wait for server to be active
+        3. Delete server from the CLB
+        4. Converge
+        5. Assert that the server is put back on the CLB.
+        """
+        clb = self.helper.clbs[0]
+
+        nodes = yield clb.list_nodes(self.rcs)
+        self.assertEqual(len(nodes['nodes']), 0,
+                         "There should be no nodes on the CLB yet.")
+
+        group, _ = self.helper.create_group(min_entities=1)
+        yield self.helper.start_group_and_wait(group, self.rcs)
+
+        nodes = yield clb.list_nodes(self.rcs)
+        self.assertEqual(
+            len(nodes['nodes']), 1,
+            "There should be 1 node on the CLB now that the group is active.")
+        the_node = nodes["nodes"][0]
+
+        yield clb.delete_nodes(self.rcs, [the_node['id']])
+
+        nodes = yield clb.list_nodes(self.rcs)
+        self.assertEqual(len(nodes['nodes']), 0,
+                         "There should no nodes on the CLB after deletion.")
+
+        yield group.trigger_convergence(self.rcs)
+
+        yield clb.wait_for_nodes(
+            self.rcs,
+            MatchesAll(
+                HasLength(1),
+                ContainsAllIPs([the_node["address"]])
+            ),
+            timeout=600
+        )
+
+
 # Run the ConvergenceTestsNoLBs in a configuration with 1 CLB
 copy_test_methods(
     ConvergenceTestsNoLBs, ConvergenceTestsWith1CLB,

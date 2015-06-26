@@ -1,24 +1,30 @@
 """Tests for convergence steps."""
 import json
 
-from effect import Effect, Func, TypeDispatcher, base_dispatcher, sync_perform
+from effect import Effect, Func, base_dispatcher, sync_perform
+from effect.testing import SequenceDispatcher
 
 from mock import ANY, patch
 
 from pyrsistent import freeze, pset
 
-from testtools.matchers import ContainsAll, IsInstance
+from testtools.matchers import ContainsAll
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import (
+    CLBDeletedError,
+    CLBDuplicateNodesError,
+    CLBNodeLimitError,
+    CLBPendingUpdateError,
+    CLBRateLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
+    NoSuchCLBError,
     NoSuchServerError,
     NovaComputeFaultError,
     NovaRateLimitError,
     ServerMetadataOverLimitError,
-    ServiceRequest,
     has_code,
     service_request)
 from otter.constants import ServiceType
@@ -51,8 +57,8 @@ from otter.convergence.steps import (
 )
 from otter.test.utils import (
     StubResponse,
-    get_fake_service_request_performer,
     matches,
+    raise_,
     resolve_effect,
     transform_eq)
 from otter.util.hashkey import generate_server_name
@@ -376,10 +382,10 @@ class StepAsEffectTests(SynchronousTestCase):
             ('2.3.4.5', CLBDescription(lb_id=lb_id, port=80))
         ])
         step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
-        request = step.as_effect()
+        eff = step.as_effect()
 
         self.assertEqual(
-            request.intent,
+            eff.intent,
             service_request(
                 ServiceType.CLOUD_LOAD_BALANCERS,
                 'POST',
@@ -388,7 +394,7 @@ class StepAsEffectTests(SynchronousTestCase):
                 success_pred=ANY,
                 data={"nodes": ANY}).intent)
 
-        node_data = sorted(request.intent.data['nodes'],
+        node_data = sorted(eff.intent.data['nodes'],
                            key=lambda n: (n['address'], n['port']))
         self.assertEqual(node_data, [
             {'address': '1.2.3.4',
@@ -408,108 +414,72 @@ class StepAsEffectTests(SynchronousTestCase):
              'weight': 1}
         ])
 
+    def _add_one_node_to_clb(self):
+        """
+        Return an effect from adding nodes to CLB.  Uses 1 default node.
+        """
+        lb_id = "12345"
+        lb_nodes = pset([('1.2.3.4', CLBDescription(lb_id=lb_id, port=80))])
+        step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
+        return step.as_effect()
+
     def test_add_nodes_to_clb_success_response_codes(self):
         """
-        :obj:`AddNodesToCLB` succeeds on 202 or if duplicate nodes are detected
+        :obj:`AddNodesToCLB` succeeds on 202.
         """
-        lb_id = "12345"
-        lb_nodes = pset([('1.2.3.4', CLBDescription(lb_id=lb_id, port=80))])
-        step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
-        request = step.as_effect()
+        eff = self._add_one_node_to_clb()
+        seq = SequenceDispatcher([
+            (eff.intent, lambda i: (StubResponse(202, {}), ''))
+        ])
+        expected = (
+            StepResult.RETRY,
+            [ErrorReason.String('must re-gather after adding to CLB in order '
+                                'to update the active cache')])
 
-        def get_result(response, body):
-            return sync_perform(
-                TypeDispatcher({
-                    ServiceRequest:
-                    get_fake_service_request_performer((response, body))
-                }),
-                request)
+        with seq.consume():
+            self.assertEquals(sync_perform(seq, eff), expected)
 
-        self.assertEqual(
-            get_result(StubResponse(202, {}), ''),
-            (StepResult.RETRY,
-             [ErrorReason.String('must re-gather after adding to CLB in order '
-                                 'to update the active cache')]))
-
-        self.assertEqual(
-            get_result(
-                StubResponse(422, {}),
-                {
-                    "message": "Duplicate nodes detected. One or more "
-                               "nodes already configured on load "
-                               "balancer.",
-                    "code": 422
-                }),
-            (StepResult.RETRY,
-             [ErrorReason.String('must re-gather after adding to CLB in order '
-                                 'to update the active cache')]))
-
-    def test_add_nodes_to_clb_failure_response_codes(self):
+    def test_add_nodes_to_clb_non_terminal_failures(self):
         """
-        :obj:`AddNodesToCLB` returns FAILURE on 404 or 422 PENDING_DELETE and
-        returns RETRY on any other error.
+        :obj:`AddNodesToCLB` retries if the CLB is temporarily locked, or if
+        the request was rate-limited, or if there were duplicate nodes, or if
+        there was an API error and the error is unknown but not a 4xx.
         """
-        lb_id = "12345"
-        lb_nodes = pset([('1.2.3.4', CLBDescription(lb_id=lb_id, port=80))])
-        step = AddNodesToCLB(lb_id=lb_id, address_configs=lb_nodes)
-        request = step.as_effect()
+        non_terminals = (CLBDuplicateNodesError(lb_id=u"12345"),
+                         CLBPendingUpdateError(lb_id=u"12345"),
+                         CLBRateLimitError(lb_id=u"12345"),
+                         APIError(code=500, body="oops!"))
+        eff = self._add_one_node_to_clb()
 
-        def get_result(response, body):
-            return sync_perform(
-                TypeDispatcher({
-                    ServiceRequest:
-                    get_fake_service_request_performer((response, body))
-                }),
-                request)
+        for exc in non_terminals:
+            seq = SequenceDispatcher([(eff.intent, lambda i: raise_(exc))])
+            with seq.consume():
+                self.assertEquals(
+                    sync_perform(seq, eff),
+                    (StepResult.RETRY, [ErrorReason.Exception(
+                        matches(ContainsAll([type(exc), exc])))]))
 
-        any_api_error = ErrorReason.Exception(
-            (APIError, matches(IsInstance(APIError)), ANY))
+    def test_add_nodes_to_clb_terminal_failures(self):
+        """
+        :obj:`AddNodesToCLB` retries if the CLB is not found or deleted, or
+        if there is any other 4xx error, or if there is a non-API error, then
+        the error is propagated up and the result is a failure.
+        """
+        terminals = (CLBDeletedError(lb_id=u"12345"),
+                     CLBNodeLimitError(lb_id=u"12345"),
+                     NoSuchCLBError(lb_id=u"12345"),
+                     APIError(code=403, body="You're out of luck."),
+                     APIError(code=422, body="Oh look another 422."),
+                     TypeError("You did something wrong in your code."))
+        eff = self._add_one_node_to_clb()
 
-        # Fail on 404 or 422 PENDING_DELETE
-        self.assertEqual(
-            get_result(StubResponse(404, {}), ''),
-            (StepResult.FAILURE, [any_api_error]))
-        self.assertEqual(
-            get_result(
-                StubResponse(422, {}),
-                {
-                    "message": "Load Balancer '12345' has a status of "
-                               "'PENDING_DELETE' and is considered immutable.",
-                    "code": 422
-                }),
-            (StepResult.FAILURE, [any_api_error]))
-        self.assertEqual(
-            get_result(
-                StubResponse(422, {}),
-                {
-                    "message": "The load balancer is deleted and considered "
-                               "immutable.",
-                    "code": 422
-                }),
-            (StepResult.FAILURE, [any_api_error]))
-
-        # Retry on other API errors
-        self.assertEqual(
-            get_result(
-                StubResponse(422, {}),
-                {
-                    "message": "Load Balancer '12345' has a status of "
-                               "'PENDING_UPDATE' and is considered immutable.",
-                    "code": 422
-                }),
-            (StepResult.RETRY, [any_api_error]))
-        self.assertEqual(get_result(StubResponse(413, {}), ''),
-                         (StepResult.RETRY, [any_api_error]))
-        self.assertEqual(get_result(StubResponse(500, {}), ''),
-                         (StepResult.RETRY, [any_api_error]))
-
-        # Any unknown errors are propogated
-        self.assertRaises(
-            ValueError,
-            resolve_effect,
-            request,
-            service_request_error_response(ValueError('no')),
-            is_error=True)
+        for exc in terminals:
+            seq = SequenceDispatcher([(eff.intent, lambda i: raise_(exc))])
+            with seq.consume():
+                self.assertEquals(
+                    sync_perform(seq, eff),
+                    (StepResult.FAILURE, [ErrorReason.Exception(
+                        matches(ContainsAll([type(exc), exc])))]))
 
     def test_remove_nodes_from_clb(self):
         """

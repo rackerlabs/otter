@@ -225,7 +225,7 @@ class AutoscaleConfig(ConfigSectionInterface):
         """
         Test password without autoscale endpoint in its service catalog
         """
-        return self.get('non_autoscale_password')
+        return self.get_raw('non_autoscale_password')
 
     @property
     def non_autoscale_tenant(self):

@@ -28,6 +28,8 @@ from txeffect import perform
 from otter.auth import Authenticate, InvalidateToken
 from otter.cloud_client import (
     CLBDeletedError,
+    CLBDuplicateNodesError,
+    CLBNodeLimitError,
     CLBPendingUpdateError,
     CLBRateLimitError,
     CreateServerConfigurationError,
@@ -45,6 +47,7 @@ from otter.cloud_client import (
     _perform_throttle,
     _serialize_and_delay,
     add_bind_service,
+    add_clb_nodes,
     change_clb_node,
     concretize_service_request,
     create_server,
@@ -58,7 +61,7 @@ from otter.test.utils import (
     StubResponse,
     resolve_effect,
     stub_pure_response,
-    unwrap_wrapped_effect)
+    nested_sequence)
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.config import set_config_data
 from otter.util.http import APIError, headers
@@ -288,7 +291,8 @@ class PerformServiceRequestTests(SynchronousTestCase):
 
         response = stub_pure_response({}, 200)
         seq = SequenceDispatcher([
-            unwrap_wrapped_effect(_Throttle, dict(bracket=bracket), [
+            (_Throttle(bracket=bracket, effect=mock.ANY),
+             nested_sequence([
                 (Authenticate(authenticator=self.authenticator,
                               tenant_id=1,
                               log=self.log),
@@ -296,7 +300,8 @@ class PerformServiceRequestTests(SynchronousTestCase):
                 (Request(method='GET', url='http://dfw.openstack/servers',
                          headers=headers('token'), log=self.log),
                  lambda i: response),
-            ])])
+             ])),
+         ])
 
         eff = self._concrete(svcreq, throttler=throttler)
         with seq.consume():
@@ -547,8 +552,7 @@ class CLBClientTests(SynchronousTestCase):
              "considered immutable.", 422, CLBDeletedError),
             ("The load balancer is deleted and considered immutable.",
              422, CLBDeletedError),
-            ("Load balancer not found.", 404, NoSuchCLBError),
-            ("OverLimit Retry...", 413, CLBRateLimitError)
+            ("Load balancer not found.", 404, NoSuchCLBError)
         ]
 
         for msg, code, err in json_responses_and_errs:
@@ -562,6 +566,26 @@ class CLBClientTests(SynchronousTestCase):
                     eff)
             self.assertEqual(cm.exception, err(msg, lb_id=self.lb_id))
 
+        # OverLimit Retry is different because it's produced by repose
+        over_limit = stub_pure_response(
+            json.dumps({
+                "overLimit": {
+                    "message": "OverLimit Retry...",
+                    "code": 413,
+                    "retryAfter": "2015-06-13T22:30:10Z",
+                    "details": "Error Details..."
+                }
+            }),
+            413)
+        with self.assertRaises(CLBRateLimitError) as cm:
+            sync_perform(
+                EQFDispatcher([(intent, service_request_eqf(over_limit))]),
+                eff)
+        self.assertEqual(
+            cm.exception,
+            CLBRateLimitError("OverLimit Retry...", lb_id=self.lb_id))
+
+        # Ignored errors
         bad_resps = [
             stub_pure_response(
                 json.dumps({
@@ -580,6 +604,11 @@ class CLBClientTests(SynchronousTestCase):
                     'message': "Cloud load balancers is down",
                     'code': 500}),
                 500),
+            stub_pure_response(
+                json.dumps({
+                    'message': "this is not an over limit message",
+                    'code': 413}),
+                413),
             stub_pure_response("random repose error message", 404),
             stub_pure_response("random repose error message", 413)
         ]
@@ -595,8 +624,8 @@ class CLBClientTests(SynchronousTestCase):
 
     def test_change_clb_node(self):
         """
-        Produce a request for modifying a load balancer, which returns a
-        successful result on 202.
+        Produce a request for modifying a node on a load balancer, which
+        returns a successful result on 202.
 
         Parse the common CLB errors, and :class:`NoSuchCLBNodeError`.
         """
@@ -630,6 +659,62 @@ class CLBClientTests(SynchronousTestCase):
         self.assertEqual(
             cm.exception,
             NoSuchCLBNodeError(msg, lb_id=self.lb_id, node_id=u'1234'))
+
+        # all the common failures
+        self.assert_parses_common_clb_errors(expected.intent, eff)
+
+    def test_add_clb_nodes(self):
+        """
+        Produce a request for adding nodes to a load balancer, which returns
+        a successful result on a 202.
+
+        Parse the common CLB errors, and a :class:`CLBDuplicateNodesError`.
+        """
+        nodes = [{"address": "1.1.1.1", "port": 80, "condition": "ENABLED"},
+                 {"address": "1.1.1.2", "port": 80, "condition": "ENABLED"},
+                 {"address": "1.1.1.5", "port": 81, "condition": "ENABLED"}]
+
+        eff = add_clb_nodes(lb_id=self.lb_id, nodes=nodes)
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'POST',
+            'loadbalancers/{0}/nodes'.format(self.lb_id),
+            data={'nodes': nodes},
+            success_pred=has_code(202))
+
+        # success
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(stub_pure_response('', 202)))])
+        self.assertEqual(sync_perform(dispatcher, eff),
+                         stub_pure_response(None, 202))
+
+        # CLBDuplicateNodesError failure
+        msg = ("Duplicate nodes detected. One or more nodes already "
+               "configured on load balancer.")
+        duplicate_nodes = stub_pure_response(
+            json.dumps({'message': msg, 'code': 422}), 422)
+        dispatcher = EQFDispatcher([(
+            expected.intent, service_request_eqf(duplicate_nodes))])
+
+        with self.assertRaises(CLBDuplicateNodesError) as cm:
+            sync_perform(dispatcher, eff)
+        self.assertEqual(
+            cm.exception,
+            CLBDuplicateNodesError(msg, lb_id=self.lb_id))
+
+        # CLBNodeLimitError failure
+        msg = "Nodes must not exceed 25 per load balancer."
+        limit = stub_pure_response(
+            json.dumps({'message': msg, 'code': 413}), 413)
+        dispatcher = EQFDispatcher([(
+            expected.intent, service_request_eqf(limit))])
+
+        with self.assertRaises(CLBNodeLimitError) as cm:
+            sync_perform(dispatcher, eff)
+        self.assertEqual(
+            cm.exception,
+            CLBNodeLimitError(msg, lb_id=self.lb_id))
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)

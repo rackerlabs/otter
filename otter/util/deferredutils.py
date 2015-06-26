@@ -1,15 +1,15 @@
 """
 Deferred utilities
 """
-
-from twisted.internet import defer
-
-from otter.util.retry import retry
+from collections import defaultdict
+from functools import wraps
 
 from pyrsistent import freeze
 
-from functools import wraps
-from collections import defaultdict
+from twisted.internet import defer
+
+from otter.log import log as default_log
+from otter.util.retry import retry
 
 
 def unwrap_first_error(possible_first_error):
@@ -231,37 +231,53 @@ def log_with_time(result, reactor, log, start, msg, time_kwarg=None):
     return result
 
 
-def with_lock(reactor, lock, func, log=None, acquire_timeout=None, release_timeout=None):
+def with_lock(reactor, lock, func, log=default_log, acquire_timeout=None,
+              release_timeout=None, held_too_long=120):
     """
-    Context manager for any lock object that contains acquire() and release() methods
+    Context manager for any lock object that contains acquire() and release()
+    methods
     """
-    if log:
-        log.msg('Starting lock acquisition')
+    held = [True]
+    log = log.bind(lock_status="Acquiring",
+                   lock=lock,
+                   locked_func=func)
+    log.msg('Starting lock acquisition')
     d = defer.maybeDeferred(lock.acquire)
     if acquire_timeout is not None:
         timeout_deferred(d, acquire_timeout, reactor, 'Lock acquisition')
-    if log:
-        d.addCallback(log_with_time, reactor, log, reactor.seconds(),
-                      'Lock acquisition', 'acquire_time')
-        d.addErrback(log_with_time, reactor, log, reactor.seconds(),
-                     'Lock acquisition failed')
+    d.addCallback(log_with_time, reactor, log.bind(lock_status='Acquired'),
+                  reactor.seconds(), 'Lock acquisition', 'acquire_time')
+    d.addErrback(log_with_time, reactor, log.bind(lock_status='Failed'),
+                 reactor.seconds(), 'Lock acquisition failed')
 
-    def release_lock(result):
-        if log:
-            log.msg('Starting lock release')
+    def release_lock(result, log):
+        log.msg('Starting lock release', lock_status="Releasing")
         d = defer.maybeDeferred(lock.release)
         if release_timeout is not None:
             timeout_deferred(d, release_timeout, reactor, 'Lock release')
-        if log:
-            d.addCallback(
-                log_with_time, reactor, log, reactor.seconds(), 'Lock release', 'release_time')
-        return d.addCallback(lambda _: result)
+        d.addCallback(
+            log_with_time, reactor, log.bind(lock_status="Released"),
+            reactor.seconds(),
+            'Lock release', 'release_time')
 
-    def lock_acquired(_):
-        d = defer.maybeDeferred(func).addBoth(release_lock)
+        def finished_release(_):
+            held[0] = False
+            return result
+
+        return d.addCallback(finished_release)
+
+    def check_still_acquired(log):
+        if held[0]:
+            log.msg("Lock held for more than %s seconds!" % (held_too_long,),
+                    isError=True)
+
+    def lock_acquired(acquire_result, log):
+        log = log.bind(lock_status="Acquired")
+        reactor.callLater(held_too_long, check_still_acquired, log)
+        d = defer.maybeDeferred(func).addBoth(release_lock, log)
         return d
 
-    d.addCallback(lock_acquired)
+    d.addCallback(lock_acquired, log)
     return d
 
 
