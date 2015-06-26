@@ -126,7 +126,7 @@ class CLBTests(SynchronousTestCase):
         d = mutate_callable(clb, clock)
         self.assertNoResult(d)
 
-        for _ in range((timeout - 1)/3):
+        for _ in range((timeout - 1) / 3):
             clock.pump([3])
             self.assertNoResult(d)
 
@@ -199,6 +199,41 @@ class CLBTests(SynchronousTestCase):
 
         self.assert_mutate_function_does_not_retry_if_not_pending_update(
             delete, main_treq_args)
+
+    def test_add_node_retries_until_success(self):
+        """
+        Adding one or more nodes calls the right endpoint, succeeds on
+        202, and retries on pending update for 60 seconds.
+        """
+        nodes_to_add = {"nodes": [
+            {
+                "address": "10.2.2.3",
+                "port": 80,
+                "condition": "ENABLED",
+                "type": "PRIMARY"
+            },
+            {
+                "address": "10.2.2.4",
+                "port": 81,
+                "condition": "ENABLED",
+                "type": "SECONDARY"
+            }]}
+
+        main_treq_args = ['post', 'clburl/loadbalancers/12345/nodes',
+                          ((json.dumps(nodes_to_add),), self.expected_kwargs)]
+
+        def add(clb, clock):
+            return clb.add_nodes(self.rcs, nodes_to_add["nodes"], clock=clock)
+
+        self.assert_mutate_function_retries_until_success(
+            add, main_treq_args, (Response(202), json.dumps(nodes_to_add)),
+            nodes_to_add)
+
+        self.assert_mutate_function_retries_until_timeout(
+            add, main_treq_args, 60)
+
+        self.assert_mutate_function_does_not_retry_if_not_pending_update(
+            add, main_treq_args)
 
 
 class WaitForNodesTestCase(SynchronousTestCase):

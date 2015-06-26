@@ -354,6 +354,39 @@ class CloudLoadBalancer(object):
                 ", ".join(map(str, node_ids)))
         )
 
+    def add_nodes(self, rcs, node_list, clock=None):
+        """
+        Add one or more nodes to a cloud load balancer
+
+        :param rcs: a :class:`otter.integration.lib.resources.TestResources`
+            instance
+
+        :param list node_list: A list of node dictionaries to add.
+
+        :return: On success, a json dictionary containing the add response that
+            lists the nodes
+
+        """
+        def really_add():
+            d = self.treq.post(
+                "{0}/nodes".format(self.endpoint(rcs)),
+                json.dumps({"nodes": node_list}),
+                headers=headers(str(rcs.token)),
+                pool=self.pool
+            )
+            d.addCallback(check_success, [202], _treq=self.treq)
+            d.addCallbacks(self.treq.json_content,
+                           _pending_update_to_transient)
+            return d
+
+        return retry_and_timeout(
+            really_add, 60,
+            can_retry=terminal_errors_except(TransientRetryError),
+            next_interval=repeating_interval(3),
+            clock=clock or reactor,
+            deferred_description="Trying to add nodes"
+        )
+
 
 HasLength = MatchesPredicateWithParams(
     lambda items, length: len(items) == length,
