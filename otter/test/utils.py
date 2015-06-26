@@ -12,6 +12,7 @@ from effect import (
     ComposedDispatcher, ParallelEffects, TypeDispatcher,
     base_dispatcher, sync_perform, sync_performer)
 from effect.async import perform_parallel_async
+from effect.fold import sequence
 from effect.testing import (
     SequenceDispatcher,
     resolve_effect as eff_resolve_effect,
@@ -761,8 +762,9 @@ def nested_parallel(parallel, fallback_dispatcher=base_dispatcher):
     :param fallback_dispatcher: an optional dispatcher to compose onto the
         sequence dispatcher.
     """
-    return (ParallelEffects(effects=mock.ANY),
-            nested_sequence(seq, get_effect=lambda i: sequence(i.effects)))
+    return (
+        ParallelEffects(effects=mock.ANY),
+        nested_sequence(parallel, get_effect=lambda i: sequence(i.effects)))
 
 
 def test_dispatcher(disp=None):
