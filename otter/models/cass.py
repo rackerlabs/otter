@@ -153,11 +153,6 @@ _cql_insert_group_state = (
     '"policyTouched", paused, desired) VALUES(:tenantId, :groupId, :active, '
     ':pending, :groupTouched, :policyTouched, :paused, :desired) '
     'USING TIMESTAMP :ts')
-_cql_view_group_state = (
-    'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at, status '
-    'FROM {cf} '
-    'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND deleting=false;')
 
 # --- Event related queries
 _cql_insert_group_event = (
@@ -788,14 +783,14 @@ class CassScalingGroup(object):
         return d.addCallback(lambda group:
                              _jsonloads_data(group['launch_config']))
 
-    def view_state(self, consistency=None):
+    def view_state(self, consistency=None, get_deleting=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_state`
         """
         if consistency is None:
             consistency = DEFAULT_CONSISTENCY
 
-        view_query = _cql_view_group_state.format(cf=self.group_table)
+        view_query = _cql_view_manifest.format(cf=self.group_table)
         del_query = _cql_delete_all_in_group.format(
             cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
@@ -805,7 +800,12 @@ class CassScalingGroup(object):
                           NoSuchScalingGroupError(self.tenant_id, self.uuid),
                           self.log)
 
-        return d.addCallback(_unmarshal_state)
+        def check_deleting(group):
+            if not get_deleting and group['deleting']:
+                raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
+            return group
+
+        return d.addCallback(check_deleting).addCallback(_unmarshal_state)
 
     def modify_state(self, modifier_callable, *args, **kwargs):
         """
@@ -1300,7 +1300,7 @@ class CassScalingGroup(object):
             return d
 
         def _delete_group():
-            d = self.view_state()
+            d = self.view_state(get_deleting=True)
             d.addCallback(_maybe_delete)
             return d
 

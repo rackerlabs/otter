@@ -25,7 +25,7 @@ from silverberg.client import CQLClient, ConsistencyLevel
 
 from testtools.matchers import IsInstance
 
-from toolz.dicttoolz import assoc
+from toolz.dicttoolz import assoc, merge
 
 from twisted.internet import defer
 from twisted.internet.task import Clock
@@ -376,6 +376,24 @@ class WeakLocksTests(SynchronousTestCase):
         self.assertIsNot(self.locks.get_lock('a'), self.locks.get_lock('b'))
 
 
+scaling_group_entry = {
+    'tenantId': 'tenant_id',
+    "groupId": 'group_id',
+    'id': "12345678g",
+    'group_config': serialize_json_data({'name': 'a'}, 1.0),
+    'launch_config': serialize_json_data({}, 1.0),
+    'active': '{"A":"R"}',
+    'pending': '{"P":"R"}',
+    'groupTouched': '2014-01-01T00:00:05Z.1234',
+    'policyTouched': '{"PT":"R"}',
+    'paused': False,
+    'desired': 0,
+    'created_at': 23,
+    'deleting': False,
+    'status': 'ACTIVE',
+}
+
+
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin,
                                SynchronousTestCase):
     """
@@ -528,28 +546,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         """
         Test that you can call view state and receive a valid parsed response
         """
-        cass_response = [
-            {'tenantId': self.tenant_id,
-             'groupId': self.group_id,
-             'group_config': '{"name": "a"}',
-             'active': '{"A":"R"}',
-             'pending': '{"P":"R"}',
-             'groupTouched': '2014-01-01T00:00:05Z.1234',
-             'policyTouched': '{"PT":"R"}',
-             'paused': False,
-             'created_at': 23,
-             'desired': 10,
-             'status': 'ACTIVE'}]
-        self.returns = [cass_response]
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'desired': 10})
+        ]]
         d = self.group.view_state()
         r = self.successResultOf(d)
         expectedCql = (
-            'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'SELECT "tenantId", "groupId", group_config, launch_config, '
+            'active, pending, "groupTouched", "policyTouched", paused, '
+            'desired, created_at, status, deleting '
             'FROM scaling_group '
-            'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
-            'AND deleting=false;')
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
@@ -570,19 +580,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         """
         If there is no desired capacity, it defaults to 0
         """
-        cass_response = [
-            {'tenantId': self.tenant_id,
-             'groupId': self.group_id,
-             'group_config': '{"name": "a"}',
-             'active': '{"A":"R"}',
-             'pending': '{"P":"R"}',
-             'groupTouched': '2014-01-01T00:00:05Z.1234',
-             'policyTouched': '{"PT":"R"}',
-             'paused': False,
-             'created_at': 23,
-             'desired': None,
-             'status': 'ACTIVE'}]
-        self.returns = [cass_response]
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'desired': None})
+        ]]
         r = self.successResultOf(self.group.view_state())
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
                                        'a',
@@ -599,19 +602,10 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         If a consistency argument is passed to ``view_state``, it is honored
         over the default consistency
         """
-        cass_response = [
-            {'tenantId': self.tenant_id,
-             'groupId': self.group_id,
-             'group_config': '{"name": "a"}',
-             'active': '{"A":"R"}',
-             'pending': '{"P":"R"}',
-             'groupTouched': '2014-01-01T00:00:05Z.1234',
-             'policyTouched': '{"PT":"R"}',
-             'paused': False,
-             'desired': 0,
-             'created_at': 23,
-             'status': 'ACTIVE'}]
-        self.returns = [cass_response]
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id, 'groupId': self.group_id})
+        ]]
         d = self.group.view_state(consistency=ConsistencyLevel.ALL)
         self.successResultOf(d)
         self.connection.execute.assert_called_once_with(mock.ANY,
@@ -624,28 +618,57 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         ``NoSuchScalingGroupError``
         """
         self.returns = [[]]
-        d = self.group.view_state()
-        f = self.failureResultOf(d)
-        self.assertTrue(f.check(NoSuchScalingGroupError))
+        self.failureResultOf(self.group.view_state(), NoSuchScalingGroupError)
+
+    def test_view_state_deleting_group_filter_deleting_group(self):
+        """
+        Calling ``view_state`` on a group that is deleting, with
+        ``get_deleting`` = `False`, raises a :class:`NoSuchScalingGroupError`
+        """
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'deleting': True})
+        ]]
+        self.failureResultOf(self.group.view_state(), NoSuchScalingGroupError)
+
+    def test_view_state_deleting_group_do_not_filter_deleting_group(self):
+        """
+        Calling ``view_state`` on a group that is deleting, with
+        ``get_deleting`` = `True`, returns the deleting group
+        """
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'deleting': True})
+        ]]
+        result = self.successResultOf(self.group.view_state(get_deleting=True))
+        group_state = GroupState(tenant_id=self.tenant_id,
+                                 group_id=self.group_id,
+                                 group_name='a',
+                                 active={'A': 'R'},
+                                 pending={'P': 'R'},
+                                 group_touched='2014-01-01T00:00:05Z.1234',
+                                 policy_touched={'PT': 'R'},
+                                 paused=False,
+                                 status=ScalingGroupStatus.DELETING,
+                                 desired=0)
+        self.assertEqual(result, group_state)
 
     def test_view_state_error_status(self):
         """
         view_state sets the ``GroupState.status`` based on the ``status``
         value.
         """
-        cass_response = [
-            {'tenantId': self.tenant_id,
-             'groupId': self.group_id,
-             'group_config': '{"name": "a"}',
-             'active': '{"A":"R"}',
-             'pending': '{"P":"R"}',
-             'groupTouched': '2014-01-01T00:00:05Z.1234',
-             'policyTouched': '{"PT":"R"}',
-             'paused': False,
-             'created_at': 23,
-             'desired': 10,
-             'status': 'ERROR'}]
-        self.returns = [cass_response]
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'desired': 10,
+                   'status': 'ERROR'})
+        ]]
         result = self.successResultOf(self.group.view_state())
 
         group_state = GroupState(tenant_id=self.tenant_id,
@@ -667,27 +690,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         that row's deletion is triggered.
         """
         cass_response = [
-            {'tenantId': self.tenant_id,
-             'groupId': self.group_id,
-             'group_config': '{"name": "a"}',
-             'active': '{"A":"R"}',
-             'pending': '{"P":"R"}',
-             'groupTouched': '2014-01-01T00:00:05Z.1234',
-             'policyTouched': '{"PT":"R"}',
-             'paused': False,
-             'desired': None,
-             'created_at': None,
-             'status': 'ACTIVE'}]
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'created_at': None})
+        ]
         self.returns = [cass_response, None]
         d = self.group.view_state()
         self.failureResultOf(d, NoSuchScalingGroupError)
         viewCql = (
-            'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'SELECT "tenantId", "groupId", group_config, launch_config, '
+            'active, pending, "groupTouched", "policyTouched", paused, '
+            'desired, created_at, status, deleting '
             'FROM scaling_group '
-            'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
-            'AND deleting=false;')
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         delCql = ('DELETE FROM scaling_group '
                   'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
@@ -700,20 +716,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         view_state returns a dictionary with a key paused equal to True for a
         paused group.
         """
-        cass_response = _cassandrify_data([
-            {'tenantId': self.tenant_id,
-             'groupId': self.group_id,
-             'group_config': '{"name": "a"}',
-             'active': '{"A":"R"}',
-             'pending': '{"P":"R"}',
-             'groupTouched': '2014-01-01T00:00:05Z.1234',
-             'policyTouched': '{"PT":"R"}',
-             'paused': True,
-             'desired': 0,
-             'created_at': 3,
-             'status': 'ACTIVE'}])
-
-        self.returns = [cass_response]
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'paused': True})
+        ]]
         d = self.group.view_state()
         r = self.successResultOf(d)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
