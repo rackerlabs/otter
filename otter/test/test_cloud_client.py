@@ -55,7 +55,7 @@ from otter.test.utils import (
     StubResponse,
     resolve_effect,
     stub_pure_response,
-    unwrap_wrapped_effect)
+    nested_sequence)
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.config import set_config_data
 from otter.util.http import APIError, headers
@@ -285,7 +285,8 @@ class PerformServiceRequestTests(SynchronousTestCase):
 
         response = stub_pure_response({}, 200)
         seq = SequenceDispatcher([
-            unwrap_wrapped_effect(_Throttle, dict(bracket=bracket), [
+            (_Throttle(bracket=bracket, effect=mock.ANY),
+             nested_sequence([
                 (Authenticate(authenticator=self.authenticator,
                               tenant_id=1,
                               log=self.log),
@@ -293,7 +294,8 @@ class PerformServiceRequestTests(SynchronousTestCase):
                 (Request(method='GET', url='http://dfw.openstack/servers',
                          headers=headers('token'), log=self.log),
                  lambda i: response),
-            ])])
+             ])),
+         ])
 
         eff = self._concrete(svcreq, throttler=throttler)
         with seq.consume():
