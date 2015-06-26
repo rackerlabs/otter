@@ -208,11 +208,17 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
             {'loadBalancerId': 3, 'type': 'CloudLoadBalancer'},
             {'loadBalancerId': 3, 'port': '80', 'type': 'blah blah'},
             {'loadBalancerId': 3, 'type': 'RackConnectV3'},
-            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2', 'type': 'CloudLoadBalancer'},
-            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2', 'type': 'RackConnectV3',
-             'port': 80},
+            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2',
+             'type': 'CloudLoadBalancer'},
+            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2',
+             'type': 'RackConnectV3', 'port': 80},
             {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'},
-            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2', 'type': ''},
+            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2',
+             'type': ''},
+            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2',
+             'type': None},
+            {'loadBalancerId': '112345', 'type': '', 'port': 80},
+            {'loadBalancerId': '112345', 'type': None, 'port': 80},
         ]
         for invalid in invalids:
             base["args"]["loadBalancers"] = [invalid]
