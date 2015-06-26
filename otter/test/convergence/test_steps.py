@@ -194,7 +194,8 @@ class CreateServerTests(SynchronousTestCase):
         errs = (
             NovaComputeFaultError("oops"),
             NovaRateLimitError("OverLimit Retry..."),
-            APIError(code=501, body=":(", headers={})
+            APIError(code=501, body=":(", headers={}),
+            TypeError("You did something wrong")
         )
         self._assert_create_server_with_errs_has_status(errs, StepResult.RETRY)
 
