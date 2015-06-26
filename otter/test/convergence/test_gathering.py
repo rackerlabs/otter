@@ -18,8 +18,8 @@ from effect.testing import (
 
 from pyrsistent import freeze
 
-from toolz.functoolz import compose
 from toolz.curried import map
+from toolz.functoolz import compose
 
 from twisted.trial.unittest import SynchronousTestCase
 

@@ -8,7 +8,7 @@ from effect import (
     TypeDispatcher, base_dispatcher, sync_perform)
 from effect.async import perform_parallel_async
 from effect.ref import ReadReference, Reference, reference_dispatcher
-from effect.testing import EQDispatcher, EQFDispatcher, SequenceDispatcher
+from effect.testing import SequenceDispatcher
 
 from kazoo.exceptions import BadVersionError
 from kazoo.recipe.partitioner import PartitionState
@@ -34,7 +34,7 @@ from otter.convergence.service import (
     determine_active, execute_convergence, get_my_divergent_groups,
     non_concurrently)
 from otter.convergence.steps import ConvergeLater
-from otter.log.intents import BoundFields, Log, LogErr, get_log_dispatcher
+from otter.log.intents import BoundFields, Log, LogErr
 from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,
@@ -49,13 +49,13 @@ from otter.test.utils import (
     Cache, CheckFailureValue, FakePartitioner,
     TestStep,
     mock_group, mock_log,
+    nested_sequence,
     noop,
     perform_sequence,
     raise_,
     raise_to_exc_info,
     test_dispatcher,
-    transform_eq,
-    nested_sequence)
+    transform_eq)
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 
