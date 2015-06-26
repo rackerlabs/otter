@@ -1907,7 +1907,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.flushLoggedErrors(NoSuchWebhookError)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
-    def test_delete_non_empty_scaling_group_fails(self, mock_view_state):
+    def test_delete_non_empty_scaling_non_deleting_group_fails(
+            self, mock_view_state):
         """
         ``delete_group`` errbacks with :class:`GroupNotEmptyError` if scaling
         group state is not empty
@@ -1923,6 +1924,26 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.flushLoggedErrors(GroupNotEmptyError)
         # locks znode is not deleted
         self.assertFalse(self.kz_client.delete.called)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_state')
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')
+    def test_delete_non_empty_scaling_deleting_group_succeeds(
+            self, mock_naive, mock_view_state):
+        """
+        ``delete_group`` succeeds even if the group is not empty if the group
+        is in deleting state.
+        """
+        mock_view_state.return_value = defer.succeed(GroupState(
+            self.tenant_id, self.group_id, '', {'1': {}}, {}, None, {}, False,
+            ScalingGroupStatus.DELETING))
+
+        mock_naive.return_value = defer.succeed([])
+
+        self.returns = [None]
+        result = self.successResultOf(self.group.delete_group())
+        self.assertIsNone(result)  # delete returns None
+
+        mock_view_state.assert_called_once_with(get_deleting=True)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')

@@ -1292,7 +1292,8 @@ class CassScalingGroup(object):
             return b.execute(self.connection)
 
         def _maybe_delete(state):
-            if len(state.active) + len(state.pending) > 0:
+            if (state.status != ScalingGroupStatus.DELETING and
+                    len(state.active) + len(state.pending) > 0):
                 raise GroupNotEmptyError(self.tenant_id, self.uuid)
 
             d = self._naive_list_all_webhooks()
