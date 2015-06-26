@@ -736,11 +736,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         except ZeroDivisionError:
             exc_info = sys.exc_info()
 
-        step = TestStep(Effect(Constant(
-            (StepResult.RETRY, [
+        step = TestStep(Effect("the step"))
+        step_result = (StepResult.RETRY, [
                 ErrorReason.Exception(exc_info),
                 ErrorReason.String('foo'),
-                ErrorReason.Structured({'foo': 'bar'})]))))
+                ErrorReason.Structured({'foo': 'bar'})])
 
         def plan(*args, **kwargs):
             return pbag([step])
@@ -761,22 +761,20 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                          'foo',
                          {'foo': 'bar'}]))],
             'worst_status': 'RETRY'}
-        sequence = SequenceDispatcher([
-            (self.gsgi, lambda i: (self.group, self.manifest)),
+        sequence = [
+            nested_parallel([
+                (self.gsgi, lambda i: (self.group, self.manifest)),
+            ]),
+            (ParallelEffects([]), noop),  # no loggable steps
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
              noop),
+            nested_parallel([("the step", lambda i: step_result)]),
             (Log(msg='execute-convergence-results', fields=expected_fields),
              noop),
-        ])
+        ]
 
-        dispatcher = ComposedDispatcher([
-            base_dispatcher,
-            TypeDispatcher({ParallelEffects: perform_parallel_async}),
-            sequence])
-
-        with sequence.consume():
-            self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
+        self.assertEqual(perform_sequence(sequence, eff), StepResult.RETRY)
 
     def test_log_steps(self):
         """The steps to be executed are logged to cloud feeds."""
