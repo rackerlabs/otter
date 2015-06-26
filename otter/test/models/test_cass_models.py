@@ -1918,7 +1918,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.failureResultOf(self.group.delete_group(), GroupNotEmptyError)
 
         # nothing else called except view
-        self.assertTrue(mock_view_state.called)
+        mock_view_state.assert_called_once_with(get_deleting=True)
         self.assertFalse(self.connection.execute.called)
         self.flushLoggedErrors(GroupNotEmptyError)
         # locks znode is not deleted
