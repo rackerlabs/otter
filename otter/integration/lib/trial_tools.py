@@ -15,15 +15,15 @@ from twisted.web.client import HTTPConnectionPool
 
 from otter import auth
 
-from otter.integration.lib.cloud_load_balancer import (
-    CloudLoadBalancer, ContainsAllIPs)
-
 from otter.integration.lib.autoscale import (
     HasActive,
     ScalingGroup,
     ScalingPolicy,
     create_scaling_group_dict
 )
+
+from otter.integration.lib.cloud_load_balancer import (
+    CloudLoadBalancer, ContainsAllIPs)
 
 from otter.integration.lib.identity import IdentityV2
 

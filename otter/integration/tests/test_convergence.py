@@ -9,8 +9,10 @@ from functools import wraps
 
 from testtools.matchers import (
     AllMatch, ContainsDict, Equals, MatchesAll, MatchesSetwise, NotEquals)
+
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 from twisted.trial import unittest
+
 from otter.integration.lib.autoscale import (
     ExcludesServers,
     HasActive,
