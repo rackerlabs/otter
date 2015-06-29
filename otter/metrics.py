@@ -43,8 +43,8 @@ metrics_log = otter_log.bind(system='otter.metrics')
 
 QUERY_GROUPS_OF_TENANTS = (
     'SELECT '
-    '"tenantId", "groupId", desired, active, pending, created_at, status '
-    'FROM scaling_group WHERE "tenantId" IN ({tids})')
+    '"tenantId", "groupId", desired, active, pending, created_at, status, '
+    'deleting FROM scaling_group WHERE "tenantId" IN ({tids})')
 
 
 @defer.inlineCallbacks
@@ -55,7 +55,8 @@ def get_specific_scaling_groups(client, tenant_ids):
     defer.returnValue(r for r in results
                       if r.get('created_at') is not None and
                       r.get('desired') is not None and
-                      r.get('status') not in ('DISABLED', 'ERROR'))
+                      r.get('status') not in ('DISABLED', 'ERROR') and
+                      not r.get('deleting', False))
 
 
 @defer.inlineCallbacks
