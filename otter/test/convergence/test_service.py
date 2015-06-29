@@ -371,7 +371,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         """
         sequence = SequenceDispatcher([
             (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: (StepResult.SUCCESS, ScalingGroupStatus.DELETING)),
+             lambda i: (StepResult.SUCCESS, None)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1', version=-1),
              noop),
             (Log('mark-clean-success', {}), noop),
@@ -878,8 +878,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ])
         # This succeeded without `ModifyGroupState` dispatcher in it
         # ensuring that it was not called
-        self.assertEqual(sync_perform(disp, eff),
-                         (StepResult.SUCCESS, ScalingGroupStatus.DELETING))
+        self.assertEqual(sync_perform(disp, eff), (StepResult.SUCCESS, None))
 
         # desired capacity was changed to 0
         self.assertEqual(self.dsg.capacity, 0)

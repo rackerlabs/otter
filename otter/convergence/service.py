@@ -140,8 +140,8 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         :func`get_all_convergence_data`, used for testing.
     :param callable plan: like :func:`plan`, to be used for test injection only
 
-    :return: Effect of two-tuple of (most severe StepResult, group status). If
-        group status is DELETING it's safe to assume the group has been
+    :return: Effect of two-tuple of (most severe StepResult, group status).
+        When group status is None it means the group has been successfully
         deleted.
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
@@ -182,15 +182,16 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         if group_state.status == ScalingGroupStatus.DELETING:
             # servers have been deleted. Delete the group for real
             yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
+            result_status = None
         elif group_state.status == ScalingGroupStatus.ERROR:
             yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                            status=ScalingGroupStatus.ACTIVE))
             yield cf_msg('group-status-active',
                          status=ScalingGroupStatus.ACTIVE.name)
     elif worst_status == StepResult.FAILURE:
-        result_status = ScalingGroupStatus.ERROR
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))
+        result_status = ScalingGroupStatus.ERROR
         yield cf_err(
             'group-status-error', status=ScalingGroupStatus.ERROR.name,
             reasons='; '.join(sorted(present_reasons(reasons))))
@@ -396,11 +397,11 @@ def converge_one_group(currently_converging, tenant_id, group_id, version,
     else:
         if result[0] in (StepResult.FAILURE, StepResult.SUCCESS):
             # In order to avoid doing extra work and reporting spurious errors,
-            # if the group status is DELETING it means the group has
-            # successfully been deleted by execute_convergence. And so we will
+            # if the group status is None it means the group has successfully
+            # been deleted by execute_convergence. And so we will
             # unconditionally delete the divergent flag to avoid any further
             # queued-up convergences that will imminently fail.
-            if result[1] == ScalingGroupStatus.DELETING:
+            if result[1] is None:
                 version = -1
             yield delete_divergent_flag(tenant_id, group_id, version)
 
