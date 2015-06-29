@@ -764,7 +764,9 @@ def nested_parallel(parallel, fallback_dispatcher=base_dispatcher):
     """
     return (
         ParallelEffects(effects=mock.ANY),
-        nested_sequence(parallel, get_effect=lambda i: sequence(i.effects)))
+        nested_sequence(parallel,
+                        get_effect=lambda i: sequence(i.effects),
+                        fallback_dispatcher=fallback_dispatcher))
 
 
 def test_dispatcher(disp=None):
