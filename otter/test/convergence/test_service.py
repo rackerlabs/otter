@@ -257,7 +257,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         """
         sequence = SequenceDispatcher([
             (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: StepResult.SUCCESS),
+             lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version), lambda i: None),
             (Log('mark-clean-success', {}), lambda i: None)
@@ -313,7 +313,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         """
         sequence = SequenceDispatcher([
             (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: StepResult.SUCCESS),
+             lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version),
              lambda i: raise_(BadVersionError())),
@@ -327,7 +327,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         """When marking clean raises arbitrary errors, an error is logged."""
         sequence = SequenceDispatcher([
             (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: StepResult.SUCCESS),
+             lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version),
              lambda i: raise_(ZeroDivisionError())),
@@ -345,7 +345,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         """
         sequence = SequenceDispatcher([
             (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: StepResult.RETRY)
+             lambda i: (StepResult.RETRY, ScalingGroupStatus.ACTIVE))
         ])
         self._verify_sequence(sequence)
 
@@ -356,10 +356,25 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         """
         sequence = SequenceDispatcher([
             (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: StepResult.FAILURE),
+             lambda i: (StepResult.FAILURE, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version), lambda i: None),
             (Log('mark-clean-success', {}), lambda i: None)
+        ])
+        self._verify_sequence(sequence)
+
+    def test_delete_flag_unconditionally_when_group_deleted(self):
+        """
+        When execute_convergence's return value indicates the group has been
+        deleted, the divergent flag is unconditionally deleted (ignoring
+        mismatched versions), because a re-converge would be fruitless.
+        """
+        sequence = SequenceDispatcher([
+            (('ec', self.tenant_id, self.group_id, 3600),
+             lambda i: (StepResult.SUCCESS, ScalingGroupStatus.DELETING)),
+            (DeleteNode(path='/groups/divergent/tenant-id_g1', version=-1),
+             noop),
+            (Log('mark-clean-success', {}), noop),
         ])
         self._verify_sequence(sequence)
 
@@ -672,7 +687,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         result = sync_perform(self._get_dispatcher(), eff)
         self.assertEqual(self.group.modify_state_values[-1].active,
                          expected_active)
-        self.assertEqual(result, StepResult.SUCCESS)
+        self.assertEqual(result, (StepResult.SUCCESS,
+                         ScalingGroupStatus.ACTIVE))
 
     def test_success(self):
         """
@@ -717,7 +733,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         with sequence.consume():
             result = sync_perform(dispatcher, eff)
         self.assertEqual(self.group.modify_state_values[-1].active, {})
-        self.assertEqual(result, StepResult.SUCCESS)
+        self.assertEqual(result,
+                         (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
 
     def test_first_error_extraction(self):
         """
@@ -792,7 +809,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             sequence])
 
         with sequence.consume():
-            self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
+            self.assertEqual(sync_perform(dispatcher, eff),
+                             (StepResult.RETRY, ScalingGroupStatus.ACTIVE))
 
     def test_log_steps(self):
         """The steps to be executed are logged to cloud feeds."""
@@ -825,7 +843,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             sequence])
 
         with sequence.consume():
-            self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
+            self.assertEqual(sync_perform(dispatcher, eff),
+                             (StepResult.RETRY, ScalingGroupStatus.ACTIVE))
 
     def test_deleting_group(self):
         """
@@ -859,7 +878,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ])
         # This succeeded without `ModifyGroupState` dispatcher in it
         # ensuring that it was not called
-        self.assertEqual(sync_perform(disp, eff), StepResult.SUCCESS)
+        self.assertEqual(sync_perform(disp, eff),
+                         (StepResult.SUCCESS, ScalingGroupStatus.DELETING))
 
         # desired capacity was changed to 0
         self.assertEqual(self.dsg.capacity, 0)
@@ -874,7 +894,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         disp = self._get_dispatcher([(self.gsgi, (self.group, self.manifest))])
         # This succeeded without DeleteGroup performer being there ensuring
         # that it was not called
-        self.assertEqual(sync_perform(disp, eff), StepResult.RETRY)
+        self.assertEqual(sync_perform(disp, eff),
+                         (StepResult.RETRY, ScalingGroupStatus.DELETING))
 
     def test_returns_retry(self):
         """
@@ -893,7 +914,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                   build_timeout=3600, plan=plan,
                                   get_all_convergence_data=gacd)
         dispatcher = self._get_dispatcher()
-        self.assertEqual(sync_perform(dispatcher, eff), StepResult.RETRY)
+        self.assertEqual(sync_perform(dispatcher, eff),
+                         (StepResult.RETRY, ScalingGroupStatus.ACTIVE))
 
     def test_returns_failure_set_error_state(self):
         """
@@ -941,7 +963,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
         with sequence.consume():
-            self.assertEqual(sync_perform(dispatcher, eff), StepResult.FAILURE)
+            self.assertEqual(sync_perform(dispatcher, eff),
+                             (StepResult.FAILURE, ScalingGroupStatus.ERROR))
 
     def test_reactivate_group_on_success_after_steps(self):
         """
@@ -972,7 +995,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
         with sequence.consume():
-            self.assertEqual(sync_perform(dispatcher, eff), StepResult.SUCCESS)
+            self.assertEqual(sync_perform(dispatcher, eff),
+                             (StepResult.SUCCESS, ScalingGroupStatus.ERROR))
 
     def test_reactivate_group_on_success_with_no_steps(self):
         """
@@ -1001,7 +1025,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ])
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
         with sequence.consume():
-            self.assertEqual(sync_perform(dispatcher, eff), StepResult.SUCCESS)
+            self.assertEqual(sync_perform(dispatcher, eff),
+                             (StepResult.SUCCESS, ScalingGroupStatus.ERROR))
 
 
 class DetermineActiveTests(SynchronousTestCase):
