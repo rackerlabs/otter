@@ -423,6 +423,18 @@ class TimestampTests(SynchronousTestCase):
             timestamp.timestamp_to_epoch('2015-05-01T04:51:12.078580Z'),
             1430455872.078580)
 
+    def test_datetime_to_epoch(self):
+        """
+        `datetime_to_epoch` returns EPOCH seconds for given datetime
+        """
+        self.assertEqual(
+            timestamp.datetime_to_epoch(datetime(1970, 1, 1, 0, 0, 0)),
+            0.0)
+        self.assertEqual(
+            timestamp.datetime_to_epoch(
+                datetime(2015, 5, 1, 4, 51, 12, 78580)),
+            1430455872.078580)
+
 
 class ConfigTest(SynchronousTestCase):
     """
@@ -488,6 +500,12 @@ class WithLockTests(SynchronousTestCase):
 
         self.reactor = Clock()
         self.log = mock_log()
+        self.log_fields = {'lock': self.lock, 'locked_func': self.method}
+
+        # This is shared between multiple tests, and used in negative
+        # assertions. Centralizing the definition means that if the message
+        # changes the negative assertions will also be updated.
+        self.too_long_message = "Lock held for more than 120 seconds!"
 
     def test_acquire_release(self):
         """
@@ -495,22 +513,34 @@ class WithLockTests(SynchronousTestCase):
         """
         d = with_lock(self.reactor, self.lock, self.method, self.log)
         self.assertNoResult(d)
-        self.log.msg.assert_called_once_with('Starting lock acquisition')
-
+        self.log.msg.assert_called_once_with(
+            'Starting lock acquisition', lock_status='Acquiring',
+            **self.log_fields)
         self.reactor.advance(10)
         self.acquire_d.callback(None)
-        self.log.msg.assert_called_with('Lock acquisition in 10.0 seconds',
-                                        acquire_time=10.0)
+        self.log.msg.assert_called_with(
+            'Lock acquisition in 10.0 seconds',
+            lock_status='Acquired', acquire_time=10.0, **self.log_fields)
         self.method.assert_called_once_with()
         self.method_d.callback('result')
 
-        self.log.msg.assert_called_with('Starting lock release')
+        self.log.msg.assert_called_with(
+            'Starting lock release', lock_status='Releasing',
+            **self.log_fields)
         self.reactor.advance(3)
         self.release_d.callback(None)
-        self.log.msg.assert_called_with('Lock release in 3.0 seconds',
-                                        release_time=3.0)
+        self.log.msg.assert_called_with(
+            'Lock release in 3.0 seconds',
+            release_time=3.0, lock_status='Released', **self.log_fields)
 
         self.assertEqual(self.successResultOf(d), 'result')
+
+        # And since the release successfully happened, the "held too long" log
+        # message will _not_ be emitted
+        self.reactor.advance(120)
+        self.assertNotIn(
+            self.too_long_message,
+            (call[1][0] for call in self.log.msg.mock_calls))
 
     def test_acquire_release_no_log(self):
         """
@@ -535,11 +565,15 @@ class WithLockTests(SynchronousTestCase):
         """
         d = with_lock(self.reactor, self.lock, self.method, self.log)
         self.assertNoResult(d)
-        self.log.msg.assert_called_once_with('Starting lock acquisition')
+        self.log.msg.assert_called_once_with(
+            'Starting lock acquisition', lock_status='Acquiring',
+            **self.log_fields)
 
         self.reactor.advance(10)
         self.acquire_d.errback(ValueError(None))
-        self.log.msg.assert_called_with('Lock acquisition failed in 10.0 seconds')
+        self.log.msg.assert_called_with(
+            'Lock acquisition failed in 10.0 seconds', lock_status='Failed',
+            **self.log_fields)
         self.assertFalse(self.method.called)
         self.failureResultOf(d, ValueError)
 
@@ -552,20 +586,27 @@ class WithLockTests(SynchronousTestCase):
 
         d = with_lock(self.reactor, self.lock, self.method, self.log)
         self.assertNoResult(d)
-        self.log.msg.assert_called_once_with('Starting lock acquisition')
+        self.log.msg.assert_called_once_with(
+            'Starting lock acquisition', lock_status='Acquiring',
+            **self.log_fields)
 
         self.reactor.advance(10)
         self.acquire_d.callback(None)
         self.assertEqual(
             self.log.msg.mock_calls[-2:],
-            [mock.call('Lock acquisition in 10.0 seconds', acquire_time=10.0),
-             mock.call('Starting lock release')])
+            [mock.call('Lock acquisition in 10.0 seconds',
+                       acquire_time=10.0, lock_status='Acquired',
+                       **self.log_fields),
+             mock.call('Starting lock release', lock_status='Releasing',
+                       **self.log_fields)])
         self.method.assert_called_once_with()
 
         self.reactor.advance(3)
         self.release_d.callback(None)
         self.log.msg.assert_called_with('Lock release in 3.0 seconds',
-                                        release_time=3.0)
+                                        release_time=3.0,
+                                        lock_status='Released',
+                                        **self.log_fields)
 
         self.failureResultOf(d, ValueError)
 
@@ -576,12 +617,17 @@ class WithLockTests(SynchronousTestCase):
         d = with_lock(self.reactor, self.lock, self.method, self.log,
                       acquire_timeout=9)
         self.assertNoResult(d)
-        self.log.msg.assert_called_once_with('Starting lock acquisition')
+        self.log.msg.assert_called_once_with(
+            'Starting lock acquisition', lock_status='Acquiring',
+            **self.log_fields)
 
         self.reactor.advance(10)
         f = self.failureResultOf(d, TimedOutError)
-        self.assertEqual(f.value.message, 'Lock acquisition timed out after 9 seconds.')
-        self.log.msg.assert_called_with('Lock acquisition failed in 10.0 seconds')
+        self.assertEqual(f.value.message,
+                         'Lock acquisition timed out after 9 seconds.')
+        self.log.msg.assert_called_with(
+            'Lock acquisition failed in 10.0 seconds', lock_status='Failed',
+            **self.log_fields)
 
         self.assertFalse(self.method.called)
         self.assertFalse(self.lock.release.called)
@@ -600,7 +646,19 @@ class WithLockTests(SynchronousTestCase):
 
         self.reactor.advance(10)
         f = self.failureResultOf(d, TimedOutError)
-        self.assertEqual(f.value.message, 'Lock release timed out after 9 seconds.')
+        self.assertEqual(f.value.message,
+                         'Lock release timed out after 9 seconds.')
+
+    def test_held_too_long(self):
+        """When the lock is held for some time, a log message is emitted."""
+        d = with_lock(self.reactor, self.lock, self.method, self.log)
+        self.assertNoResult(d)
+        self.acquire_d.callback(None)
+        self.method.assert_called_once_with()
+        self.reactor.advance(120)
+        self.log.msg.assert_called_with(
+            self.too_long_message,
+            isError=True, lock_status='Acquired', **self.log_fields)
 
 
 class DelayTests(SynchronousTestCase):

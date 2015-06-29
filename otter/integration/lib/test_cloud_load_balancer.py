@@ -1,4 +1,6 @@
 """Tests for :mod:`otter.integration.lib.cloud_load_balancer`"""
+import json
+
 from testtools.matchers import Equals
 
 from twisted.internet.defer import succeed
@@ -10,7 +12,228 @@ from otter.integration.lib.cloud_load_balancer import (
     ContainsAllIPs,
     ExcludesAllIPs,
     HasLength)
+from otter.integration.lib.test_nova import Response, get_fake_treq
 from otter.util.deferredutils import TimedOutError
+from otter.util.http import APIError, headers
+
+
+class _FakeRCS(object):
+    endpoints = {'loadbalancers': 'clburl'}
+    token = "token"
+
+
+pending_update_response = [
+    Response(422),
+    json.dumps({
+        "message": ("Load Balancer '12345' has a status of "
+                    "'PENDING_UPDATE' and is considered immutable."),
+        "code": 422
+    })
+]
+
+
+class CLBTests(SynchronousTestCase):
+    """
+    Tests for the :class:`CloudLoadBalancer` API calls.
+    """
+    def setUp(self):
+        """
+        Set up fake pool, treq, responses, and RCS.
+        """
+        self.pool = object()
+        self.rcs = _FakeRCS()
+        self.server_id = 'server_id'
+        self.expected_kwargs = {
+            'headers': headers('token'),
+            'pool': self.pool
+        }
+
+    def get_clb(self, method, url, treq_args_kwargs, response, str_body):
+        """
+        Stub out treq, and return a cloud load balancer
+        """
+        clb = CloudLoadBalancer(
+            pool=self.pool,
+            treq=get_fake_treq(self, method, url, treq_args_kwargs,
+                               (response, str_body)))
+        clb.clb_id = 12345
+        return clb
+
+    def test_list_nodes(self):
+        """
+        Listing nodes calls the right endpoint and succeeds on 200.
+        """
+        clb = self.get_clb('get', 'clburl/loadbalancers/12345/nodes',
+                           ((), self.expected_kwargs),
+                           Response(200), '{"nodes": []}')
+        d = clb.list_nodes(self.rcs)
+        self.assertEqual({'nodes': []}, self.successResultOf(d))
+
+    def assert_mutate_function_retries_until_success(
+            self, mutate_callable, expected_args, success_response,
+            expected_result):
+        """
+        Assert that some CLB function that mutates the CLB will retry on
+        pending update until the function succeeds.
+
+        :param mutate_callable: a callable which takes a clb argument and
+            a clock argument - this callable should call the CLB's mutate
+            function with the required arguments and return the function's
+            return value.  For example:
+            ``lambda clb, clk: clb.update_node(..., clock=clk)``
+        :param expected_args: What are the expected treq arguments?  This
+            should be an array of
+            [method, url, (expected args, expected kwargs)]
+        :param success_response: a tuple of (Response, string response body)
+            which should be the successful response back from the API
+        :param expected_result: What is the expected successful result of the
+            function that is called by ``mutate_callable``
+        """
+        clock = Clock()
+        clb = self.get_clb(*(expected_args + pending_update_response))
+
+        d = mutate_callable(clb, clock)
+
+        self.assertNoResult(d)
+        clock.pump([3])
+        self.assertNoResult(d)
+
+        clb.treq = get_fake_treq(
+            *([self] + expected_args + [success_response]))
+
+        clock.pump([3])
+        self.assertEqual(self.successResultOf(d), expected_result)
+
+    def assert_mutate_function_retries_until_timeout(
+            self, mutate_callable, expected_args, timeout=60):
+        """
+        Assert that some CLB function that mutates the CLB will retry on
+        pending update until the function times out.
+
+        :param mutate_callable: a callable which takes a clb argument and
+            a clock argument - this callable should call the CLB's mutate
+            function with the required arguments and return the function's
+            return value.  For example:
+            ``lambda clb, clk: clb.update_node(..., clock=clk)``
+        :param expected_args: What are the expected treq arguments?  This
+            should be an array of
+            [method, url, (expected args, expected kwargs)]
+        :param int timeout: When does your function time out retrying?
+        """
+        clock = Clock()
+        clb = self.get_clb(*(expected_args + pending_update_response))
+
+        d = mutate_callable(clb, clock)
+        self.assertNoResult(d)
+
+        for _ in range((timeout - 1) / 3):
+            clock.pump([3])
+            self.assertNoResult(d)
+
+        clock.pump([3])
+        self.failureResultOf(d, TimedOutError)
+
+    def assert_mutate_function_does_not_retry_if_not_pending_update(
+            self, mutate_callable, expected_args):
+        """
+        Assert that some CLB function that mutates the CLB will not retry if
+        the error is not a pending update.
+
+        :param mutate_callable: a callable which takes a clb argument and
+            a clock argument - this callable should call the CLB's mutate
+            function with the required arguments and return the function's
+            return value.  For example:
+            ``lambda clb, clk: clb.update_node(..., clock=clk)``
+        :param expected_args: What are the expected treq arguments?  This
+            should be an array of
+            [method, url, (expected args, expected kwargs)]
+        """
+        clock = Clock()
+        pending_delete = {
+            "message": ("Load Balancer '12345' has a status of "
+                        "'PENDING_DELETE' and is considered immutable."),
+            "code": 422
+        }
+        clb = self.get_clb(
+            *(expected_args + [Response(422), json.dumps(pending_delete)]))
+        d = mutate_callable(clb, clock)
+        self.failureResultOf(d, APIError)
+
+    def test_update_node(self):
+        """
+        Update node calls the right endpoint, succeeds on 202, and retries
+        on pending update for 60 seconds.
+        """
+        main_treq_args = ['put', 'clburl/loadbalancers/12345/nodes/54321',
+                          (('{"node": {"weight": 5}}',), self.expected_kwargs)]
+
+        def update(clb, clock):
+            return clb.update_node(self.rcs, 54321, weight=5, clock=clock)
+
+        self.assert_mutate_function_retries_until_success(
+            update, main_treq_args, (Response(202), ""), "")
+
+        self.assert_mutate_function_retries_until_timeout(
+            update, main_treq_args, 60)
+
+        self.assert_mutate_function_does_not_retry_if_not_pending_update(
+            update, main_treq_args)
+
+    def test_delete_node_retries_until_success(self):
+        """
+        Deleting one or more nodes calls the right endpoint, succeeds on
+        202, and retries on pending update for 60 seconds.
+        """
+        self.expected_kwargs['params'] = [("id", 11111), ("id", 22222)]
+        main_treq_args = ['delete', 'clburl/loadbalancers/12345/nodes',
+                          ((), self.expected_kwargs)]
+
+        def delete(clb, clock):
+            return clb.delete_nodes(self.rcs, (11111, 22222), clock=clock)
+
+        self.assert_mutate_function_retries_until_success(
+            delete, main_treq_args, (Response(202), ""), "")
+
+        self.assert_mutate_function_retries_until_timeout(
+            delete, main_treq_args, 60)
+
+        self.assert_mutate_function_does_not_retry_if_not_pending_update(
+            delete, main_treq_args)
+
+    def test_add_node_retries_until_success(self):
+        """
+        Adding one or more nodes calls the right endpoint, succeeds on
+        202, and retries on pending update for 60 seconds.
+        """
+        nodes_to_add = {"nodes": [
+            {
+                "address": "10.2.2.3",
+                "port": 80,
+                "condition": "ENABLED",
+                "type": "PRIMARY"
+            },
+            {
+                "address": "10.2.2.4",
+                "port": 81,
+                "condition": "ENABLED",
+                "type": "SECONDARY"
+            }]}
+
+        main_treq_args = ['post', 'clburl/loadbalancers/12345/nodes',
+                          ((json.dumps(nodes_to_add),), self.expected_kwargs)]
+
+        def add(clb, clock):
+            return clb.add_nodes(self.rcs, nodes_to_add["nodes"], clock=clock)
+
+        self.assert_mutate_function_retries_until_success(
+            add, main_treq_args, (Response(202), json.dumps(nodes_to_add)),
+            nodes_to_add)
+
+        self.assert_mutate_function_retries_until_timeout(
+            add, main_treq_args, 60)
+
+        self.assert_mutate_function_does_not_retry_if_not_pending_update(
+            add, main_treq_args)
 
 
 class WaitForNodesTestCase(SynchronousTestCase):
@@ -26,13 +249,6 @@ class WaitForNodesTestCase(SynchronousTestCase):
         self.clock = Clock()
         self.get_calls = 0
 
-        class FakeRCS(object):
-            endpoints = {'loadbalancers': 'clburl'}
-            token = "token"
-
-        class Resp(object):
-            code = 200
-
         class FakeTreq(object):
             @classmethod
             def get(cls, url, headers, pool):
@@ -42,13 +258,13 @@ class WaitForNodesTestCase(SynchronousTestCase):
                 self.assertEqual(['clburl', 'loadbalancers', 'clb_id',
                                   'nodes'],
                                  url.split('/'))
-                return succeed(Resp())
+                return succeed(Response(200))
 
             @classmethod
             def json_content(cls, resp):
                 return succeed(self.nodes)
 
-        self.rcs = FakeRCS()
+        self.rcs = _FakeRCS()
         self.clb = CloudLoadBalancer(pool=self.pool, treq=FakeTreq)
         self.clb.clb_id = 'clb_id'
 

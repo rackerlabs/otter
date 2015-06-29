@@ -3,16 +3,17 @@ Cassandra implementation of the store for the front-end scaling groups engine
 """
 
 import functools
-import itertools
 import json
 import time
 import uuid
 import weakref
 from datetime import datetime
+from itertools import cycle, takewhile
 
 from characteristic import attributes
 
-from effect import Effect, parallel
+from effect import Constant, Effect, TypeDispatcher, parallel
+from effect.do import do, do_return
 
 from jsonschema import ValidationError
 
@@ -22,7 +23,7 @@ from pyrsistent import freeze
 
 from silverberg.client import ConsistencyLevel
 
-from toolz.dicttoolz import keymap
+from toolz.dicttoolz import keymap, merge
 
 from twisted.internet import defer
 
@@ -37,6 +38,7 @@ from otter.models.interface import (
     IAdmin,
     IScalingGroup,
     IScalingGroupCollection,
+    IScalingGroupServersCache,
     IScalingScheduleCollection,
     NoSuchPolicyError,
     NoSuchScalingGroupError,
@@ -72,6 +74,26 @@ def perform_cql_query(conn, disp, intent):
     """
     return conn.execute(
         intent.query, intent.params, intent.consistency_level)
+
+
+def get_cql_dispatcher(connection):
+    """
+    Get dispatcher with `CQLQueryExecute`'s performer in it
+
+    :param connection: Silverberg connection
+    """
+    return TypeDispatcher({
+        CQLQueryExecute: functools.partial(perform_cql_query, connection)
+    })
+
+
+def cql_eff(query, params={}, consistency_level=ConsistencyLevel.ONE):
+    """
+    Return Effect of CQLQueryExecute intent
+    """
+    return Effect(
+        CQLQueryExecute(query=query, params=params,
+                        consistency_level=consistency_level))
 
 
 def serialize_json_data(data, ver):
@@ -131,11 +153,6 @@ _cql_insert_group_state = (
     '"policyTouched", paused, desired) VALUES(:tenantId, :groupId, :active, '
     ':pending, :groupTouched, :policyTouched, :paused, :desired) '
     'USING TIMESTAMP :ts')
-_cql_view_group_state = (
-    'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at, status '
-    'FROM {cf} '
-    'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND deleting=false;')
 
 # --- Event related queries
 _cql_insert_group_event = (
@@ -586,6 +603,17 @@ def get_client_ts(reactor):
     return defer.succeed(int(reactor.seconds() * 1000000))
 
 
+def _check_deleting(group, get_deleting=False):
+    """
+    Given a single group from reading the scaling group table, and whether
+    a deleting group should be returns, either returns the group or raises
+    a :class:`NoSuchScalingGroupError`.
+    """
+    if not get_deleting and group['deleting']:
+        raise NoSuchScalingGroupError(group['tenantId'], group['groupId'])
+    return group
+
+
 @implementer(IScalingGroup)
 class CassScalingGroup(object):
     """
@@ -649,6 +677,7 @@ class CassScalingGroup(object):
         self.webhooks_table = "policy_webhooks"
         self.webhooks_keys_table = "webhook_keys"
         self.event_table = "scaling_schedule_v2"
+        self.servers_cache_table = "servers_cache"
 
     def with_timestamp(self, func):
         """
@@ -702,11 +731,6 @@ class CassScalingGroup(object):
             }
             return m
 
-        def check_deleting(group):
-            if not get_deleting and group['deleting']:
-                raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
-            return group
-
         view_query = _cql_view_manifest.format(
             cf=self.group_table)
         del_query = _cql_delete_all_in_group.format(
@@ -717,7 +741,7 @@ class CassScalingGroup(object):
                           DEFAULT_CONSISTENCY,
                           NoSuchScalingGroupError(self.tenant_id, self.uuid),
                           self.log)
-        d.addCallback(check_deleting)
+        d.addCallback(_check_deleting, get_deleting)
         d.addCallback(_generate_manifest_group_part)
 
         if with_policies:
@@ -765,14 +789,14 @@ class CassScalingGroup(object):
         return d.addCallback(lambda group:
                              _jsonloads_data(group['launch_config']))
 
-    def view_state(self, consistency=None):
+    def view_state(self, consistency=None, get_deleting=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_state`
         """
         if consistency is None:
             consistency = DEFAULT_CONSISTENCY
 
-        view_query = _cql_view_group_state.format(cf=self.group_table)
+        view_query = _cql_view_manifest.format(cf=self.group_table)
         del_query = _cql_delete_all_in_group.format(
             cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
@@ -782,13 +806,17 @@ class CassScalingGroup(object):
                           NoSuchScalingGroupError(self.tenant_id, self.uuid),
                           self.log)
 
+        d.addCallback(_check_deleting, get_deleting)
         return d.addCallback(_unmarshal_state)
 
     def modify_state(self, modifier_callable, *args, **kwargs):
         """
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
-        log = self.log.bind(system='CassScalingGroup.modify_state')
+        modify_state_reason = kwargs.pop('modify_state_reason', None)
+        log = self.log.bind(
+            system='CassScalingGroup.modify_state',
+            modify_state_reason=modify_state_reason)
         consistency = DEFAULT_CONSISTENCY
 
         @self.with_timestamp
@@ -822,7 +850,8 @@ class CassScalingGroup(object):
         local_lock = self.local_locks.get_lock(self.uuid)
         return local_lock.run(
             with_lock, self.reactor, lock, _modify_state,
-            log.bind(category='locking'), acquire_timeout=150,
+            log.bind(category='locking', lock_reason='modify_state'),
+            acquire_timeout=150,
             release_timeout=30)
 
     def update_status(self, status):
@@ -1252,7 +1281,8 @@ class CassScalingGroup(object):
 
             queries.extend([
                 _cql_delete_all_in_group.format(cf=table, name='') for table in
-                (self.policies_table, self.webhooks_table)])
+                (self.policies_table, self.webhooks_table,
+                 self.servers_cache_table)])
             queries.append(_cql_delete_group.format(cf=self.group_table))
             params.update({'tenantId': self.tenant_id,
                            'groupId': self.uuid,
@@ -1264,7 +1294,8 @@ class CassScalingGroup(object):
             return b.execute(self.connection)
 
         def _maybe_delete(state):
-            if len(state.active) + len(state.pending) > 0:
+            if (state.status != ScalingGroupStatus.DELETING and
+                    len(state.active) + len(state.pending) > 0):
                 raise GroupNotEmptyError(self.tenant_id, self.uuid)
 
             d = self._naive_list_all_webhooks()
@@ -1272,7 +1303,7 @@ class CassScalingGroup(object):
             return d
 
         def _delete_group():
-            d = self.view_state()
+            d = self.view_state(get_deleting=True)
             d.addCallback(_maybe_delete)
             return d
 
@@ -1293,7 +1324,7 @@ class CassScalingGroup(object):
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         d = with_lock(self.reactor, lock, _delete_group,
-                      log.bind(category='locking'),
+                      log.bind(category='locking', lock_reason='delete_group'),
                       acquire_timeout=150,
                       release_timeout=30)
         # Cleanup /locks/<groupID> znode as it will not be required anymore
@@ -1365,7 +1396,7 @@ class CassScalingGroupCollection:
         Set round-robin list of buckets that will be used to store scheduled
         events.
         """
-        self.buckets = itertools.cycle(buckets)
+        self.buckets = cycle(buckets)
 
     def create_scaling_group(self, log, tenant_id, config, launch,
                              policies=None):
@@ -1654,7 +1685,8 @@ class CassScalingGroupCollection:
         lock.acquire = functools.partial(lock.acquire, timeout=5)
         start_time = self.reactor.seconds()
         d = with_lock(self.reactor, lock, lambda: None,
-                      otter_log.bind(system='health_check'))
+                      otter_log.bind(system='health_check',
+                                     lock_reason='kazoo_health_check'))
 
         d.addCallback(lambda _:
                       self.kz_client.delete(lock_path, recursive=True))
@@ -1680,6 +1712,65 @@ class CassScalingGroupCollection:
                       (True, {'cassandra_time':
                               self.reactor.seconds() - start_time}))
         return d
+
+
+@implementer(IScalingGroupServersCache)
+class CassScalingGroupServersCache(object):
+    """
+    Collection of cache of scaling group servers
+    """
+
+    def __init__(self, tenant_id, group_id):
+        self.tenantId = tenant_id
+        self.groupId = group_id
+        self.table = "servers_cache"
+        self.params = {"tenantId": self.tenantId, "groupId": self.groupId}
+
+    @do
+    def get_servers(self):
+        """
+        See :method:`IScalingGroupServersCache.get_servers`
+        """
+        query = ('SELECT server_blob, last_update FROM {cf} '
+                 'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
+                 'ORDER BY last_update DESC;')
+        rows = yield cql_eff(query.format(cf=self.table), self.params)
+        if len(rows) == 0:
+            yield do_return(([], None))
+        last_update = rows[0]['last_update']
+        rows = takewhile(lambda r: r['last_update'] == last_update, rows)
+        yield do_return(([json.loads(r['server_blob']) for r in rows],
+                         last_update))
+
+    def insert_servers(self, last_update, servers, clear_others):
+        """
+        See :method:`IScalingGroupServersCache.insert_servers`
+        """
+        if len(servers) == 0:
+            return Effect(Constant(None))
+        query = ('INSERT INTO {cf} ("tenantId", "groupId", last_update, '
+                 'server_id, server_blob) '
+                 'VALUES(:tenantId, :groupId, :last_update, :server_id{i}, '
+                 ':server_blob{i});')
+        params = merge(self.params, {"last_update": last_update})
+        queries = []
+        for i, server in enumerate(servers):
+            params['server_id{}'.format(i)] = server['id']
+            params['server_blob{}'.format(i)] = json.dumps(server)
+            queries.append(query.format(cf=self.table, i=i))
+        if clear_others:
+            return self.delete_servers().on(
+                lambda _: cql_eff(batch(queries), params))
+        else:
+            return cql_eff(batch(queries), params)
+
+    def delete_servers(self):
+        """
+        See :method:`IScalingGroupServersCache.delete_servers`
+        """
+        return cql_eff(
+            _cql_delete_all_in_group.format(cf=self.table, name=''),
+            self.params)
 
 
 @implementer(IAdmin)

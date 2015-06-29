@@ -14,12 +14,26 @@ from twisted.internet import reactor
 from twisted.python.log import msg
 
 from otter.util.deferredutils import retry_and_timeout
-from otter.util.http import check_success, headers
+from otter.util.http import APIError, check_success, headers
 from otter.util.retry import (
     TransientRetryError,
     repeating_interval,
     terminal_errors_except
 )
+
+
+def _pending_update_to_transient(f):
+    """
+    A cloud load balancer locks on every update, so to ensure that the test
+    doesn't fail because of that, we want to retry POST/PUT/DELETE commands
+    issued by the test.  This is a utility function that checks if a treq
+    API failure is a 422 PENDING_UDPATE failure, and if so, re-raises a
+    TransientRetryError instead.
+    """
+    f.trap(APIError)
+    if f.value.code == 422 and 'PENDING_UPDATE' in f.value.body:
+        raise TransientRetryError()
+    return f
 
 
 @attributes([
@@ -51,11 +65,20 @@ class CloudLoadBalancer(object):
         scaling group.  See also the lib.autoscale.create_scaling_group_dict
         function for more details.
         """
-
         return {
             "port": 80,
             "loadBalancerId": self.clb_id,
         }
+
+    def endpoint(self, rcs):
+        """
+        :param TestResources rcs: The resources used to make appropriate API
+            calls with.
+
+        :return: this load balancer's endpoint
+        """
+        return "{0}/loadbalancers/{1}".format(
+            str(rcs.endpoints['loadbalancers']), self.clb_id)
 
     def get_state(self, rcs):
         """Returns the current state of the cloud load balancer.
@@ -67,14 +90,11 @@ class CloudLoadBalancer(object):
         """
         return (
             self.treq.get(
-                "%s/loadbalancers/%s" % (
-                    str(rcs.endpoints["loadbalancers"]),
-                    self.clb_id
-                ),
+                self.endpoint(rcs),
                 headers=headers(str(rcs.token)),
                 pool=self.pool,
             )
-            .addCallback(check_success, [200])
+            .addCallback(check_success, [200], _treq=self.treq)
             .addCallback(self.treq.json_content)
         )
 
@@ -127,7 +147,10 @@ class CloudLoadBalancer(object):
         :param TestResources rcs: The resources used to make appropriate API
             calls with.
         """
-        return self.delete(rcs)
+        # TODO: Ideally .addErrback(err) should do the job but doing it
+        # causes the error to get propogated to trial after logging it
+        return self.delete(rcs).addErrback(
+            lambda f: msg("error deleting clb: {}".format(f)))
 
     def start(self, rcs, test):
         """Creates the cloud load balancer and launches it in the cloud.
@@ -152,7 +175,7 @@ class CloudLoadBalancer(object):
                                json.dumps(self.config()),
                                headers=headers(str(rcs.token)),
                                pool=self.pool)
-                .addCallback(check_success, [202])
+                .addCallback(check_success, [202], _treq=self.treq)
                 .addCallback(self.treq.json_content)
                 .addCallback(record_results))
 
@@ -167,16 +190,45 @@ class CloudLoadBalancer(object):
         """
         return (
             self.treq.delete(
-                "%s/loadbalancers/%s" % (
-                    str(rcs.endpoints["loadbalancers"]),
-                    self.clb_id
-                ),
+                self.endpoint(rcs),
                 headers=headers(str(rcs.token)),
                 pool=self.pool
             ).addCallback(
                 check_success,
-                [202, 404] if success_codes is None else success_codes)
+                [202, 404] if success_codes is None else success_codes,
+                _treq=self.treq)
         ).addCallback(lambda _: rcs)
+
+    def list_nodes(self, rcs):
+        """
+        Get all the nodes on the load balancer.
+
+        :param rcs: a :class:`otter.integration.lib.resources.TestResources`
+            instance
+
+        :return: the JSON response from the load balancer, which looks like::
+
+            {
+                "nodes": [
+                    {
+                        "id": ...
+                    },
+                    {
+                        "id": ...
+                    },
+                    ...
+                ]
+            }
+
+        """
+        d = self.treq.get(
+            "{0}/nodes".format(self.endpoint(rcs)),
+            headers=headers(str(rcs.token)),
+            pool=self.pool
+        )
+        d.addCallback(check_success, [200], _treq=self.treq)
+        d.addCallback(self.treq.json_content)
+        return d
 
     def wait_for_nodes(self, rcs, matcher, timeout, period=10, clock=None):
         """
@@ -211,26 +263,14 @@ class CloudLoadBalancer(object):
         ```
         """
         def check(nodes):
-            mismatch = matcher.match(nodes['nodes'])
+            mismatch = matcher.match(nodes["nodes"])
             if mismatch:
                 msg("Waiting for CLB node state for CLB {}.\nMismatch: {}"
                     .format(self.clb_id, mismatch.describe()))
                 raise TransientRetryError(mismatch.describe())
 
         def poll():
-            return (
-                self.treq.get(
-                    "{0}/loadbalancers/{1}/nodes".format(
-                        str(rcs.endpoints["loadbalancers"]),
-                        self.clb_id
-                    ),
-                    headers=headers(str(rcs.token)),
-                    pool=self.pool
-                )
-                .addCallback(check_success, [200])
-                .addCallback(self.treq.json_content)
-                .addCallback(check)
-            )
+            return self.list_nodes(rcs).addCallback(check)
 
         return retry_and_timeout(
             poll, timeout,
@@ -239,6 +279,112 @@ class CloudLoadBalancer(object):
             clock=clock or reactor,
             deferred_description="Waiting for nodes to reach state {0}".format(
                 str(matcher))
+        )
+
+    def update_node(self, rcs, node_id, weight=None, condition=None,
+                    type=None, clock=None):
+        """
+        Update a node's attributes.  At least one of the optional parameters
+        must be provided.
+
+        :param rcs: a :class:`otter.integration.lib.resources.TestResources`
+            instance
+
+        :param node_id: The node ID to modify
+        :type node_id: `str` or `int`
+
+        :param int weight: The weight to change the node to
+        :param str condition: The condition to change the node to - one of
+            ENABLED, DISBABLED, or DRAINING.
+        :param str type: The type to change the node to - one of PRIMARY or
+            SECONDARY
+
+        :return: An empty string if successful.
+        """
+        data = [("weight", weight), ("condition", condition), ("type", type)]
+        data = {k: v for k, v in data if v is not None}
+
+        def really_change():
+            d = self.treq.put(
+                "{0}/nodes/{1}".format(self.endpoint(rcs), node_id),
+                json.dumps({"node": data}),
+                headers=headers(str(rcs.token)),
+                pool=self.pool
+            )
+            d.addCallback(check_success, [202], _treq=self.treq)
+            d.addCallbacks(self.treq.content, _pending_update_to_transient)
+            return d
+
+        return retry_and_timeout(
+            really_change, 60,
+            can_retry=terminal_errors_except(TransientRetryError),
+            next_interval=repeating_interval(3),
+            clock=clock or reactor,
+            deferred_description="Trying to change node {0}".format(node_id)
+        )
+
+    def delete_nodes(self, rcs, node_ids, clock=None):
+        """
+        Delete one or more nodes from a load balancer.
+
+        :param rcs: a :class:`otter.integration.lib.resources.TestResources`
+            instance
+
+        :param list node_ids: A list of `int` node ids to delete.
+
+        :return: An empty string if successful.
+        """
+        def really_delete():
+            d = self.treq.delete(
+                "{0}/nodes".format(self.endpoint(rcs)),
+                params=[('id', node_id) for node_id in node_ids],
+                headers=headers(str(rcs.token)),
+                pool=self.pool
+            )
+            d.addCallback(check_success, [202], _treq=self.treq)
+            d.addCallbacks(self.treq.content, _pending_update_to_transient)
+            return d
+
+        return retry_and_timeout(
+            really_delete, 60,
+            can_retry=terminal_errors_except(TransientRetryError),
+            next_interval=repeating_interval(3),
+            clock=clock or reactor,
+            deferred_description="Trying to delete nodes {0}".format(
+                ", ".join(map(str, node_ids)))
+        )
+
+    def add_nodes(self, rcs, node_list, clock=None):
+        """
+        Add one or more nodes to a cloud load balancer
+
+        :param rcs: a :class:`otter.integration.lib.resources.TestResources`
+            instance
+
+        :param list node_list: A list of node dictionaries to add.
+
+        :return: On success, a json dictionary containing the add response that
+            lists the nodes
+
+        """
+        def really_add():
+            d = self.treq.post(
+                "{0}/nodes".format(self.endpoint(rcs)),
+                json.dumps({"nodes": node_list}),
+                headers=headers(str(rcs.token)),
+                pool=self.pool
+            )
+            d.addCallback(check_success, [202], _treq=self.treq)
+            d.addCallbacks(self.treq.json_content,
+                           _pending_update_to_transient)
+            return d
+
+        return retry_and_timeout(
+            really_add, 60,
+            can_retry=terminal_errors_except(TransientRetryError),
+            next_interval=repeating_interval(3),
+            clock=clock or reactor,
+            deferred_description="Trying to add nodes"
         )
 
 

@@ -8,8 +8,9 @@ from copy import deepcopy
 from datetime import datetime
 from functools import partial
 
-from effect import Effect, ParallelEffects, TypeDispatcher, sync_perform
-from effect.testing import resolve_effect
+from effect import (
+    Constant, Effect, ParallelEffects, TypeDispatcher, sync_perform)
+from effect.testing import SequenceDispatcher, resolve_effect
 
 from jsonschema import ValidationError
 
@@ -24,11 +25,13 @@ from silverberg.client import CQLClient, ConsistencyLevel
 
 from testtools.matchers import IsInstance
 
-from toolz.dicttoolz import assoc
+from toolz.dicttoolz import assoc, merge
 
 from twisted.internet import defer
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
+
+from txeffect import deferred_performer
 
 from otter.json_schema import group_examples
 from otter.models.cass import (
@@ -36,9 +39,11 @@ from otter.models.cass import (
     CassAdmin,
     CassScalingGroup,
     CassScalingGroupCollection,
+    CassScalingGroupServersCache,
     WeakLocks,
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
+    get_cql_dispatcher,
     perform_cql_query,
     serialize_json_data,
     verified_view
@@ -65,7 +70,8 @@ from otter.test.utils import (
     LockMixin,
     matches,
     mock_log,
-    patch)
+    patch,
+    test_dispatcher)
 from otter.util.config import set_config_data
 from otter.util.timestamp import from_timestamp
 
@@ -116,14 +122,14 @@ def _cassandrify_data(list_of_dicts):
     return _de_identify(list_of_dicts)
 
 
-class PerformTests(SynchronousTestCase):
+class EffectTests(SynchronousTestCase):
     """
-    Tests for :func:`perform_cql_query` function
+    Tests for :func:`perform_cql_query` and :func:`get_cql_dispatcher`
     """
 
     def test_perform_cql_query(self):
         """
-        Calls given connection's execute
+        `perform_cql_query` calls given connection's execute
         """
         conn = mock.Mock(spec=CQLClient)
         conn.execute.return_value = defer.succeed('ret')
@@ -136,6 +142,24 @@ class PerformTests(SynchronousTestCase):
         self.assertEqual(r, 'ret')
         conn.execute.assert_called_once_with(
             'query', {'w': 2}, ConsistencyLevel.ONE)
+
+    @mock.patch('otter.models.cass.perform_cql_query')
+    def test_cql_disp(self, mock_pcq):
+        """
+        The :obj:`CQLQueryExecute` performer is called with
+        dispatcher returned from get_cql_dispatcher
+        """
+
+        @deferred_performer
+        def performer(c, d, i):
+            return defer.succeed('p' + c)
+
+        mock_pcq.side_effect = performer
+
+        dispatcher = get_cql_dispatcher('conn')
+        intent = CQLQueryExecute(query='q', params='p', consistency_level=1)
+        eff = Effect(intent)
+        self.assertEqual(sync_perform(dispatcher, eff), 'pconn')
 
 
 class SerialJsonDataTestCase(SynchronousTestCase):
@@ -352,6 +376,24 @@ class WeakLocksTests(SynchronousTestCase):
         self.assertIsNot(self.locks.get_lock('a'), self.locks.get_lock('b'))
 
 
+scaling_group_entry = {
+    'tenantId': 'tenant_id',
+    "groupId": 'group_id',
+    'id': "12345678g",
+    'group_config': serialize_json_data({'name': 'a'}, 1.0),
+    'launch_config': serialize_json_data({}, 1.0),
+    'active': '{"A":"R"}',
+    'pending': '{"P":"R"}',
+    'groupTouched': '2014-01-01T00:00:05Z.1234',
+    'policyTouched': '{"PT":"R"}',
+    'paused': False,
+    'desired': 0,
+    'created_at': 23,
+    'deleting': False,
+    'status': 'ACTIVE',
+}
+
+
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin,
                                SynchronousTestCase):
     """
@@ -504,28 +546,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         """
         Test that you can call view state and receive a valid parsed response
         """
-        cass_response = [
-            {'tenantId': self.tenant_id,
-             'groupId': self.group_id,
-             'group_config': '{"name": "a"}',
-             'active': '{"A":"R"}',
-             'pending': '{"P":"R"}',
-             'groupTouched': '2014-01-01T00:00:05Z.1234',
-             'policyTouched': '{"PT":"R"}',
-             'paused': False,
-             'created_at': 23,
-             'desired': 10,
-             'status': 'ACTIVE'}]
-        self.returns = [cass_response]
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'desired': 10})
+        ]]
         d = self.group.view_state()
         r = self.successResultOf(d)
         expectedCql = (
-            'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'SELECT "tenantId", "groupId", group_config, launch_config, '
+            'active, pending, "groupTouched", "policyTouched", paused, '
+            'desired, created_at, status, deleting '
             'FROM scaling_group '
-            'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
-            'AND deleting=false;')
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
@@ -546,19 +580,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         """
         If there is no desired capacity, it defaults to 0
         """
-        cass_response = [
-            {'tenantId': self.tenant_id,
-             'groupId': self.group_id,
-             'group_config': '{"name": "a"}',
-             'active': '{"A":"R"}',
-             'pending': '{"P":"R"}',
-             'groupTouched': '2014-01-01T00:00:05Z.1234',
-             'policyTouched': '{"PT":"R"}',
-             'paused': False,
-             'created_at': 23,
-             'desired': None,
-             'status': 'ACTIVE'}]
-        self.returns = [cass_response]
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'desired': None})
+        ]]
         r = self.successResultOf(self.group.view_state())
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
                                        'a',
@@ -575,19 +602,10 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         If a consistency argument is passed to ``view_state``, it is honored
         over the default consistency
         """
-        cass_response = [
-            {'tenantId': self.tenant_id,
-             'groupId': self.group_id,
-             'group_config': '{"name": "a"}',
-             'active': '{"A":"R"}',
-             'pending': '{"P":"R"}',
-             'groupTouched': '2014-01-01T00:00:05Z.1234',
-             'policyTouched': '{"PT":"R"}',
-             'paused': False,
-             'desired': 0,
-             'created_at': 23,
-             'status': 'ACTIVE'}]
-        self.returns = [cass_response]
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id, 'groupId': self.group_id})
+        ]]
         d = self.group.view_state(consistency=ConsistencyLevel.ALL)
         self.successResultOf(d)
         self.connection.execute.assert_called_once_with(mock.ANY,
@@ -600,28 +618,57 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         ``NoSuchScalingGroupError``
         """
         self.returns = [[]]
-        d = self.group.view_state()
-        f = self.failureResultOf(d)
-        self.assertTrue(f.check(NoSuchScalingGroupError))
+        self.failureResultOf(self.group.view_state(), NoSuchScalingGroupError)
+
+    def test_view_state_deleting_group_filter_deleting_group(self):
+        """
+        Calling ``view_state`` on a group that is deleting, with
+        ``get_deleting`` = `False`, raises a :class:`NoSuchScalingGroupError`
+        """
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'deleting': True})
+        ]]
+        self.failureResultOf(self.group.view_state(), NoSuchScalingGroupError)
+
+    def test_view_state_deleting_group_do_not_filter_deleting_group(self):
+        """
+        Calling ``view_state`` on a group that is deleting, with
+        ``get_deleting`` = `True`, returns the deleting group
+        """
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'deleting': True})
+        ]]
+        result = self.successResultOf(self.group.view_state(get_deleting=True))
+        group_state = GroupState(tenant_id=self.tenant_id,
+                                 group_id=self.group_id,
+                                 group_name='a',
+                                 active={'A': 'R'},
+                                 pending={'P': 'R'},
+                                 group_touched='2014-01-01T00:00:05Z.1234',
+                                 policy_touched={'PT': 'R'},
+                                 paused=False,
+                                 status=ScalingGroupStatus.DELETING,
+                                 desired=0)
+        self.assertEqual(result, group_state)
 
     def test_view_state_error_status(self):
         """
         view_state sets the ``GroupState.status`` based on the ``status``
         value.
         """
-        cass_response = [
-            {'tenantId': self.tenant_id,
-             'groupId': self.group_id,
-             'group_config': '{"name": "a"}',
-             'active': '{"A":"R"}',
-             'pending': '{"P":"R"}',
-             'groupTouched': '2014-01-01T00:00:05Z.1234',
-             'policyTouched': '{"PT":"R"}',
-             'paused': False,
-             'created_at': 23,
-             'desired': 10,
-             'status': 'ERROR'}]
-        self.returns = [cass_response]
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'desired': 10,
+                   'status': 'ERROR'})
+        ]]
         result = self.successResultOf(self.group.view_state())
 
         group_state = GroupState(tenant_id=self.tenant_id,
@@ -643,27 +690,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         that row's deletion is triggered.
         """
         cass_response = [
-            {'tenantId': self.tenant_id,
-             'groupId': self.group_id,
-             'group_config': '{"name": "a"}',
-             'active': '{"A":"R"}',
-             'pending': '{"P":"R"}',
-             'groupTouched': '2014-01-01T00:00:05Z.1234',
-             'policyTouched': '{"PT":"R"}',
-             'paused': False,
-             'desired': None,
-             'created_at': None,
-             'status': 'ACTIVE'}]
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'created_at': None})
+        ]
         self.returns = [cass_response, None]
         d = self.group.view_state()
         self.failureResultOf(d, NoSuchScalingGroupError)
         viewCql = (
-            'SELECT "tenantId", "groupId", group_config, active, pending, '
-            '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'SELECT "tenantId", "groupId", group_config, launch_config, '
+            'active, pending, "groupTouched", "policyTouched", paused, '
+            'desired, created_at, status, deleting '
             'FROM scaling_group '
-            'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
-            'AND deleting=false;')
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         delCql = ('DELETE FROM scaling_group '
                   'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
@@ -676,20 +716,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         view_state returns a dictionary with a key paused equal to True for a
         paused group.
         """
-        cass_response = _cassandrify_data([
-            {'tenantId': self.tenant_id,
-             'groupId': self.group_id,
-             'group_config': '{"name": "a"}',
-             'active': '{"A":"R"}',
-             'pending': '{"P":"R"}',
-             'groupTouched': '2014-01-01T00:00:05Z.1234',
-             'policyTouched': '{"PT":"R"}',
-             'paused': True,
-             'desired': 0,
-             'created_at': 3,
-             'status': 'ACTIVE'}])
-
-        self.returns = [cass_response]
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'paused': True})
+        ]]
         d = self.group.view_state()
         r = self.successResultOf(d)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
@@ -869,9 +901,10 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.group.modify_state(modifier)
 
         log.bind.assert_called_once_with(
+            modify_state_reason=None,
             system='CassScalingGroup.modify_state')
-        log.bind().bind.assert_called_once_with(category='locking')
-        self.assertEqual(log.bind().bind().msg.call_count, 4)
+        log.bind().bind.assert_called_once_with(
+            category='locking', lock_reason='modify_state')
 
     def test_modify_state_propagates_modifier_error_and_does_not_save(self):
         """
@@ -1874,7 +1907,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.flushLoggedErrors(NoSuchWebhookError)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
-    def test_delete_non_empty_scaling_group_fails(self, mock_view_state):
+    def test_delete_non_empty_scaling_non_deleting_group_fails(
+            self, mock_view_state):
         """
         ``delete_group`` errbacks with :class:`GroupNotEmptyError` if scaling
         group state is not empty
@@ -1885,11 +1919,31 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.failureResultOf(self.group.delete_group(), GroupNotEmptyError)
 
         # nothing else called except view
-        self.assertTrue(mock_view_state.called)
+        mock_view_state.assert_called_once_with(get_deleting=True)
         self.assertFalse(self.connection.execute.called)
         self.flushLoggedErrors(GroupNotEmptyError)
         # locks znode is not deleted
         self.assertFalse(self.kz_client.delete.called)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_state')
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')
+    def test_delete_non_empty_scaling_deleting_group_succeeds(
+            self, mock_naive, mock_view_state):
+        """
+        ``delete_group`` succeeds even if the group is not empty if the group
+        is in deleting state.
+        """
+        mock_view_state.return_value = defer.succeed(GroupState(
+            self.tenant_id, self.group_id, '', {'1': {}}, {}, None, {}, False,
+            ScalingGroupStatus.DELETING))
+
+        mock_naive.return_value = defer.succeed([])
+
+        self.returns = [None]
+        result = self.successResultOf(self.group.delete_group())
+        self.assertIsNone(result)  # delete returns None
+
+        mock_view_state.assert_called_once_with(get_deleting=True)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')
@@ -1927,6 +1981,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
 
             'DELETE FROM policy_webhooks '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+
+            'DELETE FROM servers_cache '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
 
             'DELETE FROM scaling_group USING TIMESTAMP :ts '
@@ -1976,6 +2033,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'DELETE FROM policy_webhooks '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
 
+            'DELETE FROM servers_cache '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+
             'DELETE FROM scaling_group USING TIMESTAMP :ts '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'APPLY BATCH;')
@@ -2023,8 +2083,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         log.bind.assert_called_once_with(
             system='CassScalingGroup.delete_group')
-        log.bind().bind.assert_called_once_with(category='locking')
-        self.assertEqual(log.bind().bind().msg.call_count, 4)
+        log.bind().bind.assert_called_once_with(
+            category='locking', lock_reason='delete_group')
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')
@@ -3633,6 +3693,124 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         self.assertEqual(
             self.successResultOf(d),
             (True, {'cassandra_time': 0}))
+
+
+class CassGroupServersCacheTests(SynchronousTestCase):
+    """
+    Tests for :class:`CassScalingGroupServersCache`
+    """
+
+    def setUp(self):
+        self.tenant_id = 'tid'
+        self.group_id = 'gid'
+        self.params = {"tenantId": self.tenant_id, "groupId": self.group_id}
+        self.cache = CassScalingGroupServersCache(
+            self.tenant_id, self.group_id)
+        self.dt = datetime(2010, 10, 20, 10, 0, 0)
+
+    def _test_get_servers(self, query_result, exp_result):
+        sequence = SequenceDispatcher([
+            (CQLQueryExecute(
+                query=('SELECT server_blob, last_update FROM servers_cache '
+                       'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
+                       'ORDER BY last_update DESC;'),
+                params=self.params, consistency_level=ConsistencyLevel.ONE),
+             lambda i: query_result)])
+        dispatcher = test_dispatcher(sequence)
+        with sequence.consume():
+            self.assertEqual(
+                sync_perform(dispatcher, self.cache.get_servers()),
+                exp_result)
+
+    def test_get_servers_empty(self):
+        """
+        `get_servers` returns ([], None) if cache is empty
+        """
+        self._test_get_servers([], ([], None))
+
+    def test_get_servers(self):
+        """
+        `get_servers` fetches all servers that have highest last_fetch
+        time
+        """
+        self._test_get_servers(
+            [{"server_blob": '{"a": "b"}', "last_update": self.dt},
+             {"server_blob": '{"d": "e"}', "last_update": self.dt}],
+            ([{"a": "b"}, {"d": "e"}], self.dt))
+
+    def test_get_servers_diff_last_update(self):
+        """
+        `get_servers` will return servers with only latest last_update time
+        if there are multiple caches
+        """
+        dt_earlier = datetime(2010, 10, 15, 10, 0, 0)
+        self._test_get_servers(
+            [{"server_blob": '{"a": "b"}', "last_update": dt_earlier},
+             {"server_blob": '{"d": "e"}', "last_update": dt_earlier},
+             {"server_blob": '{"c": "f"}', "last_update": self.dt}],
+            ([{"a": "b"}, {"d": "e"}], dt_earlier))
+
+    def _test_insert_servers(self, eff):
+        query = (
+            'BEGIN BATCH '
+            'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
+            'server_id, server_blob) '
+            'VALUES(:tenantId, :groupId, :last_update, :server_id0, '
+            ':server_blob0); '
+            'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
+            'server_id, server_blob) '
+            'VALUES(:tenantId, :groupId, :last_update, :server_id1, '
+            ':server_blob1); APPLY BATCH;')
+        self.params.update(
+            {"server_id0": "a", "server_blob0": '{"id": "a"}',
+             "server_id1": "b", "server_blob1": '{"id": "b"}',
+             "last_update": self.dt})
+        self.assertEqual(
+            eff.intent,
+            CQLQueryExecute(query=query, params=self.params,
+                            consistency_level=ConsistencyLevel.ONE))
+        self.assertEqual(resolve_effect(eff, None), None)
+
+    def test_insert_servers(self):
+        """
+        `insert_servers` issues query to insert server as json blobs
+        """
+        eff = self.cache.insert_servers(
+            self.dt, [{"id": "a"}, {"id": "b"}], False)
+        self._test_insert_servers(eff)
+
+    def test_insert_servers_delete(self):
+        """
+        `insert_servers` deletes existing caches before inserting
+        when clear_others=True
+        """
+        self.cache.delete_servers = lambda: Effect("delete")
+        eff = self.cache.insert_servers(
+            self.dt, [{"id": "a"}, {"id": "b"}], True)
+        self.assertEqual(eff.intent, "delete")
+        eff = resolve_effect(eff, None)
+        self._test_insert_servers(eff)
+
+    def test_insert_empty(self):
+        """
+        `insert_servers` does nothing if called with empty servers list
+        """
+        self.assertEqual(
+            self.cache.insert_servers(self.dt, [], False),
+            Effect(Constant(None)))
+
+    def test_delete_servers(self):
+        """
+        `delete_servers` issues query to delete the whole cache
+        """
+        self.assertEqual(
+            self.cache.delete_servers(),
+            Effect(
+                CQLQueryExecute(
+                    query=('DELETE FROM servers_cache WHERE '
+                           '"tenantId" = :tenantId AND "groupId" = :groupId'),
+                    params=self.params,
+                    consistency_level=ConsistencyLevel.ONE)))
 
 
 class CassAdminTestCase(SynchronousTestCase):

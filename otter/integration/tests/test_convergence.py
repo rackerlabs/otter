@@ -19,210 +19,42 @@ from testtools.matchers import (
     NotEquals
 )
 
-from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 from twisted.trial import unittest
-from twisted.web.client import HTTPConnectionPool
 
-from otter import auth
 from otter.integration.lib.autoscale import (
     ExcludesServers,
     HasActive,
-    ScalingGroup,
     ScalingPolicy,
-    create_scaling_group_dict,
     extract_active_ids,
 )
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer, ContainsAllIPs, ExcludesAllIPs, HasLength)
-from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.mimic import MimicCLB, MimicIdentity, MimicNova
 from otter.integration.lib.nova import (
     NovaServer, delete_servers, wait_for_servers)
 from otter.integration.lib.resources import TestResources
+from otter.integration.lib.trial_tools import (
+    TestHelper,
+    copy_test_methods,
+    get_identity,
+    get_resource_mapping,
+    not_mimic,
+    random_string,
+    region,
+    skip_if,
+    skip_me,
+    tag
+)
 
-
-username = os.environ['AS_USERNAME']
-password = os.environ['AS_PASSWORD']
-endpoint = os.environ['AS_IDENTITY']
-flavor_ref = os.environ['AS_FLAVOR_REF']
-image_ref = os.environ['AS_IMAGE_REF']
-region = os.environ['AS_REGION']
-# Get vs dict lookup because it will return None if not found,
-# not throw an exception.  None is a valid value for convergence_tenant.
-convergence_tenant = os.environ.get('AS_CONVERGENCE_TENANT')
-otter_key = os.environ.get('AS_AUTOSCALE_SC_KEY', 'autoscale')
-otter_url = os.environ.get('AS_AUTOSCALE_LOCAL_URL')
-nova_key = os.environ.get('AS_NOVA_SC_KEY', 'cloudServersOpenStack')
-clb_key = os.environ.get('AS_CLB_SC_KEY', 'cloudLoadBalancers')
 
 # if this is None, the test will be skipped
 convergence_tenant_auth_errors = os.environ.get(
     'AS_CONVERGENCE_TENANT_FOR_AUTH_ERRORS')
 
-# these are the service names for mimic control planes
-mimic_nova_key = os.environ.get("MIMICNOVA_SC_KEY", 'cloudServersBehavior')
-mimic_clb_key = os.environ.get("MIMICCLB_SC_KEY", 'cloudLoadBalancerControl')
 
 # otter configuration options for testing
 otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
-
-
-def not_mimic():
-    """
-    Return True unless the environment variable AS_USING_MIMIC is set to
-    something truthy.
-    """
-    return not bool(os.environ.get("AS_USING_MIMIC", False))
-
-
-class TestHelper(object):
-    """
-    A helper class that contains useful functions for actual test cases.  This
-    also creates a number of CLB that are required.
-    """
-    def __init__(self, test_case, num_clbs=0):
-        """
-        Set up the test case, HTTP pool, identity, and cleanup.
-        """
-        self.test_case = test_case
-        self.pool = HTTPConnectionPool(reactor, False)
-        self.test_case.addCleanup(self.pool.closeCachedConnections)
-
-        self.clbs = [CloudLoadBalancer(pool=self.pool)
-                     for _ in range(num_clbs)]
-
-    def create_group(self, **kwargs):
-        """
-        :return: a tuple of the scaling group with (the helper's pool) and
-            the server name prefix used for the scaling group.
-        """
-        if self.clbs:
-            kwargs['use_lbs'] = [clb.scaling_group_spec() for clb in self.clbs]
-
-        server_name_prefix = "{}-{}".format(
-            random_string(), reactor.seconds())
-        if "server_name_prefix" in kwargs:
-            server_name_prefix = "{}-{}".format(kwargs['server_name_prefix'],
-                                                server_name_prefix)
-        kwargs['server_name_prefix'] = server_name_prefix
-
-        return (
-            ScalingGroup(
-                group_config=create_scaling_group_dict(**kwargs),
-                pool=self.pool),
-            server_name_prefix)
-
-    @inlineCallbacks
-    def start_group_and_wait(self, group, rcs, desired=None):
-        """
-        Start a group, and if desired is supplied, creates and executes a
-        policy that scales to that number.  This would be used for example
-        if we wanted to scale to the max of a group, but did not want the min
-        to be equal to the max.
-
-        This also waits for the desired number of servers to be reached - that
-        would be desired if provided, or the min if not provided.
-
-        :param TestResources rcs: An instance of
-            :class:`otter.integration.lib.resources.TestResources`
-        :param ScalingGroup group: An instance of
-            :class:`otter.integration.lib.autoscale.ScalingGroup` to start -
-            this group should not have been started already.
-        :param int desired: A desired number to scale to.
-        """
-        yield group.start(rcs, self.test_case)
-        if desired is not None:
-            p = ScalingPolicy(set_to=desired, scaling_group=group)
-            yield p.start(rcs, self.test_case)
-            yield p.execute(rcs)
-
-        if desired is None:
-            desired = group.group_config['groupConfiguration'].get(
-                'minEntities', 0)
-
-        yield group.wait_for_state(
-            rcs,
-            MatchesAll(HasActive(desired),
-                       ContainsDict({'pendingCapacity': Equals(0),
-                                     'desiredCapacity': Equals(desired)})),
-            timeout=600)
-
-        if self.clbs:
-            ips = yield group.get_servicenet_ips(rcs)
-            yield gatherResults([
-                clb.wait_for_nodes(
-                    rcs, ContainsAllIPs(ips.values()), timeout=600)
-                for clb in self.clbs])
-
-        returnValue(rcs)
-
-
-def tag(*tags):
-    """
-    Decorator that adds tags to a function by setting the property "tags".
-
-    This should be added upstream to Twisted trial.
-    """
-    def decorate(function):
-        function.tags = tags
-        return function
-    return decorate
-
-
-def skip_me(reason):
-    """
-    Decorator that skips a test method or test class by setting the property
-    "skip".  This decorator is not named "skip", because setting "skip" on a
-    module skips the whole test module.
-
-    This should be added upstream to Twisted trial.
-    """
-    def decorate(function):
-        function.skip = reason
-        return function
-    return decorate
-
-
-def skip_if(predicate, reason):
-    """
-    Decorator that skips a test method or test class by setting the property
-    "skip", and only if the provided predicate evaluates to True.
-    """
-    if predicate():
-        return skip_me(reason)
-    return lambda f: f
-
-
-def copy_test_methods(from_class, to_class, filter_and_change=None):
-    """
-    Copy test methods (methods that start with `test_*`) from ``from_class`` to
-    ``to_class``.  If a decorator is provided, the test method on the
-    ``to_class`` will first be decorated before being set.
-
-    :param class from_class: The test case to copy from
-    :param class to_class: The test case to copy to
-    :param callable filter_and_change: A function that takes a test name
-        and test method, and returns a tuple of `(name, method)`
-        if the test method should be copied. None else.  This allows the
-        method name to change, the method to be decorated and/or skipped.
-    """
-    for name, attr in from_class.__dict__.items():
-        if name.startswith('test_') and callable(attr):
-            if filter_and_change is not None:
-                filtered = filter_and_change(name, attr)
-                if filtered is not None:
-                    setattr(to_class, *filtered)
-            else:
-                setattr(to_class, name, attr)
-
-
-def random_string(byte_len=4):
-    """
-    Generate a random string of the ``byte_len``.
-    The string will be 2 * ``byte_len`` in length.
-    """
-    return os.urandom(byte_len).encode('hex')
 
 
 class TestConvergence(unittest.TestCase):
@@ -235,11 +67,7 @@ class TestConvergence(unittest.TestCase):
         clean Twisted reactor.
         """
         self.helper = TestHelper(self)
-        self.identity = IdentityV2(
-            auth=auth, username=username, password=password,
-            endpoint=endpoint, pool=self.helper.pool,
-            convergence_tenant_override=convergence_tenant,
-        )
+        self.identity = get_identity(self.helper.pool)
 
     def test_scale_over_group_max_after_metadata_removal_reduced_grp_max(self):
         """
@@ -251,19 +79,10 @@ class TestConvergence(unittest.TestCase):
         """
         rcs = TestResources()
 
-        self.untouchable_scaling_group = ScalingGroup(
-            group_config=create_scaling_group_dict(
-                image_ref=image_ref, flavor_ref=flavor_ref, min_entities=4,
-            ),
-            pool=self.helper.pool
-        )
+        self.untouchable_scaling_group, _ = self.helper.create_group(
+            min_entities=4)
 
-        self.scaling_group = ScalingGroup(
-            group_config=create_scaling_group_dict(
-                image_ref=image_ref, flavor_ref=flavor_ref, max_entities=12,
-            ),
-            pool=self.helper.pool
-        )
+        self.scaling_group, _ = self.helper.create_group(max_entities=12)
 
         self.scale_up_to_max = ScalingPolicy(
             scale_by=12,
@@ -295,10 +114,7 @@ class TestConvergence(unittest.TestCase):
         return (
             self.identity.authenticate_user(
                 rcs,
-                resources={
-                    "otter": (otter_key, otter_url),
-                    "nova": (nova_key,),
-                },
+                resources=get_resource_mapping(),
                 region=region,
             ).addCallback(self.scaling_group.start, self)
             .addCallback(self.untouchable_scaling_group.start, self)
@@ -338,14 +154,7 @@ class TestConvergence(unittest.TestCase):
 
         rcs = TestResources()
 
-        scaling_group_body = create_scaling_group_dict(
-            image_ref=image_ref, flavor_ref=flavor_ref,
-        )
-
-        self.scaling_group = ScalingGroup(
-            group_config=scaling_group_body,
-            pool=self.helper.pool
-        )
+        self.scaling_group, _ = self.helper.create_group()
 
         self.scale_up_to_max = ScalingPolicy(
             scale_by=25,
@@ -360,10 +169,7 @@ class TestConvergence(unittest.TestCase):
         return (
             self.identity.authenticate_user(
                 rcs,
-                resources={
-                    "otter": (otter_key, otter_url),
-                    "nova": (nova_key,),
-                },
+                resources=get_resource_mapping(),
                 region=region,
             ).addCallback(self.scaling_group.start, self)
             .addCallback(self.scale_up_to_max.start, self)
@@ -430,11 +236,7 @@ class TestConvergence(unittest.TestCase):
             return (
                 self.identity.authenticate_user(
                     rcs,
-                    resources={
-                        "otter": (otter_key, otter_url),
-                        "nova": (nova_key,),
-                        "loadbalancers": (clb_key,)
-                    },
+                    resources=get_resource_mapping(),
                     region=region,
                 ).addCallback(self.clb.start, self)
                 .addCallback(self.clb.wait_for_state, "ACTIVE", 600)
@@ -453,6 +255,7 @@ class TestConvergence(unittest.TestCase):
         This will strip them of their association with Autoscale.
         """
         self.removed_ids = ids
+        self.addCleanup(delete_servers, ids, rcs, self.helper.pool)
         return gatherResults([
             NovaServer(id=_id, pool=self.helper.pool).update_metadata({}, rcs)
             for _id in ids]).addCallback(lambda _: rcs)
@@ -507,7 +310,6 @@ def _oob_disable_then(helper, rcs, num_to_disable, disabler, then,
     :return: The scaling group that was created and tested.
     """
     scaling_group, _ = helper.create_group(
-        image_ref=image_ref, flavor_ref=flavor_ref,
         min_entities=min_servers, max_entities=max_servers
     )
 
@@ -605,18 +407,11 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         """
         self.helper = TestHelper(self)
         self.rcs = TestResources()
-        self.identity = IdentityV2(
-            auth=auth, username=username, password=password,
-            endpoint=endpoint, pool=self.helper.pool,
-            convergence_tenant_override=convergence_tenant,
-        )
+        self.identity = get_identity(self.helper.pool)
+
         return self.identity.authenticate_user(
             self.rcs,
-            resources={
-                "otter": (otter_key, otter_url),
-                "nova": (nova_key,),
-                "mimic_nova": (mimic_nova_key,)
-            },
+            resources=get_resource_mapping(),
             region=region
         )
 
@@ -834,7 +629,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         Checks nova to make sure that convergence has not overprovisioned.
         """
         group, server_name_prefix = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref,
             min_entities=2, max_entities=10,
             server_name_prefix="build-to-error"
         )
@@ -871,7 +665,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
            the account.  The one that was building forever should be deleted.
         """
         group, server_name_prefix = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref,
             min_entities=2, max_entities=10,
             server_name_prefix="build-timeout"
         )
@@ -985,7 +778,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         Checks nova to make sure that convergence has not overprovisioned.
         """
         group, server_name_prefix = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref,
             min_entities=2, max_entities=10,
             server_name_prefix="false-negative"
         )
@@ -1019,7 +811,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         Autoscale should be able to recover from these failures by retrying.
         """
         group, server_name_prefix = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref,
             min_entities=2, max_entities=10,
             server_name_prefix="intermittent-errors"
         )
@@ -1041,9 +832,48 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             ])
 
         group, _ = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=2,
+            min_entities=2,
             max_entities=10)
         yield self.helper.start_group_and_wait(group, self.rcs, desired=5)
+
+    @skip_if(not_mimic, "This requires Mimic for error injection.")
+    @tag("CATC-024")
+    @inlineCallbacks
+    def test_various_nova_40xs(self):
+        """
+        CATC-024
+
+        Validate that an autoscale group transitions to an ERROR state when
+        a scaling operation results in a 400: BadRequest response from Nova.
+
+        """
+        group, server_name_prefix = self.helper.create_group(
+            min_entities=3, max_entities=10,
+            server_name_prefix="nova_400s"
+        )
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+
+        message_400 = "Can not find requested image"
+
+        yield mimic_nova.sequenced_behaviors(
+            self.rcs,
+            criteria=[{"server_name": server_name_prefix + ".*"}],
+            behaviors=[
+                {"name": "default"},
+                {"name": "fail",
+                 "parameters": {"code": 400, "message": message_400,
+                                "type": "badRequest"}}
+            ])
+
+        yield group.start(self.rcs, self)
+        yield group.wait_for_state(
+            self.rcs,
+            MatchesAll(
+                ContainsDict({
+                    'desiredCapacity': Equals(3),
+                    'status': Equals("ERROR")
+                }),
+            ), timeout=600)
 
     @skip_me("Autoscale does not yet handle Nova over-quota errors: #1470")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
@@ -1058,7 +888,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         active state, and the correct number of servers appear.
         """
         group, server_name_prefix = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref,
             min_entities=2, max_entities=10,
             server_name_prefix="over-quota"
         )
@@ -1130,17 +959,14 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         # re-authenticate as this new user, not the original user
         rcs = TestResources()
         new_username = random_string()
-        identity = IdentityV2(
-            auth=auth, username=new_username, password="random_password",
-            endpoint=endpoint, pool=self.helper.pool,
-            convergence_tenant_override=convergence_tenant_auth_errors
+        identity = get_identity(
+            pool=self.helper.pool,
+            username=new_username, password="random_password",
+            convergence_tenant=convergence_tenant_auth_errors
         )
         yield identity.authenticate_user(
             rcs,
-            resources={
-                "otter": (otter_key, otter_url),
-                "nova": (nova_key,)
-            },
+            resources=get_resource_mapping(),
             region=region
         )
 
@@ -1148,7 +974,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         # impersonates, it gets failures
         mimic_identity = MimicIdentity(pool=self.helper.pool, test_case=self)
         yield mimic_identity.sequenced_behaviors(
-            endpoint,
+            self.identity.endpoint,
             criteria=[{"username": new_username + ".*"}],
             behaviors=[
                 {"name": "fail",
@@ -1161,7 +987,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             ])
 
         group, _ = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=2,
+            min_entities=2,
             max_entities=10)
         yield self.helper.start_group_and_wait(group, rcs, desired=5)
 
@@ -1218,20 +1044,10 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
         """
         self.helper = TestHelper(self, num_clbs=1)
         self.rcs = TestResources()
-        self.identity = IdentityV2(
-            auth=auth, username=username, password=password,
-            endpoint=endpoint, pool=self.helper.pool,
-            convergence_tenant_override=convergence_tenant,
-        )
+        self.identity = get_identity(pool=self.helper.pool)
         return self.identity.authenticate_user(
             self.rcs,
-            resources={
-                "otter": (otter_key, otter_url),
-                "nova": (nova_key,),
-                "loadbalancers": (clb_key,),
-                "mimic_nova": (mimic_nova_key,),
-                "mimic_clb": (mimic_clb_key,)
-            },
+            resources=get_resource_mapping(),
             region=region
         ).addCallback(lambda _: gatherResults([
             clb.start(self.rcs, self)
@@ -1298,7 +1114,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
         group_max = 30
 
         group, _ = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=1,
+            min_entities=1,
             max_entities=group_max)
 
         scale_up_to_group_max = ScalingPolicy(
@@ -1343,7 +1159,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             load balancer.
         """
         group, _ = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=1)
+            min_entities=1)
 
         return (
             self.helper.start_group_and_wait(group, self.rcs)
@@ -1379,8 +1195,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             and a load balancer and deletes (or pending-deletes) the
             load balancer.
         """
-        group, _ = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref)
+        group, _ = self.helper.create_group()
 
         return (
             self.helper.start_group_and_wait(group, self.rcs, desired=1)
@@ -1413,8 +1228,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
         4. Assert that the group goes into error state since it cannot
             take action.
         """
-        group, _ = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=1)
+        group, _ = self.helper.create_group(min_entities=1)
 
         mimic_clb = MimicCLB(pool=self.helper.pool, test_case=self)
 
@@ -1454,8 +1268,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
         3. Scale down
         4. Assert that the group reaches the desired state
         """
-        group, _ = self.helper.create_group(
-            image_ref=image_ref, flavor_ref=flavor_ref, min_entities=0)
+        group, _ = self.helper.create_group()
 
         mimic_clb = MimicCLB(pool=self.helper.pool, test_case=self)
 
@@ -1484,6 +1297,53 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 timeout=600
             )
         )
+
+    @tag("LBSH")
+    @inlineCallbacks
+    def test_oob_deleted_clb_node(self):
+        """
+        If an autoscaled server is removed from the CLB out of band its
+        supposed to be on, Otter will put it back.
+
+        1. Create a scaling group with 1 CLB and 1 server
+        2. Wait for server to be active
+        3. Delete server from the CLB
+        4. Converge
+        5. Assert that the server is put back on the CLB.
+        """
+        clb = self.helper.clbs[0]
+
+        nodes = yield clb.list_nodes(self.rcs)
+        self.assertEqual(len(nodes['nodes']), 0,
+                         "There should be no nodes on the CLB yet.")
+
+        group, _ = self.helper.create_group(min_entities=1)
+        yield self.helper.start_group_and_wait(group, self.rcs)
+
+        nodes = yield clb.list_nodes(self.rcs)
+        self.assertEqual(
+            len(nodes['nodes']), 1,
+            "There should be 1 node on the CLB now that the group is active.")
+        the_node = nodes["nodes"][0]
+
+        yield clb.delete_nodes(self.rcs, [the_node['id']])
+
+        nodes = yield clb.list_nodes(self.rcs)
+        self.assertEqual(len(nodes['nodes']), 0,
+                         "There should no nodes on the CLB after deletion.")
+
+        yield group.trigger_convergence(self.rcs)
+
+        yield clb.wait_for_nodes(
+            self.rcs,
+            MatchesAll(
+                HasLength(1),
+                ContainsAllIPs([the_node["address"]])
+            ),
+            timeout=600
+        )
+
+
 # Run the ConvergenceTestsNoLBs in a configuration with 1 CLB
 copy_test_methods(
     ConvergenceTestsNoLBs, ConvergenceTestsWith1CLB,
@@ -1503,18 +1363,10 @@ class ConvergenceTestsWith2CLBs(unittest.TestCase):
         """
         self.helper = TestHelper(self, num_clbs=2)
         self.rcs = TestResources()
-        self.identity = IdentityV2(
-            auth=auth, username=username, password=password,
-            endpoint=endpoint, pool=self.helper.pool,
-            convergence_tenant_override=convergence_tenant,
-        )
+        self.identity = get_identity(pool=self.helper.pool)
         return self.identity.authenticate_user(
             self.rcs,
-            resources={
-                "otter": (otter_key, otter_url),
-                "nova": (nova_key,),
-                "loadbalancers": (clb_key,)
-            },
+            resources=get_resource_mapping(),
             region=region
         ).addCallback(lambda _: gatherResults([
             clb.start(self.rcs, self)

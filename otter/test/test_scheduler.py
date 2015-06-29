@@ -502,7 +502,8 @@ class ExecuteEventTests(SchedulerTests):
         def _set_new_state(new_state):
             self.new_state = new_state
 
-        def _mock_modify_state(modifier, *args, **kwargs):
+        def _mock_modify_state(modifier, modify_state_reason=None,
+                               *args, **kwargs):
             d = modifier(self.mock_group, self.mock_state, *args, **kwargs)
             return d.addCallback(_set_new_state)
 
@@ -552,7 +553,7 @@ class ExecuteEventTests(SchedulerTests):
         """
         del_pol_ids = set()
         self.mock_group.modify_state.side_effect = \
-            lambda *_: defer.fail(NoSuchScalingGroupError(1, 2))
+            lambda *_, **__: defer.fail(NoSuchScalingGroupError(1, 2))
 
         d = execute_event(self.mock_store, self.log, self.event, del_pol_ids)
 
@@ -568,7 +569,7 @@ class ExecuteEventTests(SchedulerTests):
         """
         del_pol_ids = set()
         self.mock_group.modify_state.side_effect = (
-            lambda *_: defer.fail(NoSuchPolicyError(1, 2, 3)))
+            lambda *_, **__: defer.fail(NoSuchPolicyError(1, 2, 3)))
 
         d = execute_event(self.mock_store, self.log, self.event, del_pol_ids)
 

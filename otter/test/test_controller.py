@@ -37,10 +37,10 @@ from otter.test.utils import (
     matches,
     mock_group as util_mock_group,
     mock_log,
+    nested_sequence,
     patch,
     raise_,
-    test_dispatcher,
-    unwrap_wrapped_effect)
+    test_dispatcher)
 from otter.util.config import set_config_data
 from otter.util.fp import assoc_obj
 from otter.util.retry import (
@@ -1443,11 +1443,13 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         Return a :class:`SequenceDispatcher` tuple such that a TenantScope
         is wrapped over a Retry which is wrapped over the given intent.
         """
-        return unwrap_wrapped_effect(
-            TenantScope, {'tenant_id': self.group.tenant_id},
-            [unwrap_wrapped_effect(
-                Retry, {'should_retry': _should_retry_params},
-                [(intent, performer)])])
+        return (
+            TenantScope(mock.ANY, self.group.tenant_id),
+            nested_sequence([
+                (Retry(effect=mock.ANY, should_retry=_should_retry_params),
+                 nested_sequence([(intent, performer)]))
+             ])
+         )
 
     def _remove(self, replace, purge, seq_dispatcher):
         eff = controller.convergence_remove_server_from_group(
