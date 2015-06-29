@@ -122,7 +122,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             .format(upd_policy_to_desired_capacity_execute, self.group.id))
         self.check_for_expected_number_of_building_servers(
             group_id=self.group.id,
-            expected_servers=26)
+            expected_servers=26, time_scale=False)
 
     @tags(speed='slow', convergence='yes')
     def test_update_scale_up_to_scale_down(self):
