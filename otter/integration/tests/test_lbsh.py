@@ -31,7 +31,7 @@ timeout_default = 600
 class TestLoadBalancerSelfHealing(unittest.TestCase):
     """
     This class contains test cases to test the load balancer healing
-    functino of the Otter Converger.
+    function of the Otter Converger.
     """
 
     def setUp(self):
