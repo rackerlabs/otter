@@ -36,9 +36,8 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
     def setUp(self):
         """
-        Establish an HTTP conncetion pool and commonly used resources for each
-        test. The HTTP connection pool is important for maintaining a clean
-        Twisted reactor.
+        Establish resources used for each test, such as the auth token
+        and a load balancer.
         """
 
         self.helper = TestHelper(self, num_clbs=1)
