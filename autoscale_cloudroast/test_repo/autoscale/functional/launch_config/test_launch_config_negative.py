@@ -216,6 +216,28 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
             msg='Updating a group to have CLBs but no ServiceNet was '
             'successsful with response {0}'.format(status))
 
+    def test_create_scaling_group_with_CLB_with_invalid_types(self):
+        """
+        Scaling group creation fails with a 400 when a launch config has a
+        load balancers with an invalid types.
+        """
+        invalids = ['cloudloadbalancer', 'rackconnectv3', '', 'NotReal']
+
+        for invalid in invalids:
+            create_group_response = self.autoscale_client.create_scaling_group(
+                gc_name='test_empty_clb_type',
+                gc_cooldown=self.gc_cooldown,
+                gc_min_entities=self.gc_min_entities,
+                lc_image_ref=self.lc_image_ref,
+                lc_flavor_ref=self.lc_flavor_ref,
+                lc_load_balancers=[{'loadBalancerId': '1234', 'port': 80,
+                                    'type': invalid}])
+            self.assertEquals(
+                create_group_response.status_code, 400,
+                msg=('Create group with CLBs with a type "{0}" was '
+                     ' successsful with response {1}'
+                     .format(invalid, create_group_response.status_code)))
+
     def _create_group(self):
         """
         Create a group.

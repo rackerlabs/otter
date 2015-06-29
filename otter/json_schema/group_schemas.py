@@ -117,7 +117,7 @@ _rcv3_lb = {
             "description": (
                 "What type of a load balancer is in use"),
             "required": True,
-            "oneOf": ["RackConnectV3"]
+            "pattern": "^RackConnectV3$"
         }
     },
     "additionalProperties": False
@@ -132,7 +132,7 @@ _clb_lb = {
         # Cloud load balancer id's are NOT uuid's, just ints.  But accept
         # strings also for backwards compatibility reasons.
         "loadBalancerId": {
-            "type": ["integer", "string"],
+            "type": ["integer", {"type": "string", "pattern": "^\S+$"}],
             "description": (
                 "The ID of the load balancer to which new "
                 "servers will be added."),
@@ -151,7 +151,7 @@ _clb_lb = {
             "description": (
                 "What type of a load balancer is in use"),
             "required": False,
-            "oneOf": ["CloudLoadBalancer"]
+            "pattern": "^CloudLoadBalancer$"
         }
     },
     "additionalProperties": False
