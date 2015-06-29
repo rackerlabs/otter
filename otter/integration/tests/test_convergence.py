@@ -1259,7 +1259,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
         3. Scale down
         4. Assert that the group reaches the desired state
         """
-        group, _ = self.helper.create_group(min_entities=0)
+        group, _ = self.helper.create_group()
 
         mimic_clb = MimicCLB(pool=self.helper.pool, test_case=self)
 
