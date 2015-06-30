@@ -150,19 +150,32 @@ class NovaServerCollectionTestCase(SynchronousTestCase):
         """
         self.pool = object()
         self.rcs = _FakeRCS()
+        self.expected_kwargs = {
+            'headers': headers('token'),
+            'pool': self.pool
+        }
 
     def test_list_servers(self):
         """
         Get all addresses with a particular name and succeeds on 200.
         """
+        self.expected_kwargs['params'] = {'limit': 10000}
         treq = get_fake_treq(self, 'get', 'novaurl/servers/detail',
-                             ((), {'params': {'limit': 10000},
-                                   'headers': headers('token'),
-                                   'pool': self.pool}),
+                             ((), self.expected_kwargs),
                              (Response(200), '{"servers": {}}'))
         d = nova.list_servers(self.rcs, pool=self.pool,
                               _treq=treq)
         self.assertEqual({'servers': {}}, self.successResultOf(d))
+
+    def test_create_server(self):
+        """
+        Create a server with particular args and succeeds on 202.
+        """
+        treq = get_fake_treq(self, 'post', 'novaurl/servers',
+                             (({'server': {}},), self.expected_kwargs),
+                             (Response(200), '{"server": {"id": "12345"}}'))
+        d = nova.create_server(self.rcs, self.pool, {'server': {}}, _treq=treq)
+        self.assertEqual("12345", self.successResultOf(d))
 
 
 class NovaWaitForServersTestCase(SynchronousTestCase):

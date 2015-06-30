@@ -1,6 +1,8 @@
 """Contains reusable classes relating to nova."""
 import json
 
+from operator import itemgetter
+
 from characteristic import Attribute, attributes
 
 import treq
@@ -118,6 +120,27 @@ def list_servers(rcs, pool, _treq=treq):
         headers=headers(str(rcs.token)),
         pool=pool
     ).addCallback(check_success, [200]).addCallback(_treq.json_content)
+
+
+def create_server(rcs, pool, server_args, _treq=treq):
+    """
+    Create a server using Nova.
+
+    :param rcs: an instance of
+        :class:`otter.integration.lib.resources.TestResources`
+    :param pool: a :class:`twisted.web.client.HTTPConnectionPool`
+    :param server_args: a ``dict`` containing the arguments with which to
+        create the server.
+
+    :return: the server ID of the created server.
+    """
+    d = _treq.post(
+        "{0}/servers".format(rcs.endpoints['nova']),
+        server_args,
+        headers=headers(str(rcs.token)),
+        pool=pool
+    ).addCallback(check_success, [200]).addCallback(_treq.json_content)
+    return d.addCallback(itemgetter('server')).addCallback(itemgetter('id'))
 
 
 def wait_for_servers(rcs, pool, matcher, group=None, timeout=600, period=10,
