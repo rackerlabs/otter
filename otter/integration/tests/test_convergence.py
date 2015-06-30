@@ -1289,51 +1289,6 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             )
         )
 
-    @tag("LBSH")
-    @inlineCallbacks
-    def test_oob_deleted_clb_node(self):
-        """
-        If an autoscaled server is removed from the CLB out of band its
-        supposed to be on, Otter will put it back.
-
-        1. Create a scaling group with 1 CLB and 1 server
-        2. Wait for server to be active
-        3. Delete server from the CLB
-        4. Converge
-        5. Assert that the server is put back on the CLB.
-        """
-        clb = self.helper.clbs[0]
-
-        nodes = yield clb.list_nodes(self.rcs)
-        self.assertEqual(len(nodes['nodes']), 0,
-                         "There should be no nodes on the CLB yet.")
-
-        group, _ = self.helper.create_group(min_entities=1)
-        yield self.helper.start_group_and_wait(group, self.rcs)
-
-        nodes = yield clb.list_nodes(self.rcs)
-        self.assertEqual(
-            len(nodes['nodes']), 1,
-            "There should be 1 node on the CLB now that the group is active.")
-        the_node = nodes["nodes"][0]
-
-        yield clb.delete_nodes(self.rcs, [the_node['id']])
-
-        nodes = yield clb.list_nodes(self.rcs)
-        self.assertEqual(len(nodes['nodes']), 0,
-                         "There should no nodes on the CLB after deletion.")
-
-        yield group.trigger_convergence(self.rcs)
-
-        yield clb.wait_for_nodes(
-            self.rcs,
-            MatchesAll(
-                HasLength(1),
-                ContainsAllIPs([the_node["address"]])
-            ),
-            timeout=600
-        )
-
 
 # Run the ConvergenceTestsNoLBs in a configuration with 1 CLB
 copy_test_methods(
