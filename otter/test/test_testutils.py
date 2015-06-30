@@ -2,8 +2,9 @@
 Tests for :obj:`otter.test.utils`.
 """
 from effect import (
-    ComposedDispatcher, Effect,
+    ComposedDispatcher, Effect, NoPerformerFoundError,
     base_dispatcher, parallel, sync_performer)
+from effect.fold import FoldError, sequence
 
 from pyrsistent import pvector
 
@@ -194,3 +195,19 @@ class NestedParallelTests(SynchronousTestCase):
         ]
         p = parallel([Effect(1), Effect(2), Effect(3)])
         self.assertEqual(perform_sequence(seq, p), ['one!', 'two!', 'three!'])
+
+    def test_must_be_parallel(self):
+        """
+        If the sequences aren't run in parallel, the nested_parallel won't
+        match and a FoldError of NoPerformerFoundError will be raised.
+        """
+        seq = [
+            nested_parallel([
+                (1, lambda i: "one!"),
+                (2, lambda i: "two!"),
+                (3, lambda i: "three!"),
+            ])
+        ]
+        p = sequence([Effect(1), Effect(2), Effect(3)])
+        e = self.assertRaises(FoldError, perform_sequence, seq, p)
+        self.assertIs(e.wrapped_exception[0], NoPerformerFoundError)
