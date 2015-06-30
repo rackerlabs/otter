@@ -66,6 +66,7 @@ class GetSpecificScalingGroupsTests(SynchronousTestCase):
             {'created_at': '0', 'status': 'ACTIVE'},  # no desired
             {'created_at': '0', 'desired': 'some'},   # no status
             {'created_at': '0', 'desired': 'some', 'status': 'DISABLED'},
+            {'created_at': '0', 'desired': 'some', 'deleting': 'True', },
             {'created_at': '0', 'desired': 'some', 'status': 'ERROR'}]
         expected_query = QUERY_GROUPS_OF_TENANTS.format(tids="'foo', 'bar'")
         exec_args = {(expected_query, freeze({})): rows}

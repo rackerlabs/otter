@@ -33,6 +33,7 @@ from otter.convergence.composition import get_desired_group_state
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.errors import present_reasons, structure_reason
 from otter.convergence.gathering import get_all_convergence_data
+from otter.convergence.logging import log_steps
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
@@ -141,7 +142,9 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         :func`get_all_convergence_data`, used for testing.
     :param callable plan: like :func:`plan`, to be used for test injection only
 
-    :return: Effect of most severe StepResult
+    :return: Effect of two-tuple of (most severe StepResult, group status).
+        When group status is None it means the group has been successfully
+        deleted.
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
     # Huh! It turns out we can parallelize the gathering of data with the
@@ -165,6 +168,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         group_id, launch_config, desired_capacity)
     steps = plan(desired_group_state, servers, lb_nodes,
                  datetime_to_epoch(now_dt), build_timeout)
+    yield log_steps(steps)
     active = determine_active(servers, lb_nodes)
     yield msg('execute-convergence',
               servers=servers, lb_nodes=lb_nodes, steps=steps, now=now_dt,
@@ -176,10 +180,13 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     worst_status, reasons = yield _execute_steps(steps)
 
     cache = cache_class(tenant_id, group_id)
+    result_status = group_state.status
+
     if worst_status == StepResult.SUCCESS:
         if group_state.status == ScalingGroupStatus.DELETING:
             # servers have been deleted. Delete the group for real
             yield Effect(DeleteGroup(tenant_id=tenant_id, group_id=group_id))
+            result_status = None
         elif group_state.status == ScalingGroupStatus.ERROR:
             yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                            status=ScalingGroupStatus.ACTIVE))
@@ -195,11 +202,12 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     elif worst_status == StepResult.FAILURE:
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ERROR))
+        result_status = ScalingGroupStatus.ERROR
         yield cf_err(
             'group-status-error', status=ScalingGroupStatus.ERROR.name,
             reasons='; '.join(sorted(present_reasons(reasons))))
 
-    yield do_return(worst_status)
+    yield do_return((worst_status, result_status))
 
 
 def format_dirty_flag(tenant_id, group_id):
@@ -398,7 +406,14 @@ def converge_one_group(currently_converging, tenant_id, group_id, version,
         # unexpected errors, so convergence will be retried.
         yield err(None, 'converge-non-fatal-error')
     else:
-        if result in (StepResult.FAILURE, StepResult.SUCCESS):
+        if result[0] in (StepResult.FAILURE, StepResult.SUCCESS):
+            # In order to avoid doing extra work and reporting spurious errors,
+            # if the group status is None it means the group has successfully
+            # been deleted by execute_convergence. And so we will
+            # unconditionally delete the divergent flag to avoid any further
+            # queued-up convergences that will imminently fail.
+            if result[1] is None:
+                version = -1
             yield delete_divergent_flag(tenant_id, group_id, version)
 
 
