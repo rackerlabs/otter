@@ -5,6 +5,8 @@ import json
 import re
 from functools import partial, wraps
 
+import attr
+
 from characteristic import Attribute, attributes
 
 from effect import (
@@ -341,6 +343,33 @@ _CLB_NODE_LIMIT_PATTERN = re.compile(
 _CLB_OVER_LIMIT_PATTERN = re.compile("^OverLimit Retry\.{3}$")
 
 
+@attr.s(these={"message": attr.ib()}, init=False)
+class ExceptionWithMessage(Exception):
+    """
+    The builtin `Exception` doesn't have equality (it tests for identity).
+    ``attr`` provides equality based on the attributes.
+
+    But letting ``attr`` generate the `__init__` function for you means that
+    means extra kwargs do not get passed to the superclass's
+    ``__init__``.
+
+    So this gives us a base class that does both.  By using providing
+    our own ``__init__`` function, we can make this compatible with the builtin
+    Exception and also get the Python27 Exception's ``__str__`` function
+    automatically.
+
+    Also useful to note that Python 3 does not store the message on the
+    Exception, it just stores the args passed to it, so this lets us have a
+    message attribute in Python 3 as well.
+    """
+    def __init__(self, message):
+        """
+        Set ``self.message`` and also call the base class's ``__init__``.
+        """
+        super(ExceptionWithMessage, self).__init__(message)
+        self.message = message
+
+
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
 class CLBPendingUpdateError(Exception):
     """
@@ -604,30 +633,26 @@ class ServerMetadataOverLimitError(Exception):
     """
 
 
-@attributes([])
-class NovaRateLimitError(Exception):
+class NovaRateLimitError(ExceptionWithMessage):
     """
     Exception to be raised when Nova has rate-limited requests.
     """
 
 
-@attributes([])
-class NovaComputeFaultError(Exception):
+class NovaComputeFaultError(ExceptionWithMessage):
     """
     Exception to be raised when there is a service failure from Nova.
     """
 
 
-@attributes([])
-class CreateServerConfigurationError(Exception):
+class CreateServerConfigurationError(ExceptionWithMessage):
     """
     Exception to be raised when creating a server with invalid arguments.  The
     message to be returned is the message that comes back from Nova.
     """
 
 
-@attributes([])
-class CreateServerOverQuoteError(Exception):
+class CreateServerOverQuoteError(ExceptionWithMessage):
     """
     Exception to be raised when unable to create a server because the quote for
     some item (e.g. RAM, instances, on-metal instances) has been exceeded.
