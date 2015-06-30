@@ -1,7 +1,7 @@
 """Tests for :mod:`otter.integration.lib.nova`"""
 import json
 
-from testtools.matchers import Equals
+from testtools.matchers import Contains, Equals, MatchesListwise
 
 from twisted.internet.defer import succeed
 from twisted.internet.task import Clock
@@ -202,8 +202,8 @@ class NovaWaitForServersTestCase(SynchronousTestCase):
         """
         If the matcher does not matches the nova state, retries until it does.
         """
-        d = nova.wait_for_servers(self.rcs, self.pool, self.group,
-                                  Equals(self.wanted), timeout=5, period=1,
+        d = nova.wait_for_servers(self.rcs, self.pool, Equals(self.wanted),
+                                  group=self.group, timeout=5, period=1,
                                   clock=self.clock, _treq=self.treq)
         self.clock.pump((1, 1, 1))
         self.assertNoResult(d)
@@ -217,8 +217,20 @@ class NovaWaitForServersTestCase(SynchronousTestCase):
         If the matcher does not matches the server state, retries until
         it times out.
         """
-        d = nova.wait_for_servers(self.rcs, self.pool, self.group,
-                                  Equals(self.wanted), timeout=5, period=1,
+        d = nova.wait_for_servers(self.rcs, self.pool, Equals(self.wanted),
+                                  group=self.group, timeout=5, period=1,
                                   clock=self.clock, _treq=self.treq)
         self.clock.pump((1, 1, 1, 1, 1))
         self.failureResultOf(d, TimedOutError)
+
+    def test_wait_for_servers_without_group(self):
+        """
+        If no group is provided, applies the matcher against all servers and
+        not just those in a group.
+        """
+        d = nova.wait_for_servers(
+            self.rcs, self.pool, MatchesListwise([Contains('metadata')]*2),
+            timeout=5, period=1,
+            clock=self.clock, _treq=self.treq)
+        self.clock.pump((1,))
+        self.assertEqual(self.servers, self.successResultOf(d))
