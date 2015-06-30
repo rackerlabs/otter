@@ -1110,8 +1110,8 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
            active count is equal to LB_max, and that no servers are pending.
 
         """
-        LB_max = 25
-        group_max = 30
+        start = 20  # 5 less than the CLB max of 25
+        group_max = 30  # 5 more than the CLB max of 25
 
         group, _ = self.helper.create_group(
             min_entities=1,
@@ -1123,18 +1123,22 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
         )
 
         return (
-            self.helper.start_group_and_wait(group, self.rcs,
-                                             desired=LB_max - 5)
+            self.helper.start_group_and_wait(group, self.rcs, desired=start)
             .addCallback(scale_up_to_group_max.start, self)
             .addCallback(scale_up_to_group_max.execute)
             .addCallback(
                 group.wait_for_state,
                 ContainsDict({
-                    'pendingCapacity': GreaterThan(group_max - LB_max - 1),
+                    # we know that we already have `start` servers active
+                    # so pending should be <= (group_max - start)
+                    'pendingCapacity': LessThan(group_max - start + 1),
                     'desiredCapacity': Equals(group_max),
                     'status': Equals("ERROR"),
+                    # we know that we already have `start` servers active, so
+                    # now total active should be >= `start`, but we can't make
+                    # it to the group max
                     'active': AfterPreprocessing(
-                        len, MatchesAll(GreaterThan(LB_max - 6),
+                        len, MatchesAll(GreaterThan(start - 1),
                                         LessThan(group_max)))
                 }),
                 timeout=600
