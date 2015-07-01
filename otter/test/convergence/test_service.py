@@ -40,13 +40,14 @@ from otter.models.intents import (
     GetScalingGroupInfo,
     ModifyGroupState,
     UpdateGroupStatus,
+    UpdateServersCache,
     perform_modify_group_state)
 from otter.models.interface import (
     GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
 from otter.test.convergence.test_planning import server
 from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
-    Cache, CheckFailureValue, FakePartitioner,
+    CheckFailureValue, FakePartitioner,
     TestStep,
     mock_group, mock_log,
     nested_sequence,
@@ -668,8 +669,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             serv.desired_lbs = pset()
         eff = execute_convergence(self.tenant_id, self.group_id,
                                   build_timeout=3600,
-                                  get_all_convergence_data=gacd,
-                                  cache_class=Cache)
+                                  get_all_convergence_data=gacd)
         expected_active = {
             'a': {'id': 'a', 'links': [{'href': 'link1', 'rel': 'self'}]},
             'b': {'id': 'b', 'links': [{'href': 'link2', 'rel': 'self'}]}
@@ -678,8 +678,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (Log('execute-convergence', mock.ANY), noop),
             (Log('execute-convergence-results',
                  {'results': [], 'worst_status': 'SUCCESS'}), noop),
-            (("cacheistenant-idgroup-id", self.now,
-              [{'id': 'a'}, {'id': 'b'}], True), noop)
+            (UpdateServersCache("tenant-id", "group-id", self.now,
+                                [{'id': 'a'}, {'id': 'b'}]), noop)
         ]
         result = perform_sequence(
             self.get_seq + sequence, eff, self._get_dispatcher())
@@ -716,7 +716,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         eff = execute_convergence(self.tenant_id, self.group_id,
                                   build_timeout=3600,
                                   get_all_convergence_data=gacd,
-                                  plan=plan, cache_class=Cache)
+                                  plan=plan)
 
         sequence = [
             (Log('execute-convergence',
@@ -731,14 +731,15 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                  {'results': [(steps[0], (StepResult.SUCCESS, []))],
                   'worst_status': 'SUCCESS'}), noop),
             # Note that servers arg is non-deleted servers
-            (("cacheistenant-idgroup-id", self.now,
-              [{'id': 'a'}, {'id': 'b'}], True), noop)
+            (UpdateServersCache(
+                "tenant-id", "group-id", self.now,
+                [{'id': 'a'}, {'id': 'b'}]), noop)
         ]
-        result = perform_sequence(
-            self.get_seq + sequence, eff, self._get_dispatcher())
+        self.assertEqual(
+            perform_sequence(self.get_seq + sequence, eff,
+                             self._get_dispatcher()),
+            (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
         self.assertEqual(self.group.modify_state_values[-1].active, {})
-        self.assertEqual(result,
-                         (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
 
     def test_first_error_extraction(self):
         """
@@ -848,8 +849,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         eff = execute_convergence(self.tenant_id, self.group_id,
                                   build_timeout=3600,
-                                  get_all_convergence_data=gacd, plan=_plan,
-                                  cache_class=Cache)
+                                  get_all_convergence_data=gacd, plan=_plan)
 
         self.state.status = ScalingGroupStatus.DELETING
         sequence = [

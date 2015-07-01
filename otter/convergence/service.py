@@ -38,9 +38,9 @@ from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, with_log
-from otter.models.cass import CassScalingGroupServersCache
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus)
+    DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus,
+    UpdateServersCache)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.fp import assoc_obj
 from otter.util.timestamp import datetime_to_epoch
@@ -160,7 +160,7 @@ def convergence_exec_data(tenant_id, group_id, now, get_all_convergence_data):
 @do
 def execute_convergence(tenant_id, group_id, build_timeout,
                         get_all_convergence_data=get_all_convergence_data,
-                        plan=plan, cache_class=CassScalingGroupServersCache):
+                        plan=plan):
     """
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
@@ -200,7 +200,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     result_status = group_state.status
     if worst_status == StepResult.SUCCESS:
         result_status = yield convergence_succeeded(
-            scaling_group, group_state, servers, now_dt, cache_class)
+            scaling_group, group_state, servers, now_dt)
     elif worst_status == StepResult.FAILURE:
         result_status = yield convergence_failed(scaling_group, reasons)
 
@@ -208,8 +208,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
 
 
 @do
-def convergence_succeeded(scaling_group, group_state, servers, now,
-                          cache_class):
+def convergence_succeeded(scaling_group, group_state, servers, now):
     """
     Handle convergence success
     """
@@ -224,13 +223,12 @@ def convergence_succeeded(scaling_group, group_state, servers, now,
         yield cf_msg('group-status-active',
                      status=ScalingGroupStatus.ACTIVE.name)
     else:
-        # Clear servers cache and update it with latest servers
-        cache = cache_class(scaling_group.tenant_id, scaling_group.uuid)
-        yield cache.insert_servers(
-            now,
-            [thaw(s.json) for s in servers
-                if s.state != ServerState.DELETED],
-            True)
+        # update servers cache with latest servers
+        yield Effect(
+            UpdateServersCache(
+                scaling_group.tenant_id, scaling_group.uuid, now,
+                [thaw(s.json) for s in servers
+                 if s.state != ServerState.DELETED]))
     yield do_return(ScalingGroupStatus.ACTIVE)
 
 

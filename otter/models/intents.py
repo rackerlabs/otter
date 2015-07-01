@@ -1,12 +1,16 @@
 from functools import partial
 
+import attr
+
 from characteristic import attributes
 
-from effect import TypeDispatcher
+from effect import TypeDispatcher, sync_performer
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 
 from txeffect import deferred_performer
+
+from otter.models.cass import CassScalingGroupServersCache
 
 
 @attributes(['scaling_group', 'modifier'])
@@ -76,6 +80,24 @@ def perform_update_group_status(dispatcher, ugs_intent):
     return ugs_intent.scaling_group.update_status(ugs_intent.status)
 
 
+@attr.s
+class UpdateServersCache(object):
+    """
+    Intent to update servers cache
+    """
+    tenant_id = attr.ib()
+    group_id = attr.ib()
+    time = attr.ib()
+    servers = attr.ib()
+
+
+@sync_performer
+def perform_update_servers_cache(disp, intent):
+    """ Perform :obj:`UpdateServersCache` """
+    cache = CassScalingGroupServersCache(intent.tenant_id, intent.group_id)
+    return cache.insert_servers(intent.time, intent.servers, True)
+
+
 def get_model_dispatcher(log, store):
     """Get a dispatcher that can handle all the model-related intents."""
     return TypeDispatcher({
@@ -84,4 +106,5 @@ def get_model_dispatcher(log, store):
             partial(perform_get_scaling_group_info, log, store),
         DeleteGroup: partial(perform_delete_group, log, store),
         UpdateGroupStatus: perform_update_group_status,
+        UpdateServersCache: perform_update_servers_cache
     })
