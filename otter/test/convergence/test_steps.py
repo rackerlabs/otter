@@ -449,7 +449,8 @@ class StepAsEffectTests(SynchronousTestCase):
         non_terminals = (CLBDuplicateNodesError(lb_id=u"12345"),
                          CLBPendingUpdateError(lb_id=u"12345"),
                          CLBRateLimitError(lb_id=u"12345"),
-                         APIError(code=500, body="oops!"))
+                         APIError(code=500, body="oops!"),
+                         TypeError("You did something wrong in your code."))
         eff = self._add_one_node_to_clb()
 
         for exc in non_terminals:
@@ -470,8 +471,7 @@ class StepAsEffectTests(SynchronousTestCase):
                      CLBNodeLimitError(lb_id=u"12345"),
                      NoSuchCLBError(lb_id=u"12345"),
                      APIError(code=403, body="You're out of luck."),
-                     APIError(code=422, body="Oh look another 422."),
-                     TypeError("You did something wrong in your code."))
+                     APIError(code=422, body="Oh look another 422."))
         eff = self._add_one_node_to_clb()
 
         for exc in terminals:
