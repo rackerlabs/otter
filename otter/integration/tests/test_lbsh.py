@@ -54,7 +54,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             for clb in self.helper.clbs])
         )
 
-    @tag("LBSH")
+    @tag("LBSH-001")
     @inlineCallbacks
     def test_oob_deleted_clb_node(self):
         """
@@ -99,7 +99,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             timeout=timeout_default
         )
 
-    @tag("LBSH")
+    @tag("LBSH-002")
     @inlineCallbacks
     def test_move_node_to_oob_lb(self):
         """
@@ -113,7 +113,6 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         # The CLB will not be added to the helper, since when the helper
         # creates a group, it automatically adds the clb
         clb_other = CloudLoadBalancer(pool=self.helper.pool)
-        clb_other.start(self.rcs, self)
 
         yield clb_other.start(self.rcs, self)
         yield clb_other.wait_for_state(
@@ -144,6 +143,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         node_info = {
             "address": the_node["address"],
             "port": the_node["port"],
+            "condition": the_node["condition"],
             "weight": 2
         }
 
