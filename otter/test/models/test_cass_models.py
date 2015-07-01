@@ -3797,6 +3797,19 @@ class CassGroupServersCacheTests(SynchronousTestCase):
             self.cache.insert_servers(self.dt, [], False),
             Effect(Constant(None)))
 
+    def test_update_server_in_lbs(self):
+        """
+        `update_server_in_lbs` updates the `server_in_lbs` field
+        """
+        self.assertEqual(
+            self.cache.update_server_in_lbs(self.dt, 'sid', True),
+            cql_eff(
+                ('UPDATE servers_cache SET server_in_lbs=:server_in_lbs '
+                 'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
+                 'AND last_update=:last_update AND server_id=:server_id'),
+                {"tenantId": "tid", "groupId": "gid", "last_update": self.dt,
+                 "server_id": "sid", "server_in_lbs": True}))
+
     def test_delete_servers(self):
         """
         `delete_servers` issues query to delete the whole cache

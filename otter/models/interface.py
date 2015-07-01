@@ -625,6 +625,7 @@ class IScalingGroupServersCache(Interface):
         """
         Return latest cache of servers in a group along with last time the
         cache was updated.
+
         :return: Effect of (servers, last update time) tuple where servers
             is list of dict and last update time is datetime object. Will
             return last_update time as None if cache is empty
@@ -634,10 +635,23 @@ class IScalingGroupServersCache(Interface):
     def insert_servers(last_update, servers, clear_others):
         """
         Update the servers cache of the group with last update time
+
         :param datetime last_update: Update time of the cache
         :param list servers: List of server dicts
         :param bool clear_others: Should any other cache from a different
             update_time be deleted?
+
+        :return: Effect of None
+        """
+
+    def update_server_in_lbs(last_update, server_id, server_in_lbs):
+        """
+        Update the fact that server has been added to add LBs
+
+        :param datetime last_udpate: Update time of the cache
+        :param str server_id: ID of server
+        :param bool server_in_lbs: Has server been added to all LBs?
+
         :return: Effect of None
         """
 
