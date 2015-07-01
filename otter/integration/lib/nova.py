@@ -136,10 +136,10 @@ def create_server(rcs, pool, server_args, _treq=treq):
     """
     d = _treq.post(
         "{0}/servers".format(rcs.endpoints['nova']),
-        server_args,
+        json.dumps(server_args),
         headers=headers(str(rcs.token)),
         pool=pool
-    ).addCallback(check_success, [200]).addCallback(_treq.json_content)
+    ).addCallback(check_success, [202]).addCallback(_treq.json_content)
     return d.addCallback(itemgetter('server')).addCallback(itemgetter('id'))
 
 

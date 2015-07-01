@@ -172,8 +172,8 @@ class NovaServerCollectionTestCase(SynchronousTestCase):
         Create a server with particular args and succeeds on 202.
         """
         treq = get_fake_treq(self, 'post', 'novaurl/servers',
-                             (({'server': {}},), self.expected_kwargs),
-                             (Response(200), '{"server": {"id": "12345"}}'))
+                             (('{"server": {}}',), self.expected_kwargs),
+                             (Response(202), '{"server": {"id": "12345"}}'))
         d = nova.create_server(self.rcs, self.pool, {'server': {}}, _treq=treq)
         self.assertEqual("12345", self.successResultOf(d))
 
