@@ -17,11 +17,11 @@ from twisted.python.constants import NamedConstant
 from zope.interface import Interface, implementer
 
 from otter.cloud_client import (
-    CLBDuplicateNodesError,
-    CLBPendingUpdateError,
-    CLBRateLimitError,
+    CLBDeletedError,
+    CLBNodeLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
+    NoSuchCLBError,
     add_clb_nodes,
     create_server,
     has_code,
@@ -70,6 +70,46 @@ def set_server_name(server_config_args, name_suffix):
     return set_in(server_config_args, ('server', 'name'), name)
 
 
+def _failure_reporter(*terminal_err_types):
+    """
+    Return a callable that takes an error tuple which interprets the error
+    tuple.
+
+    If the error is an APIError with status code 4xx, or one of the provided
+    ``terminal_err_types``, then the callable returns a tuple of::
+
+        (StepResult.FAILURE, [ErrorReason.Exception(exc_tuple)])
+
+    else it returns a tuple of::
+
+        (StepResult.RETRY, [ErrorReason.Exception(exc_tuple)])
+    """
+    def reporter(exc_tuple):
+        err_type, error, traceback = exc_tuple
+
+        terminal_error = (
+            err_type in terminal_err_types or
+            (err_type == APIError and 400 <= error.code < 500)
+        )
+
+        if terminal_error:
+            return StepResult.FAILURE, [ErrorReason.Exception(exc_tuple)]
+        return StepResult.RETRY, [ErrorReason.Exception(exc_tuple)]
+
+    return reporter
+
+
+def _success_reporter(success_reason):
+    """
+    Return a callable that takes a result and returns a::
+
+        (StepResult.RETRY, [ErrorReason.String(success_reason)])
+    """
+    def reporter(_):
+        return StepResult.RETRY, [ErrorReason.String(success_reason)]
+    return reporter
+
+
 @implementer(IStep)
 @attributes([Attribute('server_config', instance_of=PMap)])
 class CreateServer(object):
@@ -87,39 +127,10 @@ class CreateServer(object):
             server_config = set_server_name(self.server_config, random_name)
             return create_server(thaw(server_config))
 
-        def report_success(result):
-            """
-            On success, return "RETRY", because servers go into building for
-            a while, and we need to retry convergence to ensure it goes into
-            active.
-            """
-            return StepResult.RETRY, [
-                ErrorReason.String('waiting for server to become active')]
-
-        def report_failure(result):
-            """
-            If the failure is a :class:`CreateServerConfigurationError` or a
-            :class:`CreateServerOverQuoteError`, or a :class:`APIError` with
-            a 4XX status code, return a :obj:`StepResult.FAILURE` along with
-            that error a areason.
-
-            Otherwise, all other errors are considered non-terminal and a
-            :obj:`StepResult.RETRY` is returned.
-            """
-            err_type, error, traceback = result
-
-            terminal_error = (
-                err_type in (CreateServerConfigurationError,
-                             CreateServerOverQuoteError) or
-                (err_type == APIError and 400 <= error.code < 500)
-            )
-
-            if terminal_error:
-                return StepResult.FAILURE, [ErrorReason.Exception(result)]
-            return StepResult.RETRY, [ErrorReason.Exception(result)]
-
-        return eff.on(got_name).on(success=report_success,
-                                   error=report_failure)
+        return eff.on(got_name).on(
+            success=_success_reporter('waiting for server to become active'),
+            error=_failure_reporter(CreateServerConfigurationError,
+                                    CreateServerOverQuoteError))
 
 
 class UnexpectedServerStatus(Exception):
@@ -287,34 +298,12 @@ class AddNodesToCLB(object):
               'type': lbc.type.name}
              for address, lbc in self.address_configs])
 
-        def report_success(result):
-            return StepResult.RETRY, [
-                ErrorReason.String(
-                    'must re-gather after adding to CLB in order to update '
-                    'the active cache')]
-
-        def report_api_failure(result):
-            """
-            If the error is a 404 or 422 PENDING_DELETE then fail.
-            Otherwise, retry.
-            """
-            err_type, error, traceback = result
-            status = StepResult.FAILURE
-
-            known_retryable = err_type in (CLBDuplicateNodesError,
-                                           CLBRateLimitError,
-                                           CLBPendingUpdateError)
-            unknown_nonterminal = (
-                err_type == APIError and not 400 <= error.code < 500)
-
-            # we want to retry on known retryable errors, or APIErrors that
-            # are not terminal like maybe 500 or 503 errors.
-            if known_retryable or unknown_nonterminal:
-                status = StepResult.RETRY
-
-            return status, [ErrorReason.Exception(result)]
-
-        return eff.on(success=report_success, error=report_api_failure)
+        return eff.on(
+            success=_success_reporter(
+                'must re-gather after adding to CLB in order to update '
+                'the active cache'),
+            error=_failure_reporter(CLBDeletedError, CLBNodeLimitError,
+                                    NoSuchCLBError))
 
 
 @implementer(IStep)
