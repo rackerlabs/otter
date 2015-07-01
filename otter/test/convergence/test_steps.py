@@ -18,8 +18,11 @@ from otter.cloud_client import (
     CLBNodeLimitError,
     CLBPendingUpdateError,
     CLBRateLimitError,
+    CreateServerConfigurationError,
+    CreateServerOverQuoteError,
     NoSuchCLBError,
     NoSuchServerError,
+    NovaComputeFaultError,
     NovaRateLimitError,
     ServerMetadataOverLimitError,
     has_code,
@@ -141,180 +144,60 @@ class CreateServerTests(SynchronousTestCase):
             (StepResult.RETRY,
              [ErrorReason.String('waiting for server to become active')]))
 
-    def test_create_server_400_parseable_failures(self):
+    def _assert_create_server_with_errs_has_status(self, exceptions, status):
         """
-        :obj:`CreateServer.as_effect`, when it results in 400 failure code,
-        returns with :obj:`StepResult.FAILURE` and whatever message was
-        included in the Nova bad request message.
+        Helper function to make a :class:`CreateServer` effect, and resolve
+        it with the provided exceptions, asserting that the result is the
+        provided status, with the reason being the exception.
         """
         eff = CreateServer(
             server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
         eff = resolve_effect(eff, 'random-name')
 
-        # 400's we've seen so far
-        nova_400s = (
-            ("Bad networks format: network uuid is not in proper format "
-             "(2b55377-890e-4fc9-9ece-ad5a414a788e)"),
-            "Image 644d0755-e69b-4ca0-b99b-3abc2f20f7c0 is not active.",
-            "Flavor's disk is too small for requested image.",
-            "Invalid key_name provided.",
-            ("Requested image 1dff348d-c06e-4567-a0b2-f4342575979e has "
-             "automatic disk resize disabled."),
-            "OS-DCF:diskConfig must be either 'MANUAL' or 'AUTO'.",
+        for exc in exceptions:
+            self.assertEqual(
+                resolve_effect(eff, service_request_error_response(exc),
+                               is_error=True),
+                (status, [ErrorReason.Exception(
+                    matches(ContainsAll([type(exc), exc])))])
+            )
+
+    def test_create_server_terminal_failures(self):
+        """
+        :obj:`CreateServer.as_effect`, when it results in
+        :class:`CreateServerConfigurationError` or
+        :class:`CreateServerOverQuoteError` or a :class:`APIError` with
+        a 400 failure code, returns with :obj:`StepResult.FAILURE`
+        """
+        errs = (
+            CreateServerConfigurationError(
+                "Bad networks format: network uuid is not in proper format "
+                "(2b55377-890e-4fc9-9ece-ad5a414a788e)"),
+            CreateServerConfigurationError("This was just a bad request"),
+            CreateServerOverQuoteError(
+                "Quota exceeded for ram: Requested 1024, but already used "
+                "131072 of 131072 ram"),
+            APIError(code=400, body="Unparsable user error", headers={}),
+            APIError(code=418, body="I am a teapot but this is still a 4xx",
+                     headers={})
         )
-        for message in nova_400s:
-            api_error = APIError(
-                code=400,
-                body=json.dumps({
-                    'badRequest': {
-                        'message': message,
-                        'code': 400
-                    }
-                }),
-                headers={})
-            self.assertEqual(
-                resolve_effect(eff, service_request_error_response(api_error),
-                               is_error=True),
-                (StepResult.FAILURE, [ErrorReason.String(message)]))
+        self._assert_create_server_with_errs_has_status(
+            errs, StepResult.FAILURE)
 
-    def test_create_server_400_unrecognized_failures_retry(self):
+    def test_create_server_retryable_failures(self):
         """
-        :obj:`CreateServer.as_effect`, when it results in a 400 failure code
-        without a recognized body, invalidates the auth cache and returns with
-        :obj:`StepResult.RETRY`.
+        :obj:`CreateServer.as_effect`, when it results in a
+        :class:`NovaComputeFaultError` or :class:`NovaRateLimitError` or
+        :class:`APIError` that is not a 4xx, returns with a
+        :obj:`StepResult.RETRY`
         """
-        eff = CreateServer(
-            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
-        eff = resolve_effect(eff, 'random-name')
-
-        # 400's with we don't recognize
-        invalid_400s = (
-            json.dumps({
-                "what?": {
-                    "message": "Invalid key_name provided.", "code": 400
-                }}),
-            json.dumps(["not expected json format"]),
-            "not json")
-
-        for message in invalid_400s:
-            api_error = APIError(code=400, body=message, headers={})
-            exc_info = service_request_error_response(api_error)
-            self.assertEqual(
-                resolve_effect(eff, exc_info,
-                               is_error=True),
-                (StepResult.RETRY,
-                 [ErrorReason.Exception(exc_info)]))
-
-    def test_create_server_403_json_parseable_failures(self):
-        """
-        :obj:`CreateServer.as_effect`, when it results in a 403 failure code
-        with a recognized JSON body, returns with :obj:`StepResult.FAILURE` and
-        whatever message was included in the Nova forbidden message.
-        """
-        eff = CreateServer(
-            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
-        eff = resolve_effect(eff, 'random-name')
-
-        # 403's with JSON bodies we've seen so far that are not auth issues
-        nova_json_403s = (
-            ("Quota exceeded for ram: Requested 1024, but already used 131072 "
-             "of 131072 ram"),
-            ("Quota exceeded for instances: Requested 1, but already used "
-             "100 of 100 instances"),
-            ("Quota exceeded for onmetal-compute-v1-instances: Requested 1, "
-             "but already used 10 of 10 onmetal-compute-v1-instances")
+        errs = (
+            NovaComputeFaultError("oops"),
+            NovaRateLimitError("OverLimit Retry..."),
+            APIError(code=501, body=":(", headers={}),
+            TypeError("You did something wrong")
         )
-
-        for message in nova_json_403s:
-            api_error = APIError(
-                code=403,
-                body=json.dumps({
-                    "forbidden": {
-                        "message": message,
-                        "code": 403
-                    }
-                }),
-                headers={})
-            self.assertEqual(
-                resolve_effect(eff, service_request_error_response(api_error),
-                               is_error=True),
-                (StepResult.FAILURE, [ErrorReason.String(message)]))
-
-    def test_create_server_403_plaintext_parseable_failures(self):
-        """
-        :obj:`CreateServer.as_effect`, when it results in a 403 failure code
-        with a recognized plain text body, returns with
-        :obj:`StepResult.FAILURE` and whatever message was included in the
-        Nova forbidden message.
-        """
-        eff = CreateServer(
-            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
-        eff = resolve_effect(eff, 'random-name')
-
-        # 403's with JSON bodies we've seen so far that are not auth issues
-        nova_plain_403s = (
-            ("Networks (00000000-0000-0000-0000-000000000000,"
-             "11111111-1111-1111-1111-111111111111) required but missing"),
-            "Networks (00000000-0000-0000-0000-000000000000) not allowed",
-            "Exactly 1 isolated network(s) must be attached"
-        )
-
-        for message in nova_plain_403s:
-            api_error = APIError(
-                code=403,
-                body="".join((
-                    "403 Forbidden\n\n",
-                    "Access was denied to this resource.\n\n ",
-                    message)),
-                headers={})
-            self.assertEqual(
-                resolve_effect(eff, service_request_error_response(api_error),
-                               is_error=True),
-                (StepResult.FAILURE, [ErrorReason.String(message)]))
-
-    def test_create_server_403_unrecognized_failures_retry(self):
-        """
-        :obj:`CreateServer.as_effect`, when it results in a 403 failure code
-        without a recognized body, invalidates the auth cache and returns with
-        :obj:`StepResult.RETRY`.
-        """
-        eff = CreateServer(
-            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
-        eff = resolve_effect(eff, 'random-name')
-
-        # 403's with JSON and plaintext bodies don't recognize
-        invalid_403s = (
-            json.dumps({"what?": {"message": "meh", "code": 403}}),
-            "403 Forbidden\n\nAccess was denied to this resource.\n\n bleh",
-            ("403 Forbidden\n\nAccess was denied to this resource.\n\n "
-             "Quota exceeded for ram: Requested 1024, but already used 131072 "
-             "of 131072 ram"),
-            "not even a message")
-
-        for message in invalid_403s:
-            api_error = APIError(code=403, body=message, headers={})
-            exc_info = service_request_error_response(api_error)
-            self.assertEqual(
-                resolve_effect(eff, exc_info,
-                               is_error=True),
-                (StepResult.RETRY, [ErrorReason.Exception(exc_info)]))
-
-    def test_create_server_non_400_or_403_failures(self):
-        """
-        :obj:`CreateServer.as_effect`, when it results in a non-400, non-403
-        failure code without a recognized body, invalidates the auth cache and
-        returns with :obj:`StepResult.RETRY`.
-        """
-        eff = CreateServer(
-            server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
-        eff = resolve_effect(eff, 'random-name')
-
-        api_error = APIError(code=500, body="this is a 500", headers={})
-        exc_info = service_request_error_response(api_error)
-        self.assertEqual(
-            resolve_effect(eff, exc_info,
-                           is_error=True),
-            (StepResult.RETRY, [ErrorReason.Exception(exc_info)]))
+        self._assert_create_server_with_errs_has_status(errs, StepResult.RETRY)
 
 
 class DeleteServerTests(SynchronousTestCase):

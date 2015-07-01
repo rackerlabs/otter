@@ -5,6 +5,8 @@ import json
 import re
 from functools import partial, wraps
 
+import attr
+
 from characteristic import Attribute, attributes
 
 from effect import (
@@ -341,6 +343,33 @@ _CLB_NODE_LIMIT_PATTERN = re.compile(
 _CLB_OVER_LIMIT_PATTERN = re.compile("^OverLimit Retry\.{3}$")
 
 
+@attr.s(these={"message": attr.ib()}, init=False)
+class ExceptionWithMessage(Exception):
+    """
+    The builtin `Exception` doesn't have equality (it tests for identity).
+    ``attr`` provides equality based on the attributes.
+
+    But letting ``attr`` generate the `__init__` function for you means that
+    means extra kwargs do not get passed to the superclass's
+    ``__init__``.
+
+    So this gives us a base class that does both.  By using providing
+    our own ``__init__`` function, we can make this compatible with the builtin
+    Exception and also get the Python27 Exception's ``__str__`` function
+    automatically.
+
+    Also useful to note that Python 3 does not store the message on the
+    Exception, it just stores the args passed to it, so this lets us have a
+    message attribute in Python 3 as well.
+    """
+    def __init__(self, message):
+        """
+        Set ``self.message`` and also call the base class's ``__init__``.
+        """
+        super(ExceptionWithMessage, self).__init__(message)
+        self.message = message
+
+
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
 class CLBPendingUpdateError(Exception):
     """
@@ -572,6 +601,23 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
 
 # ----- Nova requests and error parsing -----
 
+def _forbidden_plaintext(message):
+    return re.compile(
+        "^403 Forbidden\n\nAccess was denied to this resource\.\n\n ({0})$"
+        .format(message))
+
+_NOVA_403_NO_PUBLIC_NETWORK = _forbidden_plaintext(
+    "Networks \(00000000-0000-0000-0000-000000000000\) not allowed")
+_NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED = _forbidden_plaintext(
+    "Networks \(00000000-0000-0000-0000-000000000000,"
+    "11111111-1111-1111-1111-111111111111\) required but missing")
+_NOVA_403_RACKCONNECT_NETWORK_REQUIRED = _forbidden_plaintext(
+    "Exactly 1 isolated network\(s\) must be attached")
+_NOVA_403_QUOTA = re.compile(
+    "^Quota exceeded for (\S+): Requested \d+, but already used \d+ of \d+ "
+    "(\S+)$")
+
+
 @attributes([Attribute('server_id', instance_of=six.text_type)])
 class NoSuchServerError(Exception):
     """
@@ -587,17 +633,32 @@ class ServerMetadataOverLimitError(Exception):
     """
 
 
-@attributes([])
-class NovaRateLimitError(Exception):
+class NovaRateLimitError(ExceptionWithMessage):
     """
     Exception to be raised when Nova has rate-limited requests.
     """
 
 
-@attributes([])
-class NovaComputeFaultError(Exception):
+class NovaComputeFaultError(ExceptionWithMessage):
     """
     Exception to be raised when there is a service failure from Nova.
+    """
+
+
+class CreateServerConfigurationError(ExceptionWithMessage):
+    """
+    Exception to be raised when creating a server with invalid arguments.  The
+    message to be returned is the message that comes back from Nova.
+    """
+
+
+class CreateServerOverQuoteError(ExceptionWithMessage):
+    """
+    Exception to be raised when unable to create a server because the quote for
+    some item (e.g. RAM, instances, on-metal instances) has been exceeded.
+
+    This could possibly be parsed down into more structured data eventually,
+    since the string format is the same no matter what the quota is for.
     """
 
 
@@ -665,6 +726,55 @@ def get_server_details(server_id):
         _match_errors(_nova_standard_errors + other_errors, code, json_body)
 
     return eff.on(error=_parse_known_errors)
+
+
+def create_server(server_args):
+    """
+    Create a server using Nova.
+
+    :ivar dict server_args:  The dictionary to pass to Nova specifying how
+        the server should be built.
+
+    Succeed on 202, and only reauthenticate on 401 because 403s may be terminal
+    errors.
+
+    :raise: :class:`CreateServerConfigurationError`,
+        :class:`CreateServerOverQuoteError`, :class:`NovaRateLimitError`,
+        :class:`NovaComputFaultError`, :class:`APIError`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_SERVERS,
+        'POST',
+        'servers',
+        data=server_args,
+        success_pred=has_code(202),
+        reauth_codes=(401,))
+
+    @_only_json_api_errors
+    def _parse_known_json_errors(code, json_body):
+        other_errors = [
+            (400, ('badRequest', 'message'), None,
+             CreateServerConfigurationError),
+            (403, ('forbidden', 'message'), _NOVA_403_QUOTA,
+             CreateServerOverQuoteError)
+        ]
+        _match_errors(_nova_standard_errors + other_errors, code, json_body)
+
+    def _parse_known_string_errors(api_error_exc_info):
+        api_error = api_error_exc_info[1]
+        if api_error.code == 403:
+            for pat in (_NOVA_403_RACKCONNECT_NETWORK_REQUIRED,
+                        _NOVA_403_NO_PUBLIC_NETWORK,
+                        _NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED):
+                m = pat.match(api_error.body)
+                if m:
+                    raise CreateServerConfigurationError(m.groups()[0])
+
+        six.reraise(*api_error_exc_info)
+
+    return (eff
+            .on(error=catch(APIError, _parse_known_string_errors))
+            .on(error=_parse_known_json_errors))
 
 
 _nova_standard_errors = [

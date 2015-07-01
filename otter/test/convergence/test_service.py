@@ -721,7 +721,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         sequence = [
             (Log('execute-convergence',
                  dict(servers=self.servers, lb_nodes=(), steps=steps,
-                      now=self.now, desired=dgs, active=[])), noop),
+                      now=self.now, desired=dgs)), noop),
             ({'dgs': dgs,
               'servers': servers,
               'lb_nodes': (),
@@ -979,7 +979,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.assertEqual(
             perform_sequence(self.get_seq + sequence, eff,
                              self._get_dispatcher()),
-            (StepResult.SUCCESS, ScalingGroupStatus.ERROR))
+            (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
 
     def test_reactivate_group_on_success_with_no_steps(self):
         """
@@ -1006,7 +1006,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.assertEqual(
             perform_sequence(self.get_seq + sequence, eff,
                              self._get_dispatcher()),
-            (StepResult.SUCCESS, ScalingGroupStatus.ERROR))
+            (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
 
 
 class DetermineActiveTests(SynchronousTestCase):
