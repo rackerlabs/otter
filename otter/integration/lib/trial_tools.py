@@ -29,13 +29,14 @@ from otter.integration.lib.autoscale import (
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer, ContainsAllIPs)
 
+from otter.integration.lib.identity import IdentityV2
+
 from otter.integration.lib.nova import (
     create_server,
     delete_servers,
     wait_for_servers
 )
 
-from otter.integration.lib.identity import IdentityV2
 
 username = os.environ['AS_USERNAME']
 password = os.environ['AS_PASSWORD']
