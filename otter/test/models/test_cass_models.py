@@ -43,6 +43,7 @@ from otter.models.cass import (
     WeakLocks,
     _assemble_webhook_from_row,
     assemble_webhooks_in_policies,
+    cql_eff,
     get_cql_dispatcher,
     perform_cql_query,
     serialize_json_data,
@@ -3714,7 +3715,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
                 query=('SELECT server_blob, last_update FROM servers_cache '
                        'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
                        'ORDER BY last_update DESC;'),
-                params=self.params, consistency_level=ConsistencyLevel.ONE),
+                params=self.params, consistency_level=ConsistencyLevel.QUORUM),
              lambda i: query_result)])
         dispatcher = test_dispatcher(sequence)
         with sequence.consume():
@@ -3765,10 +3766,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
             {"server_id0": "a", "server_blob0": '{"id": "a"}',
              "server_id1": "b", "server_blob1": '{"id": "b"}',
              "last_update": self.dt})
-        self.assertEqual(
-            eff.intent,
-            CQLQueryExecute(query=query, params=self.params,
-                            consistency_level=ConsistencyLevel.ONE))
+        self.assertEqual(eff, cql_eff(query, self.params))
         self.assertEqual(resolve_effect(eff, None), None)
 
     def test_insert_servers(self):
@@ -3805,12 +3803,9 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         """
         self.assertEqual(
             self.cache.delete_servers(),
-            Effect(
-                CQLQueryExecute(
-                    query=('DELETE FROM servers_cache WHERE '
-                           '"tenantId" = :tenantId AND "groupId" = :groupId'),
-                    params=self.params,
-                    consistency_level=ConsistencyLevel.ONE)))
+            cql_eff(('DELETE FROM servers_cache WHERE '
+                     '"tenantId" = :tenantId AND "groupId" = :groupId'),
+                    self.params))
 
 
 class CassAdminTestCase(SynchronousTestCase):

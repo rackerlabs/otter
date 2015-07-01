@@ -59,6 +59,10 @@ from otter.util.retry import repeating_interval, retry, retry_times
 
 LOCK_PATH = '/locks'
 
+DEFAULT_CONSISTENCY = ConsistencyLevel.QUORUM
+
+QUERY_LIMIT = 10000
+
 
 @attributes(['query', 'params', 'consistency_level'])
 class CQLQueryExecute(object):
@@ -87,7 +91,7 @@ def get_cql_dispatcher(connection):
     })
 
 
-def cql_eff(query, params={}, consistency_level=ConsistencyLevel.ONE):
+def cql_eff(query, params={}, consistency_level=DEFAULT_CONSISTENCY):
     """
     Return Effect of CQLQueryExecute intent
     """
@@ -305,11 +309,6 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
 
     cql_parts.append(" LIMIT :limit;")
     return (''.join(cql_parts), params)
-
-
-DEFAULT_CONSISTENCY = ConsistencyLevel.QUORUM
-
-QUERY_LIMIT = 10000
 
 
 def _build_policies(policies, policies_table, event_table, queries, data,
