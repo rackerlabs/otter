@@ -152,12 +152,10 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         nodes_as = yield clb_as.list_nodes(self.rcs)
         nodes_other = yield clb_other.list_nodes(self.rcs)
-        self.assertEqual(clb_as.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default),
-            "There should be 0 nodes on the autoscale CLB after moving.")
-        self.assertEqual(clb_other.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default),
-            "There should be 1 nodes on the out of band CLB after moving")
+        clb_as.wait_for_nodes(
+            self.rcs, HasLength(0), timeout=timeout_default)
+        clb_other.wait_for_nodes(
+            self.rcs, HasLength(1), timeout=timeout_default)
 
         yield group.trigger_convergence(self.rcs)
 
