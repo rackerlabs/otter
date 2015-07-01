@@ -39,12 +39,13 @@ def get_service_configs(config):
         ServiceType.RACKCONNECT_V3: {
             'name': config['rackconnect'],
             'region': config['region'],
-        },
-        ServiceType.CLOUD_METRICS_INGEST: {
-            'name': config['metrics']['service'],
-            'region': config['metrics']['region'],
         }
     }
+
+    metrics = config.get('metrics')
+    if metrics is not None:
+        configs[ServiceType.CLOUD_METRICS_INGEST] = {
+            'name': metrics['service'], 'region': metrics['region']}
 
     cf = config.get('cloudfeeds')
     if cf is not None:
