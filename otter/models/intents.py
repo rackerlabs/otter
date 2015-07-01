@@ -13,21 +13,25 @@ from txeffect import deferred_performer
 from otter.models.cass import CassScalingGroupServersCache
 
 
-@attributes(['scaling_group', 'modifier'])
-class ModifyGroupState(object):
+@attr.s
+class ModifyGroupStateActive(object):
     """
-    An Effect intent which indicates that a group state should be updated.
+    Intent to update group state's active list
     """
+    group = attr.ib()
+    active = attr.ib()
 
 
 @deferred_performer
 def perform_modify_group_state(dispatcher, mgs_intent):
-    """Perform a :obj:`ModifyGroupState`."""
-    group = mgs_intent.scaling_group
-    # TODO: put modify_state_reason on intent
-    return group.modify_state(
-        mgs_intent.modifier,
-        modify_state_reason='ModifyGroupState intent')
+    """Perform a :obj:`ModifyGroupStateActive`."""
+
+    def update_group_active(group, old_state):
+        return assoc_obj(old_state, active=mgs_intent.active)
+
+    return mgs_intent.group.modify_state(
+        update_group_active,
+        modify_state_reason='updating active')
 
 
 @attributes(['tenant_id', 'group_id'])
@@ -98,6 +102,24 @@ def perform_update_servers_cache(disp, intent):
     return cache.insert_servers(intent.time, intent.servers, True)
 
 
+@attr.s
+class SetServersASActive(object)
+    """
+    Intent to set server_as_active of servers in cache to True
+    """
+    tenant_id = attr.ib()
+    group_id = attr.ib()
+    time = attr.ib()
+    server_ids = attr.ib()
+
+
+@sync_performer
+def perform_set_servers_in_lbs(disp, intent):
+    """ Perform :obj:`SetServerInLBsCache` """
+    cache = CassScalingGroupServersCache(intent.tenant_id, intent.group_id)
+    return cache.set_servers_as_active(intent.time, intent.server_id)
+
+
 def get_model_dispatcher(log, store):
     """Get a dispatcher that can handle all the model-related intents."""
     return TypeDispatcher({
@@ -106,5 +128,6 @@ def get_model_dispatcher(log, store):
             partial(perform_get_scaling_group_info, log, store),
         DeleteGroup: partial(perform_delete_group, log, store),
         UpdateGroupStatus: perform_update_group_status,
-        UpdateServersCache: perform_update_servers_cache
+        UpdateServersCache: perform_update_servers_cache,
+        SetServerInLBsCache: perform_set_servers_in_lbs
     })

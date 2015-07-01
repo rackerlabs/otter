@@ -40,7 +40,7 @@ from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, with_log
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus,
-    UpdateServersCache)
+    UpdateServersCache, SetServersASActive)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.fp import assoc_obj
 from otter.util.timestamp import datetime_to_epoch
@@ -55,7 +55,7 @@ def server_to_json(server):
     return {'id': server.id, 'links': thaw(server.links)}
 
 
-def determine_active(servers, lb_nodes):
+def is_autoscale_active(server, lb_nodes):
     """
     Given the current NovaServers and LB nodes, determine which servers are
     completely built.
@@ -75,23 +75,34 @@ def determine_active(servers, lb_nodes):
             if desired.equivalent_definition(node.description)])
         return desired_lbs == met_desireds
 
-    return [s for s in servers
-            if (s.state == ServerState.ACTIVE and
-                all_met(s, [node for node in lb_nodes if node.matches(s)]))]
+    return (server.state == ServerState.ACTIVE and
+                all_met(server, [node for node in lb_nodes
+                                 if node.matches(server)]))
 
 
-def _update_active(scaling_group, active):
-    """
-    :param scaling_group: scaling group
-    :param active: list of active NovaServer objects
-    """
+def update_old_cache(group, active):
     active = {server.id: server_to_json(server) for server in active}
+    return Effect(ModifyGroupStateActive(group, active))
 
-    def update_group_state(group, old_state):
-        return assoc_obj(old_state, active=active)
 
-    return Effect(ModifyGroupState(scaling_group=scaling_group,
-                                   modifier=update_group_state))
+def update_cache(group, servers, lb_nodes, now):
+    """
+    :param group: scaling group
+    :param list servers: list of NovaServer objects
+    """
+    active = []
+    server_dicts = []
+    for server in servers:
+        sd = thaw(server.json)
+        if is_autoscale_active(server, lb_nodes):
+            sd["_is_as_active"] = True
+            active.append(server)
+        server_dicts.append(sd)
+
+    set_eff = Effect(
+        UpdateServersCache(group.tenant_id, group.uuid, now, server_dicts))
+
+    return parallel([update_old_cache(group, active), set_eff])
 
 
 @do
@@ -143,13 +154,12 @@ def convergence_exec_data(tenant_id, group_id, now, get_all_convergence_data):
     group_state = manifest['state']
     launch_config = manifest['launchConfiguration']
 
-    # update active cache for non-deleting groups
-    if group_state.status != ScalingGroupStatus.DELETING:
-        active = determine_active(servers, lb_nodes)
-        yield _update_active(scaling_group, active)
+    if group_state.status == ScalingGroupStatus.DELETING:
+        desired_capacity = 0
+    else:
+        desired_capacity = group_state.desired
+        yield update_cache(scaling_group, servers, lb_nodes, now)
 
-    desired_capacity = (0 if group_state.status == ScalingGroupStatus.DELETING
-                        else group_state.desired)
     desired_group_state = get_desired_group_state(
         group_id, launch_config, desired_capacity)
 

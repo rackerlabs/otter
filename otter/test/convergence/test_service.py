@@ -639,8 +639,18 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         }
         self.gsgi_result = (self.group, self.manifest)
         self.now = datetime(1970, 1, 1)
-        self.get_seq = [(Func(datetime.utcnow), lambda i: self.now),
-                        (self.gsgi, lambda i: self.gsgi_result)]
+
+    def get_seq(self, active):
+        return [
+            (Func(datetime.utcnow), lambda i: self.now),
+            (self.gsgi, lambda i: self.gsgi_result),
+            nested_parallel([
+                (ModifyGroupStateActive(self.group, active), noop),
+                (UpdateServersCache(self.tenant_id, self.group_id, self.now,
+                                    [{'id': 'a'}, {'id': 'b'}]),
+                 noop)
+            ])
+        ]
 
     def _get_dispatcher(self):
         return ComposedDispatcher([

@@ -150,7 +150,6 @@ def group_servers(group_id, grouped_servers):
 
 @do
 def get_scaling_group_servers(tenant_id, group_id, now,
-                              cache_class=CassScalingGroupServersCache,
                               all_as_servers=get_all_scaling_group_servers,
                               all_servers=get_all_server_details):
     """
@@ -168,14 +167,12 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     cached_servers, last_update = yield cache.get_servers()
     if last_update is None:
         servers = (yield all_as_servers()).get(group_id, [])
-        yield cache.insert_servers(now, servers, True)
     elif now - last_update >= timedelta(days=30):
         last_update = now - timedelta(days=30)
         changes, current = yield parallel([
             all_as_servers(last_update).on(partial(group_servers, group_id)),
             all_as_servers().on(partial(group_servers, group_id))])
         servers = merge_servers(changes, current)
-        yield cache.insert_servers(now, servers, True)
     else:
         changes = yield all_servers(last_update)
         servers = merge_servers(cached_servers, changes)
