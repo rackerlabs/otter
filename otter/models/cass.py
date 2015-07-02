@@ -1763,17 +1763,21 @@ class CassScalingGroupServersCache(object):
         else:
             return cql_eff(batch(queries), params)
 
-    def update_server_in_lbs(self, last_update, server_id, server_in_lbs):
+    def set_servers_as_active(self, last_update, server_ids):
         """
-        See :method:`IScalingGroupServersCache.update_server_in_lbs
+        See :method:`IScalingGroupServersCache.set_servers_as_active
         """
-        query = ('UPDATE {cf} SET server_in_lbs=:server_in_lbs '
+        if len(server_ids) == 0:
+            return Effect(Constant(None))
+        query = ('UPDATE {cf} SET server_as_active=true '
                  'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
-                 'AND last_update=:last_update AND server_id=:server_id')
-        params = merge(
-            self.params, {"last_update": last_update, "server_id": server_id,
-                          "server_in_lbs": server_in_lbs})
-        return cql_eff(query.format(cf=self.table), params)
+                 'AND last_update=:last_update AND server_id=:server_id{i};')
+        params = merge(self.params, {"last_update": last_update})
+        queries = []
+        for i, server_id in enumerate(server_ids):
+            params['server_id{}'.format(i)] = server_id
+            queries.append(query.format(cf=self.table, i=i))
+        return cql_eff(batch(queries), params)
 
     def delete_servers(self):
         """

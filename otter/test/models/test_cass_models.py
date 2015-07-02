@@ -3797,18 +3797,23 @@ class CassGroupServersCacheTests(SynchronousTestCase):
             self.cache.insert_servers(self.dt, [], False),
             Effect(Constant(None)))
 
-    def test_update_server_in_lbs(self):
+    def test_set_servers_as_active(self):
         """
-        `update_server_in_lbs` updates the `server_in_lbs` field
+        `set_servers_as_active` updates the `server_as_actve` field
         """
         self.assertEqual(
-            self.cache.update_server_in_lbs(self.dt, 'sid', True),
+            self.cache.set_servers_as_active(self.dt, ['s1', 's2']),
             cql_eff(
-                ('UPDATE servers_cache SET server_in_lbs=:server_in_lbs '
+                ('BEGIN BATCH '
+                 'UPDATE servers_cache SET server_as_active=true '
                  'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
-                 'AND last_update=:last_update AND server_id=:server_id'),
+                 'AND last_update=:last_update AND server_id=:server_id0; '
+                 'UPDATE servers_cache SET server_as_active=true '
+                 'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
+                 'AND last_update=:last_update AND server_id=:server_id1; '
+                 'APPLY BATCH;'),
                 {"tenantId": "tid", "groupId": "gid", "last_update": self.dt,
-                 "server_id": "sid", "server_in_lbs": True}))
+                 "server_id0": "s1", "server_id1": "s2"}))
 
     def test_delete_servers(self):
         """

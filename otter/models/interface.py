@@ -644,13 +644,12 @@ class IScalingGroupServersCache(Interface):
         :return: Effect of None
         """
 
-    def update_server_in_lbs(last_update, server_id, server_in_lbs):
+    def set_servers_as_active(last_update, server_ids):
         """
-        Update the fact that server has been added to add LBs
+        Update the fact that given servers have become AS active
 
         :param datetime last_udpate: Update time of the cache
-        :param str server_id: ID of server
-        :param bool server_in_lbs: Has server been added to all LBs?
+        :param list server_ids: Server IDs which have become AS active
 
         :return: Effect of None
         """
