@@ -281,7 +281,21 @@ class CLBTests(SynchronousTestCase):
         """
         self.clb_id = 12345
 
-        for state in ("PENDING_DELETE", "DELETED", "ERROR", "SUSPENDED"):
+        success_treqs = [
+            # All of these particular immutable states count as success.
+            self.get_fake_treq_for_delete(
+                {"loadBalancer": {"status": state}},
+                del_response=Response(400))
+            for state in ("PENDING_DELETE", "DELETED", "ERROR", "SUSPENDED")
+        ] + [
+            # 404 from get-ting the server, meaning it's already gone.
+            self.get_fake_treq_for_delete(
+                {"message": "No such load balancer", "code": 404},
+                get_response=Response(404),
+                del_response=Response(400))
+        ]
+
+        for success_treq in success_treqs:
             clock = Clock()
             _treq = self.get_fake_treq_for_delete(
                 {"loadBalancer": {"status": "PENDING_UPDATE"}},
@@ -296,10 +310,7 @@ class CLBTests(SynchronousTestCase):
             clock.pump([3])
             self.assertNoResult(d)
 
-            clb.treq = self.get_fake_treq_for_delete(
-                {"loadBalancer": {"status": state}},
-                del_response=Response(400))
-
+            clb.treq = success_treq
             clock.pump([3])
             self.assertEqual(self.successResultOf(d), None)
 

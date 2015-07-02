@@ -216,14 +216,19 @@ class CloudLoadBalancer(object):
                 pool=self.pool
             ).addCallback(self.treq.content)
 
-            state = yield self.get_state(rcs)
-            if state['loadBalancer']['status'] not in (
-                    "PENDING_DELETE", "SUSPENDED", "ERROR", "DELETED"):
-                raise TransientRetryError()
-            if state['loadBalancer']['status'] in ("ERROR", "SUSPENDED"):
-                msg("Could not delete CLB {0} because it is in {1} state, "
-                    "but considering this good enough.".format(
-                        self.clb_id, state['loadBalancer']['status']))
+            try:
+                state = yield self.get_state(rcs)
+            except APIError as e:
+                if e.code != 404:
+                    raise e
+            else:
+                if state['loadBalancer']['status'] not in (
+                        "PENDING_DELETE", "SUSPENDED", "ERROR", "DELETED"):
+                    raise TransientRetryError()
+                if state['loadBalancer']['status'] in ("ERROR", "SUSPENDED"):
+                    msg("Could not delete CLB {0} because it is in {1} state, "
+                        "but considering this good enough.".format(
+                            self.clb_id, state['loadBalancer']['status']))
 
         return really_delete()
 
