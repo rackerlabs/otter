@@ -23,7 +23,6 @@ from otter.integration.lib.trial_tools import (
     get_identity,
     get_resource_mapping,
     region,
-    skip_me,
     tag
 )
 
@@ -55,13 +54,13 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             for clb in self.helper.clbs])
         )
 
-    @skip_me("temp")
-    @tag("LBSH")
+    @tag("LBSH-001")
     @inlineCallbacks
     def test_oob_deleted_clb_node(self):
         """
-        If an autoscaled server is removed from the CLB out of band its
-        supposed to be on, Otter will put it back.
+        Confirm that when convergence is triggered, nodes moved to
+        non-autoscale loadbalancers are removed from the oob loadbalancer
+        and put back onto the autoscale loadbalancer.
 
         1. Create a scaling group with 1 CLB and 1 server
         2. Wait for server to be active
@@ -101,22 +100,100 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             timeout=timeout_default
         )
 
-        @tag("LBSH-003")
-        @inlineCallbacks
-        def test_lbsh_3(self):
-            """
-            This is a slight variation of lbsh-002, with the node being
+    @tag("LBSH-002")
+    @inlineCallbacks
+    def test_oob_move_node_to_oob_lb(self):
+        """
+        This is a slight variation of lbsh-002, with the node being
             copied to the second load balancer instead of moved.
 
-            Confirm that when convergence is triggered, nodes copied to
-            non-autoscale loadbalancers are removed.
+        1 group, LB1 in config, LB2 not in any autoscale configs:
 
-            1 group, LB1 in config, LB2 not in any autoscale configs:
-                - Server node added to LB2 (now on both)
-                - Trigger convergence
-                - Assert: Server still on LB1
-                - Assert: Server removed from LB2
-            """
+        Server node moved from LB1 to LB2
+        Assert: Server put back on LB1
+        Assert: Server removed from LB2
+        """
+        # Create another loadbalancer not to be used in autoscale
+        # The CLB will not be added to the helper, since when the helper
+        # creates a group, it automatically adds the clb
+        clb_other = CloudLoadBalancer(pool=self.helper.pool)
+
+        yield clb_other.start(self.rcs, self)
+        yield clb_other.wait_for_state(
+            self.rcs, "ACTIVE", timeout_default)
+
+        clb_as = self.helper.clbs[0]
+
+        nodes_as = yield clb_as.list_nodes(self.rcs)
+        nodes_other = yield clb_other.list_nodes(self.rcs)
+        self.assertEqual(len(nodes_as['nodes']), 0,
+                         "There should be no nodes on the CLB yet.")
+        self.assertEqual(len(nodes_other['nodes']), 0,
+                         "There should be no nodes on the CLB yet.")
+
+        group, _ = self.helper.create_group(min_entities=1)
+        yield self.helper.start_group_and_wait(group, self.rcs)
+
+        nodes_as = yield clb_as.list_nodes(self.rcs)
+        nodes_other = yield clb_other.list_nodes(self.rcs)
+        self.assertEqual(
+            len(nodes_as['nodes']), 1,
+            "There should be 1 node on the autoscale CLB.")
+        self.assertEqual(
+            len(nodes_other['nodes']), 0,
+            "There should still be 0 nodes on the out of band CLB")
+
+        the_node = nodes_as["nodes"][0]
+        node_info = {
+            "address": the_node["address"],
+            "port": the_node["port"],
+            "condition": the_node["condition"],
+            "weight": 2
+        }
+
+        yield clb_as.delete_nodes(self.rcs, [the_node['id']])
+        yield clb_other.add_nodes(self.rcs, [node_info])
+
+        nodes_as = yield clb_as.list_nodes(self.rcs)
+        nodes_other = yield clb_other.list_nodes(self.rcs)
+        clb_as.wait_for_nodes(
+            self.rcs, HasLength(0), timeout=timeout_default)
+        clb_other.wait_for_nodes(
+            self.rcs, HasLength(1), timeout=timeout_default)
+
+        yield group.trigger_convergence(self.rcs)
+
+        yield clb_as.wait_for_nodes(
+            self.rcs,
+            MatchesAll(
+                HasLength(1),
+                ContainsAllIPs([the_node["address"]])
+            ),
+            timeout=timeout_default
+        )
+
+        yield clb_other.wait_for_nodes(
+            self.rcs,
+            HasLength(0),
+            timeout=timeout_default
+        )
+
+    @tag("LBSH-003")
+    @inlineCallbacks
+    def test_oob_copy_node_to_oob_lb(self):
+        """
+        This is a slight variation of lbsh-002, with the node being
+        copied to the second load balancer instead of moved.
+
+        Confirm that when convergence is triggered, nodes copied to
+        non-autoscale loadbalancers are removed.
+
+        1 group, LB1 in config, LB2 not in any autoscale configs:
+            - Server node added to LB2 (now on both)
+            - Trigger convergence
+            - Assert: Server still on LB1
+            - Assert: Server removed from LB2
+        """
 
         # Create another loadbalancer not to be used in autoscale
         # The CLB will not be added to the helper, since when the helper
