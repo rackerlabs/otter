@@ -262,6 +262,9 @@ class CLBTests(SynchronousTestCase):
                 return succeed(get_response)
 
             def content(cls, resp):
+                # If the get_response is not a 200, then, it would be
+                # considered an error and hence treq.content would be called.
+                # Otherwise, treq.content is only called for the del response.
                 if get_response == Response(200):
                     self.assertEqual(resp, del_response)
                 else:
