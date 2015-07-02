@@ -213,7 +213,8 @@ class NovaWaitForServersTestCase(SynchronousTestCase):
 
     def test_wait_for_servers_retries_until_matcher_matches(self):
         """
-        If the matcher does not matches the nova state, retries until it does.
+        If the matcher does not match the nova servers state, retries until
+        it does.
         """
         d = nova.wait_for_servers(self.rcs, self.pool, Equals(self.wanted),
                                   group=self.group, timeout=5, period=1,
@@ -227,7 +228,7 @@ class NovaWaitForServersTestCase(SynchronousTestCase):
 
     def test_wait_for_servers_retries_until_timeout(self):
         """
-        If the matcher does not matches the server state, retries until
+        If the matcher does not match the nova servers state, retries until
         it times out.
         """
         d = nova.wait_for_servers(self.rcs, self.pool, Equals(self.wanted),
