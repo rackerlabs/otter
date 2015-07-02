@@ -154,7 +154,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         # Should be 3 nodes now that all servers are added
         nodes = yield clb.wait_for_nodes(
-            self.rcs, AfterPreprocessing(len, Equals(3)), timeout_default)
+            self.rcs, HasLength(3), timeout=timeout_default)
         as_node = [node for node in nodes
                    if node not in (remove_non_as_node, untouch_non_as_node)][0]
 
@@ -163,7 +163,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
                                [as_node['id'], remove_non_as_node['id']])
         # There should be 1 node left
         yield clb.wait_for_nodes(
-            self.rcs, AfterPreprocessing(len, Equals(1)), timeout_default)
+            self.rcs, HasLength(1), timeout=timeout_default)
 
         yield group.trigger_convergence(self.rcs)
 
