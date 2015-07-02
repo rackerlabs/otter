@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import json
 
-from functools import wraps, partial
+from functools import partial, wraps
 
 from characteristic import Attribute, attributes
 
