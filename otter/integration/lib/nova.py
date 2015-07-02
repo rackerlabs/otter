@@ -1,6 +1,8 @@
 """Contains reusable classes relating to nova."""
 import json
 
+from operator import itemgetter
+
 from characteristic import Attribute, attributes
 
 import treq
@@ -120,35 +122,62 @@ def list_servers(rcs, pool, _treq=treq):
     ).addCallback(check_success, [200]).addCallback(_treq.json_content)
 
 
-def wait_for_servers(rcs, pool, group, matcher, timeout=600, period=10,
-                     clock=None, _treq=treq):
+def create_server(rcs, pool, server_args, _treq=treq):
     """
-    Wait until Nova reaches a particular state (as described by the given
-    matcher)with regards to the servers for the given group.
+    Create a server using Nova.
 
     :param rcs: an instance of
         :class:`otter.integration.lib.resources.TestResources`
     :param pool: a :class:`twisted.web.client.HTTPConnectionPool`
-    :param group: a :class:`otter.integration.lib.autoscale.ScalingGroup` that
-        specifies which autoscaling group's servers we are looking at.  This
-        group should already exist, and have a `group_id` attribute.
+    :param server_args: a ``dict`` containing the arguments with which to
+        create the server.
+
+    :return: the server ID of the created server.
+    """
+    d = _treq.post(
+        "{0}/servers".format(rcs.endpoints['nova']),
+        json.dumps(server_args),
+        headers=headers(str(rcs.token)),
+        pool=pool
+    ).addCallback(check_success, [202]).addCallback(_treq.json_content)
+    return d.addCallback(itemgetter('server')).addCallback(itemgetter('id'))
+
+
+def wait_for_servers(rcs, pool, matcher, group=None, timeout=600, period=10,
+                     clock=None, _treq=treq):
+    """
+    Wait until Nova reaches a particular state (as described by the given
+    matcher) - if a group is provided, then match only the servers for the
+    given group.
+
+    :param rcs: an instance of
+        :class:`otter.integration.lib.resources.TestResources`
+    :param pool: a :class:`twisted.web.client.HTTPConnectionPool`
     :param matcher: a :mod:`testtools.matcher` matcher that describes the
         desired state of the servers belonging to the autoscaling group.
+    :param group: a :class:`otter.integration.lib.autoscale.ScalingGroup` that
+        specifies which autoscaling group's servers we are looking at.  This
+        group should already exist, and have a `group_id` attribute.  If not
+        provided, the matcher will apply to all servers.
     """
+    message = "Waiting for {0} Nova servers".format(
+        "all" if group is None else "group {0} 's".format(group.group_id))
+
     @inlineCallbacks
     def do_work():
         servers = yield list_servers(rcs, pool, _treq=_treq)
-        servers_in_group = [
-            server for server in servers['servers']
-            if (group.group_id ==
-                server['metadata'].get("rax:autoscale:group:id", None))
-        ]
-        mismatch = matcher.match(servers_in_group)
+        servers = servers['servers']
+        if group is not None:
+            servers = [
+                server for server in servers
+                if (group.group_id ==
+                    server['metadata'].get("rax:autoscale:group:id", None))
+            ]
+        mismatch = matcher.match(servers)
         if mismatch:
-            msg("Waiting for Nova servers in group {}.\nMismatch: {}"
-                .format(group.group_id, mismatch.describe()))
+            msg("{0}.\nMismatch: {1}".format(message, mismatch.describe()))
             raise TransientRetryError(mismatch.describe())
-        returnValue(servers_in_group)
+        returnValue(servers)
 
     return retry_and_timeout(
         do_work, timeout,
@@ -156,6 +185,5 @@ def wait_for_servers(rcs, pool, group, matcher, timeout=600, period=10,
         next_interval=repeating_interval(period),
         clock=clock or reactor,
         deferred_description=(
-            "Waiting for Nova servers for group {0} to reach state {1}"
-            .format(group.group_id, str(matcher)))
+            "{0} to reach state {1}".format(message, str(matcher)))
     )
