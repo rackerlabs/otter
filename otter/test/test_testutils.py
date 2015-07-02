@@ -1,13 +1,18 @@
 """
 Tests for :obj:`otter.test.utils`.
 """
+from effect import (
+    ComposedDispatcher, Effect, NoPerformerFoundError,
+    base_dispatcher, parallel, sync_performer)
+from effect.fold import FoldError, sequence
+
 from pyrsistent import pvector
 
 from twisted.trial.unittest import SynchronousTestCase
 
 from zope.interface import Attribute, Interface
 
-from otter.test.utils import iMock
+from otter.test.utils import iMock, nested_parallel, perform_sequence
 
 
 class _ITest1(Interface):
@@ -152,3 +157,57 @@ class IMockTests(SynchronousTestCase):
 
         im = iMock(_ITest1, another_attribute='what')
         self.assertEqual(im.another_attribute, 'what')
+
+
+class NestedParallelTests(SynchronousTestCase):
+    """Tests for :func:`nested_parallel`."""
+
+    def test_nested_parallel(self):
+        """
+        Ensures that all parallel effects are found in the given intents, in
+        order, and returns the results associated with those intents.
+        """
+        seq = [
+            nested_parallel([
+                (1, lambda i: "one!"),
+                (2, lambda i: "two!"),
+                (3, lambda i: "three!"),
+            ])
+        ]
+        p = parallel([Effect(1), Effect(2), Effect(3)])
+        self.assertEqual(perform_sequence(seq, p), ['one!', 'two!', 'three!'])
+
+    def test_fallback(self):
+        """
+        Accepts a ``fallback`` dispatcher that will be used when the sequence
+        doesn't contain an intent.
+        """
+        def dispatch_2(intent):
+            if intent == 2:
+                return sync_performer(lambda d, i: "two!")
+        fallback = ComposedDispatcher([dispatch_2, base_dispatcher])
+        seq = [
+            nested_parallel([
+                (1, lambda i: 'one!'),
+                (3, lambda i: 'three!'),
+                ],
+                fallback_dispatcher=fallback),
+        ]
+        p = parallel([Effect(1), Effect(2), Effect(3)])
+        self.assertEqual(perform_sequence(seq, p), ['one!', 'two!', 'three!'])
+
+    def test_must_be_parallel(self):
+        """
+        If the sequences aren't run in parallel, the nested_parallel won't
+        match and a FoldError of NoPerformerFoundError will be raised.
+        """
+        seq = [
+            nested_parallel([
+                (1, lambda i: "one!"),
+                (2, lambda i: "two!"),
+                (3, lambda i: "three!"),
+            ])
+        ]
+        p = sequence([Effect(1), Effect(2), Effect(3)])
+        e = self.assertRaises(FoldError, perform_sequence, seq, p)
+        self.assertIs(e.wrapped_exception[0], NoPerformerFoundError)
