@@ -9,6 +9,8 @@ from effect import Constant, Effect, Func, catch
 
 from pyrsistent import PMap, PSet, freeze, pset, thaw
 
+import six
+
 from twisted.python.constants import NamedConstant
 
 from zope.interface import Interface, implementer
@@ -19,6 +21,7 @@ from otter.cloud_client import (
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
     NoSuchCLBError,
+    NoSuchCLBNodeError,
     add_clb_nodes,
     create_server,
     has_code,
@@ -66,6 +69,18 @@ def set_server_name(server_config_args, name_suffix):
     else:
         name = name_suffix
     return set_in(server_config_args, ('server', 'name'), name)
+
+
+def _ignore_errors(*ignored_err_types):
+    """
+    Return an error-handler function that returns None if the exception matches
+    any of the given error types.
+    """
+    def handler(exc_info):
+        if isinstance(exc_info[1], ignored_err_types):
+            return None
+        six.reraise(*exc_info)
+    return handler
 
 
 def _failure_reporter(*terminal_err_types):
@@ -282,7 +297,12 @@ class RemoveNodesFromCLB(object):
     def as_effect(self):
         """Produce a :obj:`Effect` to remove a load balancer node."""
         eff = remove_clb_nodes(self.lb_id, self.node_ids)
+        # Since we're deleting a node, we'll ignore any errors which indicate
+        # that the node doesn't exist.
         return eff.on(
+            error=_ignore_errors(
+                CLBDeletedError, NoSuchCLBError, NoSuchCLBNodeError)
+        ).on(
             success=lambda r: (StepResult.SUCCESS, []),
             error=_failure_reporter())
 

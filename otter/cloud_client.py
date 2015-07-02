@@ -30,8 +30,7 @@ from txeffect import deferred_performer, perform as twisted_perform
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType
 from otter.util.config import config_value
-from otter.util.fp import predicate_any
-from otter.util.http import APIError, append_segments, try_json_with_keys
+from otter.util.http import APIError, append_segments
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (
     add_bind_root,
@@ -342,6 +341,8 @@ _CLB_DUPLICATE_NODES_PATTERN = re.compile(
     "on load balancer\.$")
 _CLB_NODE_LIMIT_PATTERN = re.compile(
     "^Nodes must not exceed \d+ per load balancer\.$")
+_CLB_NODE_REMOVED_PATTERN = re.compile(
+    "^Node ids ((?:\d+,)*(?:\d+)) are not a part of your loadbalancer\s*$")
 _CLB_OVER_LIMIT_PATTERN = re.compile("^OverLimit Retry\.{3}$")
 
 
@@ -554,6 +555,39 @@ def change_clb_node(lb_id, node_id, condition, weight):
     return eff.on(error=_parse_known_errors)
 
 
+def remove_clb_nodes(lb_id, node_ids):
+    """
+    Remove multiple nodes from a load balancer.
+
+    :param str lb_id: A load balancer ID.
+    :param node_ids: iterable of node IDs.
+    :return: Effect of None.
+
+    Succeeds on 202.
+
+    This function will handle the case where *some* of the nodes are valid and
+    some aren't, by retrying deleting only the valid ones.
+    """
+    eff = service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'DELETE',
+        append_segments('loadbalancers', lb_id, 'nodes'),
+        params={'id': [str(node_id) for node_id in node_ids]},
+        success_pred=has_code(202))
+
+    @_only_json_api_errors
+    def parse_known_errors(code, json_body):
+        if code == 400:
+            message = get_in(["validationErrors", "messages", 0], json_body)
+            match = _CLB_NODE_REMOVED_PATTERN.match(message)
+            if match:
+                removed = concat([group.split(',')
+                                  for group in match.groups()])
+                return remove_clb_nodes(lb_id, set(node_ids) - set(removed))
+        _process_clb_api_error(code, json_body, lb_id)
+    return eff.on(error=parse_known_errors)
+
+
 def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
     """
     All CLB messages have only the keys ("message",), and the exception tpye
@@ -599,116 +633,6 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
              (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)],
             lb_id))
     return _match_errors(mappings, api_error_code, json_body)
-
-
-_CLB_PENDING_UPDATE_PATTERN = re.compile(
-    "^Load Balancer '\d+' has a status of 'PENDING_UPDATE' and is considered "
-    "immutable.$")
-_CLB_DELETED_PATTERN = re.compile(
-    "^(Load Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
-    "The load balancer is deleted and) considered immutable.$")
-_CLB_NODE_REMOVED_PATTERN = re.compile(
-    "^Node ids ((?:\d+,)*(?:\d+)) are not a part of your loadbalancer\s*$")
-
-
-def _check_clb_422(*regex_matches):
-    """
-    A success predicate that succeeds if the status code is 422 and the content
-    matches the regex.  Used for detecting duplicate nodes on add to CLB, and
-    the load balancer being deleted or pending delete on remove from CLB.
-
-    It's unfortunate this involves parsing the body.
-    """
-    def check_response(response, content):
-        """
-        Check that the given response has a 422 code and its body matches the
-        regex.
-
-        Expects the content to be JSON, so whatever uses this should make sure
-        that the service request is called with ``json_response=True``,
-        which it should be by default.
-        """
-        if response.code == 422:
-            message = try_json_with_keys(content, ('message',))
-            return any([regex.search(message or '')
-                        for regex in regex_matches])
-        return False
-
-    return check_response
-
-
-def _clb_check_bulk_delete(lb_id, attempted_nodes, result):
-    """
-    Check if the CLB bulk deletion command failed with a 400, and if so,
-    returns the next step to try and remove the remaining nodes. This is
-    necessary because CLB bulk deletes are atomic-ish.
-
-    This seems to be the only case in which this API endpoint returns a 400.
-
-    All other cases are considered unambiguous successes.
-
-    :param result: The result of the :class:`ServiceRequest`. This should be a
-        2-tuple of the response object and the (parsed) body.
-    :ivar str lb_id: The cloud load balancer ID to remove nodes from.
-    :param attempted_nodes: The node IDs that were attempted to be removed.
-
-    This assumes that the result body is already parsed into JSON.
-    """
-    response, body = result
-    if response.code == 400:
-        message = get_in(["validationErrors", "messages", 0], body)
-        match = _CLB_NODE_REMOVED_PATTERN.match(message)
-        if match:
-            removed = concat([group.split(',') for group in match.groups()])
-            return remove_clb_nodes(lb_id, set(attempted_nodes) - set(removed))
-
-
-def remove_clb_nodes(lb_id, node_ids):
-    """
-    Remove multiple nodes from a load balancer.
-
-    :param str lb_id: A load balancer ID.
-    :param node_ids: iterable of node IDs.
-    :return: Effect of None.
-
-    Succeed unconditionally on 202 and 413 (over limit, so try again later).
-
-    Succeed conditionally on 422 if the load balancer is in PENDING_UPDATE
-    state, which happens because CLB locks for a few seconds and cannot be
-    changed again after an update - can be fixed next convergence cycle.
-
-    Succeed conditionally on 422 if the load balancer is in PENDING_DELETE
-    state, or already deleted, which means we don't have to remove any nodes.
-    """
-    eff = service_request(
-        ServiceType.CLOUD_LOAD_BALANCERS,
-        'DELETE',
-        append_segments('loadbalancers', lb_id, 'nodes'),
-        params={'id': [str(node_id) for node_id in node_ids]},
-        success_pred=predicate_any(
-            has_code(202, 413, 400),
-            _check_clb_422(_CLB_PENDING_UPDATE_PATTERN, _CLB_DELETED_PATTERN)))
-    # 400 means that there are some nodes that are no longer on the
-    # load balancer.  Parse them out and try again.
-    return eff.on(partial(_clb_check_bulk_delete, lb_id, node_ids))
-
-    # eff = service_request(
-    #     ServiceType.CLOUD_LOAD_BALANCERS,
-    #     'POST',
-    #     append_segments('loadbalancers', lb_id, 'nodes'),
-    #     data={'nodes': nodes},
-    #     success_pred=has_code(202))
-    #
-    # @_only_json_api_errors
-    # def _parse_known_errors(code, json_body):
-    #     mappings = _expand_clb_matches(
-    #         [(422, _CLB_DUPLICATE_NODES_PATTERN, CLBDuplicateNodesError),
-    #          (413, _CLB_NODE_LIMIT_PATTERN, CLBNodeLimitError)],
-    #         lb_id)
-    #     _match_errors(mappings, code, json_body)
-    #     _process_clb_api_error(code, json_body, lb_id)
-    #
-    # return eff.on(error=_parse_known_errors)
 
 
 # ----- Nova requests and error parsing -----
