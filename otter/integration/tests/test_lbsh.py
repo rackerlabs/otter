@@ -207,8 +207,6 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         clb_as = self.helper.clbs[0]
 
-        nodes_as = yield clb_as.list_nodes(self.rcs)
-
         # Confirm both LBs are empty to start
         clb_as.wait_for_nodes(
             self.rcs, HasLength(0), timeout=timeout_default)
@@ -219,9 +217,9 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         yield self.helper.start_group_and_wait(group, self.rcs)
 
         # One node should have been added to clb_as, none to clb_other
-        clb_as.wait_for_nodes(
+        yield clb_as.wait_for_nodes(
             self.rcs, HasLength(1), timeout=timeout_default)
-        clb_other.wait_for_nodes(
+        yield clb_other.wait_for_nodes(
             self.rcs, HasLength(0), timeout=timeout_default)
 
         nodes_as = yield clb_as.list_nodes(self.rcs)
@@ -236,9 +234,9 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         yield clb_other.add_nodes(self.rcs, [node_info])
 
-        clb_as.wait_for_nodes(
+        yield clb_as.wait_for_nodes(
             self.rcs, HasLength(1), timeout=timeout_default)
-        clb_other.wait_for_nodes(
+        yield clb_other.wait_for_nodes(
             self.rcs,
             MatchesAll(
                 HasLength(1),
