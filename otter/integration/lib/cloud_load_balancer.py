@@ -196,25 +196,36 @@ class CloudLoadBalancer(object):
                 .addCallback(self.treq.json_content)
                 .addCallback(record_results))
 
-    def delete(self, rcs, success_codes=None):
-        """Stops and deletes the cloud load balancer.
+    def delete(self, rcs, clock=reactor):
+        """
+        Delete the cloud load balancer.  This might not work due to the load
+        balancer being in an immutable state, but the error returned from
+        attempting the delete does not tell us which immutable state it is in.
+
+        So we also want to do a get, to see if we have to try again.
 
         :param TestResources rcs: The resources used to make appropriate API
             calls with.
-        :param list success_codes: A list of HTTP status codes to count as
-            a successful call.  If not provided, defaults to ``[202, 404]``
-            (404 is a successful result because deletes should be idempotent).
         """
-        return (
-            self.treq.delete(
+        @_retry("Trying to delete CLB", clock=clock)
+        @inlineCallbacks
+        def really_delete():
+            yield self.treq.delete(
                 self.endpoint(rcs),
                 headers=headers(str(rcs.token)),
                 pool=self.pool
-            ).addCallback(
-                check_success,
-                [202, 404] if success_codes is None else success_codes,
-                _treq=self.treq)
-        ).addCallback(lambda _: rcs)
+            ).addCallback(self.treq.content)
+
+            state = yield self.get_state(rcs)
+            if state['loadBalancer']['status'] not in (
+                    "PENDING_DELETE", "SUSPENDED", "ERROR", "DELETED"):
+                raise TransientRetryError()
+            if state['loadBalancer']['status'] in ("ERROR", "SUSPENDED"):
+                msg("Could not delete CLB {0} because it is in {1} state, "
+                    "but considering this good enough.".format(
+                        self.clb_id, state['loadBalancer']['status']))
+
+        return really_delete()
 
     def list_nodes(self, rcs):
         """
