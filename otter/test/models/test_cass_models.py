@@ -10,7 +10,7 @@ from functools import partial
 
 from effect import (
     Constant, Effect, ParallelEffects, TypeDispatcher, sync_perform)
-from effect.testing import SequenceDispatcher, resolve_effect
+from effect.testing import resolve_effect
 
 from jsonschema import ValidationError
 
@@ -71,6 +71,7 @@ from otter.test.utils import (
     LockMixin,
     matches,
     mock_log,
+    perform_sequence,
     patch,
     test_dispatcher)
 from otter.util.config import set_config_data
@@ -3709,35 +3710,52 @@ class CassGroupServersCacheTests(SynchronousTestCase):
             self.tenant_id, self.group_id)
         self.dt = datetime(2010, 10, 20, 10, 0, 0)
 
-    def _test_get_servers(self, query_result, exp_result):
-        sequence = SequenceDispatcher([
+    def _test_get_servers(self, only_as_active, query_result, exp_result):
+        sequence = [
             (CQLQueryExecute(
-                query=('SELECT server_blob, last_update FROM servers_cache '
+                query=('SELECT server_blob, server_as_active, last_update '
+                       'FROM servers_cache '
                        'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
                        'ORDER BY last_update DESC;'),
                 params=self.params, consistency_level=ConsistencyLevel.QUORUM),
-             lambda i: query_result)])
-        dispatcher = test_dispatcher(sequence)
-        with sequence.consume():
-            self.assertEqual(
-                sync_perform(dispatcher, self.cache.get_servers()),
-                exp_result)
+             lambda i: query_result)]
+        self.assertEqual(
+            perform_sequence(sequence, self.cache.get_servers(only_as_active),
+                             test_dispatcher(sequence)),
+            exp_result)
 
     def test_get_servers_empty(self):
         """
         `get_servers` returns ([], None) if cache is empty
         """
-        self._test_get_servers([], ([], None))
+        self._test_get_servers(True, [], ([], None))
+        self._test_get_servers(False, [], ([], None))
 
-    def test_get_servers(self):
+    def test_get_servers_all(self):
         """
         `get_servers` fetches all servers that have highest last_fetch
         time
         """
         self._test_get_servers(
-            [{"server_blob": '{"a": "b"}', "last_update": self.dt},
-             {"server_blob": '{"d": "e"}', "last_update": self.dt}],
+            False,
+            [{"server_blob": '{"a": "b"}', "last_update": self.dt,
+              "server_as_active": False},
+             {"server_blob": '{"d": "e"}', "last_update": self.dt,
+              "server_as_active": False}],
             ([{"a": "b"}, {"d": "e"}], self.dt))
+
+    def test_get_servers_as_active(self):
+        """
+        `get_servers` fetches only AS active servers that have highest
+        last_fetch time
+        """
+        self._test_get_servers(
+            True,
+            [{"server_blob": '{"a": "b"}', "last_update": self.dt,
+              "server_as_active": True},
+             {"server_blob": '{"d": "e"}', "last_update": self.dt,
+              "server_as_active": False}],
+            ([{"a": "b"}], self.dt))
 
     def test_get_servers_diff_last_update(self):
         """
@@ -3746,25 +3764,31 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         """
         dt_earlier = datetime(2010, 10, 15, 10, 0, 0)
         self._test_get_servers(
-            [{"server_blob": '{"a": "b"}', "last_update": dt_earlier},
-             {"server_blob": '{"d": "e"}', "last_update": dt_earlier},
-             {"server_blob": '{"c": "f"}', "last_update": self.dt}],
+            False,
+            [{"server_blob": '{"a": "b"}', "last_update": dt_earlier,
+              "server_as_active": False},
+             {"server_blob": '{"d": "e"}', "last_update": dt_earlier,
+              "server_as_active": False},
+             {"server_blob": '{"c": "f"}', "last_update": self.dt,
+              "server_as_active": False}],
             ([{"a": "b"}, {"d": "e"}], dt_earlier))
 
     def _test_insert_servers(self, eff):
         query = (
             'BEGIN BATCH '
             'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
-            'server_id, server_blob) '
+            'server_id, server_blob, server_as_active) '
             'VALUES(:tenantId, :groupId, :last_update, :server_id0, '
-            ':server_blob0); '
+            ':server_blob0, :server_as_active0); '
             'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
-            'server_id, server_blob) '
+            'server_id, server_blob, server_as_active) '
             'VALUES(:tenantId, :groupId, :last_update, :server_id1, '
-            ':server_blob1); APPLY BATCH;')
+            ':server_blob1, :server_as_active1); APPLY BATCH;')
         self.params.update(
             {"server_id0": "a", "server_blob0": '{"id": "a"}',
+             "server_as_active0": True,
              "server_id1": "b", "server_blob1": '{"id": "b"}',
+             "server_as_active1": False,
              "last_update": self.dt})
         self.assertEqual(eff, cql_eff(query, self.params))
         self.assertEqual(resolve_effect(eff, None), None)
@@ -3774,7 +3798,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         `insert_servers` issues query to insert server as json blobs
         """
         eff = self.cache.insert_servers(
-            self.dt, [{"id": "a"}, {"id": "b"}], False)
+            self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}], False)
         self._test_insert_servers(eff)
 
     def test_insert_servers_delete(self):
@@ -3784,7 +3808,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         """
         self.cache.delete_servers = lambda: Effect("delete")
         eff = self.cache.insert_servers(
-            self.dt, [{"id": "a"}, {"id": "b"}], True)
+            self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}], True)
         self.assertEqual(eff.intent, "delete")
         eff = resolve_effect(eff, None)
         self._test_insert_servers(eff)
@@ -3796,24 +3820,6 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         self.assertEqual(
             self.cache.insert_servers(self.dt, [], False),
             Effect(Constant(None)))
-
-    def test_set_servers_as_active(self):
-        """
-        `set_servers_as_active` updates the `server_as_actve` field
-        """
-        self.assertEqual(
-            self.cache.set_servers_as_active(self.dt, ['s1', 's2']),
-            cql_eff(
-                ('BEGIN BATCH '
-                 'UPDATE servers_cache SET server_as_active=true '
-                 'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
-                 'AND last_update=:last_update AND server_id=:server_id0; '
-                 'UPDATE servers_cache SET server_as_active=true '
-                 'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
-                 'AND last_update=:last_update AND server_id=:server_id1; '
-                 'APPLY BATCH;'),
-                {"tenantId": "tid", "groupId": "gid", "last_update": self.dt,
-                 "server_id0": "s1", "server_id1": "s2"}))
 
     def test_delete_servers(self):
         """

@@ -621,10 +621,12 @@ class IScalingGroupServersCache(Interface):
     tenant_id = Attribute("Rackspace Tenant ID of the owner of this group.")
     group_id = Attribute("UUID of the scaling group - immutable.")
 
-    def get_servers():
+    def get_servers(only_as_active):
         """
         Return latest cache of servers in a group along with last time the
         cache was updated.
+
+        :param bool only_as_active: Should it return only otter active servers?
 
         :return: Effect of (servers, last update time) tuple where servers
             is list of dict and last update time is datetime object. Will
@@ -637,19 +639,12 @@ class IScalingGroupServersCache(Interface):
         Update the servers cache of the group with last update time
 
         :param datetime last_update: Update time of the cache
-        :param list servers: List of server dicts
+        :param list servers: List of server dicts with optional "_is_as_active"
+            field with boolean value to represent if this server has become
+            active from autoscale's perpective. This field will be popped
+            before storing the blob
         :param bool clear_others: Should any other cache from a different
             update_time be deleted?
-
-        :return: Effect of None
-        """
-
-    def set_servers_as_active(last_update, server_ids):
-        """
-        Update the fact that given servers have become AS active
-
-        :param datetime last_udpate: Update time of the cache
-        :param list server_ids: Server IDs which have become AS active
 
         :return: Effect of None
         """
