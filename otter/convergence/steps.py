@@ -17,10 +17,13 @@ from twisted.python.constants import NamedConstant
 from zope.interface import Interface, implementer
 
 from otter.cloud_client import (
-    CLBDuplicateNodesError,
-    CLBPendingUpdateError,
-    CLBRateLimitError,
+    CLBDeletedError,
+    CLBNodeLimitError,
+    CreateServerConfigurationError,
+    CreateServerOverQuoteError,
+    NoSuchCLBError,
     add_clb_nodes,
+    create_server,
     has_code,
     service_request,
     set_nova_metadata_item)
@@ -67,50 +70,44 @@ def set_server_name(server_config_args, name_suffix):
     return set_in(server_config_args, ('server', 'name'), name)
 
 
-def _forbidden_plaintext(message):
-    return re.compile(
-        "^403 Forbidden\n\nAccess was denied to this resource\.\n\n ({0})$"
-        .format(message))
-
-_NOVA_403_NO_PUBLIC_NETWORK = _forbidden_plaintext(
-    "Networks \(00000000-0000-0000-0000-000000000000\) not allowed")
-_NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED = _forbidden_plaintext(
-    "Networks \(00000000-0000-0000-0000-000000000000,"
-    "11111111-1111-1111-1111-111111111111\) required but missing")
-_NOVA_403_RACKCONNECT_NETWORK_REQUIRED = _forbidden_plaintext(
-    "Exactly 1 isolated network\(s\) must be attached")
-
-
-def _parse_nova_user_error(api_error):
-    # TODO: Move this to cloud_client.py
+def _failure_reporter(*terminal_err_types):
     """
-    Parse API errors for user failures on creating a server.
+    Return a callable that takes an error tuple which interprets the error
+    tuple.
 
-    :param api_error: The error returned from Nova
-    :type api_error: :class:`APIError`
+    If the error is an APIError with status code 4xx, or one of the provided
+    ``terminal_err_types``, then the callable returns a tuple of::
 
-    :return: the nova message as to why the creation failed, if it was a user
-        failure.  None otherwise.
-    :rtype: `str` or `None`
+        (StepResult.FAILURE, [ErrorReason.Exception(exc_tuple)])
+
+    else it returns a tuple of::
+
+        (StepResult.RETRY, [ErrorReason.Exception(exc_tuple)])
     """
-    if api_error.code == 400:
-        message = try_json_with_keys(api_error.body,
-                                     ("badRequest", "message"))
-        if message:
-            return message
+    def reporter(exc_tuple):
+        err_type, error, traceback = exc_tuple
 
-    elif api_error.code == 403:
-        message = try_json_with_keys(api_error.body,
-                                     ("forbidden", "message"))
-        if message:
-            return message
+        terminal_error = (
+            err_type in terminal_err_types or
+            (err_type == APIError and 400 <= error.code < 500)
+        )
 
-        for pat in (_NOVA_403_RACKCONNECT_NETWORK_REQUIRED,
-                    _NOVA_403_NO_PUBLIC_NETWORK,
-                    _NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED):
-            m = pat.match(api_error.body)
-            if m:
-                return m.groups()[0]
+        if terminal_error:
+            return StepResult.FAILURE, [ErrorReason.Exception(exc_tuple)]
+        return StepResult.RETRY, [ErrorReason.Exception(exc_tuple)]
+
+    return reporter
+
+
+def _success_reporter(success_reason):
+    """
+    Return a callable that takes a result and returns a::
+
+        (StepResult.RETRY, [ErrorReason.String(success_reason)])
+    """
+    def reporter(_):
+        return StepResult.RETRY, [ErrorReason.String(success_reason)]
+    return reporter
 
 
 @implementer(IStep)
@@ -128,40 +125,12 @@ class CreateServer(object):
 
         def got_name(random_name):
             server_config = set_server_name(self.server_config, random_name)
-            return service_request(
-                ServiceType.CLOUD_SERVERS,
-                'POST',
-                'servers',
-                data=thaw(server_config),
-                success_pred=has_code(202),
-                reauth_codes=(401,))
+            return create_server(thaw(server_config))
 
-        def report_success(result):
-            """
-            On success, return "RETRY", because servers go into building for
-            a while, and we need to retry convergence to ensure it goes into
-            active.
-            """
-            return StepResult.RETRY, [
-                ErrorReason.String('waiting for server to become active')]
-
-        def report_failure(result):
-            """
-            If the failure is an APIError with a recognized user error,
-            return a :obj:`StepResult.FAILURE` along with that user error as
-            a message, otherwise return a :obj:`StepResult.RETRY` without
-            a message.
-            """
-            err_type, error, traceback = result
-            if err_type == APIError:
-                message = _parse_nova_user_error(error)
-                if message is not None:
-                    return StepResult.FAILURE, [ErrorReason.String(message)]
-
-            return StepResult.RETRY, [ErrorReason.Exception(result)]
-
-        return eff.on(got_name).on(success=report_success,
-                                   error=report_failure)
+        return eff.on(got_name).on(
+            success=_success_reporter('waiting for server to become active'),
+            error=_failure_reporter(CreateServerConfigurationError,
+                                    CreateServerOverQuoteError))
 
 
 class UnexpectedServerStatus(Exception):
@@ -329,34 +298,12 @@ class AddNodesToCLB(object):
               'type': lbc.type.name}
              for address, lbc in self.address_configs])
 
-        def report_success(result):
-            return StepResult.RETRY, [
-                ErrorReason.String(
-                    'must re-gather after adding to CLB in order to update '
-                    'the active cache')]
-
-        def report_api_failure(result):
-            """
-            If the error is a 404 or 422 PENDING_DELETE then fail.
-            Otherwise, retry.
-            """
-            err_type, error, traceback = result
-            status = StepResult.FAILURE
-
-            known_retryable = err_type in (CLBDuplicateNodesError,
-                                           CLBRateLimitError,
-                                           CLBPendingUpdateError)
-            unknown_nonterminal = (
-                err_type == APIError and not 400 <= error.code < 500)
-
-            # we want to retry on known retryable errors, or APIErrors that
-            # are not terminal like maybe 500 or 503 errors.
-            if known_retryable or unknown_nonterminal:
-                status = StepResult.RETRY
-
-            return status, [ErrorReason.Exception(result)]
-
-        return eff.on(success=report_success, error=report_api_failure)
+        return eff.on(
+            success=_success_reporter(
+                'must re-gather after adding to CLB in order to update '
+                'the active cache'),
+            error=_failure_reporter(CLBDeletedError, CLBNodeLimitError,
+                                    NoSuchCLBError))
 
 
 @implementer(IStep)

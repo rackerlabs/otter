@@ -32,6 +32,8 @@ from otter.cloud_client import (
     CLBNodeLimitError,
     CLBPendingUpdateError,
     CLBRateLimitError,
+    CreateServerConfigurationError,
+    CreateServerOverQuoteError,
     NoSuchCLBError,
     NoSuchCLBNodeError,
     NoSuchServerError,
@@ -48,6 +50,7 @@ from otter.cloud_client import (
     add_clb_nodes,
     change_clb_node,
     concretize_service_request,
+    create_server,
     get_cloud_client_dispatcher,
     get_server_details,
     perform_tenant_scope,
@@ -900,9 +903,123 @@ class NovaClientTests(SynchronousTestCase):
 
     def test_get_server_details_errors(self):
         """
-        Correctly parses nova rate limiting errors and no such server errors.
+        Correctly parses nova rate limiting errors, no such server errors, and
+        compute fault errors.
         """
         server_id, expected, eff = self._setup_for_get_server_details()
         self.assert_handles_no_such_server(expected.intent, eff, server_id)
         self.assert_handles_nova_rate_limiting(expected.intent, eff)
         self.assert_handles_nova_compute_fault(expected.intent, eff)
+
+    def _setup_for_create_server(self):
+        """
+        Produce the data needed to test :obj:`create_server`: a tuple of
+        (expected_effect, real_effect)
+        """
+        real = create_server({'server': 'args'})
+        expected = service_request(
+            ServiceType.CLOUD_SERVERS,
+            'POST', 'servers',
+            data={'server': 'args'},
+            reauth_codes=(401,),
+            success_pred=has_code(202))
+        return (expected, real)
+
+    def test_create_server_success(self):
+        """
+        Creating a server, when Nova responds with a 202, returns Nova's
+        response with the body as a JSON dictionary.
+        """
+        expected, real = self._setup_for_create_server()
+        resp, body = _perform_one_request(expected.intent, real, 202,
+                                          json.dumps({'server': 'args'}))
+        self.assertEqual(body, {'server': 'args'})
+
+    def test_create_server_standard_errors(self):
+        """
+        Creating a server correctly parses nova rate limiting errors and
+        compute fault errors.
+        """
+        expected, real = self._setup_for_create_server()
+        self.assert_handles_nova_rate_limiting(expected.intent, real)
+        self.assert_handles_nova_compute_fault(expected.intent, real)
+
+    def test_create_server_configuration_errors(self):
+        """
+        Correctly parses user configuration errors.
+        """
+        def _plaintext(msg):
+            body = "".join((
+                "403 Forbidden\n\n",
+                "Access was denied to this resource.\n\n ",
+                msg))
+            return (403, body, msg)
+
+        def _badrequest(msg):
+            return (
+                400,
+                json.dumps({'badRequest': {'message': msg, 'code': 400}}),
+                msg)
+
+        bad_configs = [
+            _badrequest("Invalid key_name provided."),
+            _plaintext(
+                "Networks (00000000-0000-0000-0000-000000000000,"
+                "11111111-1111-1111-1111-111111111111) required but missing"),
+            _plaintext(
+                "Networks (00000000-0000-0000-0000-000000000000) not allowed"),
+            _plaintext("Exactly 1 isolated network(s) must be attached")]
+
+        expected, real = self._setup_for_create_server()
+
+        for code, body, msg in bad_configs:
+            with self.assertRaises(CreateServerConfigurationError) as cm:
+                _perform_one_request(expected.intent, real, code, body)
+            self.assertEqual(cm.exception, CreateServerConfigurationError(msg))
+
+        # similar, but wrong, error messages are unparsed
+        unparseable = [
+            (403, json.dumps(
+                {'badRequest': {'message': 'Invalid key_name provided',
+                                'code': 400}})),
+            (400, json.dumps({"no": {'message': 'Invalid key_name provided',
+                                     'code': 400}})),
+            _plaintext("I don't like your networks")[:2]
+        ]
+        for code, body in unparseable:
+            with self.assertRaises(APIError):
+                _perform_one_request(expected.intent, real, code, body)
+
+    def test_create_server_quota_errors(self):
+        """
+        Correctly parses over quota errors.
+        """
+        quotas = [
+            ("Quota exceeded for ram: Requested 1024, but already used 131072 "
+             "of 131072 ram"),
+            ("Quota exceeded for instances: Requested 1, but already used "
+             "100 of 100 instances"),
+            ("Quota exceeded for onmetal-compute-v1-instances: Requested 1, "
+             "but already used 10 of 10 onmetal-compute-v1-instances"),
+        ]
+
+        expected, real = self._setup_for_create_server()
+
+        for msg in quotas:
+            with self.assertRaises(CreateServerOverQuoteError) as cm:
+                _perform_one_request(expected.intent, real, 403,
+                                     json.dumps({'forbidden': {'message': msg,
+                                                               'code': 403}}))
+            self.assertEqual(cm.exception, CreateServerOverQuoteError(msg))
+
+        # similar, but wrong, error messages are unparsed
+        unparseable = [
+            (403, json.dumps({'forbiddin': {'message': quotas[0],
+                                            'code': 403}})),
+            (402, json.dumps({'forbidden': {'message': quotas[0],
+                                            'code': 403}})),
+            (403, quotas[0])
+        ]
+        for code, body in unparseable:
+            with self.assertRaises(APIError):
+                _perform_one_request(expected.intent, real, code, body)
