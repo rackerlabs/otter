@@ -53,6 +53,9 @@ class CloudLoadBalancer(object):
                 "name": "a-load-balancer",
                 "port": 80,
                 "protocol": "HTTP",
+                # this algorithm is chosen otherwise we won't be able to
+                # check the weights on the nodes by listing all the nodes
+                "algorithm": "WEIGHTED_ROUND_ROBIN",
                 "virtualIps": [{
                     "type": "PUBLIC",
                     "ipVersion": "IPV6",
@@ -246,7 +249,7 @@ class CloudLoadBalancer(object):
         :param clock: a :class:`twisted.internet.interfaces.IReactorTime`
             provider
 
-        :return: None, if the state is reached
+        :return: the list of nodes, if the state is reached
         :raises: :class:`TimedOutError` if the state is never reached within
             the requisite amount of time.
 
@@ -268,6 +271,7 @@ class CloudLoadBalancer(object):
                 msg("Waiting for CLB node state for CLB {}.\nMismatch: {}"
                     .format(self.clb_id, mismatch.describe()))
                 raise TransientRetryError(mismatch.describe())
+            return nodes['nodes']
 
         def poll():
             return self.list_nodes(rcs).addCallback(check)
