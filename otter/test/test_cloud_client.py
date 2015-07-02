@@ -54,6 +54,7 @@ from otter.cloud_client import (
     get_cloud_client_dispatcher,
     get_server_details,
     perform_tenant_scope,
+    remove_clb_nodes,
     service_request,
     set_nova_metadata_item)
 from otter.constants import ServiceType
@@ -61,7 +62,8 @@ from otter.test.utils import (
     StubResponse,
     resolve_effect,
     stub_pure_response,
-    nested_sequence)
+    nested_sequence,
+    perform_sequence)
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.config import set_config_data
 from otter.util.http import APIError, headers
@@ -718,6 +720,66 @@ class CLBClientTests(SynchronousTestCase):
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)
+
+    def expected_node_removal_req(self, nodes=(1, 2)):
+        return service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'DELETE',
+            'loadbalancers/{}/nodes'.format(self.lb_id),
+            params={'id': map(str, nodes)},
+            success_pred=has_code(202))
+
+    def test_remove_clb_nodes_success(self):
+        """
+        A DELETE request is sent, and the Effect returns None if 202 is
+        returned.
+        """
+        eff = remove_clb_nodes(self.lb_id, [1, 2])
+        seq = [
+            (self.expected_node_removal_req().intent,
+             service_request_eqf(stub_pure_response({}, 202))),
+        ]
+        result = perform_sequence(seq, eff)
+        self.assertIs(result, None)
+
+    def test_remove_clb_nodes_non_202(self):
+        """Any random HTTP response code is bubbled up as an APIError."""
+        eff = remove_clb_nodes(self.lb_id, [1, 2])
+        seq = [
+            (self.expected_node_removal_req().intent,
+             service_request_eqf(stub_pure_response({}, 200))),
+        ]
+        self.assertRaises(APIError, perform_sequence, seq, eff)
+
+    def test_remove_clb_nodes_random_400(self):
+        """Random 400s are bubbled up as an APIError."""
+        eff = remove_clb_nodes(self.lb_id, [1, 2])
+        response = stub_pure_response(
+            {'validationErrors': {'messages': ['bar']}}, 400)
+        seq = [
+            (self.expected_node_removal_req().intent,
+             service_request_eqf(response)),
+        ]
+        self.assertRaises(APIError, perform_sequence, seq, eff)
+
+    def test_remove_clb_nodes_retry_on_some_invalid_nodes(self):
+        """
+        When CLB returns an error indicating that some of the nodes are
+        invalid, the request is retried without the offending nodes.
+        """
+        eff = remove_clb_nodes(self.lb_id, [1, 2, 3, 4])
+        response = stub_pure_response(
+            {'validationErrors': {'messages': [
+                 'Node ids 1,3 are not a part of your loadbalancer']}},
+            400)
+        response2 = stub_pure_response({}, 202)
+        seq = [
+            (self.expected_node_removal_req([1, 2, 3, 4]).intent,
+             service_request_eqf(response)),
+            (self.expected_node_removal_req([2, 4]).intent,
+             service_request_eqf(response2))
+        ]
+        self.assertIs(perform_sequence(seq, eff), None)
 
 
 def _perform_one_request(intent, effect, response_code, response_body):

@@ -30,7 +30,7 @@ from txeffect import deferred_performer, perform as twisted_perform
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType
 from otter.util.config import config_value
-from otter.util.http import APIError, append_segments
+from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (
     add_bind_root,
@@ -575,17 +575,25 @@ def remove_clb_nodes(lb_id, node_ids):
         params={'id': [str(node_id) for node_id in node_ids]},
         success_pred=has_code(202))
 
-    @_only_json_api_errors
-    def parse_known_errors(code, json_body):
+    def check_invalid_nodes(exc_info):
+        code = exc_info[1].code
+        body = exc_info[1].body
         if code == 400:
-            message = get_in(["validationErrors", "messages", 0], json_body)
+            message = try_json_with_keys(
+                body, ["validationErrors", "messages", 0])
             match = _CLB_NODE_REMOVED_PATTERN.match(message)
             if match:
-                removed = concat([group.split(',')
-                                  for group in match.groups()])
+                removed = map(int, concat([group.split(',')
+                                           for group in match.groups()]))
                 return remove_clb_nodes(lb_id, set(node_ids) - set(removed))
-        _process_clb_api_error(code, json_body, lb_id)
-    return eff.on(error=parse_known_errors)
+        six.reraise(*exc_info)
+
+    return eff.on(
+        error=catch(APIError, check_invalid_nodes)
+    ).on(
+        error=_only_json_api_errors(
+            lambda c, b: _process_clb_api_error(c, b, lb_id))
+    ).on(success=lambda _: None)
 
 
 def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
