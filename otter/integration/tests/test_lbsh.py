@@ -104,8 +104,9 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
     @inlineCallbacks
     def test_oob_move_node_to_oob_lb(self):
         """
-        This is a slight variation of lbsh-002, with the node being
-            copied to the second load balancer instead of moved.
+        Confirm that when convergence is triggered, nodes moved to
+        non-autoscale loadbalancers are removed from the OOB loadbalancer
+        and added back onto the non-autoscale loadbalancer.
 
         1 group, LB1 in config, LB2 not in any autoscale configs:
 
