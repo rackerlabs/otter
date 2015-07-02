@@ -5,7 +5,6 @@ Tests covering the Load Balancer self healing behaviors
 from __future__ import print_function
 
 from testtools.matchers import (
-    AfterPreprocessing,
     ContainsDict,
     Equals,
     MatchesAll,
