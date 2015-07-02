@@ -568,11 +568,12 @@ def remove_clb_nodes(lb_id, node_ids):
     This function will handle the case where *some* of the nodes are valid and
     some aren't, by retrying deleting only the valid ones.
     """
+    node_ids = map(str, node_ids)
     eff = service_request(
         ServiceType.CLOUD_LOAD_BALANCERS,
         'DELETE',
         append_segments('loadbalancers', lb_id, 'nodes'),
-        params={'id': [str(node_id) for node_id in node_ids]},
+        params={'id': node_ids},
         success_pred=has_code(202))
 
     def check_invalid_nodes(exc_info):
@@ -583,8 +584,8 @@ def remove_clb_nodes(lb_id, node_ids):
                 body, ["validationErrors", "messages", 0])
             match = _CLB_NODE_REMOVED_PATTERN.match(message)
             if match:
-                removed = map(int, concat([group.split(',')
-                                           for group in match.groups()]))
+                removed = concat([group.split(',')
+                                  for group in match.groups()])
                 return remove_clb_nodes(lb_id, set(node_ids) - set(removed))
         six.reraise(*exc_info)
 

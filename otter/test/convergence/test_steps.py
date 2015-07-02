@@ -58,8 +58,10 @@ from otter.convergence.steps import (
 from otter.test.utils import (
     StubResponse,
     matches,
+    perform_sequence,
     raise_,
     resolve_effect,
+    stub_pure_response,
     transform_eq)
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError
@@ -484,7 +486,7 @@ class StepAsEffectTests(SynchronousTestCase):
 
     def test_remove_nodes_from_clb(self):
         """
-        :obj:`RemoveNodesToCLB` produces a request for deleting any number of
+        :obj:`RemoveNodesFromCLB` produces a request for deleting any number of
         nodes from a cloud load balancer.
         """
         lb_id = "12345"
@@ -504,59 +506,16 @@ class StepAsEffectTests(SynchronousTestCase):
 
     def test_remove_nodes_from_clb_predicate(self):
         """
-        :obj:`RemoveNodesFromCLB` only accepts 202, 413, 400, and some 422
-        responses.  However, only 202, 413, and 422s are covered by this test.
-        400's will be covered by another test as they require retry.
+        :obj:`RemoveNodesFromCLB` only succeeds on 202.
         """
         lb_id = "12345"
         node_ids = [str(i) for i in range(5)]
         step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=pset(node_ids))
         request = step.as_effect()
-
         self.assertTrue(request.intent.json_response)
-
         predicate = request.intent.success_pred
-
         self.assertTrue(predicate(StubResponse(202, {}), None))
-        self.assertTrue(predicate(StubResponse(413, {}), None))
-        self.assertTrue(predicate(
-            StubResponse(422, {}),
-            json.dumps({
-                "message": "The load balancer is deleted and considered "
-                           "immutable.",
-                "code": 422
-            })))
-        self.assertTrue(predicate(
-            StubResponse(422, {}),
-            json.dumps({
-                "message": "Load Balancer '12345' has a status of "
-                           "'PENDING_UPDATE' and is considered immutable.",
-                "code": 422
-            })))
-        self.assertTrue(predicate(
-            StubResponse(422, {}),
-            json.dumps({
-                "message": "Load Balancer '12345' has a status of "
-                           "'PENDING_DELETE' and is considered immutable.",
-                "code": 422
-            })))
-
-        self.assertFalse(predicate(StubResponse(404, {}), None))
-        self.assertFalse(predicate(
-            StubResponse(422, {}),
-            json.dumps({
-                "message": "Duplicate nodes detected. One or more "
-                           "nodes already configured on load "
-                           "balancer.",
-                "code": 422
-            })))
-        # This one is just malformed but similar to a good message.
-        self.assertFalse(predicate(
-            StubResponse(422, {}),
-            json.dumps({
-                "message": "The load balancer is considered immutable.",
-                "code": 422
-            })))
+        self.assertFalse(predicate(StubResponse(200, {}), None))
 
     def test_remove_nodes_from_clb_retry(self):
         """
@@ -577,18 +536,30 @@ class StepAsEffectTests(SynchronousTestCase):
             "details": "The object is not valid"
         }
 
+        expected_req = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'DELETE',
+            'loadbalancers/12345/nodes',
+            params={'id': transform_eq(sorted, node_ids)},
+            success_pred=ANY,
+            json_response=True).intent
+        expected_req2 = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'DELETE',
+            'loadbalancers/12345/nodes',
+            params={'id': transform_eq(sorted, ['0', '4'])},
+            success_pred=ANY,
+            json_response=True).intent
+
         step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=pset(node_ids))
-        eff = resolve_effect(step.as_effect(),
-                             (StubResponse(400, {}), error_body))
-        self.assertEqual(
-            eff.intent,
-            service_request(
-                ServiceType.CLOUD_LOAD_BALANCERS,
-                'DELETE',
-                'loadbalancers/12345/nodes',
-                params={'id': transform_eq(sorted, ['0', '4'])},
-                success_pred=ANY,
-                json_response=True).intent)
+
+        seq = [
+            (expected_req,
+             lambda i: raise_(APIError(400, json.dumps(error_body)))),
+            (expected_req2, lambda i: stub_pure_response('', 202)),
+        ]
+        r = perform_sequence(seq, step.as_effect())
+        self.assertEqual(r, (StepResult.SUCCESS, []))
 
     def _generic_bulk_rcv3_step_test(self, step_class, expected_method):
         """
