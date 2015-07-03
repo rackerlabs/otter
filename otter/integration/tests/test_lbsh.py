@@ -74,22 +74,19 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         """
         clb = self.helper.clbs[0]
 
-        nodes = yield clb.list_nodes(self.rcs)
-        yield clb.wait_for_nodes(
+        nodes = yield clb.wait_for_nodes(
             self.rcs, HasLength(0), timeout=timeout_default)
 
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
-        yield clb.wait_for_nodes(
+        nodes = yield clb.wait_for_nodes(
             self.rcs, HasLength(1), timeout=timeout_default)
 
-        nodes = yield clb.list_nodes(self.rcs)
         the_node = nodes["nodes"][0]
 
         yield clb.delete_nodes(self.rcs, [the_node['id']])
 
-        nodes = yield clb.list_nodes(self.rcs)
         yield clb.wait_for_nodes(
             self.rcs, HasLength(0), timeout=timeout_default)
         yield group.trigger_convergence(self.rcs)
@@ -132,9 +129,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
-        nodes_as = yield clb_as.list_nodes(self.rcs)
-
-        yield clb_as.wait_for_nodes(
+        nodes_as = yield clb_as.wait_for_nodes(
             self.rcs, HasLength(1), timeout=timeout_default)
         yield clb_other.wait_for_nodes(
             self.rcs, HasLength(0), timeout=timeout_default)
