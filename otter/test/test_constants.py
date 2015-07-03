@@ -59,3 +59,11 @@ class GetServiceMappingTests(SynchronousTestCase):
         del self.config['cloudfeeds']
         self.assertNotIn(ServiceType.CLOUD_FEEDS,
                          get_service_configs(self.config))
+
+    def test_metrics_optional(self):
+        """
+        Does not return metrics service if the config is not there
+        """
+        del self.config['metrics']
+        self.assertNotIn(ServiceType.CLOUD_METRICS_INGEST,
+                         get_service_configs(self.config))
