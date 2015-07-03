@@ -285,7 +285,7 @@ class WaitForNodesTestCase(SynchronousTestCase):
 
         self.nodes = {'nodes': ['done']}
         self.clock.pump([1])
-        self.assertEqual(None, self.successResultOf(d))
+        self.assertEqual(['done'], self.successResultOf(d))
         self.assertEqual(5, self.get_calls)
 
     def test_retries_until_timeout(self):
