@@ -5,22 +5,24 @@ from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus,
-    get_model_dispatcher)
-from otter.models.interface import IScalingGroupCollection, ScalingGroupStatus
+    DeleteGroup, GetScalingGroupInfo, ModifyGroupStateActive,
+    UpdateGroupStatus, get_model_dispatcher)
+from otter.models.interface import (
+    GroupState, IScalingGroupCollection, ScalingGroupStatus)
 from otter.test.utils import iMock, mock_group, mock_log
 
 
 class ModifyGroupStateTests(SynchronousTestCase):
     """Tests for :func:`perform_modify_group_state`."""
     def test_perform(self):
-        group = mock_group(None)
-        mgs = ModifyGroupState(scaling_group=group,
-                               modifier=lambda g, o: 'new state')
+        state = GroupState('tid', 'gid', 'g', 'active', 'pending', False,
+                           False, False, 'st')
+        group = mock_group(state)
+        mgs = ModifyGroupStateActive(group, 'new active')
         dispatcher = get_model_dispatcher(mock_log(), None)
         result = sync_perform(dispatcher, Effect(mgs))
         self.assertIsNone(result)
-        self.assertEqual(group.modify_state_values, ['new state'])
+        self.assertEqual(group.modify_state_values[0].active, 'new active')
 
 
 class ScalingGroupIntentsTests(SynchronousTestCase):

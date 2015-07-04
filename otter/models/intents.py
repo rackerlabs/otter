@@ -11,6 +11,7 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 from txeffect import deferred_performer
 
 from otter.models.cass import CassScalingGroupServersCache
+from otter.util.fp import assoc_obj
 
 
 @attr.s
@@ -23,7 +24,7 @@ class ModifyGroupStateActive(object):
 
 
 @deferred_performer
-def perform_modify_group_state(dispatcher, mgs_intent):
+def perform_modify_group_state_active(dispatcher, mgs_intent):
     """Perform a :obj:`ModifyGroupStateActive`."""
 
     def update_group_active(group, old_state):
@@ -103,7 +104,7 @@ def perform_update_servers_cache(disp, intent):
 
 
 @attr.s
-class SetServersASActive(object)
+class SetServersASActive(object):
     """
     Intent to set server_as_active of servers in cache to True
     """
@@ -123,11 +124,10 @@ def perform_set_servers_in_lbs(disp, intent):
 def get_model_dispatcher(log, store):
     """Get a dispatcher that can handle all the model-related intents."""
     return TypeDispatcher({
-        ModifyGroupState: perform_modify_group_state,
+        ModifyGroupStateActive: perform_modify_group_state_active,
         GetScalingGroupInfo:
             partial(perform_get_scaling_group_info, log, store),
         DeleteGroup: partial(perform_delete_group, log, store),
         UpdateGroupStatus: perform_update_group_status,
-        UpdateServersCache: perform_update_servers_cache,
-        SetServerInLBsCache: perform_set_servers_in_lbs
+        UpdateServersCache: perform_update_servers_cache
     })

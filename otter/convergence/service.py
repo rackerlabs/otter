@@ -39,10 +39,9 @@ from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, with_log
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus,
-    UpdateServersCache, SetServersASActive)
+    DeleteGroup, GetScalingGroupInfo, ModifyGroupStateActive,
+    UpdateGroupStatus, UpdateServersCache)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
-from otter.util.fp import assoc_obj
 from otter.util.timestamp import datetime_to_epoch
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
@@ -57,13 +56,12 @@ def server_to_json(server):
 
 def is_autoscale_active(server, lb_nodes):
     """
-    Given the current NovaServers and LB nodes, determine which servers are
-    completely built.
+    Is the given NovaServer in all its desired LB nodes?
 
-    :param servers: sequence of :obj:`NovaServer`.
+    :param :obj:`NovaServer` server: NovaServer being checked
     :param lb_nodes: sequence of :obj:`ILBNode`.
 
-    :return: list of servers that are active.
+    :return: True if server is in LB nodes, False otherwise
     """
 
     def all_met(server, current_lb_nodes):
@@ -76,8 +74,8 @@ def is_autoscale_active(server, lb_nodes):
         return desired_lbs == met_desireds
 
     return (server.state == ServerState.ACTIVE and
-                all_met(server, [node for node in lb_nodes
-                                 if node.matches(server)]))
+            all_met(server, [node for node in lb_nodes
+                             if node.matches(server)]))
 
 
 def update_old_cache(group, active):

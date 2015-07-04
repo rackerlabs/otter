@@ -14,7 +14,7 @@ from effect import (
 
 from effect.async import perform_parallel_async
 from effect.testing import (
-    EQDispatcher, EQFDispatcher, SequenceDispatcher, Stub)
+    EQDispatcher, EQFDispatcher, Stub)
 
 from pyrsistent import freeze
 
@@ -46,13 +46,13 @@ from otter.convergence.model import (
 from otter.test.utils import (
     Cache,
     intent_func,
-    noop,
+    nested_parallel,
     patch,
+    perform_sequence,
     resolve_effect,
     resolve_retry_stubs,
     resolve_stubs,
-    server,
-    test_dispatcher
+    server
 )
 from otter.util.retry import (
     ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
@@ -234,14 +234,10 @@ class GetScalingGroupServersTests(SynchronousTestCase):
 
     def _test_no_cache(self, empty):
         current = [] if empty else self.servers1
-        sequence = SequenceDispatcher([
+        sequence = [
             ("cachegstidgid", lambda i: (object(), None)),
-            (("all-as",), lambda i: {} if empty else {"gid": current}),
-            (("cacheistidgid", self.now, current, True), noop)])
-        disp = test_dispatcher(sequence)
-        with sequence.consume():
-            self.assertEqual(
-                sync_perform(disp, self._invoke()), current)
+            (("all-as",), lambda i: {} if empty else {"gid": current})]
+        self.assertEqual(perform_sequence(sequence, self._invoke()), current)
 
     def test_no_cache(self):
         """
@@ -256,16 +252,15 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         as_servers = self.servers1
         current = self.servers2
         servers = (as_srvs and as_servers or []) + (cur_srvs and current or [])
-        sequence = SequenceDispatcher([
+        sequence = [
             ("cachegstidgid", lambda i: (object(), last_update)),
-            (("all-as", exp_last_update),
-             lambda i: {'gid': as_servers} if as_srvs else {}),
-            (("all-as",), lambda i: {"gid": current} if cur_srvs else {}),
-            (("cacheistidgid", self.now, servers, True), noop)])
-        disp = test_dispatcher(sequence)
-        with sequence.consume():
-            self.assertEqual(
-                sync_perform(disp, self._invoke()), servers)
+            nested_parallel([
+                (("all-as", exp_last_update),
+                 lambda i: {'gid': as_servers} if as_srvs else {}),
+                (("all-as",), lambda i: {"gid": current} if cur_srvs else {})
+            ])
+        ]
+        self.assertEqual(perform_sequence(sequence, self._invoke()), servers)
 
     def test_old_cache(self):
         """
@@ -292,14 +287,12 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             {'id': 'a', 'b': 'c', 'metadata': {asmetakey: "gid"}},
             {'id': 'd', 'metadata': {"changed": "yes"}}]
         last_update = datetime(2010, 5, 20)
-        sequence = SequenceDispatcher([
+        sequence = [
             ("cachegstidgid", lambda i: (cache, last_update)),
-            (("alls", last_update), lambda i: changes)])
-        disp = test_dispatcher(sequence)
-        with sequence.consume():
-            self.assertEqual(
-                self.freeze(sync_perform(disp, self._invoke())),
-                self.freeze([cache[1], changes[0]]))
+            (("alls", last_update), lambda i: changes)]
+        self.assertEqual(
+            self.freeze(perform_sequence(sequence, self._invoke())),
+            self.freeze([cache[1], changes[0]]))
 
     def test_merge_servers_precedence(self):
         """

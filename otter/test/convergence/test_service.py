@@ -4,9 +4,7 @@ import uuid
 from datetime import datetime
 
 from effect import (
-    ComposedDispatcher, Constant, Effect, Error, Func, ParallelEffects,
-    TypeDispatcher, base_dispatcher, sync_perform)
-from effect.async import perform_parallel_async
+    ComposedDispatcher, Effect, Error, Func, base_dispatcher, sync_perform)
 from effect.ref import ReadReference, Reference, reference_dispatcher
 from effect.testing import SequenceDispatcher
 
@@ -31,17 +29,17 @@ from otter.convergence.service import (
     Converger,
     converge_all_groups,
     converge_one_group,
-    determine_active, execute_convergence, get_my_divergent_groups,
+    execute_convergence, get_my_divergent_groups,
+    is_autoscale_active,
     non_concurrently)
-from otter.convergence.steps import ConvergeLater, CreateServer
+from otter.convergence.steps import CreateServer
 from otter.log.intents import BoundFields, Log, LogErr
 from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,
-    ModifyGroupState,
+    ModifyGroupStateActive,
     UpdateGroupStatus,
-    UpdateServersCache,
-    perform_modify_group_state)
+    UpdateServersCache)
 from otter.models.interface import (
     GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
 from otter.test.convergence.test_planning import server
@@ -49,6 +47,7 @@ from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
     CheckFailureValue, FakePartitioner,
     TestStep,
+    intent_func,
     mock_group, mock_log,
     nested_parallel,
     nested_sequence,
@@ -626,6 +625,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                    desired_lbs=self.desired_lbs,
                    links=freeze([{'href': 'link2', 'rel': 'self'}]))
         )
+        self.state_active = {}
+        self.cache = [{'id': 'a'}, {'id': 'b'}]
         self.gsgi = GetScalingGroupInfo(tenant_id='tenant-id',
                                         group_id='group-id')
         self.manifest = {  # Many details elided!
@@ -635,81 +636,69 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.gsgi_result = (self.group, self.manifest)
         self.now = datetime(1970, 1, 1)
 
-    def get_seq(self, active):
+    def get_seq(self):
         return [
             (Func(datetime.utcnow), lambda i: self.now),
-            (self.gsgi, lambda i: self.gsgi_result),
             nested_parallel([
-                (ModifyGroupStateActive(self.group, active), noop),
-                (UpdateServersCache(self.tenant_id, self.group_id, self.now,
-                                    [{'id': 'a'}, {'id': 'b'}]),
-                 noop)
+                (self.gsgi, lambda i: self.gsgi_result),
+                (("gacd", self.tenant_id, self.group_id, self.now),
+                 lambda i: (self.servers, ()))
+            ]),
+            nested_parallel([
+                (ModifyGroupStateActive(self.group, self.state_active), noop),
+                (UpdateServersCache(
+                    self.tenant_id, self.group_id, self.now, self.cache), noop)
             ])
         ]
 
-    def _get_dispatcher(self):
-        return ComposedDispatcher([
-            TypeDispatcher({
-                ParallelEffects: perform_parallel_async,
-                ModifyGroupState: perform_modify_group_state
-            }),
-            base_dispatcher
-        ])
-
-    def _get_gacd_func(self):
-        def get_all_convergence_data(tenant_id, group_id, time):
-            self.assertEqual(self.tenant_id, tenant_id)
-            self.assertEqual(self.group_id, group_id)
-            self.assertEqual(time, self.now)
-            return Effect(Constant((self.servers, ())))
-        return get_all_convergence_data
+    def _invoke(self, plan=None):
+        kwargs = {'plan': plan} if plan is not None else {}
+        return execute_convergence(
+            self.tenant_id, self.group_id, build_timeout=3600,
+            get_all_convergence_data=intent_func("gacd"), **kwargs)
 
     def test_no_steps(self):
         """
         If state of world matches desired, no steps are executed, but the
         `active` servers are still updated, and SUCCESS is the return value.
         """
-        gacd = self._get_gacd_func()
         for serv in self.servers:
             serv.desired_lbs = pset()
-        eff = execute_convergence(self.tenant_id, self.group_id,
-                                  build_timeout=3600,
-                                  get_all_convergence_data=gacd)
-        expected_active = {
-            'a': {'id': 'a', 'links': [{'href': 'link1', 'rel': 'self'}]},
-            'b': {'id': 'b', 'links': [{'href': 'link2', 'rel': 'self'}]}
-        }
         sequence = [
+            nested_parallel([]),
             (Log('execute-convergence', mock.ANY), noop),
             (Log('execute-convergence-results',
                  {'results': [], 'worst_status': 'SUCCESS'}), noop),
             (UpdateServersCache("tenant-id", "group-id", self.now,
-                                [{'id': 'a'}, {'id': 'b'}]), noop)
+                                [{"id": "a"}, {"id": "b"}]), noop)
         ]
-        result = perform_sequence(
-            self.get_seq + sequence, eff, self._get_dispatcher())
-        self.assertEqual(self.group.modify_state_values[-1].active,
-                         expected_active)
-        self.assertEqual(result, (StepResult.SUCCESS,
-                         ScalingGroupStatus.ACTIVE))
+        self.state_active = {
+            'a': {'id': 'a', 'links': [{'href': 'link1', 'rel': 'self'}]},
+            'b': {'id': 'b', 'links': [{'href': 'link2', 'rel': 'self'}]}
+        }
+        self.cache[0]["_is_as_active"] = True
+        self.cache[1]["_is_as_active"] = True
+        self.assertEqual(
+            perform_sequence(self.get_seq() + sequence, self._invoke()),
+            (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
 
     def test_success(self):
         """
         Executes the plan and returns SUCCESS when that's the most severe
         result.
         """
-        gacd = self._get_gacd_func()
         dgs = get_desired_group_state(self.group_id, self.lc, 2)
         deleted = server(
             'c', ServerState.DELETED, servicenet_address='10.0.0.3',
             desired_lbs=self.desired_lbs,
             links=freeze([{'href': 'link3', 'rel': 'self'}]))
-        servers = self.servers + (deleted,)
+        self.servers += (deleted,)
+
         steps = [
             TestStep(
                 Effect(
                     {'dgs': dgs,
-                     'servers': servers,
+                     'servers': self.servers,
                      'lb_nodes': (),
                      'now': 0})
                 .on(lambda _: (StepResult.SUCCESS, [])))]
@@ -718,20 +707,16 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             self.assertEqual(build_timeout, 3600)
             return steps
 
-        eff = execute_convergence(self.tenant_id, self.group_id,
-                                  build_timeout=3600,
-                                  get_all_convergence_data=gacd,
-                                  plan=plan)
-
         sequence = [
+            nested_parallel([]),
             (Log('execute-convergence',
                  dict(servers=self.servers, lb_nodes=(), steps=steps,
                       now=self.now, desired=dgs)), noop),
-            ({'dgs': dgs,
-              'servers': servers,
-              'lb_nodes': (),
-              'now': 0},
-             noop),
+            nested_parallel([
+                ({'dgs': dgs, 'servers': self.servers,
+                  'lb_nodes': (), 'now': 0},
+                 noop)
+            ]),
             (Log('execute-convergence-results',
                  {'results': [(steps[0], (StepResult.SUCCESS, []))],
                   'worst_status': 'SUCCESS'}), noop),
@@ -740,34 +725,29 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 "tenant-id", "group-id", self.now,
                 [{'id': 'a'}, {'id': 'b'}]), noop)
         ]
+
+        # all the servers updated in cache in beginning
+        self.cache.append({'id': 'c'})
+
         self.assertEqual(
-            perform_sequence(self.get_seq + sequence, eff,
-                             self._get_dispatcher()),
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
-        self.assertEqual(self.group.modify_state_values[-1].active, {})
 
     def test_first_error_extraction(self):
         """
         If the GetScalingGroupInfo effect fails, its exception is raised
         directly, without the FirstError wrapper.
         """
-        gacd = self._get_gacd_func()
-        for srv in self.servers:
-            srv.desired_lbs = pset()
-
-        eff = execute_convergence(self.tenant_id, self.group_id,
-                                  build_timeout=3600,
-                                  get_all_convergence_data=gacd)
-
         # Perform the GetScalingGroupInfo by raising an exception
         sequence = [
             (Func(datetime.utcnow), lambda i: self.now),
-            (self.gsgi, lambda i: raise_(RuntimeError('foo')))]
+            (self.gsgi, lambda i: raise_(RuntimeError('foo')))
+        ]
 
         # And make sure that exception isn't wrapped in FirstError.
         e = self.assertRaises(
-            RuntimeError, perform_sequence, sequence, eff,
-            self._get_dispatcher())
+            RuntimeError, perform_sequence, sequence, self._invoke(),
+            test_dispatcher())
         self.assertEqual(str(e), 'foo')
 
     def test_log_reasons(self):
@@ -777,20 +757,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         except ZeroDivisionError:
             exc_info = sys.exc_info()
 
-        step = TestStep(Effect(Constant(
-            (StepResult.RETRY, [
-                ErrorReason.Exception(exc_info),
-                ErrorReason.String('foo'),
-                ErrorReason.Structured({'foo': 'bar'})]))))
+        step = TestStep(Effect("step_intent"))
 
         def plan(*args, **kwargs):
             return pbag([step])
-
-        gacd = self._get_gacd_func()
-        eff = execute_convergence(self.tenant_id, self.group_id,
-                                  build_timeout=3600,
-                                  get_all_convergence_data=gacd,
-                                  plan=plan)
 
         exc_msg = "ZeroDivisionError('integer division or modulo by zero',)"
         tb_msg = ''.join(traceback.format_exception(*exc_info))
@@ -803,112 +773,113 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                          {'foo': 'bar'}]))],
             'worst_status': 'RETRY'}
         sequence = [
+            nested_parallel([]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            nested_parallel([
+                ("step_intent", lambda i: (
+                    StepResult.RETRY, [
+                        ErrorReason.Exception(exc_info),
+                        ErrorReason.String('foo'),
+                        ErrorReason.Structured({'foo': 'bar'})]))
+            ]),
             (Log(msg='execute-convergence-results', fields=expected_fields),
              noop)
         ]
 
         self.assertEqual(
-            perform_sequence(
-                self.get_seq + sequence, eff, self._get_dispatcher()),
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             (StepResult.RETRY, ScalingGroupStatus.ACTIVE))
 
     def test_log_steps(self):
         """The steps to be executed are logged to cloud feeds."""
         step = CreateServer(server_config=pmap({"foo": "bar"}))
+        step.as_effect = lambda: Effect("create-server")
 
         def plan(*args, **kwargs):
             return pbag([step])
 
-        gacd = self._get_gacd_func()
-        eff = execute_convergence(self.tenant_id, self.group_id,
-                                  build_timeout=3600,
-                                  get_all_convergence_data=gacd,
-                                  plan=plan)
-
         sequence = [
-            (Log('convergence-create-servers',
-                 fields={'num_servers': 1, 'server_config': {'foo': 'bar'},
-                         'cloud_feed': True}),
-             noop),
+            nested_parallel([
+                nested_parallel([
+                    (Log('convergence-create-servers',
+                         {'num_servers': 1, 'server_config': {'foo': 'bar'},
+                          'cloud_feed': True}), noop)
+                ])
+            ]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            nested_parallel([
+                ("create-server", lambda i: (StepResult.RETRY, []))
+            ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop)
         ]
 
         self.assertEqual(
-            perform_sequence(
-                self.get_seq + sequence, eff, self._get_dispatcher()),
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             (StepResult.RETRY, ScalingGroupStatus.ACTIVE))
+
+    def _test_deleting_group(self, step_result, with_delete, group_status):
+
+        def _plan(dsg, *a, **kwargs):
+            self.dsg = dsg
+            return [TestStep(Effect("step"))]
+
+        self.state.status = ScalingGroupStatus.DELETING
+        sequence = [
+            nested_parallel([]),
+            (Log('execute-convergence', mock.ANY), noop),
+            nested_parallel([
+                ("step", lambda i: (step_result, []))
+            ]),
+            (Log('execute-convergence-results', mock.ANY), noop),
+        ]
+        if with_delete:
+            sequence.append((DeleteGroup(tenant_id=self.tenant_id,
+                                         group_id=self.group_id), noop))
+        self.assertEqual(
+            # skipping cache update intents returned in get_seq()
+            perform_sequence(self.get_seq()[:-1] + sequence,
+                             self._invoke(_plan)),
+            (step_result, group_status))
+        # desired capacity was changed to 0
+        self.assertEqual(self.dsg.capacity, 0)
 
     def test_deleting_group(self):
         """
         If group's status is DELETING, plan will be generated to delete
-        all servers and group is deleted if the steps return SUCCESS. The
-        group is not deleted is the step do not succeed
+        all servers and group is deleted if the steps return SUCCESS
         """
-        gacd = self._get_gacd_func()
+        self._test_deleting_group(StepResult.SUCCESS, True, None)
 
-        def _plan(dsg, *a, **kwargs):
-            self.dsg = dsg
-            return [TestStep(Effect(Constant((StepResult.SUCCESS, []))))]
-
-        eff = execute_convergence(self.tenant_id, self.group_id,
-                                  build_timeout=3600,
-                                  get_all_convergence_data=gacd, plan=_plan)
-
-        self.state.status = ScalingGroupStatus.DELETING
-        sequence = [
-            (Log('execute-convergence', mock.ANY), noop),
-            (Log('execute-convergence-results', mock.ANY), noop),
-            (DeleteGroup(tenant_id=self.tenant_id, group_id=self.group_id),
-             noop)
-        ]
-        self.assertEqual(
-            perform_sequence(self.get_seq + sequence, eff,
-                             self._get_dispatcher()),
-            (StepResult.SUCCESS, None))
-        # ModifyGroupState was not called
-        self.assertEqual(len(self.group.modify_state_values), 0)
-        # desired capacity was changed to 0
-        self.assertEqual(self.dsg.capacity, 0)
-
-        # Group is not deleted if step result was not successful
-        def fplan(*a, **kwargs):
-            return [TestStep(Effect(Constant((StepResult.RETRY, []))))]
-
-        eff = execute_convergence(self.tenant_id, self.group_id,
-                                  build_timeout=3600,
-                                  get_all_convergence_data=gacd, plan=fplan)
-        # This succeeded without DeleteGroup performer being there ensuring
-        # that it was not called
-        self.assertEqual(
-            perform_sequence(self.get_seq + sequence[:-1], eff,
-                             self._get_dispatcher()),
-            (StepResult.RETRY, ScalingGroupStatus.DELETING))
+    def test_deleting_group_retry(self):
+        """
+        If group's status is DELETING, plan will be generated to delete
+        all servers and group is not deleted if the steps return RETRY
+        """
+        self._test_deleting_group(
+            StepResult.RETRY, False, ScalingGroupStatus.DELETING)
 
     def test_returns_retry(self):
         """
         If a step that results in RETRY is returned, and there are no FAILUREs,
         then the ultimate result of executing convergence will be a RETRY.
         """
-        gacd = self._get_gacd_func()
-
         def plan(*args, **kwargs):
-            return pbag([
-                TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                ConvergeLater(reasons=[ErrorReason.String('mywish')]),
-                TestStep(Effect(Constant((StepResult.SUCCESS, []))))])
+            return [
+                TestStep(Effect("step1")),
+                TestStep(Effect("retry"))]
 
-        eff = execute_convergence(self.tenant_id, self.group_id,
-                                  build_timeout=3600, plan=plan,
-                                  get_all_convergence_data=gacd)
         sequence = [
+            nested_parallel([]),
             (Log('execute-convergence', mock.ANY), noop),
+            nested_parallel([
+                ("step1", lambda i: (StepResult.SUCCESS, [])),
+                ("retry", lambda i: (StepResult.RETRY,
+                                     [ErrorReason.String('mywish')]))
+            ]),
             (Log('execute-convergence-results', mock.ANY), noop)
         ]
         self.assertEqual(
-            perform_sequence(self.get_seq + sequence, eff,
-                             self._get_dispatcher()),
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             (StepResult.RETRY, ScalingGroupStatus.ACTIVE))
 
     def test_returns_failure_set_error_state(self):
@@ -916,31 +887,34 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         The group is put into ERROR state if any step returns FAILURE, and
         FAILURE is the final result of convergence.
         """
-        gacd = self._get_gacd_func()
-
         exc_info = raise_to_exc_info(NoSuchCLBError(lb_id=u'nolb1'))
         exc_info2 = raise_to_exc_info(NoSuchCLBError(lb_id=u'nolb2'))
 
         def plan(*args, **kwargs):
-            return pbag([
-                TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                ConvergeLater(reasons=[ErrorReason.String('mywish')]),
-                TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-                TestStep(Effect(Constant(
-                    (StepResult.FAILURE,
-                     [ErrorReason.Exception(exc_info)])))),
-                TestStep(Effect(Constant(
-                    (StepResult.FAILURE,
-                     [ErrorReason.Exception(exc_info2)])))),
-                TestStep(Effect(Constant((StepResult.SUCCESS, [])))),
-            ])
+            return [
+                TestStep(Effect("success1")),
+                TestStep(Effect("retry")),
+                TestStep(Effect("success2")),
+                TestStep(Effect("fail1")),
+                TestStep(Effect("fail2")),
+                TestStep(Effect("success3"))]
 
-        eff = execute_convergence(self.tenant_id, self.group_id,
-                                  build_timeout=3600, plan=plan,
-                                  get_all_convergence_data=gacd)
+        def success(i):
+            return StepResult.SUCCESS, []
 
         sequence = [
+            nested_parallel([]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            nested_parallel([
+                ("success1", success),
+                ("retry", lambda i: (StepResult.RETRY, [])),
+                ("success2", success),
+                ("fail1", lambda i: (StepResult.FAILURE,
+                                     [ErrorReason.Exception(exc_info)])),
+                ("fail2", lambda i: (StepResult.FAILURE,
+                                     [ErrorReason.Exception(exc_info2)])),
+                ("success3", success)
+            ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ERROR),
@@ -953,8 +927,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              noop)
         ]
         self.assertEqual(
-            perform_sequence(self.get_seq + sequence, eff,
-                             self._get_dispatcher()),
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             (StepResult.FAILURE, ScalingGroupStatus.ERROR))
 
     def test_reactivate_group_on_success_after_steps(self):
@@ -962,18 +935,17 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         When the group started in ERROR state, and convergence succeeds, the
         group is put back into ACTIVE.
         """
-        gacd = self._get_gacd_func()
         self.manifest['state'].status = ScalingGroupStatus.ERROR
 
         def plan(*args, **kwargs):
-            return pbag([TestStep(Effect(Constant((StepResult.SUCCESS, []))))])
-
-        eff = execute_convergence(self.tenant_id, self.group_id,
-                                  build_timeout=3600, plan=plan,
-                                  get_all_convergence_data=gacd)
+            return pbag([TestStep(Effect("step"))])
 
         sequence = [
+            nested_parallel([]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            nested_parallel([
+                ("step", lambda i: (StepResult.SUCCESS, []))
+            ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ACTIVE),
@@ -982,8 +954,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                  dict(cloud_feed=True, status='ACTIVE')), noop)
         ]
         self.assertEqual(
-            perform_sequence(self.get_seq + sequence, eff,
-                             self._get_dispatcher()),
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
 
     def test_reactivate_group_on_success_with_no_steps(self):
@@ -991,15 +962,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         When the group started in ERROR state, and convergence succeeds, the
         group is put back into ACTIVE, even if there were no steps to execute.
         """
-        gacd = self._get_gacd_func()
         self.manifest['state'].status = ScalingGroupStatus.ERROR
-
-        eff = execute_convergence(self.tenant_id, self.group_id,
-                                  build_timeout=3600,
-                                  plan=lambda *a, **k: pbag([]),
-                                  get_all_convergence_data=gacd)
-
+        for serv in self.servers:
+            serv.desired_lbs = pset()
         sequence = [
+            nested_parallel([]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             (UpdateGroupStatus(scaling_group=self.group,
@@ -1008,24 +975,31 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (Log('group-status-active',
                  dict(cloud_feed=True, status='ACTIVE')), noop)
         ]
+        self.state_active = {
+            'a': {'id': 'a', 'links': [{'href': 'link1', 'rel': 'self'}]},
+            'b': {'id': 'b', 'links': [{'href': 'link2', 'rel': 'self'}]}
+        }
+        self.cache[0]["_is_as_active"] = True
+        self.cache[1]["_is_as_active"] = True
         self.assertEqual(
-            perform_sequence(self.get_seq + sequence, eff,
-                             self._get_dispatcher()),
+            perform_sequence(self.get_seq() + sequence, self._invoke()),
             (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
 
 
-class DetermineActiveTests(SynchronousTestCase):
-    """Tests for :func:`determine_active`."""
-
-    def test_nothing(self):
-        """No input means no active servers."""
-        self.assertEqual(determine_active([], []), [])
+class IsAutoscaleActiveTests(SynchronousTestCase):
+    """Tests for :func:`is_autoscale_active`."""
 
     def test_active(self):
-        """Built servers with no desired LBs are active."""
-        servers = [server('id1', ServerState.ACTIVE),
-                   server('id2', ServerState.BUILD)]
-        self.assertEqual(determine_active(servers, []), servers[:1])
+        """Built server with no desired LBs is active."""
+        self.assertEqual(
+            is_autoscale_active(server('id1', ServerState.ACTIVE), []),
+            True)
+
+    def test_non_active(self):
+        """ Non-active server is not considered AS active """
+        self.assertEqual(
+            is_autoscale_active(server('id1', ServerState.BUILD), []),
+            False)
 
     def test_lb_pending(self):
         """
@@ -1036,14 +1010,12 @@ class DetermineActiveTests(SynchronousTestCase):
             CLBNode(node_id='x',
                     description=CLBDescription(lb_id='foo', port=80),
                     address='1.1.1.3')]
-        servers = [
-            server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1',
-                   desired_lbs=desired_lbs),
-            server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2',
-                   desired_lbs=desired_lbs),
-            server('id3', ServerState.ACTIVE, servicenet_address='1.1.1.3',
-                   desired_lbs=desired_lbs)]
-        self.assertEqual(determine_active(servers, lb_nodes), servers[2:])
+        self.assertEqual(
+            is_autoscale_active(
+                server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1',
+                       desired_lbs=desired_lbs),
+                lb_nodes),
+            False)
 
     def test_multiple_lb_pending(self):
         """
@@ -1068,10 +1040,9 @@ class DetermineActiveTests(SynchronousTestCase):
                         CLBDescription(lb_id='foo', port=2),
                         CLBDescription(lb_id='bar', port=3),
                         CLBDescription(lb_id='bar', port=4))
-        servers = [
-            server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1',
-                   desired_lbs=desired_lbs),
-            server('id2', ServerState.ACTIVE, servicenet_address='1.1.1.2',
-                   desired_lbs=desired_lbs)
-        ]
-        self.assertEqual(determine_active(servers, lb_nodes), servers[:1])
+        self.assertEqual(
+            is_autoscale_active(
+                server('id1', ServerState.ACTIVE, servicenet_address='1.1.1.1',
+                       desired_lbs=desired_lbs),
+                lb_nodes),
+            True)

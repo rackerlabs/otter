@@ -151,7 +151,8 @@ def group_servers(group_id, grouped_servers):
 @do
 def get_scaling_group_servers(tenant_id, group_id, now,
                               all_as_servers=get_all_scaling_group_servers,
-                              all_servers=get_all_server_details):
+                              all_servers=get_all_server_details,
+                              cache_class=CassScalingGroupServersCache):
     """
     Get a group's servers taken from cache if it exists. Updates cache
     if it is empty from newly fetched servers
