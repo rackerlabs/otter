@@ -102,14 +102,12 @@ class FormatterHelpers(SynchronousTestCase):
             'status': 'ACTIVE',
         })
 
-    @mock.patch('otter.rest.groups.config_value')
-    def test_format_state_dict_with_convergence(self, config_value):
+    def test_format_state_dict_with_active(self):
         """
-        When convergence is enabled for a tenant, the returned desiredCapacity
+        If active is passed then the returned desiredCapacity
         is based on the stored `desired` in the group state, and the pending
-        capacity is desired from the desired and active servers.
+        capacity is got from the desired and active list provided
         """
-        config_value.side_effect = {'convergence-tenants': ['11111']}.get
         active = {
             '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
             '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
@@ -118,22 +116,16 @@ class FormatterHelpers(SynchronousTestCase):
             '11111',
             'one',
             'test',
-            active,
-            {},  # Ignored!
+            None, # active ignored
+            None, # pending Ignored!
             None,
             {},
             True,
             ScalingGroupStatus.ACTIVE,
             desired=10)
-        result = format_state_dict(state)
+        result = format_state_dict(state, active)
         self.assertEqual(result['desiredCapacity'], 10)
         self.assertEqual(result['pendingCapacity'], 7)
-
-        # And a non-convergence tenant still gets old-style data
-        state.tenant_id = '11112'
-        result = format_state_dict(state)
-        self.assertEqual(result['desiredCapacity'], 3)
-        self.assertEqual(result['pendingCapacity'], 0)
 
     @mock.patch('otter.rest.groups.config_value')
     def test_format_state_different_status(self, config_value):
@@ -141,7 +133,6 @@ class FormatterHelpers(SynchronousTestCase):
         When a group's status is something other than ACTIVE, it's reflected in
         the output.
         """
-        config_value.side_effect = {'convergence-tenants': ['11111']}.get
         active = {
             '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
             '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
@@ -150,14 +141,14 @@ class FormatterHelpers(SynchronousTestCase):
             '11111',
             'one',
             'test',
-            active,
-            {},  # Ignored!
+            None, # active ignored
+            None, # pending Ignored!
             None,
             {},
             True,
             ScalingGroupStatus.ERROR,
             desired=10)
-        result = format_state_dict(state)
+        result = format_state_dict(state, active)
         self.assertEqual(result['status'], 'ERROR')
 
 
@@ -316,7 +307,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_store.list_scaling_group_states.assert_called_once_with(
             mock.ANY, '11111', limit=100)
 
-        mock_format.assert_has_calls([mock.call(state) for state in states])
+        mock_format.assert_has_calls(
+            [mock.call(state, None) for state in states])
         self.assertEqual(len(mock_format.mock_calls), 2)
 
     @mock.patch('otter.rest.groups.get_autoscale_links',
@@ -350,6 +342,31 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             }],
             "groups_links": []
         })
+
+    @mock.patch('otter.rest.groups.get_active_cache')
+    def test_list_group_convergence(self, mock_gac):
+        """
+        ``list_all_scaling_groups`` returns state that has active servers
+        taken from servers cache table
+        """
+        set_config_data({'convergence-tenants': ['11111'], 'url_root': 'root'})
+        self.addCleanup(set_config_data, None)
+
+        mock_gac.return_value = defer.succeed({'s1': {'links': 'l'}})
+        self.mock_store.connection = 'connection'
+
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed(
+            [GroupState('11111', 'one', '1', None, None, None, {}, False,
+                        ScalingGroupStatus.ACTIVE, desired=2)]
+        )
+
+        body = self.assert_status_code(200)
+        resp = json.loads(body)
+        self.assertEqual(resp['groups'][0]['state']['activeCapacity'], 1)
+        self.assertEqual(resp['groups'][0]['state']['pendingCapacity'], 1)
+        self.assertEqual(resp['groups'][0]['state']['active'],
+                         [{'id': 's1', 'links': 'l'}])
+        mock_gac.assert_called_once_with('connection', '11111', 'one')
 
     def test_list_group_passes_limit_query(self):
         """
@@ -900,6 +917,37 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_group.view_manifest.assert_called_once_with(
             with_webhooks=False)
 
+    @mock.patch('otter.rest.groups.get_active_cache')
+    def test_view_manifest_convergence(self, mock_gac):
+        """
+        Viewing the manifest of group of convergence enabled tenant
+        returns state based on servers cache
+        """
+        set_config_data({'convergence-tenants': ['11111'], 'url_root': 'root'})
+        self.addCleanup(set_config_data, None)
+
+        manifest = {
+            'groupConfiguration': config_examples()[0],
+            'launchConfiguration': launch_examples()[0],
+            'id': 'one',
+            'state': GroupState('11111', 'one', 'g', None, None, None, {}, False,
+                                ScalingGroupStatus.ACTIVE, desired=3),
+            'scalingPolicies': [dict(id="5", **policy_examples()[0])]
+        }
+        self.mock_group.view_manifest.return_value = defer.succeed(manifest)
+
+        self.mock_store.connection = 'connection'
+        mock_gac.return_value = defer.succeed({'s1': {'links': 's1l'}})
+
+        response_body = self.assert_status_code(200, method="GET")
+        resp = json.loads(response_body)
+
+        self.assertEqual(resp['group']['state']['pendingCapacity'], 2)
+        self.assertEqual(resp['group']['state']['activeCapacity'], 1)
+        self.assertEqual(resp['group']['state']['active'],
+                         [{'id': 's1', 'links': 's1l'}])
+        mock_gac.assert_called_once_with('connection', '11111', 'one')
+
     def test_view_manifest_with_webhooks(self):
         """
         `view_manifest` gives webhooks information in policies if query args
@@ -1126,6 +1174,28 @@ class GroupStateTestCase(RestAPITestMixin, SynchronousTestCase):
             mock.ANY, '11111', 'one')
         self.mock_group.view_state.assert_called_once_with()
         mock_format.assert_called_once_with('group_state')
+
+    @mock.patch('otter.rest.groups.get_active_cache',
+                return_value=defer.succeed({'s1': {'links': 'l'}}))
+    def test_view_state_convergence(self, mock_gac):
+        """
+        Viewing the state of an existant group that belongs to convergence
+        enabled tenant returns the active list from servers cache table
+        """
+        set_config_data({'convergence-tenants': ['11111'], 'url_root': 'root'})
+        self.addCleanup(set_config_data, None)
+
+        self.mock_group.view_state.return_value = defer.succeed(
+            GroupState("11111", "one", 'g', None, None, False, False, False,
+                       ScalingGroupStatus.ACTIVE, desired=4))
+        self.mock_store.connection = 'connection'
+        response_body = self.assert_status_code(200, method="GET")
+        resp = json.loads(response_body)
+
+        self.assertEqual(resp['group']['activeCapacity'], 1)
+        self.assertEqual(resp['group']['pendingCapacity'], 3)
+        self.assertEqual(resp['group']['active'], [{'id': 's1', 'links': 'l'}])
+        mock_gac.assert_called_once_with('connection', '11111', 'one')
 
 
 class GroupPauseTestCase(RestAPITestMixin, SynchronousTestCase):
