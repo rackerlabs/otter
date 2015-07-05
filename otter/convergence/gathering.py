@@ -165,7 +165,7 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     """
 
     cache = cache_class(tenant_id, group_id)
-    cached_servers, last_update = yield cache.get_servers()
+    cached_servers, last_update = yield cache.get_servers(False)
     if last_update is None:
         servers = (yield all_as_servers()).get(group_id, [])
     elif now - last_update >= timedelta(days=30):

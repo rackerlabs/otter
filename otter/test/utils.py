@@ -885,8 +885,8 @@ class Cache(object):
     def ids(self, s):
         return "cache" + s + self.tid + self.gid
 
-    def get_servers(self):
-        return Effect(self.ids("gs"))
+    def get_servers(self, with_as_active):
+        return Effect((self.ids("gs"), with_as_active))
 
     def insert_servers(self, time, servers, clear):
         return Effect((self.ids("is"), time, servers, clear))

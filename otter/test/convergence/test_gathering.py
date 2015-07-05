@@ -235,14 +235,13 @@ class GetScalingGroupServersTests(SynchronousTestCase):
     def _test_no_cache(self, empty):
         current = [] if empty else self.servers1
         sequence = [
-            ("cachegstidgid", lambda i: (object(), None)),
+            (("cachegstidgid", False), lambda i: (object(), None)),
             (("all-as",), lambda i: {} if empty else {"gid": current})]
         self.assertEqual(perform_sequence(sequence, self._invoke()), current)
 
     def test_no_cache(self):
         """
-        If cache is empty then current list of servers are returned and added
-        to the cache
+        If cache is empty then current list of servers are returned
         """
         self._test_no_cache(False)
         self._test_no_cache(True)
@@ -253,7 +252,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         current = self.servers2
         servers = (as_srvs and as_servers or []) + (cur_srvs and current or [])
         sequence = [
-            ("cachegstidgid", lambda i: (object(), last_update)),
+            (("cachegstidgid", False), lambda i: (object(), last_update)),
             nested_parallel([
                 (("all-as", exp_last_update),
                  lambda i: {'gid': as_servers} if as_srvs else {}),
@@ -265,8 +264,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
     def test_old_cache(self):
         """
         If cache is older than 30 days then servers returned are got by getting
-        current list and changes since last 30 days. The cache is updated with
-        this list
+        current list and changes since last 30 days.
         """
         dt = datetime(2010, 3, 1)
         self._test_old_case(dt)
@@ -288,7 +286,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             {'id': 'd', 'metadata': {"changed": "yes"}}]
         last_update = datetime(2010, 5, 20)
         sequence = [
-            ("cachegstidgid", lambda i: (cache, last_update)),
+            (("cachegstidgid", False), lambda i: (cache, last_update)),
             (("alls", last_update), lambda i: changes)]
         self.assertEqual(
             self.freeze(perform_sequence(sequence, self._invoke())),
