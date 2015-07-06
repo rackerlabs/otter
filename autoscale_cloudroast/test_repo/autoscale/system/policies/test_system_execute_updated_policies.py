@@ -120,9 +120,13 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             msg='Executing the updated policy with desired capacity failed '
             'with {0} for group {1}'
             .format(upd_policy_to_desired_capacity_execute, self.group.id))
+        # We don't want to time-scale this one because of throttling if this
+        # is a convergence tenant - there are 26 servers, and convergence can
+        # only build 3 per cycle.  This might take longer than
+        # the worker would.
         self.check_for_expected_number_of_building_servers(
             group_id=self.group.id,
-            expected_servers=26)
+            expected_servers=26, time_scale=False)
 
     @tags(speed='slow', convergence='yes')
     def test_update_scale_up_to_scale_down(self):

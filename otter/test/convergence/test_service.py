@@ -49,7 +49,9 @@ from otter.test.utils import (
     CheckFailureValue, FakePartitioner,
     TestStep,
     mock_group, mock_log,
+    nested_parallel,
     noop,
+    perform_sequence,
     raise_,
     raise_to_exc_info,
     test_dispatcher,
@@ -423,25 +425,23 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                       lambda i: 'converged {}!'.format(tid))])),
             ]
 
-        sequence = SequenceDispatcher([
+        sequence = [
             (ReadReference(ref=self.currently_converging),
              lambda i: pset()),
             (Log('converge-all-groups',
                  dict(group_infos=self.group_infos, currently_converging=[])),
              lambda i: None),
-            (BoundFields(mock.ANY, fields={'tenant_id': '00',
-                                           'scaling_group_id': 'g1'}),
-             nested_sequence(get_bound_sequence('00', 'g1'))),
-            (BoundFields(mock.ANY, fields={'tenant_id': '01',
-                                           'scaling_group_id': 'g2'}),
-             nested_sequence(get_bound_sequence('01', 'g2'))),
-        ])
-        dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
-
-        with sequence.consume():
-            self.assertEqual(
-                sync_perform(dispatcher, eff),
-                ['converged 00!', 'converged 01!'])
+            nested_parallel([
+                (BoundFields(mock.ANY, fields={'tenant_id': '00',
+                                               'scaling_group_id': 'g1'}),
+                 nested_sequence(get_bound_sequence('00', 'g1'))),
+                (BoundFields(mock.ANY, fields={'tenant_id': '01',
+                                               'scaling_group_id': 'g2'}),
+                 nested_sequence(get_bound_sequence('01', 'g2'))),
+             ])
+        ]
+        self.assertEqual(perform_sequence(sequence, eff),
+                         ['converged 00!', 'converged 01!'])
 
     def test_filter_out_currently_converging(self):
         """
@@ -449,7 +449,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         convergence is not run for it.
         """
         eff = self._converge_all_groups(['00_g1', '01_g2'])
-        sequence = SequenceDispatcher([
+        sequence = [
             (ReadReference(ref=self.currently_converging),
              lambda i: pset(['g1'])),
             (Log('converge-all-groups',
@@ -457,22 +457,21 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                       currently_converging=['g1'])),
              lambda i: None),
 
-            (BoundFields(mock.ANY, dict(tenant_id='01',
-                                        scaling_group_id='g2')),
-             nested_sequence([
-                (GetStat(path='/groups/divergent/01_g2'),
-                 lambda i: ZNodeStatStub(version=5)),
-                (TenantScope(mock.ANY, '01'),
+            nested_parallel([
+                (BoundFields(mock.ANY, dict(tenant_id='01',
+                                            scaling_group_id='g2')),
                  nested_sequence([
-                    (('converge', '01', 'g2', 5, 3600),
-                     lambda i: 'converged two!'),
+                    (GetStat(path='/groups/divergent/01_g2'),
+                     lambda i: ZNodeStatStub(version=5)),
+                    (TenantScope(mock.ANY, '01'),
+                     nested_sequence([
+                        (('converge', '01', 'g2', 5, 3600),
+                         lambda i: 'converged two!'),
+                     ])),
                  ])),
-             ]))
-        ])
-        dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
-
-        with sequence.consume():
-            self.assertEqual(sync_perform(dispatcher, eff), ['converged two!'])
+             ])
+        ]
+        self.assertEqual(perform_sequence(sequence, eff), ['converged two!'])
 
     def test_no_log_on_no_groups(self):
         """When there's no work, no log message is emitted."""
@@ -505,20 +504,20 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                      fields={'znode': znode}),
                  noop)]
 
-        sequence = SequenceDispatcher([
+        sequence = [
             (ReadReference(ref=self.currently_converging),
              lambda i: pset()),
             (Log('converge-all-groups',
                  dict(group_infos=[self.group_infos[0]],
                       currently_converging=[])),
              lambda i: None),
-            (BoundFields(mock.ANY, fields={'tenant_id': '00',
-                                           'scaling_group_id': 'g1'}),
-             nested_sequence(get_bound_sequence('00', 'g1'))),
-        ])
-        dispatcher = test_dispatcher(sequence)
-        with sequence.consume():
-            self.assertEqual(sync_perform(dispatcher, eff), [None])
+            nested_parallel([
+                (BoundFields(mock.ANY, fields={'tenant_id': '00',
+                                               'scaling_group_id': 'g1'}),
+                 nested_sequence(get_bound_sequence('00', 'g1'))),
+             ]),
+        ]
+        self.assertEqual(perform_sequence(sequence, eff), [None])
 
 
 class GetMyDivergentGroupsTests(SynchronousTestCase):
@@ -541,9 +540,6 @@ class GetMyDivergentGroupsTests(SynchronousTestCase):
 
 def _get_dispatcher():
     return ComposedDispatcher([
-        TypeDispatcher({
-            ParallelEffects: perform_parallel_async,
-        }),
         reference_dispatcher,
         base_dispatcher,
     ])
@@ -719,7 +715,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (Func(time.time), lambda i: 500),
             (Log('execute-convergence',
                  dict(servers=tuple(self.servers), lb_nodes=(), steps=steps,
-                      now=500, desired=dgs, active=[])), lambda i: None),
+                      now=500, desired=dgs)), lambda i: None),
             ({'dgs': get_desired_group_state(self.group_id, self.lc, 2),
               'servers': tuple(self.servers),
               'lb_nodes': (),
@@ -796,9 +792,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             'worst_status': 'RETRY'}
         sequence = SequenceDispatcher([
             (self.gsgi, lambda i: (self.group, self.manifest)),
-            (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
              noop),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (Log(msg='execute-convergence-results', fields=expected_fields),
              noop),
         ])
@@ -827,13 +823,13 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         sequence = SequenceDispatcher([
             (self.gsgi, lambda i: (self.group, self.manifest)),
+            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
+             noop),
             (Log('convergence-create-servers',
                  fields={'num_servers': 1, 'server_config': {'foo': 'bar'},
                          'cloud_feed': True}),
              noop),
             (Log('execute-convergence', fields=mock.ANY), noop),
-            (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
-             noop),
             (Log('execute-convergence-results', fields=mock.ANY), noop),
         ])
 
@@ -946,9 +942,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         sequence = SequenceDispatcher([
             (self.gsgi, lambda i: self.gsgi_result),
-            (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
              noop),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ERROR),
@@ -982,9 +978,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         sequence = SequenceDispatcher([
             (self.gsgi, lambda i: self.gsgi_result),
-            (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
              noop),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ACTIVE),
@@ -995,7 +991,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
         with sequence.consume():
             self.assertEqual(sync_perform(dispatcher, eff),
-                             (StepResult.SUCCESS, ScalingGroupStatus.ERROR))
+                             (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
 
     def test_reactivate_group_on_success_with_no_steps(self):
         """
@@ -1012,9 +1008,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         sequence = SequenceDispatcher([
             (self.gsgi, lambda i: self.gsgi_result),
-            (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (ModifyGroupState(scaling_group=self.group, modifier=mock.ANY),
              noop),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ACTIVE),
@@ -1025,7 +1021,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         dispatcher = ComposedDispatcher([sequence, test_dispatcher()])
         with sequence.consume():
             self.assertEqual(sync_perform(dispatcher, eff),
-                             (StepResult.SUCCESS, ScalingGroupStatus.ERROR))
+                             (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
 
 
 class DetermineActiveTests(SynchronousTestCase):
