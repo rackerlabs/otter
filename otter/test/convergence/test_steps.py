@@ -465,8 +465,8 @@ class StepAsEffectTests(SynchronousTestCase):
 
     def test_add_nodes_to_clb_terminal_failures(self):
         """
-        :obj:`AddNodesToCLB` retries if the CLB is not found or deleted, or
-        if there is any other 4xx error, or if there is a non-API error, then
+        :obj:`AddNodesToCLB` fails if the CLB is not found or deleted, or
+        if there is any other 4xx error, then
         the error is propagated up and the result is a failure.
         """
         terminals = (CLBDeletedError(lb_id=u"12345"),
@@ -564,6 +564,61 @@ class StepAsEffectTests(SynchronousTestCase):
         ]
         r = perform_sequence(seq, step.as_effect())
         self.assertEqual(r, (StepResult.SUCCESS, []))
+
+    def test_remove_nodes_from_clb_non_terminal_failures_to_retry(self):
+        """
+        :obj:`RemoveNodesFromCLB` retries if the CLB is temporarily locked,
+        or if the request was rate-limited, or if there was an API error and
+        the error is unknown but not a 4xx.
+        """
+        non_terminals = (CLBPendingUpdateError(lb_id=u"12345"),
+                         CLBRateLimitError(lb_id=u"12345"),
+                         APIError(code=500, body="oops!"),
+                         TypeError("You did something wrong in your code."))
+        eff = RemoveNodesFromCLB(lb_id='12345',
+                                 node_ids=pset(['1', '2'])).as_effect()
+
+        for exc in non_terminals:
+            seq = SequenceDispatcher([(eff.intent, lambda i: raise_(exc))])
+            with seq.consume():
+                self.assertEquals(
+                    sync_perform(seq, eff),
+                    (StepResult.RETRY, [ErrorReason.Exception(
+                        matches(ContainsAll([type(exc), exc])))]))
+
+    def test_remove_nodes_from_clb_terminal_failures(self):
+        """
+        :obj:`AddNodesToCLB` fails if there are any 4xx errors, then
+        the error is propagated up and the result is a failure.
+        """
+        terminals = (APIError(code=403, body="You're out of luck."),
+                     APIError(code=422, body="Oh look another 422."))
+        eff = RemoveNodesFromCLB(lb_id='12345',
+                                 node_ids=pset(['1', '2'])).as_effect()
+
+        for exc in terminals:
+            seq = SequenceDispatcher([(eff.intent, lambda i: raise_(exc))])
+            with seq.consume():
+                self.assertEquals(
+                    sync_perform(seq, eff),
+                    (StepResult.FAILURE, [ErrorReason.Exception(
+                        matches(ContainsAll([type(exc), exc])))]))
+
+    def test_remove_nodes_from_clb_success_failures(self):
+        """
+        :obj:`AddNodesToCLB` succeeds if the CLB is not in existence (has been
+        deleted or is not found).
+        """
+        successes = (CLBDeletedError(lb_id=u"12345"),
+                     NoSuchCLBError(lb_id=u"12345"))
+        eff = RemoveNodesFromCLB(lb_id='12345',
+                                 node_ids=pset(['1', '2'])).as_effect()
+
+        for exc in successes:
+            seq = SequenceDispatcher([(eff.intent, lambda i: raise_(exc))])
+            with seq.consume():
+                self.assertEquals(sync_perform(seq, eff),
+                                  (StepResult.SUCCESS, []))
 
     def _generic_bulk_rcv3_step_test(self, step_class, expected_method):
         """
