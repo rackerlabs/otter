@@ -23,7 +23,9 @@ from pyrsistent import freeze
 
 from silverberg.client import ConsistencyLevel
 
+from toolz.curried import filter, map
 from toolz.dicttoolz import keymap, merge
+from toolz.functoolz import compose
 
 from twisted.internet import defer
 
@@ -59,6 +61,10 @@ from otter.util.retry import repeating_interval, retry, retry_times
 
 LOCK_PATH = '/locks'
 
+DEFAULT_CONSISTENCY = ConsistencyLevel.QUORUM
+
+QUERY_LIMIT = 10000
+
 
 @attributes(['query', 'params', 'consistency_level'])
 class CQLQueryExecute(object):
@@ -87,7 +93,7 @@ def get_cql_dispatcher(connection):
     })
 
 
-def cql_eff(query, params={}, consistency_level=ConsistencyLevel.ONE):
+def cql_eff(query, params={}, consistency_level=DEFAULT_CONSISTENCY):
     """
     Return Effect of CQLQueryExecute intent
     """
@@ -305,11 +311,6 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
 
     cql_parts.append(" LIMIT :limit;")
     return (''.join(cql_parts), params)
-
-
-DEFAULT_CONSISTENCY = ConsistencyLevel.QUORUM
-
-QUERY_LIMIT = 10000
 
 
 def _build_policies(policies, policies_table, event_table, queries, data,
@@ -1727,11 +1728,11 @@ class CassScalingGroupServersCache(object):
         self.params = {"tenantId": self.tenantId, "groupId": self.groupId}
 
     @do
-    def get_servers(self):
+    def get_servers(self, only_as_active):
         """
         See :method:`IScalingGroupServersCache.get_servers`
         """
-        query = ('SELECT server_blob, last_update FROM {cf} '
+        query = ('SELECT server_blob, server_as_active, last_update FROM {cf} '
                  'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
                  'ORDER BY last_update DESC;')
         rows = yield cql_eff(query.format(cf=self.table), self.params)
@@ -1739,8 +1740,13 @@ class CassScalingGroupServersCache(object):
             yield do_return(([], None))
         last_update = rows[0]['last_update']
         rows = takewhile(lambda r: r['last_update'] == last_update, rows)
-        yield do_return(([json.loads(r['server_blob']) for r in rows],
-                         last_update))
+
+        def _dict(r): return json.loads(r['server_blob'])
+        rfunc = (
+            compose(map(_dict), filter(lambda r: r['server_as_active']))
+            if only_as_active else map(_dict))
+
+        yield do_return((list(rfunc(rows)), last_update))
 
     def insert_servers(self, last_update, servers, clear_others):
         """
@@ -1749,13 +1755,15 @@ class CassScalingGroupServersCache(object):
         if len(servers) == 0:
             return Effect(Constant(None))
         query = ('INSERT INTO {cf} ("tenantId", "groupId", last_update, '
-                 'server_id, server_blob) '
+                 'server_id, server_blob, server_as_active) '
                  'VALUES(:tenantId, :groupId, :last_update, :server_id{i}, '
-                 ':server_blob{i});')
+                 ':server_blob{i}, :server_as_active{i});')
         params = merge(self.params, {"last_update": last_update})
         queries = []
         for i, server in enumerate(servers):
             params['server_id{}'.format(i)] = server['id']
+            params['server_as_active{}'.format(i)] = server.pop(
+                '_is_as_active', False)
             params['server_blob{}'.format(i)] = json.dumps(server)
             queries.append(query.format(cf=self.table, i=i))
         if clear_others:
