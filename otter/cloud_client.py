@@ -582,11 +582,13 @@ def remove_clb_nodes(lb_id, node_ids):
         if code == 400:
             message = try_json_with_keys(
                 body, ["validationErrors", "messages", 0])
-            match = _CLB_NODE_REMOVED_PATTERN.match(message)
-            if match:
-                removed = concat([group.split(',')
-                                  for group in match.groups()])
-                return remove_clb_nodes(lb_id, set(node_ids) - set(removed))
+            if message is not None:
+                match = _CLB_NODE_REMOVED_PATTERN.match(message)
+                if match:
+                    removed = concat([group.split(',')
+                                      for group in match.groups()])
+                    return remove_clb_nodes(lb_id,
+                                            set(node_ids) - set(removed))
         six.reraise(*exc_info)
 
     return eff.on(

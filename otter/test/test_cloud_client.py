@@ -722,6 +722,9 @@ class CLBClientTests(SynchronousTestCase):
         self.assert_parses_common_clb_errors(expected.intent, eff)
 
     def expected_node_removal_req(self, nodes=(1, 2)):
+        """
+        :return: Expected effect for a node removal request.
+        """
         return service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'DELETE',
@@ -752,15 +755,20 @@ class CLBClientTests(SynchronousTestCase):
         self.assertRaises(APIError, perform_sequence, seq, eff)
 
     def test_remove_clb_nodes_random_400(self):
-        """Random 400s are bubbled up as an APIError."""
-        eff = remove_clb_nodes(self.lb_id, [1, 2])
-        response = stub_pure_response(
-            {'validationErrors': {'messages': ['bar']}}, 400)
-        seq = [
-            (self.expected_node_removal_req().intent,
-             service_request_eqf(response)),
+        """Random 400s that can't be parsed are bubbled up as an APIError."""
+        error_bodies = [
+            {'validationErrors': {'messages': ['bar']}},
+            {'messages': 'bar'},
+            {'validationErrors': {'messages': []}},
+            "random non-json"
         ]
-        self.assertRaises(APIError, perform_sequence, seq, eff)
+        for body in error_bodies:
+            eff = remove_clb_nodes(self.lb_id, [1, 2])
+            seq = [
+                (self.expected_node_removal_req().intent,
+                 service_request_eqf(stub_pure_response(body, 400))),
+            ]
+            self.assertRaises(APIError, perform_sequence, seq, eff)
 
     def test_remove_clb_nodes_retry_on_some_invalid_nodes(self):
         """
@@ -770,7 +778,7 @@ class CLBClientTests(SynchronousTestCase):
         eff = remove_clb_nodes(self.lb_id, [1, 2, 3, 4])
         response = stub_pure_response(
             {'validationErrors': {'messages': [
-                 'Node ids 1,3 are not a part of your loadbalancer']}},
+                'Node ids 1,3 are not a part of your loadbalancer']}},
             400)
         response2 = stub_pure_response({}, 202)
         seq = [
