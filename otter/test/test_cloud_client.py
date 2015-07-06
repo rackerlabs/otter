@@ -745,6 +745,15 @@ class CLBClientTests(SynchronousTestCase):
         result = perform_sequence(seq, eff)
         self.assertIs(result, None)
 
+    def test_remove_clb_nodes_handles_standard_clb_errors(self):
+        """
+        Common CLB errors about it being in a deleted state, pending update,
+        etc. are handled.
+        """
+        eff = remove_clb_nodes(self.lb_id, [1, 2])
+        self.assert_parses_common_clb_errors(
+            self.expected_node_removal_req().intent, eff)
+
     def test_remove_clb_nodes_non_202(self):
         """Any random HTTP response code is bubbled up as an APIError."""
         eff = remove_clb_nodes(self.lb_id, [1, 2])
