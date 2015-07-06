@@ -138,13 +138,13 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         nodes_as = yield clb_as.list_nodes(self.rcs)
         nodes_other = yield clb_other.list_nodes(self.rcs)
         self.assertEqual(
-            len(nodes_as['nodes']), 1,
+            len(nodes_as), 1,
             "There should be 1 node on the autoscale CLB.")
         self.assertEqual(
             len(nodes_other['nodes']), 0,
             "There should still be 0 nodes on the out of band CLB")
 
-        the_node = nodes_as["nodes"][0]
+        the_node = nodes_as[0]
         node_info = {
             "address": the_node["address"],
             "port": the_node["port"],
@@ -224,7 +224,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         nodes_as = yield clb_as.list_nodes(self.rcs)
 
-        the_node = nodes_as["nodes"][0]
+        the_node = nodes_as[0]
         node_info = {
             "address": the_node["address"],
             "port": the_node["port"],
