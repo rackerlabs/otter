@@ -3741,8 +3741,10 @@ class CassGroupServersCacheTests(SynchronousTestCase):
             [{"server_blob": '{"a": "b"}', "last_update": self.dt,
               "server_as_active": False},
              {"server_blob": '{"d": "e"}', "last_update": self.dt,
-              "server_as_active": False}],
-            ([{"a": "b"}, {"d": "e"}], self.dt))
+              "server_as_active": False},
+             {"server_blob": '{"2": "a"}', "last_update": self.dt,
+              "server_as_active": True}],
+            ([{"a": "b"}, {"d": "e"}, {"2": "a"}], self.dt))
 
     def test_get_servers_as_active(self):
         """
@@ -3765,13 +3767,23 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         dt_earlier = datetime(2010, 10, 15, 10, 0, 0)
         self._test_get_servers(
             False,
-            [{"server_blob": '{"a": "b"}', "last_update": dt_earlier,
+            [{"server_blob": '{"a": "b"}', "last_update": self.dt,
               "server_as_active": False},
-             {"server_blob": '{"d": "e"}', "last_update": dt_earlier,
+             {"server_blob": '{"d": "e"}', "last_update": self.dt,
               "server_as_active": False},
-             {"server_blob": '{"c": "f"}', "last_update": self.dt,
+             {"server_blob": '{"c": "f"}', "last_update": dt_earlier,
               "server_as_active": False}],
-            ([{"a": "b"}, {"d": "e"}], dt_earlier))
+            ([{"a": "b"}, {"d": "e"}], self.dt))
+        # Test with only_as_active as True
+        self._test_get_servers(
+            True,
+            [{"server_blob": '{"a": "b"}', "last_update": self.dt,
+              "server_as_active": False},
+             {"server_blob": '{"d": "e"}', "last_update": self.dt,
+              "server_as_active": True},
+             {"server_blob": '{"c": "f"}', "last_update": dt_earlier,
+              "server_as_active": True}],
+            ([{"d": "e"}], self.dt))
 
     def _test_insert_servers(self, eff):
         query = (
