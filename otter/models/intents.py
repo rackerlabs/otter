@@ -103,24 +103,6 @@ def perform_update_servers_cache(disp, intent):
     return cache.insert_servers(intent.time, intent.servers, True)
 
 
-@attr.s
-class SetServersASActive(object):
-    """
-    Intent to set server_as_active of servers in cache to True
-    """
-    tenant_id = attr.ib()
-    group_id = attr.ib()
-    time = attr.ib()
-    server_ids = attr.ib()
-
-
-@sync_performer
-def perform_set_servers_in_lbs(disp, intent):
-    """ Perform :obj:`SetServerInLBsCache` """
-    cache = CassScalingGroupServersCache(intent.tenant_id, intent.group_id)
-    return cache.set_servers_as_active(intent.time, intent.server_id)
-
-
 def get_model_dispatcher(log, store):
     """Get a dispatcher that can handle all the model-related intents."""
     return TypeDispatcher({
