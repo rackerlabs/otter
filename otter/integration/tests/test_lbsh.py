@@ -83,7 +83,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         nodes = yield clb.wait_for_nodes(
             self.rcs, HasLength(1), timeout=timeout_default)
 
-        the_node = nodes["nodes"][0]
+        the_node = nodes[0]
 
         yield clb.delete_nodes(self.rcs, [the_node['id']])
 
@@ -134,7 +134,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         yield clb_other.wait_for_nodes(
             self.rcs, HasLength(0), timeout=timeout_default)
 
-        the_node = nodes_as["nodes"][0]
+        the_node = nodes_as[0]
         node_info = {
             "address": the_node["address"],
             "port": the_node["port"],
