@@ -107,11 +107,13 @@ def _execute_steps(steps):
         priority = sorted(results,
                           key=lambda (status, reasons): severity.index(status))
         worst_status = priority[0][0]
-        results_to_log = zip(
-            steps,
-            [(result, map(structure_reason, reasons))
-             for result, reasons in results])
-
+        results_to_log = [
+            {'step': step,
+             'result': result,
+             'reasons': map(structure_reason, reasons)}
+            for step, (result, reasons) in
+            zip(steps, results)
+        ]
         reasons = reduce(operator.add,
                          (x[1] for x in results if x[0] == worst_status))
     else:
