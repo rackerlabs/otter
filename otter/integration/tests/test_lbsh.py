@@ -217,12 +217,10 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         yield self.helper.start_group_and_wait(group, self.rcs)
 
         # One node should have been added to clb_as, none to clb_other
-        yield clb_as.wait_for_nodes(
+        nodes_as = yield clb_as.wait_for_nodes(
             self.rcs, HasLength(1), timeout=timeout_default)
         yield clb_other.wait_for_nodes(
             self.rcs, HasLength(0), timeout=timeout_default)
-
-        nodes_as = yield clb_as.list_nodes(self.rcs)
 
         the_node = nodes_as[0]
         node_info = {
