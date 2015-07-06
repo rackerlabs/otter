@@ -40,7 +40,7 @@ from zope.interface.verify import verifyObject
 
 from otter.convergence.model import NovaServer
 from otter.log.bound import BoundLog
-from otter.models.interface import IScalingGroup
+from otter.models.interface import IScalingGroup, IScalingGroupServersCache
 from otter.supervisor import ISupervisor
 from otter.util.deferredutils import DeferredPool
 from otter.util.fp import set_in
@@ -875,7 +875,8 @@ def intent_func(fname):
     return lambda *a: Effect((fname,) + a)
 
 
-class Cache(object):
+@implementer(IScalingGroupServersCache)
+class EffectServersCache(object):
     """ IScalingGroupServersCache impl for testing """
 
     def __init__(self, tid, gid):

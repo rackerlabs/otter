@@ -44,7 +44,7 @@ from otter.convergence.model import (
     RCv3Node,
     ServerState)
 from otter.test.utils import (
-    Cache,
+    EffectServersCache,
     intent_func,
     nested_parallel,
     patch,
@@ -228,7 +228,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
 
     def _invoke(self):
         return get_scaling_group_servers(
-            'tid', 'gid', self.now, cache_class=Cache,
+            'tid', 'gid', self.now, cache_class=EffectServersCache,
             all_as_servers=intent_func("all-as"),
             all_servers=intent_func("alls"))
 

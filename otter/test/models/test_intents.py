@@ -13,7 +13,7 @@ from otter.models.intents import (
     UpdateGroupStatus, UpdateServersCache, get_model_dispatcher)
 from otter.models.interface import (
     GroupState, IScalingGroupCollection, ScalingGroupStatus)
-from otter.test.utils import Cache, iMock, mock_group, mock_log
+from otter.test.utils import EffectServersCache, iMock, mock_group, mock_log
 
 
 class ModifyGroupStateTests(SynchronousTestCase):
@@ -88,7 +88,8 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         self.group.update_status.assert_called_once_with(
             ScalingGroupStatus.ERROR)
 
-    @mock.patch('otter.models.intents.CassScalingGroupServersCache', new=Cache)
+    @mock.patch('otter.models.intents.CassScalingGroupServersCache',
+                new=EffectServersCache)
     def test_perform_update_servers_cache(self):
         """
         """
