@@ -522,6 +522,10 @@ class StepAsEffectTests(SynchronousTestCase):
         :obj:`RemoveNodesFromCLB`, on receiving a 400, parses out the nodes
         that are no longer on the load balancer, and retries the bulk delete
         with those nodes removed.
+
+        TODO: this has been left in as a regression test - this can probably be
+        removed the next time it's touched, as this functionality happens
+        in cloud_client now and there is a similar test there.
         """
         lb_id = "12345"
         node_ids = [str(i) for i in range(5)]
