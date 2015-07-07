@@ -12,8 +12,6 @@ import sys
 from cql.apivalues import ProgrammingError
 from cql.connection import connect
 
-from effect import ComposedDispatcher
-
 from silverberg.client import CQLClient, ConsistencyLevel
 
 from twisted.internet import task
@@ -24,7 +22,7 @@ from txeffect import perform
 
 from otter.effect_dispatcher import get_working_cql_dispatcher
 from otter.metrics import get_scaling_groups
-from otter.models.cass import CassScalingGroupCollection, get_cql_dispatcher
+from otter.models.cass import CassScalingGroupCollection
 from otter.test.resources import CQLGenerator
 from otter.util.cqlbatch import batch
 

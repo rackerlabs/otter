@@ -6,17 +6,22 @@ import json
 
 from functools import partial
 
-from twisted.internet.defer import succeed, gatherResults
+from twisted.internet import reactor
+from twisted.internet.defer import gatherResults, succeed
+
+from txeffect import perform
 
 from otter import controller
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.service import get_convergence_starter
+from otter.effect_dispatcher import get_working_cql_dispatcher
 from otter.json_schema.group_schemas import (
     MAX_ENTITIES,
     validate_launch_config_servicenet,
 )
 from otter.json_schema.rest_schemas import create_group_request
 from otter.log import log
+from otter.models.cass import CassScalingGroupServersCache
 from otter.rest.bobby import get_bobby
 from otter.rest.configs import (
     OtterConfig,
@@ -443,6 +448,9 @@ class OtterGroups(object):
 
 
 def get_active_cache(connection, tenant_id, group_id):
+    """
+    Get active servers from servers cache table
+    """
     eff = CassScalingGroupServersCache(tenant_id, group_id).get_servers(True)
     disp = get_working_cql_dispatcher(reactor, connection)
     d = perform(disp, eff)

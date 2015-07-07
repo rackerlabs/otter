@@ -6,9 +6,13 @@ import json
 
 from copy import deepcopy
 
+from datetime import datetime
+
 from jsonschema import ValidationError
 
 import mock
+
+from silverberg.client import CQLClient, ConsistencyLevel
 
 from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
@@ -116,8 +120,8 @@ class FormatterHelpers(SynchronousTestCase):
             '11111',
             'one',
             'test',
-            None, # active ignored
-            None, # pending Ignored!
+            None,  # active ignored
+            None,  # pending Ignored!
             None,
             {},
             True,
@@ -141,8 +145,8 @@ class FormatterHelpers(SynchronousTestCase):
             '11111',
             'one',
             'test',
-            None, # active ignored
-            None, # pending Ignored!
+            None,  # active ignored
+            None,  # pending Ignored!
             None,
             {},
             True,
@@ -202,6 +206,33 @@ class ExtractBoolArgTests(SynchronousTestCase):
             e.message,
             ('Invalid "key" query argument: "junk". Must be '
              '"true" or "false". Defaults to "false" if not provided'))
+
+
+class GetActiveCacheTests(SynchronousTestCase):
+    """
+    Tests for :func:`get_active_cache`
+    """
+
+    def test_success(self):
+        """
+        Returns servers as dict keyed on id
+        """
+        connection = mock.Mock(spec=CQLClient)
+        dt = datetime(1970, 1, 1)
+        connection.execute.return_value = defer.succeed(
+            [{'server_blob': json.dumps({'id': 's1', 'links': 's1l'}),
+              'last_update': dt, 'server_as_active': True},
+             {'server_blob': json.dumps({'id': 's2', 'links': 's2l'}),
+              'last_update': dt, 'server_as_active': True}])
+
+        d = groups.get_active_cache(connection, 'tid', 'gid')
+        self.assertEqual(
+            self.successResultOf(d),
+            {'s1': {'id': 's1', 'links': 's1l'},
+             's2': {'id': 's2', 'links': 's2l'}})
+        connection.execute.assert_called_once_with(
+            mock.ANY, {"tenantId": "tid", "groupId": "gid"},
+            ConsistencyLevel.QUORUM)
 
 
 class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
@@ -930,8 +961,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             'groupConfiguration': config_examples()[0],
             'launchConfiguration': launch_examples()[0],
             'id': 'one',
-            'state': GroupState('11111', 'one', 'g', None, None, None, {}, False,
-                                ScalingGroupStatus.ACTIVE, desired=3),
+            'state': GroupState('11111', 'one', 'g', None, None, None, {},
+                                False, ScalingGroupStatus.ACTIVE, desired=3),
             'scalingPolicies': [dict(id="5", **policy_examples()[0])]
         }
         self.mock_group.view_manifest.return_value = defer.succeed(manifest)
