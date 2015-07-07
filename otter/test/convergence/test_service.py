@@ -37,7 +37,6 @@ from otter.log.intents import BoundFields, Log, LogErr
 from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,
-    ModifyGroupStateActive,
     UpdateGroupStatus,
     UpdateServersCache)
 from otter.models.interface import (
@@ -644,11 +643,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 (("gacd", self.tenant_id, self.group_id, self.now),
                  lambda i: (self.servers, ()))
             ]),
-            nested_parallel([
-                (ModifyGroupStateActive(self.group, self.state_active), noop),
-                (UpdateServersCache(
-                    self.tenant_id, self.group_id, self.now, self.cache), noop)
-            ])
+            (UpdateServersCache(
+                self.tenant_id, self.group_id, self.now, self.cache), noop)
         ]
 
     def _invoke(self, plan=None):
@@ -670,7 +666,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (Log('execute-convergence-results',
                  {'results': [], 'worst_status': 'SUCCESS'}), noop),
             (UpdateServersCache("tenant-id", "group-id", self.now,
-                                [{"id": "a"}, {"id": "b"}]), noop)
+                                [{"id": "a", "_is_as_active": True},
+                                 {"id": "b", "_is_as_active": True}]), noop)
         ]
         self.state_active = {
             'a': {'id': 'a', 'links': [{'href': 'link1', 'rel': 'self'}]},
@@ -723,9 +720,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                'reasons': []}],
                   'worst_status': 'SUCCESS'}), noop),
             # Note that servers arg is non-deleted servers
-            (UpdateServersCache(
-                "tenant-id", "group-id", self.now,
-                [{'id': 'a'}, {'id': 'b'}]), noop)
+            (UpdateServersCache("tenant-id", "group-id", self.now,
+                                [{"id": "a", "_is_as_active": True},
+                                 {"id": "b", "_is_as_active": True}]), noop)
         ]
 
         # all the servers updated in cache in beginning
