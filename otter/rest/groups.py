@@ -57,6 +57,8 @@ def format_state_dict(state, active=None):
     response.
 
     :param state: a :class:`otter.models.interface.GroupState` object
+    :param dict active: Active servers used when provided
+        instead of state.active
 
     :return: a ``dict`` that looks like what should be respond by the API
         response when getting state
@@ -472,6 +474,10 @@ class OtterGroup(object):
         self.group_id = group_id
 
     def with_active_cache(self, get_func, *args, **kwargs):
+        """
+        Return result of `get_func` and active cache from servers table
+        if this is convergence enabled tenant
+        """
         if tenant_is_enabled(self.tenant_id, config_value):
             cache_d = get_active_cache(self.store.connection,
                                        self.tenant_id, self.group_id)
