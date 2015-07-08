@@ -31,6 +31,7 @@ from otter.convergence.gathering import (
     extract_CLB_drained_at,
     get_all_convergence_data,
     get_all_server_details,
+    get_all_scaling_group_servers,
     get_clb_contents,
     get_rcv3_contents,
     get_scaling_group_servers,
@@ -213,6 +214,93 @@ class GetAllServerDetailsTests(SynchronousTestCase):
             eff.intent.should_retry,
             ShouldDelayAndRetry(can_retry=retry_times(5),
                                 next_interval=exponential_backoff_interval(2)))
+
+
+class GetAllScalingGroupServersTests(SynchronousTestCase):
+    """
+    Tests for :func:`get_all_scaling_group_servers`
+    """
+
+    def setUp(self):
+        """Save basic reused data."""
+        self.req = (ServiceType.CLOUD_SERVERS, 'GET',
+                    'servers/detail?limit=100')
+
+    def test_with_changes_since(self):
+        """
+        If given, servers are fetched based on changes_since
+        """
+        since = datetime(2010, 10, 10, 10, 10, 0)
+        eff = resolve_retry_stubs(
+            get_all_scaling_group_servers(changes_since=since))
+        fake_response = object()
+        body = {'servers': []}
+        result = resolve_svcreq(
+            eff, (fake_response, body),
+            *svc_request_args(changes_since=since, limit=100))
+        self.assertEqual(result, {})
+
+    def test_filters_no_metadata(self):
+        """
+        Servers without metadata are not included in the result.
+        """
+        servers = [{'id': i} for i in range(10)]
+        eff = resolve_retry_stubs(get_all_scaling_group_servers())
+        fake_response = object()
+        body = {'servers': servers}
+        result = resolve_svcreq(eff, (fake_response, body), *self.req)
+        self.assertEqual(result, {})
+
+    def test_filters_no_as_metadata(self):
+        """
+        Does not include servers which have metadata but does not have AS info
+        in it
+        """
+        servers = [{'id': i, 'metadata': {}} for i in range(10)]
+        eff = resolve_retry_stubs(get_all_scaling_group_servers())
+        fake_response = object()
+        body = {'servers': servers}
+        result = resolve_svcreq(eff, (fake_response, body), *self.req)
+        self.assertEqual(result, {})
+
+    def test_returns_as_servers(self):
+        """
+        Returns servers with AS metadata in it grouped by scaling group ID
+        """
+        as_servers = (
+            [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i}
+             for i in range(5)] +
+            [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i}
+             for i in range(5, 8)] +
+            [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
+        servers = as_servers + [{'metadata': 'junk'}] * 3
+        eff = resolve_retry_stubs(get_all_scaling_group_servers())
+        fake_response = object()
+        body = {'servers': servers}
+        result = resolve_svcreq(eff, (fake_response, body), *self.req)
+        self.assertEqual(
+            result,
+            {'a': as_servers[:5] + [as_servers[-1]], 'b': as_servers[5:8]})
+
+    def test_filters_on_user_criteria(self):
+        """
+        Considers user provided filter if provided
+        """
+        as_servers = (
+            [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': i}
+             for i in range(5)] +
+            [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i}
+             for i in range(5, 8)])
+        servers = as_servers + [{'metadata': 'junk'}] * 3
+        eff = resolve_retry_stubs(
+            get_all_scaling_group_servers(
+                server_predicate=lambda s: s['id'] % 3 == 0))
+        fake_response = object()
+        body = {'servers': servers}
+        result = resolve_svcreq(eff, (fake_response, body), *self.req)
+        self.assertEqual(
+            result,
+            {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
 
 
 class GetScalingGroupServersTests(SynchronousTestCase):
