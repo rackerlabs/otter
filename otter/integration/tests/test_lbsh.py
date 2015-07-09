@@ -74,7 +74,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         """
         clb = self.helper.clbs[0]
 
-        nodes = yield clb.wait_for_nodes(
+        yield clb.wait_for_nodes(
             self.rcs, HasLength(0), timeout=timeout_default)
 
         group, _ = self.helper.create_group(min_entities=1)
@@ -145,9 +145,9 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         yield clb_as.delete_nodes(self.rcs, [the_node['id']])
         yield clb_other.add_nodes(self.rcs, [node_info])
 
-        clb_as.wait_for_nodes(
+        yield clb_as.wait_for_nodes(
             self.rcs, HasLength(0), timeout=timeout_default)
-        clb_other.wait_for_nodes(
+        yield clb_other.wait_for_nodes(
             self.rcs, HasLength(1), timeout=timeout_default)
 
         yield group.trigger_convergence(self.rcs)
