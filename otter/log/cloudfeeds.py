@@ -136,7 +136,6 @@ def prepare_request(req_fmt, event, error, timestamp, region, _id):
     request['entry']['content']['event']['eventTime'] = timestamp
     request['entry']['content']['event']['product'].update(event)
     request['entry']['content']['event']['id'] = _id
-    request['entry']['content']['event']['tenantId'] = event['tenant_id']
     return request
 
 
