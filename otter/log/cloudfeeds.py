@@ -16,7 +16,7 @@ from txeffect import perform
 
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType
-from otter.effect_dispatcher import get_full_dispatcher
+from otter.effect_dispatcher import get_legacy_dispatcher
 from otter.log import log as otter_log
 from otter.log.formatters import (
     ErrorFormattingWrapper, LogLevel, PEP3101FormattingWrapper)
@@ -136,6 +136,7 @@ def prepare_request(req_fmt, event, error, timestamp, region, _id):
     request['entry']['content']['event']['eventTime'] = timestamp
     request['entry']['content']['event']['product'].update(event)
     request['entry']['content']['event']['id'] = _id
+    request['entry']['content']['event']['tenantId'] = event['tenant_id']
     return request
 
 
@@ -164,7 +165,7 @@ def add_event(event, tenant_id, region, log):
 
 @attributes(['reactor', 'authenticator', 'tenant_id', 'region',
              'service_configs', 'log', 'get_disp', 'add_event'],
-            defaults={'log': otter_log, 'get_disp': get_full_dispatcher,
+            defaults={'log': otter_log, 'get_disp': get_legacy_dispatcher,
                       'add_event': add_event})
 class CloudFeedsObserver(object):
     """
