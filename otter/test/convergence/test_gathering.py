@@ -310,8 +310,14 @@ class GetScalingGroupServersTests(SynchronousTestCase):
 
     def setUp(self):
         self.now = datetime(2010, 5, 31)
-        self.servers1 = [{'id': 'a', 'a': 'b'}, {'id': 'b', 'b': 'c'}]
-        self.servers2 = [{'id': 'd', 'd': 'e'}]
+        asmetakey = "rax:autoscale:group:id"
+        self.servers1 = [
+            {'id': 'a', 'metadata': {asmetakey: "gid"}},
+            {'id': 'b', 'metadata': {asmetakey: "gid"}},
+            {'id': 'd', 'metadata': {asmetakey: "gid"}}]
+        self.servers2 = [
+            {'id': 'a', 'b': 'c', 'metadata': {asmetakey: "gid"}},
+            {'id': 'd', 'metadata': {"changed": "yes"}}]
         self.freeze = compose(set, map(freeze))
 
     def _invoke(self):
@@ -321,7 +327,8 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             all_servers=intent_func("alls"))
 
     def _test_no_cache(self, empty):
-        current = [] if empty else self.servers1
+        current = [] if empty else [{'id': 'a', 'a': 'b'},
+                                    {'id': 'b', 'b': 'c'}]
         sequence = [
             (("cachegstidgid", False), lambda i: (object(), None)),
             (("all-as",), lambda i: {} if empty else {"gid": current})]
@@ -334,44 +341,33 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         self._test_no_cache(False)
         self._test_no_cache(True)
 
-    def _test_old_case(self, last_update, as_srvs=True, cur_srvs=True):
-        exp_last_update = datetime(2010, 5, 1)
-        as_servers = self.servers1
-        current = self.servers2
-        servers = (as_srvs and as_servers or []) + (cur_srvs and current or [])
-        sequence = [
-            (("cachegstidgid", False), lambda i: (object(), last_update)),
-            nested_parallel([
-                (("all-as", exp_last_update),
-                 lambda i: {'gid': as_servers} if as_srvs else {}),
-                (("all-as",), lambda i: {"gid": current} if cur_srvs else {})
-            ])
-        ]
-        self.assertEqual(perform_sequence(sequence, self._invoke()), servers)
-
     def test_old_cache(self):
         """
         If cache is older than 30 days then servers returned are got by getting
         current list and changes since last 30 days.
         """
-        dt = datetime(2010, 3, 1)
-        self._test_old_case(dt)
-        self._test_old_case(dt, False, True)
-        self._test_old_case(dt, True, False)
+        last_update = datetime(2010, 3, 1)
+        exp_last_update = datetime(2010, 5, 1)
+        changes = self.servers1
+        current = self.servers2
+        sequence = [
+            (("cachegstidgid", False), lambda i: (object(), last_update)),
+            nested_parallel([
+                (("alls", exp_last_update), lambda i: changes),
+                (("alls",), lambda i: current)
+            ])
+        ]
+        self.assertEqual(
+            self.freeze(perform_sequence(sequence, self._invoke())),
+            self.freeze([changes[1], current[0]]))
 
     def test_from_cache(self):
         """
         If cache is < 30 days old then servers returned are merge of
         changes since the cache time
         """
-        asmetakey = "rax:autoscale:group:id"
-        cache = [
-            {'id': 'a', 'metadata': {asmetakey: "gid"}},
-            {'id': 'b', 'metadata': {asmetakey: "gid"}},
-            {'id': 'd', 'metadata': {asmetakey: "gid"}}]
-        changes = [
-            {'id': 'a', 'b': 'c', 'metadata': {asmetakey: "gid"}},
-            {'id': 'd', 'metadata': {"changed": "yes"}}]
+        cache = self.servers1
+        changes = self.servers2
         last_update = datetime(2010, 5, 20)
         sequence = [
             (("cachegstidgid", False), lambda i: (cache, last_update)),

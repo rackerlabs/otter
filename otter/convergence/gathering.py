@@ -141,13 +141,6 @@ def server_of_group(group_id, server):
     return group_id_from_metadata(server.get('metadata', {})) == group_id
 
 
-def group_servers(group_id, grouped_servers):
-    """
-    Return servers of a group defaulting to empty if not found
-    """
-    return grouped_servers.get(group_id, [])
-
-
 @do
 def get_scaling_group_servers(tenant_id, group_id, now,
                               all_as_servers=get_all_scaling_group_servers,
@@ -171,9 +164,9 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     elif now - last_update >= timedelta(days=30):
         last_update = now - timedelta(days=30)
         changes, current = yield parallel([
-            all_as_servers(last_update).on(partial(group_servers, group_id)),
-            all_as_servers().on(partial(group_servers, group_id))])
+            all_servers(last_update), all_servers()])
         servers = merge_servers(changes, current)
+        servers = list(filter(partial(server_of_group, group_id), servers))
     else:
         changes = yield all_servers(last_update)
         servers = merge_servers(cached_servers, changes)
