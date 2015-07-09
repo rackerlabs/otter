@@ -50,8 +50,9 @@ class StructureReasonsTests(SynchronousTestCase):
         )
 
     def test_string(self):
-        """String values get unwrapped."""
-        self.assertEqual(structure_reason(ErrorReason.String('foo')), 'foo')
+        """String values get wrapped in a dictionary.unwrapped."""
+        self.assertEqual(structure_reason(ErrorReason.String('foo')),
+                         {'string': 'foo'})
 
     def test_structured(self):
         """Structured values get unwrapped."""

@@ -49,5 +49,10 @@ class structure_reason(object):
         return {
             'exception': serialize_to_jsonable(exc_info[1]),
             'traceback': ''.join(traceback.format_exception(*exc_info))}
+
+    def String(string):
+        # So that the "reasons" are all the same structure, so that it can be
+        # mapped if using elasticsearch
+        return {'string': string}
+
     Structured = identity
-    String = identity

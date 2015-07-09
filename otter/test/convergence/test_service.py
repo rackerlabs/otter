@@ -718,7 +718,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                  noop)
             ]),
             (Log('execute-convergence-results',
-                 {'results': [(steps[0], (StepResult.SUCCESS, []))],
+                 {'results': [{'step': steps[0],
+                               'result': StepResult.SUCCESS,
+                               'reasons': []}],
                   'worst_status': 'SUCCESS'}), noop),
             # Note that servers arg is non-deleted servers
             (UpdateServersCache(
@@ -766,11 +768,16 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         tb_msg = ''.join(traceback.format_exception(*exc_info))
         expected_fields = {
             'results': [
-                (step, (StepResult.RETRY,
-                        [{'exception': exc_msg,
-                          'traceback': tb_msg},
-                         'foo',
-                         {'foo': 'bar'}]))],
+                {
+                    'step': step,
+                    'result': StepResult.RETRY,
+                    'reasons': [
+                        {'exception': exc_msg, 'traceback': tb_msg},
+                        {'string': 'foo'},
+                        {'foo': 'bar'}
+                    ]
+                }
+            ],
             'worst_status': 'RETRY'}
         sequence = [
             nested_parallel([]),
