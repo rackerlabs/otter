@@ -1204,7 +1204,7 @@ class GroupStateTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
         self.mock_group.view_state.assert_called_once_with()
-        mock_format.assert_called_once_with('group_state')
+        mock_format.assert_called_once_with('group_state', None)
 
     @mock.patch('otter.rest.groups.get_active_cache',
                 return_value=defer.succeed({'s1': {'links': 'l'}}))
