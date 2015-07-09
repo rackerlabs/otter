@@ -6,8 +6,8 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 """
 
 import operator
-import time
 import uuid
+from datetime import datetime
 from functools import partial
 from hashlib import sha1
 
@@ -39,9 +39,10 @@ from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, with_log
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, ModifyGroupState, UpdateGroupStatus)
+    DeleteGroup, GetScalingGroupInfo, ModifyGroupStateActive,
+    UpdateGroupStatus, UpdateServersCache)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
-from otter.util.fp import assoc_obj
+from otter.util.timestamp import datetime_to_epoch
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 
@@ -53,15 +54,14 @@ def server_to_json(server):
     return {'id': server.id, 'links': thaw(server.links)}
 
 
-def determine_active(servers, lb_nodes):
+def is_autoscale_active(server, lb_nodes):
     """
-    Given the current NovaServers and LB nodes, determine which servers are
-    completely built.
+    Is the given NovaServer in all its desired LB nodes?
 
-    :param servers: sequence of :obj:`NovaServer`.
+    :param :obj:`NovaServer` server: NovaServer being checked
     :param lb_nodes: sequence of :obj:`ILBNode`.
 
-    :return: list of servers that are active.
+    :return: True if server is in LB nodes, False otherwise
     """
 
     def all_met(server, current_lb_nodes):
@@ -73,23 +73,34 @@ def determine_active(servers, lb_nodes):
             if desired.equivalent_definition(node.description)])
         return desired_lbs == met_desireds
 
-    return [s for s in servers
-            if (s.state == ServerState.ACTIVE and
-                all_met(s, [node for node in lb_nodes if node.matches(s)]))]
+    return (server.state == ServerState.ACTIVE and
+            all_met(server, [node for node in lb_nodes
+                             if node.matches(server)]))
 
 
-def _update_active(scaling_group, active):
-    """
-    :param scaling_group: scaling group
-    :param active: list of active NovaServer objects
-    """
+def update_old_cache(group, active):
     active = {server.id: server_to_json(server) for server in active}
+    return Effect(ModifyGroupStateActive(group, active))
 
-    def update_group_state(group, old_state):
-        return assoc_obj(old_state, active=active)
 
-    return Effect(ModifyGroupState(scaling_group=scaling_group,
-                                   modifier=update_group_state))
+def update_cache(group, servers, lb_nodes, now):
+    """
+    :param group: scaling group
+    :param list servers: list of NovaServer objects
+    """
+    active = []
+    server_dicts = []
+    for server in servers:
+        sd = thaw(server.json)
+        if is_autoscale_active(server, lb_nodes):
+            sd["_is_as_active"] = True
+            active.append(server)
+        server_dicts.append(sd)
+
+    set_eff = Effect(
+        UpdateServersCache(group.tenant_id, group.uuid, now, server_dicts))
+
+    return parallel([update_old_cache(group, active), set_eff])
 
 
 @do
@@ -107,11 +118,13 @@ def _execute_steps(steps):
         priority = sorted(results,
                           key=lambda (status, reasons): severity.index(status))
         worst_status = priority[0][0]
-        results_to_log = zip(
-            steps,
-            [(result, map(structure_reason, reasons))
-             for result, reasons in results])
-
+        results_to_log = [
+            {'step': step,
+             'result': result,
+             'reasons': map(structure_reason, reasons)}
+            for step, (result, reasons) in
+            zip(steps, results)
+        ]
         reasons = reduce(operator.add,
                          (x[1] for x in results if x[0] == worst_status))
     else:
@@ -125,13 +138,13 @@ def _execute_steps(steps):
 
 
 @do
-def convergence_exec_data(tenant_id, group_id, get_all_convergence_data):
+def convergence_exec_data(tenant_id, group_id, now, get_all_convergence_data):
     """
     Get data required while executing convergence
     """
     sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
                                         group_id=group_id))
-    gather_eff = get_all_convergence_data(group_id)
+    gather_eff = get_all_convergence_data(tenant_id, group_id, now)
     try:
         data = yield parallel([sg_eff, gather_eff])
     except FirstError as fe:
@@ -141,13 +154,12 @@ def convergence_exec_data(tenant_id, group_id, get_all_convergence_data):
     group_state = manifest['state']
     launch_config = manifest['launchConfiguration']
 
-    # update active cache for non-deleting groups
-    if group_state.status != ScalingGroupStatus.DELETING:
-        active = determine_active(servers, lb_nodes)
-        yield _update_active(scaling_group, active)
+    if group_state.status == ScalingGroupStatus.DELETING:
+        desired_capacity = 0
+    else:
+        desired_capacity = group_state.desired
+        yield update_cache(scaling_group, servers, lb_nodes, now)
 
-    desired_capacity = (0 if group_state.status == ScalingGroupStatus.DELETING
-                        else group_state.desired)
     desired_group_state = get_desired_group_state(
         group_id, launch_config, desired_capacity)
 
@@ -177,26 +189,28 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
     # Gather data
-    now = yield Effect(Func(time.time))
-    all_data = yield convergence_exec_data(tenant_id, group_id,
+    now_dt = yield Effect(Func(datetime.utcnow))
+    all_data = yield convergence_exec_data(tenant_id, group_id, now_dt,
                                            get_all_convergence_data)
     (scaling_group, group_state, desired_group_state,
      servers, lb_nodes) = all_data
 
     # prepare plan
-    steps = plan(desired_group_state, servers, lb_nodes, now, build_timeout)
+    steps = plan(desired_group_state, servers, lb_nodes,
+                 datetime_to_epoch(now_dt), build_timeout)
     yield log_steps(steps)
 
     # Execute plan
     yield msg('execute-convergence',
-              servers=servers, lb_nodes=lb_nodes, steps=steps, now=now,
+              servers=servers, lb_nodes=lb_nodes, steps=steps, now=now_dt,
               desired=desired_group_state)
     worst_status, reasons = yield _execute_steps(steps)
 
     # Handle the status from execution
     result_status = group_state.status
     if worst_status == StepResult.SUCCESS:
-        result_status = yield convergence_succeeded(scaling_group, group_state)
+        result_status = yield convergence_succeeded(
+            scaling_group, group_state, servers, now_dt)
     elif worst_status == StepResult.FAILURE:
         result_status = yield convergence_failed(scaling_group, reasons)
 
@@ -204,7 +218,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
 
 
 @do
-def convergence_succeeded(scaling_group, group_state):
+def convergence_succeeded(scaling_group, group_state, servers, now):
     """
     Handle convergence success
     """
@@ -218,6 +232,13 @@ def convergence_succeeded(scaling_group, group_state):
                                        status=ScalingGroupStatus.ACTIVE))
         yield cf_msg('group-status-active',
                      status=ScalingGroupStatus.ACTIVE.name)
+    else:
+        # update servers cache with latest servers
+        yield Effect(
+            UpdateServersCache(
+                scaling_group.tenant_id, scaling_group.uuid, now,
+                [thaw(s.json) for s in servers
+                 if s.state != ServerState.DELETED]))
     yield do_return(ScalingGroupStatus.ACTIVE)
 
 

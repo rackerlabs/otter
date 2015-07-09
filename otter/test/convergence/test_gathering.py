@@ -18,6 +18,9 @@ from effect.testing import (
 
 from pyrsistent import freeze
 
+from toolz.curried import map
+from toolz.functoolz import compose
+
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import NoSuchEndpoint
@@ -28,9 +31,11 @@ from otter.convergence.gathering import (
     extract_CLB_drained_at,
     get_all_convergence_data,
     get_all_server_details,
+    get_all_scaling_group_servers,
     get_clb_contents,
     get_rcv3_contents,
-    get_scaling_group_servers)
+    get_scaling_group_servers,
+    merge_servers)
 from otter.convergence.model import (
     CLBDescription,
     CLBNode,
@@ -40,7 +45,11 @@ from otter.convergence.model import (
     RCv3Node,
     ServerState)
 from otter.test.utils import (
+    EffectServersCache,
+    intent_func,
+    nested_parallel,
     patch,
+    perform_sequence,
     resolve_effect,
     resolve_retry_stubs,
     resolve_stubs,
@@ -207,9 +216,9 @@ class GetAllServerDetailsTests(SynchronousTestCase):
                                 next_interval=exponential_backoff_interval(2)))
 
 
-class GetScalingGroupServersTests(SynchronousTestCase):
+class GetAllScalingGroupServersTests(SynchronousTestCase):
     """
-    Tests for :func:`get_scaling_group_servers`
+    Tests for :func:`get_all_scaling_group_servers`
     """
 
     def setUp(self):
@@ -223,7 +232,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         """
         since = datetime(2010, 10, 10, 10, 10, 0)
         eff = resolve_retry_stubs(
-            get_scaling_group_servers(changes_since=since))
+            get_all_scaling_group_servers(changes_since=since))
         fake_response = object()
         body = {'servers': []}
         result = resolve_svcreq(
@@ -236,7 +245,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         Servers without metadata are not included in the result.
         """
         servers = [{'id': i} for i in range(10)]
-        eff = resolve_retry_stubs(get_scaling_group_servers())
+        eff = resolve_retry_stubs(get_all_scaling_group_servers())
         fake_response = object()
         body = {'servers': servers}
         result = resolve_svcreq(eff, (fake_response, body), *self.req)
@@ -248,7 +257,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         in it
         """
         servers = [{'id': i, 'metadata': {}} for i in range(10)]
-        eff = resolve_retry_stubs(get_scaling_group_servers())
+        eff = resolve_retry_stubs(get_all_scaling_group_servers())
         fake_response = object()
         body = {'servers': servers}
         result = resolve_svcreq(eff, (fake_response, body), *self.req)
@@ -265,7 +274,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
              for i in range(5, 8)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
         servers = as_servers + [{'metadata': 'junk'}] * 3
-        eff = resolve_retry_stubs(get_scaling_group_servers())
+        eff = resolve_retry_stubs(get_all_scaling_group_servers())
         fake_response = object()
         body = {'servers': servers}
         result = resolve_svcreq(eff, (fake_response, body), *self.req)
@@ -284,7 +293,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
              for i in range(5, 8)])
         servers = as_servers + [{'metadata': 'junk'}] * 3
         eff = resolve_retry_stubs(
-            get_scaling_group_servers(
+            get_all_scaling_group_servers(
                 server_predicate=lambda s: s['id'] % 3 == 0))
         fake_response = object()
         body = {'servers': servers}
@@ -292,6 +301,91 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         self.assertEqual(
             result,
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
+
+
+class GetScalingGroupServersTests(SynchronousTestCase):
+    """
+    Tests for :func:`get_scaling_group_servers`
+    """
+
+    def setUp(self):
+        self.now = datetime(2010, 5, 31)
+        asmetakey = "rax:autoscale:group:id"
+        self.servers1 = [
+            {'id': 'a', 'metadata': {asmetakey: "gid"}},
+            {'id': 'b', 'metadata': {asmetakey: "gid"}},
+            {'id': 'd', 'metadata': {asmetakey: "gid"}}]
+        self.servers2 = [
+            {'id': 'a', 'b': 'c', 'metadata': {asmetakey: "gid"}},
+            {'id': 'd', 'metadata': {"changed": "yes"}}]
+        self.freeze = compose(set, map(freeze))
+
+    def _invoke(self):
+        return get_scaling_group_servers(
+            'tid', 'gid', self.now, cache_class=EffectServersCache,
+            all_as_servers=intent_func("all-as"),
+            all_servers=intent_func("alls"))
+
+    def _test_no_cache(self, empty):
+        current = [] if empty else [{'id': 'a', 'a': 'b'},
+                                    {'id': 'b', 'b': 'c'}]
+        sequence = [
+            (("cachegstidgid", False), lambda i: (object(), None)),
+            (("all-as",), lambda i: {} if empty else {"gid": current})]
+        self.assertEqual(perform_sequence(sequence, self._invoke()), current)
+
+    def test_no_cache(self):
+        """
+        If cache is empty then current list of servers are returned
+        """
+        self._test_no_cache(False)
+        self._test_no_cache(True)
+
+    def test_old_cache(self):
+        """
+        If cache is older than 30 days then servers returned are got by getting
+        current list and changes since last 30 days.
+        """
+        last_update = datetime(2010, 3, 1)
+        exp_last_update = datetime(2010, 5, 1)
+        changes = self.servers1
+        current = self.servers2
+        sequence = [
+            (("cachegstidgid", False), lambda i: (object(), last_update)),
+            nested_parallel([
+                (("alls", exp_last_update), lambda i: changes),
+                (("alls",), lambda i: current)
+            ])
+        ]
+        self.assertEqual(
+            self.freeze(perform_sequence(sequence, self._invoke())),
+            self.freeze([changes[1], current[0]]))
+
+    def test_from_cache(self):
+        """
+        If cache is < 30 days old then servers returned are merge of
+        changes since the cache time
+        """
+        cache = self.servers1
+        changes = self.servers2
+        last_update = datetime(2010, 5, 20)
+        sequence = [
+            (("cachegstidgid", False), lambda i: (cache, last_update)),
+            (("alls", last_update), lambda i: changes)]
+        self.assertEqual(
+            self.freeze(perform_sequence(sequence, self._invoke())),
+            self.freeze([cache[1], changes[0]]))
+
+    def test_merge_servers_precedence(self):
+        """
+        In :func:`merge_servers`, if first list has common servers with second
+        list, the second one takes precedence
+        """
+        first = [{'id': 'a', 'a': 1}, {'id': 'b', 'b': 2}]
+        second = [{'id': 'd', 'd': 3}, {'id': 'b', 'b': 4}]
+        self.assertEqual(
+            self.freeze(merge_servers(first, second)),
+            self.freeze([first[0]] + second))
 
 
 class ExtractDrainedTests(SynchronousTestCase):
@@ -576,8 +670,8 @@ class GetRCv3ContentsTests(SynchronousTestCase):
             sync_perform(dispatcher, get_rcv3_contents()), [])
 
 
-def _constant_as_eff(constant):
-    return lambda: Effect(Stub(Constant(constant)))
+def _constant_as_eff(args, retval):
+    return lambda *a: Effect(Stub(Constant(retval))) if a == args else (1 / 0)
 
 
 class GetAllConvergenceDataTests(SynchronousTestCase):
@@ -603,6 +697,7 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                                         'version': 4}]},
              'links': [{'href': 'link2', 'rel': 'self'}]}
         ]
+        self.now = datetime(2010, 10, 20, 03, 30, 00)
 
     def test_success(self):
         """
@@ -614,10 +709,13 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
                                description=RCv3Description(lb_id='lb2'))]
 
         eff = get_all_convergence_data(
+            'tid',
             'gid',
-            get_scaling_group_servers=_constant_as_eff({'gid': self.servers}),
-            get_clb_contents=_constant_as_eff(clb_nodes),
-            get_rcv3_contents=_constant_as_eff(rcv3_nodes))
+            self.now,
+            get_scaling_group_servers=_constant_as_eff(
+                ('tid', 'gid', self.now), self.servers),
+            get_clb_contents=_constant_as_eff((), clb_nodes),
+            get_rcv3_contents=_constant_as_eff((), rcv3_nodes))
 
         expected_servers = [
             server('a', ServerState.ACTIVE, servicenet_address='10.0.0.1',
@@ -637,9 +735,12 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         an empty list.
         """
         eff = get_all_convergence_data(
+            'tid',
             'gid',
-            get_scaling_group_servers=_constant_as_eff({}),
-            get_clb_contents=_constant_as_eff([]),
-            get_rcv3_contents=_constant_as_eff([]))
+            self.now,
+            get_scaling_group_servers=_constant_as_eff(
+                ('tid', 'gid', self.now), []),
+            get_clb_contents=_constant_as_eff((), []),
+            get_rcv3_contents=_constant_as_eff((), []))
 
         self.assertEqual(resolve_stubs(eff), ([], []))

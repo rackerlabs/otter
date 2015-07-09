@@ -74,25 +74,21 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         """
         clb = self.helper.clbs[0]
 
-        nodes = yield clb.list_nodes(self.rcs)
-        self.assertEqual(len(nodes['nodes']), 0,
-                         "There should be no nodes on the CLB yet.")
+        yield clb.wait_for_nodes(
+            self.rcs, HasLength(0), timeout=timeout_default)
 
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
-        nodes = yield clb.list_nodes(self.rcs)
-        self.assertEqual(
-            len(nodes['nodes']), 1,
-            "There should be 1 node on the CLB now that the group is active.")
-        the_node = nodes["nodes"][0]
+        nodes = yield clb.wait_for_nodes(
+            self.rcs, HasLength(1), timeout=timeout_default)
+
+        the_node = nodes[0]
 
         yield clb.delete_nodes(self.rcs, [the_node['id']])
 
-        nodes = yield clb.list_nodes(self.rcs)
-        self.assertEqual(len(nodes['nodes']), 0,
-                         "There should no nodes on the CLB after deletion.")
-
+        yield clb.wait_for_nodes(
+            self.rcs, HasLength(0), timeout=timeout_default)
         yield group.trigger_convergence(self.rcs)
 
         yield clb.wait_for_nodes(
@@ -125,26 +121,20 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         clb_as = self.helper.clbs[0]
 
-        nodes_as = yield clb_as.list_nodes(self.rcs)
-        nodes_other = yield clb_other.list_nodes(self.rcs)
-        self.assertEqual(len(nodes_as['nodes']), 0,
-                         "There should be no nodes on the CLB yet.")
-        self.assertEqual(len(nodes_other['nodes']), 0,
-                         "There should be no nodes on the CLB yet.")
+        yield clb_as.wait_for_nodes(
+            self.rcs, HasLength(0), timeout=timeout_default)
+        yield clb_other.wait_for_nodes(
+            self.rcs, HasLength(0), timeout=timeout_default)
 
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
-        nodes_as = yield clb_as.list_nodes(self.rcs)
-        nodes_other = yield clb_other.list_nodes(self.rcs)
-        self.assertEqual(
-            len(nodes_as['nodes']), 1,
-            "There should be 1 node on the autoscale CLB.")
-        self.assertEqual(
-            len(nodes_other['nodes']), 0,
-            "There should still be 0 nodes on the out of band CLB")
+        nodes_as = yield clb_as.wait_for_nodes(
+            self.rcs, HasLength(1), timeout=timeout_default)
+        yield clb_other.wait_for_nodes(
+            self.rcs, HasLength(0), timeout=timeout_default)
 
-        the_node = nodes_as["nodes"][0]
+        the_node = nodes_as[0]
         node_info = {
             "address": the_node["address"],
             "port": the_node["port"],
@@ -155,11 +145,9 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         yield clb_as.delete_nodes(self.rcs, [the_node['id']])
         yield clb_other.add_nodes(self.rcs, [node_info])
 
-        nodes_as = yield clb_as.list_nodes(self.rcs)
-        nodes_other = yield clb_other.list_nodes(self.rcs)
-        clb_as.wait_for_nodes(
+        yield clb_as.wait_for_nodes(
             self.rcs, HasLength(0), timeout=timeout_default)
-        clb_other.wait_for_nodes(
+        yield clb_other.wait_for_nodes(
             self.rcs, HasLength(1), timeout=timeout_default)
 
         yield group.trigger_convergence(self.rcs)

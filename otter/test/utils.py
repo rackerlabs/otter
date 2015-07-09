@@ -9,7 +9,7 @@ from inspect import getargspec
 from operator import attrgetter
 
 from effect import (
-    ComposedDispatcher, ParallelEffects, TypeDispatcher,
+    ComposedDispatcher, Effect, ParallelEffects, TypeDispatcher,
     base_dispatcher, sync_perform)
 from effect.async import perform_parallel_async
 from effect.fold import sequence
@@ -40,7 +40,7 @@ from zope.interface.verify import verifyObject
 
 from otter.convergence.model import NovaServer
 from otter.log.bound import BoundLog
-from otter.models.interface import IScalingGroup
+from otter.models.interface import IScalingGroup, IScalingGroupServersCache
 from otter.supervisor import ISupervisor
 from otter.util.deferredutils import DeferredPool
 from otter.util.fp import set_in
@@ -865,6 +865,35 @@ class TestStep(object):
 def noop(_):
     """Ignore input and return None."""
     pass
+
+
+def intent_func(fname):
+    """
+    Return function that returns Effect of tuple of fname and its args. Useful
+    in writing tests that expect intent based on args
+    """
+    return lambda *a: Effect((fname,) + a)
+
+
+@implementer(IScalingGroupServersCache)
+class EffectServersCache(object):
+    """ IScalingGroupServersCache impl for testing """
+
+    def __init__(self, tid, gid):
+        self.tid = tid
+        self.gid = gid
+
+    def ids(self, s):
+        return "cache" + s + self.tid + self.gid
+
+    def get_servers(self, with_as_active):
+        return Effect((self.ids("gs"), with_as_active))
+
+    def insert_servers(self, time, servers, clear):
+        return Effect((self.ids("is"), time, servers, clear))
+
+    def delete_servers(self):
+        return Effect(self.ids("ds"))
 
 
 def server(id, state, created=0, image_id='image', flavor_id='flavor',
