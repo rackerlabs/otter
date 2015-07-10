@@ -30,6 +30,7 @@ from otter.cloud_client import (
     CLBDeletedError,
     CLBDuplicateNodesError,
     CLBNodeLimitError,
+    CLBNotActiveError,
     CLBPendingUpdateError,
     CLBRateLimitError,
     CreateServerConfigurationError,
@@ -554,7 +555,8 @@ class CLBClientTests(SynchronousTestCase):
              "considered immutable.", 422, CLBDeletedError),
             ("The load balancer is deleted and considered immutable.",
              422, CLBDeletedError),
-            ("Load balancer not found.", 404, NoSuchCLBError)
+            ("Load balancer not found.", 404, NoSuchCLBError),
+            ("LoadBalancer is not ACTIVE", 422, CLBNotActiveError),
         ]
 
         for msg, code, err in json_responses_and_errs:
