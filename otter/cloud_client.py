@@ -377,8 +377,11 @@ class ExceptionWithMessage(Exception):
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
 class CLBImmutableError(Exception):
     """
-    Error to be raised when the CLB is in PENDING_UPDATE status and is
-    immutable (temporarily).
+    Error to be raised when the CLB is in some status that causes is to be
+    temporarily immutable.
+
+    This exception is _not_ used when the status is PENDING_DELETE. See
+    :obj:`CLBDeletedError`.
     """
 
 
