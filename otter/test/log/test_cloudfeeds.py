@@ -157,6 +157,10 @@ class SanitizeEventTests(SynchronousTestCase):
         self.event['message'] = ('some exception', )
         self.assertRaises(UnsuitableMessage, sanitize_event, self.event)
 
+        self.event['level'] = LogLevel.INFO
+        del self.event['tenant_id']
+        self.assertRaises(UnsuitableMessage, sanitize_event, self.event)
+
 
 class EventTests(SynchronousTestCase):
     """
