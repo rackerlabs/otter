@@ -549,6 +549,8 @@ class CLBClientTests(SynchronousTestCase):
         :class:`APIError`
         """
         json_responses_and_errs = [
+            ("Load Balancer '{0}' has a status of 'BUILD' and is "
+             "considered immutable.", 422, CLBPendingUpdateError),
             ("Load Balancer '{0}' has a status of 'PENDING_UPDATE' and is "
              "considered immutable.", 422, CLBPendingUpdateError),
             ("Load Balancer '{0}' has a status of 'PENDING_DELETE' and is "
