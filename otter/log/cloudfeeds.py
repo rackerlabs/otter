@@ -78,8 +78,9 @@ def sanitize_event(event):
 
     :param dict event: Event to sanitize as given by Twisted
 
-    :return: (dict, bool, str) tuple where dict -> sanitized event,
-        bool -> is it error event?, str -> ISO8601 formatted UTC time of event
+    :return: (dict, bool, str, str) tuple where dict -> sanitized event,
+        bool -> is it error event?, str -> ISO8601 formatted UTC time of event,
+        str -> tenant ID
     """
     cf_event = {}
     error = False
@@ -98,7 +99,13 @@ def sanitize_event(event):
            'exception' in cf_event['message']):
             raise UnsuitableMessage(cf_event['message'])
 
-    return (cf_event, error, epoch_to_utctimestr(event["time"]))
+    if 'tenant_id' not in event:
+        raise UnsuitableMessage(cf_event['message'])
+
+    return (cf_event,
+            error,
+            epoch_to_utctimestr(event["time"]),
+            event['tenant_id'])
 
 
 request_format = {
@@ -125,7 +132,7 @@ request_format = {
 }
 
 
-def prepare_request(req_fmt, event, error, timestamp, region, _id):
+def prepare_request(req_fmt, event, error, timestamp, region, tenant_id, _id):
     """
     Prepare request based on request format
     """
@@ -135,18 +142,19 @@ def prepare_request(req_fmt, event, error, timestamp, region, _id):
     request['entry']['content']['event']['region'] = region
     request['entry']['content']['event']['eventTime'] = timestamp
     request['entry']['content']['event']['product'].update(event)
+    request['entry']['content']['event']['tenantId'] = tenant_id
     request['entry']['content']['event']['id'] = _id
     return request
 
 
-def add_event(event, tenant_id, region, log):
+def add_event(event, admin_tenant_id, region, log):
     """
     Add event to cloud feeds
     """
-    event, error, timestamp = sanitize_event(event)
+    event, error, timestamp, event_tenant_id = sanitize_event(event)
     eff = Effect(Func(uuid.uuid4)).on(str).on(
         partial(prepare_request, request_format, event,
-                error, timestamp, region))
+                error, timestamp, region, event_tenant_id))
 
     def _send_event(req):
         eff = retry_effect(
@@ -157,7 +165,7 @@ def add_event(event, tenant_id, region, log):
                     'content-type': ['application/vnd.rackspace.atom+json']},
                 data=req, log=log, success_pred=has_code(201)),
             retry_times(5), exponential_backoff_interval(2))
-        return Effect(TenantScope(tenant_id=tenant_id, effect=eff))
+        return Effect(TenantScope(tenant_id=admin_tenant_id, effect=eff))
 
     return eff.on(_send_event)
 
