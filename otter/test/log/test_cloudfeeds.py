@@ -86,6 +86,7 @@ def sample_event_pair():
         "current_capacity": 3,
         "message": ("human", ),
         "time": 0,
+        "tenant_id": "tid",
         "level": LogLevel.INFO
     }, {
         "scalingGroupId": "gid",
@@ -113,10 +114,11 @@ class SanitizeEventTests(SynchronousTestCase):
         """
         Ensure it has only CF keys
         """
-        se, err, _time = sanitize_event(self.event)
+        se, err, _time, tenant_id = sanitize_event(self.event)
         self.assertLessEqual(set(se.keys()), set(self.exp_cf_event))
         self.assertEqual(err, exp_err)
         self.assertEqual(_time, '1970-01-01T00:00:00Z')
+        self.assertEqual(tenant_id, 'tid')
         for key, value in self.exp_cf_event.items():
             if key in se:
                 self.assertEqual(se[key], value)
@@ -196,12 +198,13 @@ class EventTests(SynchronousTestCase):
             }
         }
 
-    def _get_request(self, _type, _id):
+    def _get_request(self, _type, _id, tenant_id):
         """
         Sample formatted request
         """
         self.req['entry']['content']['event']['type'] = _type
         self.req['entry']['content']['event']['id'] = _id
+        self.req['entry']['content']['event']['tenantId'] = tenant_id
         return self.req
 
     def test_add_event(self):
@@ -235,7 +238,7 @@ class EventTests(SynchronousTestCase):
                 ServiceType.CLOUD_FEEDS, 'POST', 'autoscale/events',
                 headers={
                     'content-type': ['application/vnd.rackspace.atom+json']},
-                data=self._get_request('INFO', uid), log=log,
+                data=self._get_request('INFO', uid, 'tid'), log=log,
                 success_pred=has_code(201)))
 
     def test_prepare_request_error(self):
@@ -244,8 +247,8 @@ class EventTests(SynchronousTestCase):
         """
         req = prepare_request(
             request_format, self.cf_event, True, "1970-01-01T00:00:00Z",
-            'ord', 'uuid')
-        self.assertEqual(req, self._get_request('ERROR', 'uuid'))
+            'ord', 'tid', 'uuid')
+        self.assertEqual(req, self._get_request('ERROR', 'uuid', 'tid'))
 
 
 class CloudFeedsObserverTests(SynchronousTestCase):
