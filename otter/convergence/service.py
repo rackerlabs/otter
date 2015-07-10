@@ -224,13 +224,12 @@ def convergence_succeeded(scaling_group, group_state, servers, now):
                                        status=ScalingGroupStatus.ACTIVE))
         yield cf_msg('group-status-active',
                      status=ScalingGroupStatus.ACTIVE.name)
-    else:
-        # update servers cache with latest servers
-        yield Effect(
-            UpdateServersCache(
-                scaling_group.tenant_id, scaling_group.uuid, now,
-                [merge(thaw(s.json), {"_is_as_active": True})
-                 for s in servers if s.state != ServerState.DELETED]))
+    # update servers cache with latest servers
+    yield Effect(
+        UpdateServersCache(
+            scaling_group.tenant_id, scaling_group.uuid, now,
+            [merge(thaw(s.json), {"_is_as_active": True})
+                for s in servers if s.state != ServerState.DELETED]))
     yield do_return(ScalingGroupStatus.ACTIVE)
 
 
