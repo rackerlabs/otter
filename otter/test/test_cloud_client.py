@@ -31,7 +31,7 @@ from otter.cloud_client import (
     CLBDuplicateNodesError,
     CLBNodeLimitError,
     CLBNotActiveError,
-    CLBPendingUpdateError,
+    CLBImmutableError,
     CLBRateLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
@@ -544,15 +544,17 @@ class CLBClientTests(SynchronousTestCase):
     def assert_parses_common_clb_errors(self, intent, eff):
         """
         Assert that the effect produced performs the common CLB error parsing:
-        :class:`CLBPendingUpdateError`, :class:`CLBDescription`,
+        :class:`CLBImmutableError`, :class:`CLBDescription`,
         :class:`NoSuchCLBError`, :class:`CLBRateLimitError`,
         :class:`APIError`
         """
         json_responses_and_errs = [
             ("Load Balancer '{0}' has a status of 'BUILD' and is "
-             "considered immutable.", 422, CLBPendingUpdateError),
+             "considered immutable.", 422, CLBImmutableError),
             ("Load Balancer '{0}' has a status of 'PENDING_UPDATE' and is "
-             "considered immutable.", 422, CLBPendingUpdateError),
+             "considered immutable.", 422, CLBImmutableError),
+            ("Load Balancer '{0}' has a status of 'unexpected status' and is "
+             "considered immutable.", 422, CLBImmutableError),
             ("Load Balancer '{0}' has a status of 'PENDING_DELETE' and is "
              "considered immutable.", 422, CLBDeletedError),
             ("The load balancer is deleted and considered immutable.",
