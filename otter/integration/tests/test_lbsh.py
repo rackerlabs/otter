@@ -196,9 +196,9 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         clb_as = self.helper.clbs[0]
 
         # Confirm both LBs are empty to start
-        clb_as.wait_for_nodes(
+        yield clb_as.wait_for_nodes(
             self.rcs, HasLength(0), timeout=timeout_default)
-        clb_other.wait_for_nodes(
+        yield clb_other.wait_for_nodes(
             self.rcs, HasLength(0), timeout=timeout_default)
 
         group, _ = self.helper.create_group(min_entities=1)
