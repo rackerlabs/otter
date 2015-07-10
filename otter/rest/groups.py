@@ -6,7 +6,6 @@ import json
 
 from functools import partial
 
-from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, succeed
 
 from txeffect import perform
@@ -200,8 +199,9 @@ class OtterGroups(object):
             if not tenant_is_enabled(self.tenant_id, config_value):
                 return group_states, [None] * len(group_states)
             d = gatherResults(
-                [get_active_cache(self.store.connection, self.tenant_id,
-                                  state.group_id)
+                [get_active_cache(
+                    self.store.reactor, self.store.connection, self.tenant_id,
+                    state.group_id)
                  for state in group_states])
             return d.addCallback(lambda cache: (group_states, cache))
 
@@ -449,7 +449,7 @@ class OtterGroups(object):
         return OtterGroup(self.store, self.tenant_id, group_id).app.resource()
 
 
-def get_active_cache(connection, tenant_id, group_id):
+def get_active_cache(reactor, connection, tenant_id, group_id):
     """
     Get active servers from servers cache table
     """
@@ -479,8 +479,9 @@ class OtterGroup(object):
         if this is convergence enabled tenant
         """
         if tenant_is_enabled(self.tenant_id, config_value):
-            cache_d = get_active_cache(self.store.connection,
-                                       self.tenant_id, self.group_id)
+            cache_d = get_active_cache(
+                self.store.reactor, self.store.connection, self.tenant_id,
+                self.group_id)
         else:
             cache_d = succeed(None)
         return gatherResults([get_func(*args, **kwargs), cache_d])

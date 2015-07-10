@@ -225,7 +225,7 @@ class GetActiveCacheTests(SynchronousTestCase):
              {'server_blob': json.dumps({'id': 's2', 'links': 's2l'}),
               'last_update': dt, 'server_as_active': True}])
 
-        d = groups.get_active_cache(connection, 'tid', 'gid')
+        d = groups.get_active_cache('reactor', connection, 'tid', 'gid')
         self.assertEqual(
             self.successResultOf(d),
             {'s1': {'id': 's1', 'links': 's1l'},
@@ -385,6 +385,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
 
         mock_gac.return_value = defer.succeed({'s1': {'links': 'l'}})
         self.mock_store.connection = 'connection'
+        self.mock_store.reactor = 'reactor'
 
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(
             [GroupState('11111', 'one', '1', None, None, None, {}, False,
@@ -397,7 +398,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(resp['groups'][0]['state']['pendingCapacity'], 1)
         self.assertEqual(resp['groups'][0]['state']['active'],
                          [{'id': 's1', 'links': 'l'}])
-        mock_gac.assert_called_once_with('connection', '11111', 'one')
+        mock_gac.assert_called_once_with(
+            'reactor', 'connection', '11111', 'one')
 
     def test_list_group_passes_limit_query(self):
         """
@@ -968,6 +970,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_group.view_manifest.return_value = defer.succeed(manifest)
 
         self.mock_store.connection = 'connection'
+        self.mock_store.reactor = 'reactor'
         mock_gac.return_value = defer.succeed({'s1': {'links': 's1l'}})
 
         response_body = self.assert_status_code(200, method="GET")
@@ -977,7 +980,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(resp['group']['state']['activeCapacity'], 1)
         self.assertEqual(resp['group']['state']['active'],
                          [{'id': 's1', 'links': 's1l'}])
-        mock_gac.assert_called_once_with('connection', '11111', 'one')
+        mock_gac.assert_called_once_with(
+            'reactor', 'connection', '11111', 'one')
 
     def test_view_manifest_with_webhooks(self):
         """
@@ -1220,13 +1224,15 @@ class GroupStateTestCase(RestAPITestMixin, SynchronousTestCase):
             GroupState("11111", "one", 'g', None, None, False, False, False,
                        ScalingGroupStatus.ACTIVE, desired=4))
         self.mock_store.connection = 'connection'
+        self.mock_store.reactor = 'reactor'
         response_body = self.assert_status_code(200, method="GET")
         resp = json.loads(response_body)
 
         self.assertEqual(resp['group']['activeCapacity'], 1)
         self.assertEqual(resp['group']['pendingCapacity'], 3)
         self.assertEqual(resp['group']['active'], [{'id': 's1', 'links': 'l'}])
-        mock_gac.assert_called_once_with('connection', '11111', 'one')
+        mock_gac.assert_called_once_with(
+            'reactor', 'connection', '11111', 'one')
 
 
 class GroupPauseTestCase(RestAPITestMixin, SynchronousTestCase):
