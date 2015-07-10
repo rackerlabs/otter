@@ -20,6 +20,7 @@ from effect import (
 import six
 
 from toolz.dicttoolz import get_in
+from toolz.itertoolz import concat
 
 from twisted.internet.defer import DeferredLock
 from twisted.internet.task import deferLater
@@ -29,7 +30,7 @@ from txeffect import deferred_performer, perform as twisted_perform
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType
 from otter.util.config import config_value
-from otter.util.http import APIError, append_segments
+from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (
     add_bind_root,
@@ -328,6 +329,7 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
 _CLB_PENDING_UPDATE_PATTERN = re.compile(
     "^Load Balancer '\d+' has a status of 'PENDING_UPDATE' and is considered "
     "immutable\.$")
+_CLB_NOT_ACTIVE_PATTERN = re.compile("^LoadBalancer is not ACTIVE$")
 _CLB_DELETED_PATTERN = re.compile(
     "^(Load Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
     "The load balancer is deleted and) considered immutable\.$")
@@ -340,6 +342,8 @@ _CLB_DUPLICATE_NODES_PATTERN = re.compile(
     "on load balancer\.$")
 _CLB_NODE_LIMIT_PATTERN = re.compile(
     "^Nodes must not exceed \d+ per load balancer\.$")
+_CLB_NODE_REMOVED_PATTERN = re.compile(
+    "^Node ids ((?:\d+,)*(?:\d+)) are not a part of your loadbalancer\s*$")
 _CLB_OVER_LIMIT_PATTERN = re.compile("^OverLimit Retry\.{3}$")
 
 
@@ -400,6 +404,14 @@ class NoSuchCLBNodeError(Exception):
     """
     Error to be raised when attempting to modify a CLB node that no longer
     exists.
+    """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBNotActiveError(Exception):
+    """
+    Error to be raised when a CLB is not ACTIVE (and we have no more
+    information about what its actual state is).
     """
 
 
@@ -552,6 +564,50 @@ def change_clb_node(lb_id, node_id, condition, weight):
     return eff.on(error=_parse_known_errors)
 
 
+def remove_clb_nodes(lb_id, node_ids):
+    """
+    Remove multiple nodes from a load balancer.
+
+    :param str lb_id: A load balancer ID.
+    :param node_ids: iterable of node IDs.
+    :return: Effect of None.
+
+    Succeeds on 202.
+
+    This function will handle the case where *some* of the nodes are valid and
+    some aren't, by retrying deleting only the valid ones.
+    """
+    node_ids = map(str, node_ids)
+    eff = service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'DELETE',
+        append_segments('loadbalancers', lb_id, 'nodes'),
+        params={'id': node_ids},
+        success_pred=has_code(202))
+
+    def check_invalid_nodes(exc_info):
+        code = exc_info[1].code
+        body = exc_info[1].body
+        if code == 400:
+            message = try_json_with_keys(
+                body, ["validationErrors", "messages", 0])
+            if message is not None:
+                match = _CLB_NODE_REMOVED_PATTERN.match(message)
+                if match:
+                    removed = concat([group.split(',')
+                                      for group in match.groups()])
+                    return remove_clb_nodes(lb_id,
+                                            set(node_ids) - set(removed))
+        six.reraise(*exc_info)
+
+    return eff.on(
+        error=catch(APIError, check_invalid_nodes)
+    ).on(
+        error=_only_json_api_errors(
+            lambda c, b: _process_clb_api_error(c, b, lb_id))
+    ).on(success=lambda _: None)
+
+
 def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
     """
     All CLB messages have only the keys ("message",), and the exception tpye
@@ -594,6 +650,7 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
         _expand_clb_matches(
             [(422, _CLB_DELETED_PATTERN, CLBDeletedError),
              (422, _CLB_PENDING_UPDATE_PATTERN, CLBPendingUpdateError),
+             (422, _CLB_NOT_ACTIVE_PATTERN, CLBNotActiveError),
              (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)],
             lb_id))
     return _match_errors(mappings, api_error_code, json_body)

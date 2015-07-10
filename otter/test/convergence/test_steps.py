@@ -58,8 +58,10 @@ from otter.convergence.steps import (
 from otter.test.utils import (
     StubResponse,
     matches,
+    perform_sequence,
     raise_,
     resolve_effect,
+    stub_pure_response,
     transform_eq)
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError
@@ -463,8 +465,8 @@ class StepAsEffectTests(SynchronousTestCase):
 
     def test_add_nodes_to_clb_terminal_failures(self):
         """
-        :obj:`AddNodesToCLB` retries if the CLB is not found or deleted, or
-        if there is any other 4xx error, or if there is a non-API error, then
+        :obj:`AddNodesToCLB` fails if the CLB is not found or deleted, or
+        if there is any other 4xx error, then
         the error is propagated up and the result is a failure.
         """
         terminals = (CLBDeletedError(lb_id=u"12345"),
@@ -484,7 +486,7 @@ class StepAsEffectTests(SynchronousTestCase):
 
     def test_remove_nodes_from_clb(self):
         """
-        :obj:`RemoveNodesToCLB` produces a request for deleting any number of
+        :obj:`RemoveNodesFromCLB` produces a request for deleting any number of
         nodes from a cloud load balancer.
         """
         lb_id = "12345"
@@ -504,65 +506,26 @@ class StepAsEffectTests(SynchronousTestCase):
 
     def test_remove_nodes_from_clb_predicate(self):
         """
-        :obj:`RemoveNodesFromCLB` only accepts 202, 413, 400, and some 422
-        responses.  However, only 202, 413, and 422s are covered by this test.
-        400's will be covered by another test as they require retry.
+        :obj:`RemoveNodesFromCLB` only succeeds on 202.
         """
         lb_id = "12345"
         node_ids = [str(i) for i in range(5)]
         step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=pset(node_ids))
         request = step.as_effect()
-
         self.assertTrue(request.intent.json_response)
-
         predicate = request.intent.success_pred
-
         self.assertTrue(predicate(StubResponse(202, {}), None))
-        self.assertTrue(predicate(StubResponse(413, {}), None))
-        self.assertTrue(predicate(
-            StubResponse(422, {}),
-            json.dumps({
-                "message": "The load balancer is deleted and considered "
-                           "immutable.",
-                "code": 422
-            })))
-        self.assertTrue(predicate(
-            StubResponse(422, {}),
-            json.dumps({
-                "message": "Load Balancer '12345' has a status of "
-                           "'PENDING_UPDATE' and is considered immutable.",
-                "code": 422
-            })))
-        self.assertTrue(predicate(
-            StubResponse(422, {}),
-            json.dumps({
-                "message": "Load Balancer '12345' has a status of "
-                           "'PENDING_DELETE' and is considered immutable.",
-                "code": 422
-            })))
-
-        self.assertFalse(predicate(StubResponse(404, {}), None))
-        self.assertFalse(predicate(
-            StubResponse(422, {}),
-            json.dumps({
-                "message": "Duplicate nodes detected. One or more "
-                           "nodes already configured on load "
-                           "balancer.",
-                "code": 422
-            })))
-        # This one is just malformed but similar to a good message.
-        self.assertFalse(predicate(
-            StubResponse(422, {}),
-            json.dumps({
-                "message": "The load balancer is considered immutable.",
-                "code": 422
-            })))
+        self.assertFalse(predicate(StubResponse(200, {}), None))
 
     def test_remove_nodes_from_clb_retry(self):
         """
         :obj:`RemoveNodesFromCLB`, on receiving a 400, parses out the nodes
         that are no longer on the load balancer, and retries the bulk delete
         with those nodes removed.
+
+        TODO: this has been left in as a regression test - this can probably be
+        removed the next time it's touched, as this functionality happens
+        in cloud_client now and there is a similar test there.
         """
         lb_id = "12345"
         node_ids = [str(i) for i in range(5)]
@@ -577,18 +540,85 @@ class StepAsEffectTests(SynchronousTestCase):
             "details": "The object is not valid"
         }
 
+        expected_req = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'DELETE',
+            'loadbalancers/12345/nodes',
+            params={'id': transform_eq(sorted, node_ids)},
+            success_pred=ANY,
+            json_response=True).intent
+        expected_req2 = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'DELETE',
+            'loadbalancers/12345/nodes',
+            params={'id': transform_eq(sorted, ['0', '4'])},
+            success_pred=ANY,
+            json_response=True).intent
+
         step = RemoveNodesFromCLB(lb_id=lb_id, node_ids=pset(node_ids))
-        eff = resolve_effect(step.as_effect(),
-                             (StubResponse(400, {}), error_body))
-        self.assertEqual(
-            eff.intent,
-            service_request(
-                ServiceType.CLOUD_LOAD_BALANCERS,
-                'DELETE',
-                'loadbalancers/12345/nodes',
-                params={'id': transform_eq(sorted, ['0', '4'])},
-                success_pred=ANY,
-                json_response=True).intent)
+
+        seq = [
+            (expected_req,
+             lambda i: raise_(APIError(400, json.dumps(error_body)))),
+            (expected_req2, lambda i: stub_pure_response('', 202)),
+        ]
+        r = perform_sequence(seq, step.as_effect())
+        self.assertEqual(r, (StepResult.SUCCESS, []))
+
+    def test_remove_nodes_from_clb_non_terminal_failures_to_retry(self):
+        """
+        :obj:`RemoveNodesFromCLB` retries if the CLB is temporarily locked,
+        or if the request was rate-limited, or if there was an API error and
+        the error is unknown but not a 4xx.
+        """
+        non_terminals = (CLBPendingUpdateError(lb_id=u"12345"),
+                         CLBRateLimitError(lb_id=u"12345"),
+                         APIError(code=500, body="oops!"),
+                         TypeError("You did something wrong in your code."))
+        eff = RemoveNodesFromCLB(lb_id='12345',
+                                 node_ids=pset(['1', '2'])).as_effect()
+
+        for exc in non_terminals:
+            seq = SequenceDispatcher([(eff.intent, lambda i: raise_(exc))])
+            with seq.consume():
+                self.assertEquals(
+                    sync_perform(seq, eff),
+                    (StepResult.RETRY, [ErrorReason.Exception(
+                        matches(ContainsAll([type(exc), exc])))]))
+
+    def test_remove_nodes_from_clb_terminal_failures(self):
+        """
+        :obj:`AddNodesToCLB` fails if there are any 4xx errors, then
+        the error is propagated up and the result is a failure.
+        """
+        terminals = (APIError(code=403, body="You're out of luck."),
+                     APIError(code=422, body="Oh look another 422."))
+        eff = RemoveNodesFromCLB(lb_id='12345',
+                                 node_ids=pset(['1', '2'])).as_effect()
+
+        for exc in terminals:
+            seq = SequenceDispatcher([(eff.intent, lambda i: raise_(exc))])
+            with seq.consume():
+                self.assertEquals(
+                    sync_perform(seq, eff),
+                    (StepResult.FAILURE, [ErrorReason.Exception(
+                        matches(ContainsAll([type(exc), exc])))]))
+
+    def test_remove_nodes_from_clb_success_failures(self):
+        """
+        :obj:`AddNodesToCLB` succeeds if the CLB is not in existence (has been
+        deleted or is not found).
+        """
+        successes = (CLBDeletedError(lb_id=u"12345"),
+                     NoSuchCLBError(lb_id=u"12345"))
+        eff = RemoveNodesFromCLB(lb_id='12345',
+                                 node_ids=pset(['1', '2'])).as_effect()
+
+        for exc in successes:
+            seq = SequenceDispatcher([(eff.intent, lambda i: raise_(exc))])
+            with seq.consume():
+                self.assertEquals(sync_perform(seq, eff),
+                                  (StepResult.SUCCESS, []))
 
     def _generic_bulk_rcv3_step_test(self, step_class, expected_method):
         """
