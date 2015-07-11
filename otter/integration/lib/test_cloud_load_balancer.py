@@ -238,14 +238,12 @@ class CLBTests(SynchronousTestCase):
         self.assert_mutate_function_does_not_retry_if_not_pending_update(
             add, main_treq_args)
 
-    def get_fake_treq_for_delete(self, get_json_body, get_response=None,
-                                 del_response=None):
+    def get_fake_treq_for_delete(self, get_response, del_response=None):
         """
         Return a CLB for use with deleting a CLB - this is different than
         the one returned by `get_clb` because it requires stubbing out two
         treq requests.
         """
-        get_response = get_response or Response(200)
         del_response = del_response or Response(202)
 
         class FakeTreq(object):
@@ -262,18 +260,10 @@ class CLBTests(SynchronousTestCase):
                 return succeed(get_response)
 
             def content(cls, resp):
-                # If the get_response is not a 200, then, it would be
-                # considered an error and hence treq.content would be called.
-                # Otherwise, treq.content is only called for the del response.
-                if get_response == Response(200):
-                    self.assertEqual(resp, del_response)
-                else:
-                    self.assertIn(resp, (del_response, get_response))
-                return succeed("")
+                return succeed(resp.strbody)
 
             def json_content(cls, resp):
-                self.assertEqual(resp, get_response)
-                return succeed(get_json_body)
+                return succeed(json.loads(resp.strbody))
 
         return FakeTreq()
 
@@ -287,21 +277,24 @@ class CLBTests(SynchronousTestCase):
         success_treqs = [
             # All of these particular immutable states count as success.
             self.get_fake_treq_for_delete(
-                {"loadBalancer": {"status": state}},
+                Response(200, strbody=json.dumps(
+                    {"loadBalancer": {"status": state}})),
                 del_response=Response(400))
             for state in ("PENDING_DELETE", "DELETED", "ERROR", "SUSPENDED")
         ] + [
             # 404 from get-ting the server, meaning it's already gone.
             self.get_fake_treq_for_delete(
-                {"message": "No such load balancer", "code": 404},
-                get_response=Response(404),
+                Response(404, strbody=(
+                    '{"message": "No such load balancer", "code": 404}')),
                 del_response=Response(400))
         ]
 
         for success_treq in success_treqs:
             clock = Clock()
             _treq = self.get_fake_treq_for_delete(
-                {"loadBalancer": {"status": "PENDING_UPDATE"}},
+                Response(
+                    200,
+                    strbody='{"loadBalancer": {"status": "PENDING_UPDATE"}}'),
                 del_response=Response(400))
 
             clb = CloudLoadBalancer(pool=self.pool, treq=_treq)
@@ -324,7 +317,9 @@ class CLBTests(SynchronousTestCase):
         clock = Clock()
         self.clb_id = 12345
         _treq = self.get_fake_treq_for_delete(
-            {"loadBalancer": {"status": "PENDING_UPDATE"}},
+            Response(
+                200,
+                strbody='{"loadBalancer": {"status": "PENDING_UPDATE"}}'),
             del_response=Response(400))
 
         clb = CloudLoadBalancer(pool=self.pool, treq=_treq)
@@ -346,8 +341,8 @@ class CLBTests(SynchronousTestCase):
         """
         clock = Clock()
         self.clb_id = 12345
-        _treq = self.get_fake_treq_for_delete("Something is wrong",
-                                              get_response=Response(400))
+        _treq = self.get_fake_treq_for_delete(
+            Response(400, strbody="Something is wrong"))
 
         clb = CloudLoadBalancer(pool=self.pool, treq=_treq)
         clb.clb_id = self.clb_id
