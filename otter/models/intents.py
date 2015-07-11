@@ -11,28 +11,6 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 from txeffect import deferred_performer
 
 from otter.models.cass import CassScalingGroupServersCache
-from otter.util.fp import assoc_obj
-
-
-@attr.s
-class ModifyGroupStateActive(object):
-    """
-    Intent to update group state's active list
-    """
-    group = attr.ib()
-    active = attr.ib()
-
-
-@deferred_performer
-def perform_modify_group_state_active(dispatcher, mgs_intent):
-    """Perform a :obj:`ModifyGroupStateActive`."""
-
-    def update_group_active(group, old_state):
-        return assoc_obj(old_state, active=mgs_intent.active)
-
-    return mgs_intent.group.modify_state(
-        update_group_active,
-        modify_state_reason='updating active')
 
 
 @attributes(['tenant_id', 'group_id'])
@@ -106,7 +84,6 @@ def perform_update_servers_cache(disp, intent):
 def get_model_dispatcher(log, store):
     """Get a dispatcher that can handle all the model-related intents."""
     return TypeDispatcher({
-        ModifyGroupStateActive: perform_modify_group_state_active,
         GetScalingGroupInfo:
             partial(perform_get_scaling_group_info, log, store),
         DeleteGroup: partial(perform_delete_group, log, store),

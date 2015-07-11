@@ -23,6 +23,8 @@ from pyrsistent import thaw
 
 import six
 
+from toolz.dicttoolz import merge
+
 from twisted.application.service import MultiService
 
 from txeffect import exc_info_to_failure, perform
@@ -39,8 +41,7 @@ from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, with_log
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, ModifyGroupStateActive,
-    UpdateGroupStatus, UpdateServersCache)
+    DeleteGroup, GetScalingGroupInfo, UpdateGroupStatus, UpdateServersCache)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.timestamp import datetime_to_epoch
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
@@ -78,29 +79,20 @@ def is_autoscale_active(server, lb_nodes):
                              if node.matches(server)]))
 
 
-def update_old_cache(group, active):
-    active = {server.id: server_to_json(server) for server in active}
-    return Effect(ModifyGroupStateActive(group, active))
-
-
 def update_cache(group, servers, lb_nodes, now):
     """
     :param group: scaling group
     :param list servers: list of NovaServer objects
     """
-    active = []
     server_dicts = []
     for server in servers:
         sd = thaw(server.json)
         if is_autoscale_active(server, lb_nodes):
             sd["_is_as_active"] = True
-            active.append(server)
         server_dicts.append(sd)
 
-    set_eff = Effect(
+    return Effect(
         UpdateServersCache(group.tenant_id, group.uuid, now, server_dicts))
-
-    return parallel([update_old_cache(group, active), set_eff])
 
 
 @do
@@ -232,13 +224,12 @@ def convergence_succeeded(scaling_group, group_state, servers, now):
                                        status=ScalingGroupStatus.ACTIVE))
         yield cf_msg('group-status-active',
                      status=ScalingGroupStatus.ACTIVE.name)
-    else:
-        # update servers cache with latest servers
-        yield Effect(
-            UpdateServersCache(
-                scaling_group.tenant_id, scaling_group.uuid, now,
-                [thaw(s.json) for s in servers
-                 if s.state != ServerState.DELETED]))
+    # update servers cache with latest servers
+    yield Effect(
+        UpdateServersCache(
+            scaling_group.tenant_id, scaling_group.uuid, now,
+            [merge(thaw(s.json), {"_is_as_active": True})
+                for s in servers if s.state != ServerState.DELETED]))
     yield do_return(ScalingGroupStatus.ACTIVE)
 
 
