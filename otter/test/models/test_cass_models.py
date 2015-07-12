@@ -1024,6 +1024,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
     def test_update_error_reasons_success(self, mock_vc):
+        """
+        Executes query that udpates group error reasons
+        """
         self.clock.advance(10.345)
         d = self.group.update_error_reasons(['r1', 'r2'])
         self.assertIsNone(self.successResultOf(d))  # update returns None
@@ -1035,6 +1038,18 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                         "tenantId": '11111', 'ts': 10345000}
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.fail(NoSuchScalingGroupError('t', 'g')))
+    def test_update_error_reasons_no_group(self, mock_vc):
+        """
+        Raises NoSuchScalingGroupError if group is not found and does not
+        execute update query
+        """
+        self.clock.advance(10.345)
+        d = self.group.update_error_reasons(['r1', 'r2'])
+        self.failureResultOf(d, NoSuchScalingGroupError)
+        self.assertFalse(self.connection.execute.called)
 
     def test_view_config_no_such_group(self):
         """
