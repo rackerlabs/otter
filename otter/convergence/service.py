@@ -243,6 +243,7 @@ def convergence_failed(scaling_group, reasons):
     yield cf_err(
         'group-status-error', status=ScalingGroupStatus.ERROR.name,
         reasons='; '.join(sorted(present_reasons(reasons))))
+    yield Effect(UpdateGroupErrorReasons(scaling_group, reasons))
     yield do_return(ScalingGroupStatus.ERROR)
 
 
