@@ -41,7 +41,8 @@ from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, with_log
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, UpdateGroupStatus, UpdateServersCache)
+    DeleteGroup, GetScalingGroupInfo, UpdateGroupErrorReasons,
+    UpdateGroupStatus, UpdateServersCache)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.timestamp import datetime_to_epoch
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
@@ -240,10 +241,11 @@ def convergence_failed(scaling_group, reasons):
     """
     yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                    status=ScalingGroupStatus.ERROR))
+    presented_reasons = sorted(present_reasons(reasons))
     yield cf_err(
         'group-status-error', status=ScalingGroupStatus.ERROR.name,
-        reasons='; '.join(sorted(present_reasons(reasons))))
-    yield Effect(UpdateGroupErrorReasons(scaling_group, reasons))
+        reasons='; '.join(presented_reasons))
+    yield Effect(UpdateGroupErrorReasons(scaling_group, presented_reasons))
     yield do_return(ScalingGroupStatus.ERROR)
 
 
