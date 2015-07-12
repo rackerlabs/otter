@@ -1021,6 +1021,21 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.succeed({}))
+    def test_update_error_reasons_success(self, mock_vc):
+        self.clock.advance(10.345)
+        d = self.group.update_error_reasons(['r1', 'r2'])
+        self.assertIsNone(self.successResultOf(d))  # update returns None
+        expectedCql = (
+            'INSERT INTO scaling_group("tenantId", "groupId", error_reasons) '
+            'VALUES (:tenantId, :groupId, :reasons) USING TIMESTAMP :ts')
+        expectedData = {"reasons": ['r1', 'r2'],
+                        "groupId": '12345678g',
+                        "tenantId": '11111', 'ts': 10345000}
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
     def test_view_config_no_such_group(self):
         """
         Tests what happens if you try to view a group that doesn't exist.

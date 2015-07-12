@@ -360,6 +360,19 @@ class IScalingGroup(Interface):
             doesn't exist for this tenant id
         """
 
+    def update_error_reasons(reasons):
+        """
+        Updates the reasons why the group is in ERROR
+
+        :param list reasons: List of string reasons
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires
+            with None
+
+        :raises NoSuchScalingGroupError: if the scaling group id
+            doesn't exist for this tenant id
+        """
+
     def update_config(config):
         """
         Update the scaling group configuration paramaters based on the

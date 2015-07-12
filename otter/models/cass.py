@@ -23,7 +23,7 @@ from pyrsistent import freeze
 
 from silverberg.client import ConsistencyLevel
 
-from toolz.curried import filter, map
+from toolz.curried import filter, get_in, map
 from toolz.dicttoolz import keymap, merge
 from toolz.functoolz import compose
 
@@ -890,6 +890,27 @@ class CassScalingGroup(object):
             d.addCallback(set_deleting)
         else:
             d.addCallback(_do_update)
+        return d
+
+    def update_error_reasons(self, reasons):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.update_error_reasons`
+        """
+        self.log.msg("Updating error reasons {reasons}", reasons=reasons)
+
+        @self.with_timestamp
+        def _do_update(ts, lastRev):
+            query = _cql_update.format(
+                cf=self.group_table, column='error_reasons', name=":reasons")
+            d = self.connection.execute(
+                query,
+                {"tenantId": self.tenant_id, "groupId": self.uuid,
+                 "reasons": reasons, "ts": ts},
+                DEFAULT_CONSISTENCY)
+            return d.addCallback(get_in([0, 'error_reasons']))
+
+        d = self.view_config()
+        d.addCallback(_do_update)
         return d
 
     def update_config(self, data):
