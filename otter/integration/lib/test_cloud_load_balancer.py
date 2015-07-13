@@ -22,6 +22,7 @@ from otter.util.http import APIError, headers
 class _FakeRCS(object):
     endpoints = {'loadbalancers': 'clburl'}
     token = "token"
+    clbs = []
 
 
 pending_update_response = [
@@ -174,6 +175,51 @@ class CLBTests(SynchronousTestCase):
             *(expected_args + [Response(422), json.dumps(pending_delete)]))
         d = function(clb, clock)
         self.failureResultOf(d, APIError)
+
+    def test_start_clb(self):
+        """
+        Creating a CLB succeeds on 200, and retries on overlimit/pending
+        update.
+        """
+        clb_args = {
+            "loadBalancer": {
+                "name": "a-load-balancer",
+                "port": 80,
+                "protocol": "HTTP",
+                # this algorithm is chosen otherwise we won't be able to
+                # check the weights on the nodes by listing all the nodes
+                "algorithm": "WEIGHTED_ROUND_ROBIN",
+                "virtualIps": [{
+                    "type": "PUBLIC",
+                    "ipVersion": "IPV6",
+                }],
+            }
+        }
+        main_treq_args = ['post', 'clburl/loadbalancers',
+                          ((json.dumps(clb_args),), self.expected_kwargs)]
+
+        class FakeTest(object):
+            def __init__(fakeself, clb=None):
+                fakeself.clb = clb
+
+            def addCleanup(fakeself, *args, **kwargs):
+                if fakeself.clb:
+                    self.assertEqual((args, kwargs),
+                                     ((fakeself.clb.stop, self.rcs), {}))
+
+        def start(clb, clock):
+            return clb.start(self.rcs, FakeTest(), clock=clock)
+
+        self.assert_function_retries_until_success(
+            start, main_treq_args,
+            (Response(202), json.dumps({'loadBalancer': {'id': 12345}})),
+            self.rcs)
+
+        self.assert_function_retries_until_timeout(
+            start, main_treq_args)
+
+        self.assert_function_does_not_retry_if_not_pending_update_or_overlimit(
+            start, main_treq_args)
 
     def test_update_node(self):
         """
