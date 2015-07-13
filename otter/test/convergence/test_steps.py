@@ -16,7 +16,7 @@ from otter.cloud_client import (
     CLBDeletedError,
     CLBDuplicateNodesError,
     CLBNodeLimitError,
-    CLBPendingUpdateError,
+    CLBImmutableError,
     CLBRateLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
@@ -449,7 +449,7 @@ class StepAsEffectTests(SynchronousTestCase):
         there was an API error and the error is unknown but not a 4xx.
         """
         non_terminals = (CLBDuplicateNodesError(lb_id=u"12345"),
-                         CLBPendingUpdateError(lb_id=u"12345"),
+                         CLBImmutableError(lb_id=u"12345"),
                          CLBRateLimitError(lb_id=u"12345"),
                          APIError(code=500, body="oops!"),
                          TypeError("You did something wrong in your code."))
@@ -571,7 +571,7 @@ class StepAsEffectTests(SynchronousTestCase):
         or if the request was rate-limited, or if there was an API error and
         the error is unknown but not a 4xx.
         """
-        non_terminals = (CLBPendingUpdateError(lb_id=u"12345"),
+        non_terminals = (CLBImmutableError(lb_id=u"12345"),
                          CLBRateLimitError(lb_id=u"12345"),
                          APIError(code=500, body="oops!"),
                          TypeError("You did something wrong in your code."))

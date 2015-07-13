@@ -326,8 +326,8 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
 
 # ----- CLB requests and error parsing -----
 
-_CLB_PENDING_UPDATE_PATTERN = re.compile(
-    "^Load Balancer '\d+' has a status of 'PENDING_UPDATE' and is considered "
+_CLB_IMMUTABLE_PATTERN = re.compile(
+    "^Load Balancer '\d+' has a status of '[^']+' and is considered "
     "immutable\.$")
 _CLB_NOT_ACTIVE_PATTERN = re.compile("^LoadBalancer is not ACTIVE$")
 _CLB_DELETED_PATTERN = re.compile(
@@ -377,10 +377,13 @@ class ExceptionWithMessage(Exception):
 
 
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
-class CLBPendingUpdateError(Exception):
+class CLBImmutableError(Exception):
     """
-    Error to be raised when the CLB is in PENDING_UPDATE status and is
-    immutable (temporarily).
+    Error to be raised when the CLB is in some status that causes is to be
+    temporarily immutable.
+
+    This exception is _not_ used when the status is PENDING_DELETE. See
+    :obj:`CLBDeletedError`.
     """
 
 
@@ -505,7 +508,7 @@ def add_clb_nodes(lb_id, nodes):
 
     :return: :class:`ServiceRequest` effect
 
-    :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
+    :raises: :class:`CLBImmutableError`, :class:`CLBDeletedError`,
         :class:`NoSuchCLBError`, :class:`CLBDuplicateNodesError`,
         :class:`APIError`
     """
@@ -543,7 +546,7 @@ def change_clb_node(lb_id, node_id, condition, weight):
 
     :return: :class:`ServiceRequest` effect
 
-    :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
+    :raises: :class:`CLBImmutableError`, :class:`CLBDeletedError`,
         :class:`NoSuchCLBError`, :class:`NoSuchCLBNodeError`, :class:`APIError`
     """
     eff = service_request(
@@ -641,7 +644,7 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
     :param dict json_body: The error message, parsed as a JSON dict.
     :param string lb_id: The load balancer ID
 
-    :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
+    :raises: :class:`CLBImmutableError`, :class:`CLBDeletedError`,
         :class:`NoSuchCLBError`, :class:`APIError` by itself
     """
     mappings = (
@@ -652,7 +655,7 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
         _expand_clb_matches(
             [(422, _CLB_DELETED_PATTERN, CLBDeletedError),
              (410, _CLB_MARKED_DELETED_PATTERN, CLBDeletedError),
-             (422, _CLB_PENDING_UPDATE_PATTERN, CLBPendingUpdateError),
+             (422, _CLB_IMMUTABLE_PATTERN, CLBImmutableError),
              (422, _CLB_NOT_ACTIVE_PATTERN, CLBNotActiveError),
              (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)],
             lb_id))

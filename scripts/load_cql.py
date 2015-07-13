@@ -12,8 +12,6 @@ import sys
 from cql.apivalues import ProgrammingError
 from cql.connection import connect
 
-from effect import ComposedDispatcher
-
 from silverberg.client import CQLClient, ConsistencyLevel
 
 from twisted.internet import task
@@ -22,9 +20,9 @@ from twisted.internet.endpoints import clientFromString
 
 from txeffect import perform
 
-from otter.effect_dispatcher import get_simple_dispatcher
+from otter.effect_dispatcher import get_working_cql_dispatcher
 from otter.metrics import get_scaling_groups
-from otter.models.cass import CassScalingGroupCollection, get_cql_dispatcher
+from otter.models.cass import CassScalingGroupCollection
 from otter.test.resources import CQLGenerator
 from otter.util.cqlbatch import batch
 
@@ -161,7 +159,7 @@ def webhook_index(reactor, conn):
     """
     store = CassScalingGroupCollection(None, None, 3)
     eff = store.get_webhook_index_only()
-    return perform(get_dispatcher(reactor, conn), eff)
+    return perform(get_working_cql_dispatcher(reactor, conn), eff)
 
 
 def webhook_migrate(reactor, conn):
@@ -170,18 +168,7 @@ def webhook_migrate(reactor, conn):
     """
     store = CassScalingGroupCollection(None, None, 3)
     eff = store.get_webhook_index_only().on(store.add_webhook_keys)
-    return perform(get_dispatcher(reactor, conn), eff)
-
-
-def get_dispatcher(reactor, connection):
-    """
-    Get dispatcher with CQLQueryExecute performer with any other
-    necessary performers
-    """
-    return ComposedDispatcher([
-        get_simple_dispatcher(reactor),
-        get_cql_dispatcher(connection)
-    ])
+    return perform(get_working_cql_dispatcher(reactor, conn), eff)
 
 
 @inlineCallbacks

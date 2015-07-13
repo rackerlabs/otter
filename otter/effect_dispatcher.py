@@ -62,6 +62,17 @@ def get_full_dispatcher(reactor, authenticator, log, service_configs,
     ])
 
 
+def get_working_cql_dispatcher(reactor, cass_client):
+    """
+    Get dispatcher with CQLQueryExecute performer along with any other
+    dependent performers to make it work
+    """
+    return ComposedDispatcher([
+        get_simple_dispatcher(reactor),
+        get_cql_dispatcher(cass_client)
+    ])
+
+
 def get_legacy_dispatcher(reactor, authenticator, log, service_configs):
     """
     Return a dispatcher that can perform effects that are needed by the old
