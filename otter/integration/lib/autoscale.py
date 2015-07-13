@@ -281,8 +281,8 @@ class ScalingGroup(object):
             This provides useful information to complete the request, like
             which endpoint to use to make the API request.
         """
-
-        return self.delete_scaling_group(rcs)
+        if getattr(self, 'group_id', None):
+            return self.delete_scaling_group(rcs)
 
     def delete_scaling_group(self, rcs):
         """Unconditionally delete the scaling group.  You may call this only
