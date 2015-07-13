@@ -10,6 +10,8 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer,
     ContainsAllIPs,
+    DEFAULT_POLL_PERIOD,
+    DEFAULT_POLL_TIMEOUT,
     ExcludesAllIPs,
     HasLength)
 from otter.integration.lib.test_nova import Response, get_fake_treq
@@ -28,6 +30,17 @@ pending_update_response = [
         "message": ("Load Balancer '12345' has a status of "
                     "'PENDING_UPDATE' and is considered immutable."),
         "code": 422
+    })
+]
+
+over_limit_response = [
+    Response(413),
+    json.dumps({
+        "overLimit": {
+            "code": 413,
+            "message": "OverLimit Retry...",
+            "details": "...."
+        }
     })
 ]
 
@@ -89,23 +102,25 @@ class CLBTests(SynchronousTestCase):
         :param expected_result: What is the expected successful result of the
             function that is called by ``mutate_callable``
         """
-        clock = Clock()
-        clb = self.get_clb(*(expected_args + pending_update_response))
+        for resp in (pending_update_response, over_limit_response):
+            clock = Clock()
+            clb = self.get_clb(*(expected_args + resp))
 
-        d = mutate_callable(clb, clock)
+            d = mutate_callable(clb, clock)
 
-        self.assertNoResult(d)
-        clock.pump([3])
-        self.assertNoResult(d)
+            self.assertNoResult(d)
+            clock.pump([DEFAULT_POLL_PERIOD])
+            self.assertNoResult(d)
 
-        clb.treq = get_fake_treq(
-            *([self] + expected_args + [success_response]))
+            clb.treq = get_fake_treq(
+                *([self] + expected_args + [success_response]))
 
-        clock.pump([3])
-        self.assertEqual(self.successResultOf(d), expected_result)
+            clock.pump([DEFAULT_POLL_PERIOD])
+            self.assertEqual(self.successResultOf(d), expected_result)
 
     def assert_mutate_function_retries_until_timeout(
-            self, mutate_callable, expected_args, timeout=60):
+            self, mutate_callable, expected_args,
+            timeout=DEFAULT_POLL_TIMEOUT):
         """
         Assert that some CLB function that mutates the CLB will retry on
         pending update until the function times out.
@@ -120,18 +135,19 @@ class CLBTests(SynchronousTestCase):
             [method, url, (expected args, expected kwargs)]
         :param int timeout: When does your function time out retrying?
         """
-        clock = Clock()
-        clb = self.get_clb(*(expected_args + pending_update_response))
+        for resp in (pending_update_response, over_limit_response):
+            clock = Clock()
+            clb = self.get_clb(*(expected_args + pending_update_response))
 
-        d = mutate_callable(clb, clock)
-        self.assertNoResult(d)
-
-        for _ in range((timeout - 1) / 3):
-            clock.pump([3])
+            d = mutate_callable(clb, clock)
             self.assertNoResult(d)
 
-        clock.pump([3])
-        self.failureResultOf(d, TimedOutError)
+            for _ in range((timeout - 1) / DEFAULT_POLL_PERIOD):
+                clock.pump([DEFAULT_POLL_PERIOD])
+                self.assertNoResult(d)
+
+            clock.pump([DEFAULT_POLL_PERIOD])
+            self.failureResultOf(d, TimedOutError)
 
     def assert_mutate_function_does_not_retry_if_not_pending_update(
             self, mutate_callable, expected_args):
@@ -175,7 +191,7 @@ class CLBTests(SynchronousTestCase):
             update, main_treq_args, (Response(202), ""), "")
 
         self.assert_mutate_function_retries_until_timeout(
-            update, main_treq_args, 60)
+            update, main_treq_args)
 
         self.assert_mutate_function_does_not_retry_if_not_pending_update(
             update, main_treq_args)
@@ -197,7 +213,7 @@ class CLBTests(SynchronousTestCase):
             delete, main_treq_args, (Response(202), ""), "")
 
         self.assert_mutate_function_retries_until_timeout(
-            delete, main_treq_args, 60)
+            delete, main_treq_args)
 
         self.assert_mutate_function_does_not_retry_if_not_pending_update(
             delete, main_treq_args)
@@ -233,7 +249,7 @@ class CLBTests(SynchronousTestCase):
             nodes_to_add)
 
         self.assert_mutate_function_retries_until_timeout(
-            add, main_treq_args, 60)
+            add, main_treq_args)
 
         self.assert_mutate_function_does_not_retry_if_not_pending_update(
             add, main_treq_args)
@@ -303,11 +319,11 @@ class CLBTests(SynchronousTestCase):
             d = clb.delete(self.rcs, clock=clock)
 
             self.assertNoResult(d)
-            clock.pump([3])
+            clock.pump([DEFAULT_POLL_PERIOD])
             self.assertNoResult(d)
 
             clb.treq = success_treq
-            clock.pump([3])
+            clock.pump([DEFAULT_POLL_PERIOD])
             self.assertEqual(self.successResultOf(d), None)
 
     def test_delete_clb_retries_until_timeout(self):
@@ -327,12 +343,11 @@ class CLBTests(SynchronousTestCase):
         d = clb.delete(self.rcs, clock=clock)
         self.assertNoResult(d)
 
-        timeout = 60
-        for _ in range((timeout - 1) / 3):
-            clock.pump([3])
+        for _ in range((DEFAULT_POLL_TIMEOUT - 1) / DEFAULT_POLL_PERIOD):
+            clock.pump([DEFAULT_POLL_PERIOD])
             self.assertNoResult(d)
 
-        clock.pump([3])
+        clock.pump([DEFAULT_POLL_PERIOD])
         self.failureResultOf(d, TimedOutError)
 
     def test_delete_clb_does_not_retry_on_get_failure(self):

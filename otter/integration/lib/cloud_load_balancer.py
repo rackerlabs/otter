@@ -25,21 +25,27 @@ from otter.util.retry import (
 )
 
 
-def _pending_update_to_transient(f):
+DEFAULT_POLL_PERIOD = 20
+DEFAULT_POLL_TIMEOUT = 200
+
+
+def _find_transient_errors(f):
     """
     A cloud load balancer locks on every update, so to ensure that the test
     doesn't fail because of that, we want to retry POST/PUT/DELETE commands
     issued by the test.  This is a utility function that checks if a treq
-    API failure is a 422 PENDING_UDPATE failure, and if so, re-raises a
-    TransientRetryError instead.
+    API failure is a 422 PENDING_UDPATE failure (or a 413 rate limit failure),
+    and if so, re-raises a TransientRetryError instead.
     """
     f.trap(APIError)
-    if f.value.code == 422 and 'PENDING_UPDATE' in f.value.body:
+    if ((f.value.code == 422 and 'PENDING_UPDATE' in f.value.body) or
+            (f.value.code == 413 and 'overLimit' in f.value.body)):
         raise TransientRetryError()
     return f
 
 
-def _retry(reason, timeout=60, period=3, clock=reactor):
+def _retry(reason, timeout=DEFAULT_POLL_TIMEOUT, period=DEFAULT_POLL_PERIOD,
+           clock=reactor):
     """
     Helper that decorates a function to retry it until success it succeeds or
     times out.  Assumes the function will raise :class:`TransientRetryError`
@@ -345,7 +351,7 @@ class CloudLoadBalancer(object):
                 pool=self.pool
             )
             d.addCallback(check_success, [202], _treq=self.treq)
-            d.addCallbacks(self.treq.content, _pending_update_to_transient)
+            d.addCallbacks(self.treq.content, _find_transient_errors)
             return d
 
         return really_change()
@@ -372,7 +378,7 @@ class CloudLoadBalancer(object):
                 pool=self.pool
             )
             d.addCallback(check_success, [202], _treq=self.treq)
-            d.addCallbacks(self.treq.content, _pending_update_to_transient)
+            d.addCallbacks(self.treq.content, _find_transient_errors)
             return d
 
         return really_delete()
@@ -400,7 +406,7 @@ class CloudLoadBalancer(object):
             )
             d.addCallback(check_success, [202], _treq=self.treq)
             d.addCallbacks(self.treq.json_content,
-                           _pending_update_to_transient)
+                           _find_transient_errors)
             return d
 
         return really_add()
