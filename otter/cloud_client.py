@@ -333,6 +333,8 @@ _CLB_NOT_ACTIVE_PATTERN = re.compile("^LoadBalancer is not ACTIVE$")
 _CLB_DELETED_PATTERN = re.compile(
     "^(Load Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
     "The load balancer is deleted and) considered immutable\.$")
+_CLB_MARKED_DELETED_PATTERN = re.compile(
+    "^The loadbalancer is marked as deleted\.$")
 _CLB_NO_SUCH_NODE_PATTERN = re.compile(
     "^Node with id #\d+ not found for loadbalancer #\d+$")
 _CLB_NO_SUCH_LB_PATTERN = re.compile(
@@ -652,6 +654,7 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
           partial(CLBRateLimitError, lb_id=lb_id))] +
         _expand_clb_matches(
             [(422, _CLB_DELETED_PATTERN, CLBDeletedError),
+             (410, _CLB_MARKED_DELETED_PATTERN, CLBDeletedError),
              (422, _CLB_IMMUTABLE_PATTERN, CLBImmutableError),
              (422, _CLB_NOT_ACTIVE_PATTERN, CLBNotActiveError),
              (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)],
