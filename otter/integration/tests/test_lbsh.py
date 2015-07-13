@@ -266,9 +266,8 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         """
         clb = self.helper.clbs[0]
 
-        nodes = yield clb.list_nodes(self.rcs)
-        self.assertEqual(len(nodes['nodes']), 0,
-                         "There should be no nodes on the CLB yet.")
+        yield clb.wait_for_nodes(self.rcs, HasLength(0),
+                                 timeout=timeout_default)
 
         # create the other two non-autoscaled servers - just wait until they
         # have servicenet addresses - don't bother waiting for them to be
