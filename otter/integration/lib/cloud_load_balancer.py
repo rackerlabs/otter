@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import json
 
-from functools import partial, wraps
+from functools import wraps
 
 from characteristic import Attribute, attributes
 
@@ -54,8 +54,11 @@ def _retry(reason, timeout=DEFAULT_POLL_TIMEOUT, period=DEFAULT_POLL_PERIOD,
     def decorator(f):
         @wraps(f)
         def retrier(*args, **kwargs):
+            def f_ignore_transient():
+                return f(*args, **kwargs).addErrback(_find_transient_errors)
+
             return retry_and_timeout(
-                partial(f, *args, **kwargs), timeout,
+                f_ignore_transient, timeout,
                 can_retry=terminal_errors_except(TransientRetryError),
                 next_interval=repeating_interval(period),
                 clock=clock,
@@ -203,8 +206,7 @@ class CloudLoadBalancer(object):
                                    headers=headers(str(rcs.token)),
                                    pool=self.pool)
                     .addCallback(check_success, [202], _treq=self.treq)
-                    .addCallbacks(self.treq.json_content,
-                                  _find_transient_errors)
+                    .addCallback(self.treq.json_content)
                     .addCallback(record_results))
 
         return _start()
@@ -230,7 +232,8 @@ class CloudLoadBalancer(object):
             ).addCallback(self.treq.content)
 
             try:
-                state = yield self.get_state(rcs)
+                state = yield self.get_state(rcs).addErrback(
+                    _find_transient_errors)
             except APIError as e:
                 if e.code != 404:
                     raise e
@@ -355,7 +358,7 @@ class CloudLoadBalancer(object):
                 pool=self.pool
             )
             d.addCallback(check_success, [202], _treq=self.treq)
-            d.addCallbacks(self.treq.content, _find_transient_errors)
+            d.addCallback(self.treq.content)
             return d
 
         return really_change()
@@ -382,7 +385,7 @@ class CloudLoadBalancer(object):
                 pool=self.pool
             )
             d.addCallback(check_success, [202], _treq=self.treq)
-            d.addCallbacks(self.treq.content, _find_transient_errors)
+            d.addCallback(self.treq.content)
             return d
 
         return really_delete()
@@ -409,8 +412,7 @@ class CloudLoadBalancer(object):
                 pool=self.pool
             )
             d.addCallback(check_success, [202], _treq=self.treq)
-            d.addCallbacks(self.treq.json_content,
-                           _find_transient_errors)
+            d.addCallback(self.treq.json_content)
             return d
 
         return really_add()
