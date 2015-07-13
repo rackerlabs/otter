@@ -162,7 +162,8 @@ class CLBTests(SynchronousTestCase):
     def test_update_node(self):
         """
         Update node calls the right endpoint, succeeds on 202, and retries
-        on pending update for 60 seconds.
+        on pending update for 60 seconds. It does not retry if the error is
+        not PENDING_UPDATE.
         """
         main_treq_args = ['put', 'clburl/loadbalancers/12345/nodes/54321',
                           (('{"node": {"weight": 5}}',), self.expected_kwargs)]
@@ -179,10 +180,11 @@ class CLBTests(SynchronousTestCase):
         self.assert_mutate_function_does_not_retry_if_not_pending_update(
             update, main_treq_args)
 
-    def test_delete_node_retries_until_success(self):
+    def test_delete_node(self):
         """
         Deleting one or more nodes calls the right endpoint, succeeds on
-        202, and retries on pending update for 60 seconds.
+        202, and retries on pending update for 60 seconds. It does not
+        retry if the error is not PENDING_UPDATE.
         """
         self.expected_kwargs['params'] = [("id", 11111), ("id", 22222)]
         main_treq_args = ['delete', 'clburl/loadbalancers/12345/nodes',
@@ -200,10 +202,11 @@ class CLBTests(SynchronousTestCase):
         self.assert_mutate_function_does_not_retry_if_not_pending_update(
             delete, main_treq_args)
 
-    def test_add_node_retries_until_success(self):
+    def test_add_node(self):
         """
         Adding one or more nodes calls the right endpoint, succeeds on
-        202, and retries on pending update for 60 seconds.
+        202, and retries on pending update for 60 seconds.  It does not
+        retry if the error is not PENDING_UPDATE.
         """
         nodes_to_add = {"nodes": [
             {
@@ -234,6 +237,118 @@ class CLBTests(SynchronousTestCase):
 
         self.assert_mutate_function_does_not_retry_if_not_pending_update(
             add, main_treq_args)
+
+    def get_fake_treq_for_delete(self, get_response, del_response=None):
+        """
+        Return a CLB for use with deleting a CLB - this is different than
+        the one returned by `get_clb` because it requires stubbing out two
+        treq requests.
+        """
+        del_response = del_response or Response(202)
+
+        class FakeTreq(object):
+            def delete(cls, _url, *args, **kwargs):
+                # args and kwargs are the same as the get ones
+                self.assertEqual(args, ())
+                self.assertEqual(kwargs, self.expected_kwargs)
+                self.assertEqual(_url, 'clburl/loadbalancers/{0}'.format(
+                    self.clb_id))
+                return succeed(del_response)
+
+            def get(cls, _url, *args, **kwargs):
+                cls.delete(_url, *args, **kwargs)
+                return succeed(get_response)
+
+            def content(cls, resp):
+                return succeed(resp.strbody)
+
+            def json_content(cls, resp):
+                return succeed(json.loads(resp.strbody))
+
+        return FakeTreq()
+
+    def test_delete_clb_retries_until_success(self):
+        """
+        Deleting a CLB will retry until the CLB is deleted (or in error or
+        suspended mode, in which case it will give up).
+        """
+        self.clb_id = 12345
+
+        success_treqs = [
+            # All of these particular immutable states count as success.
+            self.get_fake_treq_for_delete(
+                Response(200, strbody=json.dumps(
+                    {"loadBalancer": {"status": state}})),
+                del_response=Response(400))
+            for state in ("PENDING_DELETE", "DELETED", "ERROR", "SUSPENDED")
+        ] + [
+            # 404 from get-ting the server, meaning it's already gone.
+            self.get_fake_treq_for_delete(
+                Response(404, strbody=(
+                    '{"message": "No such load balancer", "code": 404}')),
+                del_response=Response(400))
+        ]
+
+        for success_treq in success_treqs:
+            clock = Clock()
+            _treq = self.get_fake_treq_for_delete(
+                Response(
+                    200,
+                    strbody='{"loadBalancer": {"status": "PENDING_UPDATE"}}'),
+                del_response=Response(400))
+
+            clb = CloudLoadBalancer(pool=self.pool, treq=_treq)
+            clb.clb_id = self.clb_id
+
+            d = clb.delete(self.rcs, clock=clock)
+
+            self.assertNoResult(d)
+            clock.pump([3])
+            self.assertNoResult(d)
+
+            clb.treq = success_treq
+            clock.pump([3])
+            self.assertEqual(self.successResultOf(d), None)
+
+    def test_delete_clb_retries_until_timeout(self):
+        """
+        Deleting a CLB will retry if the state wonky until it times out.
+        """
+        clock = Clock()
+        self.clb_id = 12345
+        _treq = self.get_fake_treq_for_delete(
+            Response(
+                200,
+                strbody='{"loadBalancer": {"status": "PENDING_UPDATE"}}'),
+            del_response=Response(400))
+
+        clb = CloudLoadBalancer(pool=self.pool, treq=_treq)
+        clb.clb_id = self.clb_id
+        d = clb.delete(self.rcs, clock=clock)
+        self.assertNoResult(d)
+
+        timeout = 60
+        for _ in range((timeout - 1) / 3):
+            clock.pump([3])
+            self.assertNoResult(d)
+
+        clock.pump([3])
+        self.failureResultOf(d, TimedOutError)
+
+    def test_delete_clb_does_not_retry_on_get_failure(self):
+        """
+        Deleting a CLB will retry if the state wonky until it times out.
+        """
+        clock = Clock()
+        self.clb_id = 12345
+        _treq = self.get_fake_treq_for_delete(
+            Response(400, strbody="Something is wrong"))
+
+        clb = CloudLoadBalancer(pool=self.pool, treq=_treq)
+        clb.clb_id = self.clb_id
+
+        d = clb.delete(self.rcs, clock=clock)
+        self.failureResultOf(d, APIError)
 
 
 class WaitForNodesTestCase(SynchronousTestCase):
