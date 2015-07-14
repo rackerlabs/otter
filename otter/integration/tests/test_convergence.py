@@ -253,7 +253,8 @@ class TestConvergence(unittest.TestCase):
         This will strip them of their association with Autoscale.
         """
         self.removed_ids = ids
-        self.addCleanup(delete_servers, ids, rcs, self.helper.pool)
+        self.addCleanup(delete_servers, ids, rcs, self.helper.pool,
+                        _treq=self.helper.treq)
         return gatherResults([
             NovaServer(id=_id, pool=self.helper.pool).update_metadata({}, rcs)
             for _id in ids]).addCallback(lambda _: rcs)
@@ -642,7 +643,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         d.addCallback(
             lambda _: self.helper.start_group_and_wait(group, self.rcs))
         d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
-                      matcher=HasLength(2), timeout=600)
+                      matcher=HasLength(2), _treq=self.helper.treq,
+                      **self.helper.retry_args)
         d.addCallback(lambda _: group)
         return d
 
@@ -681,10 +683,12 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         initial_servers = yield wait_for_servers(
             self.rcs, pool=self.helper.pool, group=group,
             timeout=otter_build_timeout,
+            period=self.helper.retry_args['period'],
             matcher=MatchesSetwise(
                 ContainsDict({'status': Equals('ACTIVE')}),
                 ContainsDict({'status': Equals('BUILD')}),
-            ))
+            ),
+            _treq=self.helper.treq)
 
         # the above ensures that there is one server with status BUILD
         building_server_id = next(s['id'] for s in initial_servers
@@ -704,12 +708,13 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
 
         yield wait_for_servers(
             self.rcs, pool=self.helper.pool, group=group,
-            timeout=600,
             matcher=MatchesAll(
                 AllMatch(ContainsDict({'status': Equals('ACTIVE'),
                                        'id': NotEquals(building_server_id)})),
                 HasLength(2)
-            ))
+            ),
+            _treq=self.helper.treq,
+            **self.helper.retry_args)
         returnValue(group)
 
     @skip_if(not_mimic, "This requires Mimic for error injection.")
@@ -793,7 +798,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         d.addCallback(
             lambda _: self.helper.start_group_and_wait(group, self.rcs))
         d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
-                      matcher=HasLength(2), timeout=600)
+                      matcher=HasLength(2), _treq=self.helper.treq,
+                      **self.helper.retry_args)
         return d
 
     @skip_if(not_mimic, "This requires Mimic for error injection.")

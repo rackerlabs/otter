@@ -30,8 +30,6 @@ from otter.integration.lib.trial_tools import (
     tag
 )
 
-timeout_default = 600
-
 
 class TestLoadBalancerSelfHealing(unittest.TestCase):
     """
@@ -45,7 +43,6 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         Establish resources used for each test, such as the auth token
         and a load balancer.
         """
-
         self.helper = TestHelper(self, num_clbs=1)
         self.rcs = TestResources()
         self.identity = get_identity(pool=self.helper.pool)
@@ -55,7 +52,8 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             region=region,
         ).addCallback(lambda _: gatherResults([
             clb.start(self.rcs, self)
-            .addCallback(clb.wait_for_state, "ACTIVE", timeout_default)
+            .addCallback(clb.wait_for_state, "ACTIVE",
+                         **self.helper.retry_args)
             for clb in self.helper.clbs])
         )
 
@@ -75,20 +73,20 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         clb = self.helper.clbs[0]
 
         yield clb.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+            self.rcs, HasLength(0), **self.helper.retry_args)
 
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
         nodes = yield clb.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
+            self.rcs, HasLength(1), **self.helper.retry_args)
 
         the_node = nodes[0]
 
         yield clb.delete_nodes(self.rcs, [the_node['id']])
 
         yield clb.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+            self.rcs, HasLength(0), **self.helper.retry_args)
         yield group.trigger_convergence(self.rcs)
 
         yield clb.wait_for_nodes(
@@ -97,7 +95,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
                 HasLength(1),
                 ContainsAllIPs([the_node["address"]])
             ),
-            timeout=timeout_default
+            **self.helper.retry_args
         )
 
     @tag("LBSH-002")
@@ -113,26 +111,27 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         # Create another loadbalancer not to be used in autoscale
         # The CLB will not be added to the helper, since when the helper
         # creates a group, it automatically adds the clb
-        clb_other = CloudLoadBalancer(pool=self.helper.pool)
+        clb_other = CloudLoadBalancer(pool=self.helper.pool,
+                                      treq=self.helper.treq)
 
         yield clb_other.start(self.rcs, self)
         yield clb_other.wait_for_state(
-            self.rcs, "ACTIVE", timeout_default)
+            self.rcs, "ACTIVE", **self.helper.retry_args)
 
         clb_as = self.helper.clbs[0]
 
         yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+            self.rcs, HasLength(0), **self.helper.retry_args)
         yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+            self.rcs, HasLength(0), **self.helper.retry_args)
 
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
         nodes_as = yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
+            self.rcs, HasLength(1), **self.helper.retry_args)
         yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+            self.rcs, HasLength(0), **self.helper.retry_args)
 
         the_node = nodes_as[0]
         node_info = {
@@ -146,9 +145,9 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         yield clb_other.add_nodes(self.rcs, [node_info])
 
         yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+            self.rcs, HasLength(0), **self.helper.retry_args)
         yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
+            self.rcs, HasLength(1), **self.helper.retry_args)
 
         yield group.trigger_convergence(self.rcs)
 
@@ -158,13 +157,13 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
                 HasLength(1),
                 ContainsAllIPs([the_node["address"]])
             ),
-            timeout=timeout_default
+            **self.helper.retry_args
         )
 
         yield clb_other.wait_for_nodes(
             self.rcs,
             HasLength(0),
-            timeout=timeout_default
+            **self.helper.retry_args
         )
 
     @tag("LBSH-003")
@@ -187,28 +186,29 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         # Create another loadbalancer not to be used in autoscale
         # The CLB will not be added to the helper, since when the helper
         # creates a group, it automatically adds the clb
-        clb_other = CloudLoadBalancer(pool=self.helper.pool)
+        clb_other = CloudLoadBalancer(pool=self.helper.pool,
+                                      treq=self.helper.treq)
 
         yield clb_other.start(self.rcs, self)
         yield clb_other.wait_for_state(
-            self.rcs, "ACTIVE", timeout_default)
+            self.rcs, "ACTIVE", **self.helper.retry_args)
 
         clb_as = self.helper.clbs[0]
 
         # Confirm both LBs are empty to start
         yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+            self.rcs, HasLength(0), **self.helper.retry_args)
         yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+            self.rcs, HasLength(0), **self.helper.retry_args)
 
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
         # One node should have been added to clb_as, none to clb_other
         nodes_as = yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
+            self.rcs, HasLength(1), **self.helper.retry_args)
         yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+            self.rcs, HasLength(0), **self.helper.retry_args)
 
         the_node = nodes_as[0]
         node_info = {
@@ -221,14 +221,14 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         yield clb_other.add_nodes(self.rcs, [node_info])
 
         yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
+            self.rcs, HasLength(1), **self.helper.retry_args)
         yield clb_other.wait_for_nodes(
             self.rcs,
             MatchesAll(
                 HasLength(1),
                 ContainsAllIPs([the_node["address"]])
             ),
-            timeout=timeout_default
+            **self.helper.retry_args
         )
 
         yield group.trigger_convergence(self.rcs)
@@ -239,13 +239,13 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
                 HasLength(1),
                 ContainsAllIPs([the_node["address"]])
             ),
-            timeout=timeout_default
+            **self.helper.retry_args
         )
 
         yield clb_other.wait_for_nodes(
             self.rcs,
             HasLength(0),
-            timeout=timeout_default
+            **self.helper.retry_args
         )
 
     @tag("LBSH-004")
@@ -297,7 +297,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         # Should be 3 nodes now that all servers are added
         nodes = yield clb.wait_for_nodes(
-            self.rcs, HasLength(3), timeout=timeout_default)
+            self.rcs, HasLength(3), **self.helper.retry_args)
         as_node = [node for node in nodes
                    if node not in (remove_non_as_node, untouch_non_as_node)][0]
 
@@ -306,7 +306,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
                                [as_node['id'], remove_non_as_node['id']])
         # There should be 1 node left
         yield clb.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
+            self.rcs, HasLength(1), **self.helper.retry_args)
 
         yield group.trigger_convergence(self.rcs)
 
@@ -322,5 +322,5 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
                     if k in ('address', 'port', 'weight' 'type', 'condition')
                 })
             ),
-            timeout=timeout_default
+            **self.helper.retry_args
         )
