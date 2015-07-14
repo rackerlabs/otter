@@ -4,8 +4,6 @@ from __future__ import print_function
 
 import json
 
-from functools import partial, wraps
-
 from characteristic import Attribute, attributes
 
 from testtools.matchers import MatchesPredicateWithParams
@@ -16,13 +14,9 @@ from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks
 from twisted.python.log import msg
 
-from otter.util.deferredutils import retry_and_timeout
+from otter.integration.lib.retry import retry
 from otter.util.http import APIError, check_success, headers
-from otter.util.retry import (
-    TransientRetryError,
-    repeating_interval,
-    terminal_errors_except
-)
+from otter.util.retry import TransientRetryError
 
 
 DEFAULT_POLL_PERIOD = 20
@@ -41,27 +35,6 @@ def _pending_update_to_transient(f):
     if f.value.code == 422 and 'PENDING_UPDATE' in f.value.body:
         raise TransientRetryError()
     return f
-
-
-def _retry(reason, timeout=DEFAULT_POLL_TIMEOUT, period=DEFAULT_POLL_PERIOD,
-           clock=reactor):
-    """
-    Helper that decorates a function to retry it until success it succeeds or
-    times out.  Assumes the function will raise :class:`TransientRetryError`
-    if it can be retried.
-    """
-    def decorator(f):
-        @wraps(f)
-        def retrier(*args, **kwargs):
-            return retry_and_timeout(
-                partial(f, *args, **kwargs), timeout,
-                can_retry=terminal_errors_except(TransientRetryError),
-                next_interval=repeating_interval(period),
-                clock=clock,
-                deferred_description=reason
-            )
-        return retrier
-    return decorator
 
 
 @attributes([
@@ -158,9 +131,9 @@ class CloudLoadBalancer(object):
 
             raise TransientRetryError()
 
-        @_retry("Waiting for cloud load balancer to reach state {}".format(
-                state_desired),
-                timeout=timeout, period=period, clock=clock)
+        @retry("Waiting for cloud load balancer to reach state {}".format(
+               state_desired),
+               timeout=timeout, period=period, clock=clock)
         def poll():
             return self.get_state(rcs).addCallback(check)
 
@@ -215,7 +188,8 @@ class CloudLoadBalancer(object):
         :param TestResources rcs: The resources used to make appropriate API
             calls with.
         """
-        @_retry("Trying to delete CLB", clock=clock)
+        @retry("Trying to delete CLB", timeout=DEFAULT_POLL_TIMEOUT,
+               period=DEFAULT_POLL_PERIOD, clock=clock)
         @inlineCallbacks
         def really_delete():
             yield self.treq.delete(
@@ -311,8 +285,8 @@ class CloudLoadBalancer(object):
                 raise TransientRetryError(mismatch.describe())
             return nodes['nodes']
 
-        @_retry("Waiting for nodes to reach state {0}".format(str(matcher)),
-                timeout=timeout, period=period, clock=clock)
+        @retry("Waiting for nodes to reach state {0}".format(str(matcher)),
+               timeout=timeout, period=period, clock=clock)
         def poll():
             return self.list_nodes(rcs).addCallback(check)
 
@@ -341,7 +315,9 @@ class CloudLoadBalancer(object):
         data = [("weight", weight), ("condition", condition), ("type", type)]
         data = {k: v for k, v in data if v is not None}
 
-        @_retry("Trying to change node {0}".format(node_id), clock=clock)
+        @retry("Trying to change node {0}".format(node_id),
+               timeout=DEFAULT_POLL_TIMEOUT, period=DEFAULT_POLL_PERIOD,
+               clock=clock)
         def really_change():
             d = self.treq.put(
                 "{0}/nodes/{1}".format(self.endpoint(rcs), node_id),
@@ -366,9 +342,11 @@ class CloudLoadBalancer(object):
 
         :return: An empty string if successful.
         """
-        @_retry("Trying to delete nodes {0}".format(
-                ", ".join(map(str, node_ids))),
-                clock=clock)
+        @retry("Trying to delete nodes {0}".format(
+               ", ".join(map(str, node_ids))),
+               timeout=DEFAULT_POLL_TIMEOUT,
+               period=DEFAULT_POLL_PERIOD,
+               clock=clock)
         def really_delete():
             d = self.treq.delete(
                 "{0}/nodes".format(self.endpoint(rcs)),
@@ -395,7 +373,8 @@ class CloudLoadBalancer(object):
             lists the nodes
 
         """
-        @_retry("Trying to add nodes.", clock=clock)
+        @retry("Trying to add nodes.", timeout=DEFAULT_POLL_TIMEOUT,
+               period=DEFAULT_POLL_PERIOD, clock=clock)
         def really_add():
             d = self.treq.post(
                 "{0}/nodes".format(self.endpoint(rcs)),
