@@ -11,6 +11,8 @@ from testtools.matchers import (
     Equals,
     MatchesAll)
 
+import treq
+
 from twisted.internet import reactor
 
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
@@ -36,6 +38,8 @@ from otter.integration.lib.nova import (
     delete_servers,
     wait_for_servers
 )
+
+from otter.integration.lib.retry import RetryingTreq
 
 
 username = os.environ['AS_USERNAME']
@@ -104,9 +108,16 @@ class TestHelper(object):
         """
         self.test_case = test_case
         self.pool = HTTPConnectionPool(reactor, False)
+        self.retry_args = {
+            'timeout': 600,
+            'period': 30 if not_mimic() else 3
+        }
+        self.treq = (
+            RetryingTreq(treq=treq, **self.retry_args)
+            if not_mimic() else treq)
         self.test_case.addCleanup(self.pool.closeCachedConnections)
 
-        self.clbs = [CloudLoadBalancer(pool=self.pool)
+        self.clbs = [CloudLoadBalancer(pool=self.pool, treq=self.treq)
                      for _ in range(num_clbs)]
 
     def create_group(self, **kwargs):
@@ -131,7 +142,8 @@ class TestHelper(object):
         return (
             ScalingGroup(
                 group_config=create_scaling_group_dict(**kwargs),
-                pool=self.pool),
+                pool=self.pool,
+                treq=self.treq),
             server_name_prefix)
 
     @inlineCallbacks
@@ -167,13 +179,13 @@ class TestHelper(object):
             MatchesAll(HasActive(desired),
                        ContainsDict({'pendingCapacity': Equals(0),
                                      'desiredCapacity': Equals(desired)})),
-            timeout=600)
+            **self.retry_args)
 
         if self.clbs:
             ips = yield group.get_servicenet_ips(rcs)
             yield gatherResults([
                 clb.wait_for_nodes(
-                    rcs, ContainsAllIPs(ips.values()), timeout=600)
+                    rcs, ContainsAllIPs(ips.values()), **self.retry_args)
                 for clb in self.clbs])
 
         returnValue(rcs)
@@ -203,9 +215,11 @@ class TestHelper(object):
             wait_for = ContainsDict({'status': Equals("ACTIVE")})
 
         server_ids = yield gatherResults([
-            create_server(rcs, self.pool, server_args) for _ in range(num)])
+            create_server(rcs, self.pool, server_args,
+                          _treq=self.treq) for _ in range(num)])
 
-        self.test_case.addCleanup(delete_servers, server_ids, rcs, self.pool)
+        self.test_case.addCleanup(delete_servers, server_ids, rcs, self.pool,
+                                  _treq=self.treq)
 
         servers = yield wait_for_servers(
             rcs,
@@ -214,7 +228,9 @@ class TestHelper(object):
             AfterPreprocessing(
                 lambda servers: [s for s in servers if s['id'] in server_ids],
                 AllMatch(wait_for)
-            )
+            ),
+            _treq=self.treq,
+            **self.retry_args
         )
 
         returnValue(
