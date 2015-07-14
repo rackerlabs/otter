@@ -49,9 +49,9 @@ class RetryingTreq(object):
     format).
     """
     treq = attr.ib()
-    clock = attr.ib()
     timeout = attr.ib()
     period = attr.ib()
+    clock = attr.ib(default=reactor)
 
     def _treq_retry(self, f):
         """
