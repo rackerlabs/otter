@@ -151,6 +151,11 @@ group_state = _openstackify_schema("group", {
             'required': True,
             'pattern': '|'.join(
                 x.name for x in ScalingGroupStatus.iterconstants())
+        },
+        'errors': {
+            'type': 'array',
+            'required': False,
+            'items': {'type': 'string'}
         }
     },
     'additionalProperties': False

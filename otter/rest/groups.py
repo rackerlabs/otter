@@ -69,7 +69,7 @@ def format_state_dict(state, active=None):
         pending = len(state.pending)
         desired = len(state.active) + pending
         active = state.active
-    return {
+    state_json = {
         'activeCapacity': len(active),
         'pendingCapacity': pending,
         'desiredCapacity': desired,
@@ -83,6 +83,9 @@ def format_state_dict(state, active=None):
             } for key, server_blob in active.iteritems()
         ]
     }
+    if state.status == ScalingGroupStatus.ERROR:
+        state_json['errors'] = state.error_reasons
+    return state_json
 
 
 def extract_bool_arg(request, key, default=False):

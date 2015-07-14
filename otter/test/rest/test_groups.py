@@ -103,7 +103,7 @@ class FormatterHelpers(SynchronousTestCase):
             'pendingCapacity': 3,
             'desiredCapacity': 6,
             'paused': True,
-            'status': 'ACTIVE',
+            'status': 'ACTIVE'
         })
 
     def test_format_state_dict_with_active(self):
@@ -368,7 +368,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
                     'pendingCapacity': 1,
                     'desiredCapacity': 1,
                     'paused': False,
-                    'status': 'ACTIVE',
+                    'status': 'ACTIVE'
                 }
             }],
             "groups_links": []
