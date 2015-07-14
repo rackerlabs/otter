@@ -25,6 +25,10 @@ from otter.util.retry import (
 )
 
 
+DEFAULT_POLL_PERIOD = 20
+DEFAULT_POLL_TIMEOUT = 200
+
+
 def _pending_update_to_transient(f):
     """
     A cloud load balancer locks on every update, so to ensure that the test
@@ -39,7 +43,8 @@ def _pending_update_to_transient(f):
     return f
 
 
-def _retry(reason, timeout=60, period=3, clock=reactor):
+def _retry(reason, timeout=DEFAULT_POLL_TIMEOUT, period=DEFAULT_POLL_PERIOD,
+           clock=reactor):
     """
     Helper that decorates a function to retry it until success it succeeds or
     times out.  Assumes the function will raise :class:`TransientRetryError`
