@@ -167,7 +167,7 @@ class ScalingGroup(object):
             provided will be returned.  Otherwise, an exception will rise.
         """
         return (
-            treq.put(
+            self.treq.put(
                 "{0}/groups/{1}/launch".format(rcs.endpoints["otter"],
                                                self.group_id),
                 json.dumps(launch_config),
@@ -225,7 +225,7 @@ class ScalingGroup(object):
             return rcs
 
         return (
-            treq.put(
+            self.treq.put(
                 "{0}/groups/{1}/config".format(rcs.endpoints["otter"],
                                                self.group_id),
                 json.dumps(replacement_config),
@@ -281,8 +281,8 @@ class ScalingGroup(object):
             This provides useful information to complete the request, like
             which endpoint to use to make the API request.
         """
-
-        return self.delete_scaling_group(rcs)
+        if getattr(self, 'group_id', None):
+            return self.delete_scaling_group(rcs)
 
     def delete_scaling_group(self, rcs):
         """Unconditionally delete the scaling group.  You may call this only
@@ -596,7 +596,7 @@ class ScalingPolicy(object):
             return rcs
 
         return (
-            treq.post(
+            self.scaling_group.treq.post(
                 "%s/groups/%s/policies" % (
                     str(rcs.endpoints["otter"]), self.scaling_group.group_id
                 ),
@@ -605,7 +605,7 @@ class ScalingPolicy(object):
                 pool=self.scaling_group.pool,
             )
             .addCallback(check_success, [201])
-            .addCallback(treq.json_content)
+            .addCallback(self.scaling_group.treq.json_content)
             .addCallback(record_results)
         )
 
@@ -621,7 +621,7 @@ class ScalingPolicy(object):
             of integration test code.
         """
         return (
-            treq.delete(
+            self.scaling_group.treq.delete(
                 "%s?force=true" % self.link,
                 headers=headers(str(rcs.token)),
                 pool=self.scaling_group.pool,
@@ -644,7 +644,7 @@ class ScalingPolicy(object):
             of integration test code.
         """
         return (
-            treq.post(
+            self.scaling_group.treq.post(
                 "%sexecute" % self.link,
                 headers=headers(str(rcs.token)),
                 pool=self.scaling_group.pool,
