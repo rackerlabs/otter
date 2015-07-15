@@ -263,8 +263,8 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         """
         Metrics are returned based on the requests done to get server info.
         """
-        # Maybe this could use a parameterized "get_scaling_group_servers" call
-        # to avoid needing to stub the nova responses, but it seems okay.
+        # Maybe this could use a parameterized "get_all_scaling_group_servers"
+        # call to avoid needing to stub the nova responses, but it seems okay.
         servers_t1 = {
             'g1': ([_server('g1', 'ACTIVE')] * 3
                    + [_server('g1', 'BUILD')] * 2),
@@ -283,7 +283,7 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         effs = get_all_metrics_effects(groups, mock_log())
         # All the effs are wrapped in TenantScopes to indicate the tenant
         # of ServiceRequests made under them. We use that tenant to get the
-        # stubbed result of get_scaling_group_servers.
+        # stubbed result of get_all_scaling_group_servers.
         results = [
             resolve_effect(eff, tenant_servers[eff.intent.tenant_id])
             for eff in effs]
