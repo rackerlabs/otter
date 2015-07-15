@@ -52,7 +52,7 @@ CREATE COLUMNFAMILY scaling_group (
     created_at timestamp,
     status ascii,
     deleting boolean,
-    error_reasons list<ascii>,
+    error_reasons list<text>,
     PRIMARY KEY("tenantId", "groupId")
 ) WITH compaction = {
     'class' : 'SizeTieredCompactionStrategy',
