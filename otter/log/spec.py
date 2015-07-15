@@ -73,17 +73,20 @@ class MsgTypeNotFound(Exception):
     """
 
 
-def try_msg_types(*tries):
+def try_msg_types(event, specs, tries):
     """
     Try series of msg_types
     """
     for msg_type in tries:
-        if msg_type in msg_types:
-            return msg_types[msg_type], msg_type
-    raise MsgTypeNotFound
+        if msg_type in specs:
+            formatter = specs[msg_type]
+            if callable(formatter):
+                formatter = formatter(event)
+            return formatter, msg_type
+    raise MsgTypeNotFound(msg_type)
 
 
-def get_validated_event(event):
+def get_validated_event(event, specs=msg_types):
     """
     Validate event's message as per msg_types and error details as
     per error_fields
@@ -97,13 +100,14 @@ def get_validated_event(event):
 
         # Is this message speced?
         if event.get('isError', False):
-            expanded, msg_type = try_msg_types(event.get("why", None), message)
+            expanded, msg_type = try_msg_types(
+                event, specs, [event.get("why", None), message])
             validate_error(event)
             event['why'] = expanded
             if message:
                 event['message'] = (expanded,)
         else:
-            expanded, msg_type = try_msg_types(message)
+            expanded, msg_type = try_msg_types(event, specs, [message])
             event["message"] = (expanded, )
 
         # TODO: Validate non-primitive fields

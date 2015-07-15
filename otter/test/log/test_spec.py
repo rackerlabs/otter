@@ -113,3 +113,28 @@ class GetValidatedEventTests(SynchronousTestCase):
             get_validated_event(e),
             {'message': ('Deleting {server_id} server',),
              'a': 'b', 'otter_msg_type': 'delete-server'})
+
+    def test_callable_spec(self):
+        """
+        Spec values can be callable, in which case they will be called with the
+        event dict, and their return value will be used as the new `message`.
+        """
+        e = {"message": ('foo-bar',), 'ab': 'cd'}
+        self.assertEqual(
+            get_validated_event(e, specs={'foo-bar': lambda e: e['ab']}),
+            {'message': ('cd',),
+             'otter_msg_type': 'foo-bar',
+             'ab': 'cd'})
+
+    def test_callable_spec_error(self):
+        """
+        Spec values will be called for errors as well, and their return will be
+        used as the new value for `why`.
+        """
+        e = {'isError': True, 'why': 'foo-bar', 'ab': 'cd'}
+        self.assertEqual(
+            get_validated_event(e, specs={'foo-bar': lambda e: e['ab']}),
+            {'why': 'cd',
+             'isError': True,
+             'otter_msg_type': 'foo-bar',
+             'ab': 'cd'})
