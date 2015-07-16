@@ -22,9 +22,10 @@ from otter.log.formatters import (
     ErrorFormattingWrapper, LogLevel, PEP3101FormattingWrapper)
 from otter.log.intents import err as err_effect, msg as msg_effect
 from otter.log.spec import SpecificationObserverWrapper
-from otter.util.http import append_segments
+from otter.util.http import APIError, append_segments
 from otter.util.pure_http import has_code
 from otter.util.retry import (
+    compose_retries,
     exponential_backoff_interval,
     retry_effect,
     retry_times)
@@ -161,10 +162,19 @@ def add_event(event, admin_tenant_id, region, log):
             service_request(
                 ServiceType.CLOUD_FEEDS, 'POST',
                 append_segments('autoscale', 'events'),
+                # note: if we actually wanted a JSON response instead of XML,
+                # we'd have to pass the header:
+                # 'accept': ['application/vnd.rackspace.atom+json'],
                 headers={
                     'content-type': ['application/vnd.rackspace.atom+json']},
-                data=req, log=log, success_pred=has_code(201)),
-            retry_times(5), exponential_backoff_interval(2))
+                data=req, log=log, success_pred=has_code(201),
+                json_response=False),
+            compose_retries(
+                lambda f: (not f.check(APIError) or
+                           f.value.code < 400 or
+                           f.value.code >= 500),
+                retry_times(5)),
+            exponential_backoff_interval(2))
         return Effect(TenantScope(tenant_id=admin_tenant_id, effect=eff))
 
     return eff.on(_send_event)

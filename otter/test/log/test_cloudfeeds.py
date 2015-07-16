@@ -10,6 +10,7 @@ from effect import Effect, TypeDispatcher
 import mock
 
 from twisted.internet.defer import fail, succeed
+from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
 
 from txeffect import deferred_performer
@@ -29,6 +30,7 @@ from otter.log.cloudfeeds import (
 from otter.log.formatters import LogLevel
 from otter.log.intents import Log, LogErr
 from otter.test.utils import CheckFailure, mock_log, patch, resolve_effect
+from otter.util.http import APIError
 from otter.util.retry import (
     ShouldDelayAndRetry,
     exponential_backoff_interval,
@@ -231,7 +233,7 @@ class EventTests(SynchronousTestCase):
         eff = eff.intent.effect
         self.assertEqual(
             eff.intent.should_retry,
-            ShouldDelayAndRetry(can_retry=retry_times(5),
+            ShouldDelayAndRetry(can_retry=mock.ANY,  # tested elsewhere
                                 next_interval=exponential_backoff_interval(2)))
 
         # effect wrapped in retry is ServiceRequest
@@ -243,7 +245,27 @@ class EventTests(SynchronousTestCase):
                 headers={
                     'content-type': ['application/vnd.rackspace.atom+json']},
                 data=self._get_request('INFO', uid, 'tid'), log=log,
-                success_pred=has_code(201)))
+                success_pred=has_code(201),
+                json_response=False))
+
+    def test_add_event_only_retries_on_non_400_api_errors(self):
+        """
+        Attempting to add an event is only retried up to a maximum of 5 times,
+        and only if it's not an 4XX APIError.
+        """
+        def _get_can_retry():
+            eff = add_event(self.event, 'tid', 'ord', object())
+            eff = resolve_effect(eff, uuid.UUID(int=0))  # get tenant scope
+            eff = eff.intent.effect   # get wrapped effect
+            return eff.intent.should_retry.can_retry
+
+        for exc in (Exception(), APIError(code=500, body='<some xml>')):
+            can_retry = _get_can_retry()
+            self.assertEqual(
+                [can_retry(Failure(exc)) for _ in range(6)],
+                [True] * 5 + [False])
+        self.assertFalse(
+            _get_can_retry()(Failure(APIError(code=409, body='<some xml>'))))
 
     def test_prepare_request_error(self):
         """
