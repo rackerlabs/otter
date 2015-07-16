@@ -6,9 +6,9 @@ import json
 from twisted.internet.defer import maybeDeferred
 from twisted.web.server import Request
 
-from otter.rest.otterapp import OtterApp
 from otter.rest.groups import OtterGroups
 from otter.rest.limits import OtterLimits
+from otter.rest.otterapp import OtterApp
 from otter.rest.webhooks import OtterExecute
 
 from otter.util.config import config_value
