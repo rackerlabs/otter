@@ -266,8 +266,8 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         # Maybe this could use a parameterized "get_all_scaling_group_servers"
         # call to avoid needing to stub the nova responses, but it seems okay.
         servers_t1 = {
-            'g1': ([_server('g1', 'ACTIVE')] * 3
-                   + [_server('g1', 'BUILD')] * 2),
+            'g1': ([_server('g1', 'ACTIVE')] * 3 +
+                   [_server('g1', 'BUILD')] * 2),
             'g2': [_server('g2', 'ACTIVE')]}
 
         servers_t2 = {
