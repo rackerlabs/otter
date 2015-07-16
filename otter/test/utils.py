@@ -9,7 +9,7 @@ from inspect import getargspec
 from operator import attrgetter
 
 from effect import (
-    ComposedDispatcher, Effect, ParallelEffects, TypeDispatcher,
+    ComposedDispatcher, Constant, Effect, ParallelEffects, TypeDispatcher,
     base_dispatcher, sync_perform)
 from effect.async import perform_parallel_async
 from effect.fold import sequence
@@ -44,7 +44,7 @@ from otter.models.interface import IScalingGroup, IScalingGroupServersCache
 from otter.supervisor import ISupervisor
 from otter.util.deferredutils import DeferredPool
 from otter.util.fp import set_in
-from otter.util.retry import Retry
+from otter.util.retry import Retry, perform_retry
 
 
 class matches(object):
@@ -695,6 +695,53 @@ def resolve_stubs(eff):
     dispatchers from Effect.
     """
     return eff_resolve_stubs(base_dispatcher, eff)
+
+
+def retry_sequence(retry_intent, performers,
+                   fallback_dispatcher=None):
+    """
+    Return a function of Intent -> a that performs the retried effect
+    from the intent over and over.
+
+    :param fallback_dispatcher: an optional dispatcher to compose onto the
+        sequence dispatcher.
+
+    Usage::
+
+        SequenceDispatcher([
+            retry_sequence(
+                Retry(
+                    effect=SomeEffect(),
+                    should_retry=ShouldDelayAndRetry(
+                        can_retry=retry_times(5),
+                        next_interval=repeating_interval(10))),
+                [fail_to_perform,
+                 fail_to_perform,
+                 perform_intent])
+        ])
+    """
+    def perform_retry_without_delay(i):
+        def should_retry(exc_info):
+            exc_type, exc_value, exc_traceback = exc_info
+            failure = Failure(exc_value, exc_type, exc_traceback)
+            return Effect(Constant(
+                retry_intent.should_retry.can_retry(failure)))
+
+        seq = [(retry_intent.effect.intent, performer)
+               for performer in performers]
+
+        new_retry_intent = Effect(Retry(effect=retry_intent.effect,
+                                        should_retry=should_retry))
+
+        _dispatchers = [TypeDispatcher({Retry: perform_retry}),
+                        base_dispatcher]
+        if fallback_dispatcher is not None:
+            _dispatchers.append(fallback_dispatcher)
+
+        return perform_sequence(seq, new_retry_intent,
+                                ComposedDispatcher(_dispatchers))
+
+    return (retry_intent, perform_retry_without_delay)
 
 
 def perform_sequence(seq, eff, fallback_dispatcher=base_dispatcher):
