@@ -15,10 +15,12 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.log.intents import (
     err,
+    get_log,
     get_log_dispatcher,
     msg,
     with_log)
-from otter.test.utils import CheckFailureValue, mock_log
+from otter.test.utils import (
+    CheckFailureValue, IsBoundWith, matches, mock_log)
 
 
 class LogDispatcherTests(SynchronousTestCase):
@@ -161,3 +163,10 @@ class LogDispatcherTests(SynchronousTestCase):
         self.assertEqual(sync_perform(self.disp, with_log(e, o='f')), "def")
         self.log.msg.assert_called_once_with(
             'foo', i='a', f1='v', m='d', o='f')
+
+    def test_get_log(self):
+        eff = with_log(get_log(), ab=12, cd='foo')
+        log = sync_perform(self.disp, eff)
+        self.assertEqual(
+            log,
+            matches(IsBoundWith(f1='v', ab=12, cd='foo')))

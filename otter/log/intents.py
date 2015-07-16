@@ -6,7 +6,8 @@ from functools import partial
 
 import attr
 
-from effect import ComposedDispatcher, Effect, TypeDispatcher, perform
+from effect import (
+    ComposedDispatcher, Effect, TypeDispatcher, perform, sync_performer)
 
 from toolz.dicttoolz import merge
 
@@ -44,6 +45,16 @@ class LogErr(object):
 
 
 @attr.s
+class GetLog(object):
+    """
+    Intent to get a BoundLog from the effectful context.
+
+    This is useful to pass a log object to "legacy" code using BoundLogs
+    directly.
+    """
+
+
+@attr.s
 class BoundFields(object):
     """
     Intent that binds log fields to an effect. Any log or err effect
@@ -75,6 +86,11 @@ def err(failure, msg, **fields):
     return Effect(LogErr(failure, msg, fields))
 
 
+def get_log():
+    """Return Effect(GetLog())."""
+    return Effect(GetLog())
+
+
 def perform_logging(log, fields, log_func, disp, intent, box):
     """ Perform logging related intents """
     all_fields = merge(fields, intent.fields)
@@ -100,6 +116,15 @@ def bound_log(log, all_fields, disp, intent, box):
     perform(new_disp, intent.effect.on(box.succeed, box.fail))
 
 
+@sync_performer
+def perform_get_log(log, fields, disp, intent):
+    """
+    Perform a GetLog intent by returning a BoundLog with all the Effectfully
+    bound fields.
+    """
+    return log.bind(**fields)
+
+
 def get_log_dispatcher(log, fields):
     """
     Get dispatcher containing performers for logging intents that
@@ -108,5 +133,6 @@ def get_log_dispatcher(log, fields):
     return TypeDispatcher({
         BoundFields: partial(perform_logging, log, fields, bound_log),
         Log: partial(perform_logging, log, fields, log_msg),
-        LogErr: partial(perform_logging, log, fields, log_err)
+        LogErr: partial(perform_logging, log, fields, log_err),
+        GetLog: partial(perform_get_log, log, fields),
     })
