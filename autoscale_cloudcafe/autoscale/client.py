@@ -739,21 +739,6 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         return self.request('POST', url,
                             requestslib_kwargs=requestslib_kwargs)
 
-    def get_history(self, requestslib_kwargs=None):
-        """
-        :summary: Request the history audit log
-        :return: Response object containing response code 200 (on success) and a body
-                 containing the audit log details
-        :rtype: Response Object
-
-        GET
-        '/<string:tenantId>/history'
-        """
-        url = '{0}/history'.format(self.url)
-        return self.request('GET', url,
-                            requestslib_kwargs=requestslib_kwargs,
-                            response_entity_type=Audit)
-
     def delete_server(self, group_id, server_id, replace=None):
         """
         Delete server from the group
