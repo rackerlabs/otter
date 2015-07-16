@@ -6,6 +6,8 @@ from effect import (
     base_dispatcher, parallel, sync_performer)
 from effect.fold import FoldError, sequence
 
+from mock import ANY
+
 from pyrsistent import pvector
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -260,6 +262,37 @@ class RetrySequenceTests(SynchronousTestCase):
         ]
         self.assertRaises(NoPerformerFoundError,
                           perform_sequence, seq, Effect(r))
+
+    def test_do_not_have_to_expect_an_exact_can_retry(self):
+        """
+        The expected retry intent does not actually have to specify the
+        exact ``can_retry`` function, since it might just be a lambda,
+        which is hard to compare or hash.
+        """
+        expected = Retry(effect=Effect(1), should_retry=ANY)
+        actual = Retry(effect=Effect(1), should_retry=ShouldDelayAndRetry(
+            can_retry=lambda _: False,
+            next_interval=repeating_interval(10)))
+
+        seq = [
+            retry_sequence(expected, [lambda _: raise_(Exception())])
+        ]
+        self.assertRaises(Exception,
+                          perform_sequence, seq, Effect(actual))
+
+    def test_can_have_a_different_should_retry_function(self):
+        """
+        The ``should_retry`` function does not have to be a
+        :obj:`ShouldDelayAndRetry`.
+        """
+        expected = Retry(effect=Effect(1), should_retry=ANY)
+        actual = Retry(effect=Effect(1), should_retry=lambda _: False)
+
+        seq = [
+            retry_sequence(expected, [lambda _: raise_(Exception())])
+        ]
+        self.assertRaises(Exception,
+                          perform_sequence, seq, Effect(actual))
 
     def test_fallback(self):
         """
