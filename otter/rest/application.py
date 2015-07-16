@@ -22,12 +22,10 @@ class Otter(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, region, health_check_function=None, es_host=None,
-                 _treq=None):
+    def __init__(self, store, region, health_check_function=None, _treq=None):
         self.store = store
         self.region = region
         self.health_check_function = health_check_function
-        self.es_host = es_host
         self.scheduler = None
         self.treq = _treq
 
