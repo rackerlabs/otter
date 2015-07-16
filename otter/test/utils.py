@@ -700,8 +700,9 @@ def resolve_stubs(eff):
 def retry_sequence(expected_retry_intent, performers,
                    fallback_dispatcher=None):
     """
-    Return a function of Intent -> a that performs the retried effect
-    from the intent over and over.
+    Return a two-tuple of ``(expected_retry_intent, Intent -> a)`` for use in
+    a :obj:`SequenceDispatcher`.  The Intent -> a function performs the
+    retried effect from the actual :obj:`Retry` intent over and over.
 
     :param fallback_dispatcher: an optional dispatcher to compose onto the
         sequence dispatcher.
