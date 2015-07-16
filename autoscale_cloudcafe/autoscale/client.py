@@ -17,8 +17,7 @@ from autoscale.models.request.autoscale_requests import (
     Webhook_Request
 )
 from autoscale.models.response.autoscale_response import (
-    Audit, Config,
-    Group, Groups, Policies, Policy, RackConnectLBNodeDetail,
+    Config, Group, Groups, Policies, Policy, RackConnectLBNodeDetail,
     RackConnectLBNodes, RackConnectLBPool, RackConnectLBPools,
     RackConnectNetworkInfo, ScalingGroup, Webhook, Webhooks
 )
