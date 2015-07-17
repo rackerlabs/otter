@@ -5,7 +5,7 @@ Tests for otter.cloudfeeds
 import uuid
 from functools import partial
 
-from effect import Constant, Effect, Func, TypeDispatcher
+from effect import Effect, Func, TypeDispatcher
 
 import mock
 
@@ -37,15 +37,14 @@ from otter.test.utils import (
     patch,
     perform_sequence,
     raise_,
-    stub_pure_response,
-    test_dispatcher
+    retry_sequence,
+    stub_pure_response
 )
 from otter.util.http import APIError
 from otter.util.retry import (
     Retry,
     ShouldDelayAndRetry,
-    exponential_backoff_interval,
-    perform_retry,
+    exponential_backoff_interval
 )
 
 
@@ -240,34 +239,18 @@ class EventTests(SynchronousTestCase):
                 'content-type': ['application/vnd.rackspace.atom+json']},
             data=self._get_request('INFO', uid, 'tid'), log=log,
             success_pred=has_code(201),
-            json_response=False).intent
-
-        def perform_retry_without_delay(retry_intention):
-            def should_retry(exc_info):
-                exc_type, exc_value, exc_traceback = exc_info
-                failure = Failure(exc_value, exc_type, exc_traceback)
-                return Effect(Constant(
-                    retry_intention.should_retry.can_retry(failure)))
-
-            seq = [(svrq, resp) for resp in response_sequence]
-
-            new_retry_intent = Effect(Retry(effect=retry_intention.effect,
-                                            should_retry=should_retry))
-
-            return perform_sequence(
-                seq, new_retry_intent,
-                test_dispatcher(TypeDispatcher({Retry: perform_retry})))
+            json_response=False)
 
         seq = [
             (Func(uuid.uuid4), lambda _: uid),
             (TenantScope(mock.ANY, 'tid'), nested_sequence([
-                (Retry(effect=mock.ANY, should_retry=ShouldDelayAndRetry(
-                    can_retry=mock.ANY,
-                    next_interval=exponential_backoff_interval(2))),
-                 # we actually want to perform the effect multiple times so
-                 # we can test retrying
-                 perform_retry_without_delay)
-                ]))
+                retry_sequence(
+                    Retry(effect=svrq, should_retry=ShouldDelayAndRetry(
+                        can_retry=mock.ANY,
+                        next_interval=exponential_backoff_interval(2))),
+                    response_sequence
+                )
+            ]))
         ]
 
         return perform_sequence(seq, eff)
