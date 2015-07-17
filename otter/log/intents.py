@@ -118,8 +118,10 @@ def bound_log(log, all_fields, disp, intent, box):
 
 def merge_effectful_fields(dispatcher, log):
     """
-    An *implicitly* side-effecting function which returns a log object based on
-    binding fields in the effectful log context into the passed-in log.
+    Return a log object based on bound fields in the effectful log context and
+    the passed-in log. The effectful context takes precedence.
+
+    If log is None then the default otter log will be used.
 
     Intended for use in legacy-ish intent performers that need a BoundLog.
     """
