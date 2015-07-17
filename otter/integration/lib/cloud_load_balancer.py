@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import json
 
-from functools import partial, wraps
+from functools import wraps
 
 from characteristic import Attribute, attributes
 
@@ -25,21 +25,27 @@ from otter.util.retry import (
 )
 
 
-def _pending_update_to_transient(f):
+DEFAULT_POLL_PERIOD = 20
+DEFAULT_POLL_TIMEOUT = 200
+
+
+def _find_transient_errors(f):
     """
     A cloud load balancer locks on every update, so to ensure that the test
     doesn't fail because of that, we want to retry POST/PUT/DELETE commands
     issued by the test.  This is a utility function that checks if a treq
-    API failure is a 422 PENDING_UDPATE failure, and if so, re-raises a
-    TransientRetryError instead.
+    API failure is a 422 PENDING_UDPATE failure (or a 413 rate limit failure),
+    and if so, re-raises a TransientRetryError instead.
     """
     f.trap(APIError)
-    if f.value.code == 422 and 'PENDING_UPDATE' in f.value.body:
+    if ((f.value.code == 422 and 'PENDING_UPDATE' in f.value.body) or
+            (f.value.code == 413 and 'overLimit' in f.value.body)):
         raise TransientRetryError()
     return f
 
 
-def _retry(reason, timeout=60, period=3, clock=reactor):
+def _retry(reason, timeout=DEFAULT_POLL_TIMEOUT, period=DEFAULT_POLL_PERIOD,
+           clock=reactor):
     """
     Helper that decorates a function to retry it until success it succeeds or
     times out.  Assumes the function will raise :class:`TransientRetryError`
@@ -48,8 +54,11 @@ def _retry(reason, timeout=60, period=3, clock=reactor):
     def decorator(f):
         @wraps(f)
         def retrier(*args, **kwargs):
+            def f_ignore_transient():
+                return f(*args, **kwargs).addErrback(_find_transient_errors)
+
             return retry_and_timeout(
-                partial(f, *args, **kwargs), timeout,
+                f_ignore_transient, timeout,
                 can_retry=terminal_errors_except(TransientRetryError),
                 next_interval=repeating_interval(period),
                 clock=clock,
@@ -172,7 +181,7 @@ class CloudLoadBalancer(object):
         return self.delete(rcs).addErrback(
             lambda f: msg("error deleting clb: {}".format(f)))
 
-    def start(self, rcs, test):
+    def start(self, rcs, test, clock=reactor):
         """Creates the cloud load balancer and launches it in the cloud.
 
         :param TestResources rcs: The resources used to make appropriate API
@@ -183,21 +192,24 @@ class CloudLoadBalancer(object):
             to the `start` function.  The instance will also have its cloud
             load balancer ID (`clb_id`) set by this time.
         """
-        test.addCleanup(self.stop, rcs)
-
         def record_results(resp):
             rcs.clbs.append(resp)
             self.clb_id = str(resp["loadBalancer"]["id"])
+            test.addCleanup(self.stop, rcs)
             return rcs
 
-        return (self.treq.post("%s/loadbalancers" %
-                               str(rcs.endpoints["loadbalancers"]),
-                               json.dumps(self.config()),
-                               headers=headers(str(rcs.token)),
-                               pool=self.pool)
-                .addCallback(check_success, [202], _treq=self.treq)
-                .addCallback(self.treq.json_content)
-                .addCallback(record_results))
+        @_retry("Waiting for CLB to be created.", clock=clock)
+        def _start():
+            return (self.treq.post("%s/loadbalancers" %
+                                   str(rcs.endpoints["loadbalancers"]),
+                                   json.dumps(self.config()),
+                                   headers=headers(str(rcs.token)),
+                                   pool=self.pool)
+                    .addCallback(check_success, [202], _treq=self.treq)
+                    .addCallback(self.treq.json_content)
+                    .addCallback(record_results))
+
+        return _start()
 
     def delete(self, rcs, clock=reactor):
         """
@@ -220,7 +232,8 @@ class CloudLoadBalancer(object):
             ).addCallback(self.treq.content)
 
             try:
-                state = yield self.get_state(rcs)
+                state = yield self.get_state(rcs).addErrback(
+                    _find_transient_errors)
             except APIError as e:
                 if e.code != 404:
                     raise e
@@ -345,7 +358,7 @@ class CloudLoadBalancer(object):
                 pool=self.pool
             )
             d.addCallback(check_success, [202], _treq=self.treq)
-            d.addCallbacks(self.treq.content, _pending_update_to_transient)
+            d.addCallback(self.treq.content)
             return d
 
         return really_change()
@@ -372,7 +385,7 @@ class CloudLoadBalancer(object):
                 pool=self.pool
             )
             d.addCallback(check_success, [202], _treq=self.treq)
-            d.addCallbacks(self.treq.content, _pending_update_to_transient)
+            d.addCallback(self.treq.content)
             return d
 
         return really_delete()
@@ -399,8 +412,7 @@ class CloudLoadBalancer(object):
                 pool=self.pool
             )
             d.addCallback(check_success, [202], _treq=self.treq)
-            d.addCallbacks(self.treq.json_content,
-                           _pending_update_to_transient)
+            d.addCallback(self.treq.json_content)
             return d
 
         return really_add()
