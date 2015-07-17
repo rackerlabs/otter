@@ -13,7 +13,7 @@ from toolz.functoolz import compose, identity
 from toolz.itertoolz import concat
 
 from otter.auth import NoSuchEndpoint
-from otter.cloud_client import service_request
+from otter.cloud_client import get_clb_nodes, service_request
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
@@ -179,13 +179,16 @@ def get_clb_contents():
     Get Rackspace Cloud Load Balancer contents as list of `CLBNode`.
     """
 
+    def retry(eff):
+        return retry_effect(
+            eff, retry_times(5), exponential_backoff_interval(2))
+
     def lb_req(method, url, json_response=True):
         """Make a request to the LB service with retries."""
-        return retry_effect(
+        return retry(
             service_request(
                 ServiceType.CLOUD_LOAD_BALANCERS,
-                method, url, json_response=json_response),
-            retry_times(5), exponential_backoff_interval(2))
+                method, url, json_response=json_response))
 
     def _lb_path(lb_id):
         """Return the URL path to lb with given id's nodes."""
@@ -195,13 +198,13 @@ def get_clb_contents():
         _response, body = result
         lbs = body['loadBalancers']
         lb_ids = [lb['id'] for lb in lbs]
-        lb_reqs = [
-            lb_req('GET', _lb_path(lb_id)).on(
-                lambda (response, body): body['nodes'])
-            for lb_id in lb_ids]
+        lb_reqs = map(compose(retry, get_clb_nodes), lb_ids)
         return parallel(lb_reqs).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
+        ids = list(ids)
+        all_lb_nodes = list(all_lb_nodes)
+        print ids, all_lb_nodes
         nodes = [
             CLBNode(
                 node_id=str(node['id']),

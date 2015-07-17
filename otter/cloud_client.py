@@ -619,6 +619,18 @@ def remove_clb_nodes(lb_id, node_ids):
     ).on(success=lambda _: None)
 
 
+def get_clb_nodes(lb_id):
+    return service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'GET',
+        append_segments('loadbalancers', str(lb_id), 'nodes'),
+    ).on(
+        error=_only_json_api_errors(
+            lambda c, b: _process_clb_api_error(c, b, lb_id))
+    ).on(
+        success=lambda (response, body): body['nodes'])
+
+
 def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
     """
     All CLB messages have only the keys ("message",), and the exception tpye

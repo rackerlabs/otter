@@ -459,11 +459,15 @@ class GetCLBContentsTests(SynchronousTestCase):
             ShouldDelayAndRetry(can_retry=retry_times(5),
                                 next_interval=exponential_backoff_interval(2)))
         req = eff.intent.effect.intent
+        print "req", req
+        print "skipping", eff.intent.effect.callbacks
         body = self.reqs[(req.method, req.url, req.json_response)]
         fake_response = object()
         return resolve_effect(eff, (fake_response, body))
 
     def _resolve_lb(self, eff):
+        # BURN THIS WITH FIRE
+        # REPLACE WITH SequenceDispatcher
         """Resolve the tree of effects used to fetch LB information."""
         # first resolve the request to list LBs
         lb_nodes_fetch = self._resolve_request(eff)
