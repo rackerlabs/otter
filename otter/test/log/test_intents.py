@@ -164,9 +164,8 @@ class LogDispatcherTests(SynchronousTestCase):
         self.log.msg.assert_called_once_with(
             'foo', i='a', f1='v', m='d', o='f')
 
-    def test_get_log(self):
+    def test_get_fields(self):
+        """GetFields results in the fields bound in the effectful context."""
         eff = with_log(get_log(), ab=12, cd='foo')
-        log = sync_perform(self.disp, eff)
-        self.assertEqual(
-            log,
-            matches(IsBoundWith(f1='v', ab=12, cd='foo')))
+        fields = sync_perform(self.disp, eff)
+        self.assertEqual(fields, {'f1': 'v', 'ab': 12, 'cd': 'foo'})
