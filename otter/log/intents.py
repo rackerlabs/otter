@@ -7,11 +7,14 @@ from functools import partial
 import attr
 
 from effect import (
-    ComposedDispatcher, Effect, TypeDispatcher, perform, sync_performer)
+    ComposedDispatcher, Effect, NoPerformerFoundError, TypeDispatcher,
+    perform, sync_perform, sync_performer)
 
 from toolz.dicttoolz import merge
 
 from twisted.python.failure import Failure
+
+from otter.log import log as default_log
 
 
 @attr.s
@@ -111,6 +114,25 @@ def bound_log(log, all_fields, disp, intent, box):
     new_disp = ComposedDispatcher(
         [get_log_dispatcher(log, all_fields), disp])
     perform(new_disp, intent.effect.on(box.succeed, box.fail))
+
+
+def merge_effectful_fields(dispatcher, log):
+    """
+    An *implicitly* side-effecting function which returns a log object based on
+    binding fields in the effectful log context into the passed-in log.
+
+    Intended for use in legacy-ish intent performers that need a BoundLog.
+    """
+    log = log if log is not None else default_log
+    try:
+        eff_fields = sync_perform(dispatcher, get_fields())
+    except NoPerformerFoundError:
+        # There's no BoundLog wrapping this intent; no effectful log fields to
+        # extract
+        pass
+    else:
+        log = log.bind(**eff_fields)
+    return log
 
 
 def get_log_dispatcher(log, fields):
