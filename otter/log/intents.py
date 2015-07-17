@@ -83,7 +83,7 @@ def err(failure, msg, **fields):
     return Effect(LogErr(failure, msg, fields))
 
 
-def get_log():
+def get_fields():
     """Return Effect(GetFields())."""
     return Effect(GetFields())
 

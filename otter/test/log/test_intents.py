@@ -15,12 +15,11 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.log.intents import (
     err,
-    get_log,
+    get_fields,
     get_log_dispatcher,
     msg,
     with_log)
-from otter.test.utils import (
-    CheckFailureValue, IsBoundWith, matches, mock_log)
+from otter.test.utils import CheckFailureValue, mock_log
 
 
 class LogDispatcherTests(SynchronousTestCase):
@@ -166,6 +165,6 @@ class LogDispatcherTests(SynchronousTestCase):
 
     def test_get_fields(self):
         """GetFields results in the fields bound in the effectful context."""
-        eff = with_log(get_log(), ab=12, cd='foo')
+        eff = with_log(get_fields(), ab=12, cd='foo')
         fields = sync_perform(self.disp, eff)
         self.assertEqual(fields, {'f1': 'v', 'ab': 12, 'cd': 'foo'})
