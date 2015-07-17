@@ -255,14 +255,15 @@ class EventTests(SynchronousTestCase):
 
         return perform_sequence(seq, eff)
 
-    def test_add_event_succeeds_on_201_with_xml_body(self):
+    def test_add_event_succeeds_if_request_succeeds(self):
         """
-        Adding an event succeeds on a 201, and ignores whether the body is JSON
-        or not.
+        Adding an event succeeds without retrying if the service request
+        succeeds.
         """
-        resp = stub_pure_response("<some xml>", 202)
-        response = [lambda _: resp]
-        self.assertEqual(self._perform_add_event(response), resp)
+        body = "<some xml>"
+        resp = stub_pure_response(body, 202)
+        response = [lambda _: (resp, body)]
+        self.assertEqual(self._perform_add_event(response), (resp, body))
 
     def test_add_event_only_retries_5_times_on_non_4xx_api_errors(self):
         """
@@ -273,8 +274,8 @@ class EventTests(SynchronousTestCase):
             lambda _: raise_(Exception("oh noes!")),
             lambda _: raise_(ResponseFailed(Failure(Exception(":(")))),
             lambda _: raise_(APIError(code=100, body="<some xml>")),
+            lambda _: raise_(APIError(code=202, body="<some xml>")),
             lambda _: raise_(APIError(code=301, body="<some xml>")),
-            lambda _: raise_(APIError(code=500, body="<some xml>")),
             lambda _: raise_(APIError(code=501, body="<some xml>")),
         ]
         with self.assertRaises(APIError) as cm:
