@@ -14,7 +14,9 @@ from effect import (
 
 from effect.async import perform_parallel_async
 from effect.testing import (
-    EQDispatcher, EQFDispatcher, Stub)
+    EQDispatcher, EQFDispatcher, SequenceDispatcher, Stub)
+
+import mock
 
 from pyrsistent import freeze
 
@@ -46,8 +48,10 @@ from otter.convergence.model import (
     ServerState)
 from otter.test.utils import (
     EffectServersCache,
+    StubResponse,
     intent_func,
     nested_parallel,
+    nested_sequence,
     patch,
     perform_sequence,
     resolve_effect,
@@ -56,7 +60,7 @@ from otter.test.utils import (
     server
 )
 from otter.util.retry import (
-    ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
+    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import timestamp_to_epoch
 
 
@@ -425,77 +429,65 @@ class GetCLBContentsTests(SynchronousTestCase):
     """
 
     def setUp(self):
-        """
-        Stub request function and mock `extract_CLB_drained_at`
-        """
-        self.reqs = {
-            ('GET', 'loadbalancers', True): {'loadBalancers':
-                                             [{'id': 1}, {'id': 2}]},
-            ('GET', 'loadbalancers/1/nodes', True): {'nodes': [
-                {'id': '11', 'port': 20, 'address': 'a11',
-                 'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
-                {'id': '12', 'port': 20, 'address': 'a12',
-                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}]},
-            ('GET', 'loadbalancers/2/nodes', True): {'nodes': [
-                {'id': '21', 'port': 20, 'address': 'a21',
-                 'weight': 3, 'condition': 'ENABLED', 'type': 'PRIMARY'},
-                {'id': '22', 'port': 20, 'address': 'a22',
-                 'condition': 'DRAINING', 'type': 'PRIMARY'}]},
-            ('GET', 'loadbalancers/1/nodes/11.atom', False): '11feed',
-            ('GET', 'loadbalancers/2/nodes/22.atom', False): '22feed'
-        }
+        """mock `extract_CLB_drained_at`"""
         self.feeds = {'11feed': 1.0, '22feed': 2.0}
         self.mock_eda = patch(
             self, 'otter.convergence.gathering.extract_CLB_drained_at',
             side_effect=lambda f: self.feeds[f])
 
-    def _resolve_request(self, eff):
-        """
-        Resolve a :obj:`ServiceRequest` based on ``self.reqs`` and assert
-        that it's wrapped in a Retry with the expected policy.
-        """
-        self.assertEqual(
-            eff.intent.should_retry,
-            ShouldDelayAndRetry(can_retry=retry_times(5),
-                                next_interval=exponential_backoff_interval(2)))
-        req = eff.intent.effect.intent
-        print "req", req
-        print "skipping", eff.intent.effect.callbacks
-        body = self.reqs[(req.method, req.url, req.json_response)]
-        fake_response = object()
-        return resolve_effect(eff, (fake_response, body))
-
-    def _resolve_lb(self, eff):
-        # BURN THIS WITH FIRE
-        # REPLACE WITH SequenceDispatcher
-        """Resolve the tree of effects used to fetch LB information."""
-        # first resolve the request to list LBs
-        lb_nodes_fetch = self._resolve_request(eff)
-        if type(lb_nodes_fetch) is not Effect:
-            # If a parallel effect is *empty*, resolve_stubs will
-            # simply return an empty list immediately.
-            self.assertEqual(lb_nodes_fetch, [])  # sanity check
-            return lb_nodes_fetch
-        # which results in a parallel fetch of all nodes from all LBs
-        feed_fetches = resolve_effect(
-            lb_nodes_fetch,
-            map(self._resolve_request, lb_nodes_fetch.intent.effects))
-        # which results in a list parallel fetch of feeds for the nodes
-        lbnodes = resolve_effect(
-            feed_fetches,
-            map(self._resolve_request, feed_fetches.intent.effects))
-        # and we finally have the CLBNodes.
-        return lbnodes
+    def lb_req(self, method, url, json, response):
+        return (
+            Retry(
+                effect=mock.ANY,
+                should_retry=ShouldDelayAndRetry(
+                    can_retry=retry_times(5),
+                    next_interval=exponential_backoff_interval(2))
+            ),
+            nested_sequence([
+                (service_request(
+                    ServiceType.CLOUD_LOAD_BALANCERS,
+                    method, url, json_response=json).intent,
+                 lambda i: (StubResponse(200, {}), response))
+            ])
+        )
 
     def test_success(self):
         """
         Gets LB contents with drained_at correctly
         """
+        seq = [
+            self.lb_req(
+                'GET', 'loadbalancers', True,
+                {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            nested_parallel([
+                self.lb_req(
+                    'GET', 'loadbalancers/1/nodes', True,
+                    {'nodes': [
+                        {'id': '11', 'port': 20, 'address': 'a11',
+                         'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
+                        {'id': '12', 'port': 20, 'address': 'a12',
+                         'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}]}
+                ),
+                self.lb_req(
+                    'GET', 'loadbalancers/2/nodes', True,
+                    {'nodes': [
+                        {'id': '21', 'port': 20, 'address': 'a21',
+                         'weight': 3, 'condition': 'ENABLED', 'type': 'PRIMARY'},
+                        {'id': '22', 'port': 20, 'address': 'a22',
+                         'condition': 'DRAINING', 'type': 'PRIMARY'}]}),
+            ]),
+            nested_parallel([
+                self.lb_req(
+                    'GET', 'loadbalancers/1/nodes/11.atom', False, '11feed'),
+                self.lb_req(
+                    'GET', 'loadbalancers/2/nodes/22.atom', False, '22feed'),
+            ]),
+        ]
         eff = get_clb_contents()
         draining, enabled = CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED
         make_desc = partial(CLBDescription, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
-            self._resolve_lb(eff),
+            perform_sequence(seq, eff),
             [CLBNode(node_id='11',
                      address='a11',
                      drained_at=1.0,
@@ -523,45 +515,61 @@ class GetCLBContentsTests(SynchronousTestCase):
         """
         Return empty list if there are no LB
         """
-        self.reqs = {('GET', 'loadbalancers', True): {'loadBalancers': []}}
+        seq = [
+            self.lb_req('GET', 'loadbalancers', True,
+                        {'loadBalancers': []}),
+            nested_parallel([]),  # No LBs to fetch
+            nested_parallel([]),  # No nodes to fetch
+        ]
         eff = get_clb_contents()
-        self.assertEqual(self._resolve_lb(eff), [])
+        self.assertEqual(perform_sequence(seq, eff), [])
 
     def test_no_nodes(self):
         """
         Return empty if there are LBs but no nodes in them
         """
-        self.reqs = {
-            ('GET', 'loadbalancers', True): {'loadBalancers':
-                                             [{'id': 1}, {'id': 2}]},
-            ('GET', 'loadbalancers/1/nodes', True): {'nodes': []},
-            ('GET', 'loadbalancers/2/nodes', True): {'nodes': []},
-        }
-        eff = get_clb_contents()
-        self.assertEqual(self._resolve_lb(eff), [])
+        seq = [
+            self.lb_req('GET', 'loadbalancers', True,
+                {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            nested_parallel([
+                self.lb_req('GET', 'loadbalancers/1/nodes', True,
+                            {'nodes': []}),
+                self.lb_req('GET', 'loadbalancers/2/nodes', True,
+                            {'nodes': []}),
+            ]),
+            nested_parallel([]),  # No nodes to fetch
+        ]
+        self.assertEqual(perform_sequence(seq, get_clb_contents()), [])
 
     def test_no_draining(self):
         """
         Doesnt fetch feeds if all nodes are ENABLED
         """
-        self.reqs = {
-            ('GET', 'loadbalancers', True): {'loadBalancers':
-                                             [{'id': 1}, {'id': 2}]},
-            ('GET', 'loadbalancers/1/nodes', True): {'nodes': [
-                {'id': '11', 'port': 20, 'address': 'a11',
-                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
-            ]},
-            ('GET', 'loadbalancers/2/nodes', True): {'nodes': [
-                {'id': '21', 'port': 20, 'address': 'a21',
-                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
-            ]},
-        }
+        seq = [
+            self.lb_req('GET', 'loadbalancers', True,
+                        {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            nested_parallel([
+                self.lb_req(
+                    'GET', 'loadbalancers/1/nodes', True,
+                    {'nodes': [
+                        {'id': '11', 'port': 20, 'address': 'a11',
+                         'weight': 2, 'condition': 'ENABLED',
+                        'type': 'PRIMARY'}]}),
+                self.lb_req(
+                    'GET', 'loadbalancers/2/nodes', True,
+                    {'nodes': [
+                        {'id': '21', 'port': 20, 'address': 'a21',
+                         'weight': 2, 'condition': 'ENABLED',
+                         'type': 'PRIMARY'}]}),
+            ]),
+            nested_parallel([])  # No nodes to fetch
+        ]
         make_desc = partial(CLBDescription, port=20, weight=2,
                             condition=CLBNodeCondition.ENABLED,
                             type=CLBNodeType.PRIMARY)
         eff = get_clb_contents()
         self.assertEqual(
-            self._resolve_lb(eff),
+            perform_sequence(seq, eff),
             [CLBNode(node_id='11', address='a11',
                      description=make_desc(lb_id='1')),
              CLBNode(node_id='21', address='a21',

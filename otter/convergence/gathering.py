@@ -202,9 +202,6 @@ def get_clb_contents():
         return parallel(lb_reqs).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
-        ids = list(ids)
-        all_lb_nodes = list(all_lb_nodes)
-        print ids, all_lb_nodes
         nodes = [
             CLBNode(
                 node_id=str(node['id']),
