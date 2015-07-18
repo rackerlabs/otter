@@ -2,7 +2,7 @@
 
 """Functional programming utilities."""
 
-from copy import deepcopy
+from copy import copy
 
 from pyrsistent import freeze, pmap
 
@@ -85,7 +85,7 @@ def predicate_any(*preds):
 
 def assoc_obj(o, **k):
     """Update attributes on an object, returning a new one."""
-    new_o = deepcopy(o)
+    new_o = copy(o)
     new_o.__dict__.update(k)
     return new_o
 

@@ -14,6 +14,7 @@ from toolz.itertoolz import concat
 
 from otter.auth import NoSuchEndpoint
 from otter.cloud_client import (
+    CLBDeletedError, NoSuchCLBError,
     get_clb_node_feed, get_clb_nodes, get_clbs, service_request)
 from otter.constants import ServiceType
 from otter.convergence.model import (
@@ -25,6 +26,7 @@ from otter.convergence.model import (
     group_id_from_metadata)
 from otter.indexer import atom
 from otter.models.cass import CassScalingGroupServersCache
+from otter.util.fp import assoc_obj
 from otter.util.http import append_segments
 from otter.util.retry import (
     exponential_backoff_interval, retry_effect, retry_times)
@@ -169,32 +171,39 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     yield do_return(servers)
 
 
+@do
 def get_clb_contents():
-    """
-    Get Rackspace Cloud Load Balancer contents as list of `CLBNode`.
-    """
-    def fetch_nodes(lbs):
-        lb_ids = [lb['id'] for lb in lbs]
-        lb_reqs = map(compose(_retry, get_clb_nodes), lb_ids)
-        return parallel(lb_reqs).on(lambda all_nodes: (lb_ids, all_nodes))
+    """Get Rackspace Cloud Load Balancer contents as list of `CLBNode`."""
+    def gone(r):
+        return catch((CLBDeletedError, NoSuchCLBError), lambda exc: r)
+    def gone_sentinel(r):
+        return lambda e: e.on(error=gone(r))
+    lb_ids = [lb['id'] for lb in (yield _retry(get_clbs()))]
 
-    def fetch_drained_feeds((ids, all_lb_nodes)):
-        nodes = [CLBNode.from_node_json(lb_id, node)
-                 for lb_id, nodes in zip(ids, all_lb_nodes) for node in nodes]
-        draining = [n for n in nodes
-                    if n.description.condition == CLBNodeCondition.DRAINING]
-        return parallel(
-            [_retry(get_clb_node_feed(n.description.lb_id, n.node_id))
-             for n in draining]
-         ).on(lambda feeds: (nodes, draining, feeds))
+    # zipping the LBIDs with the results of the node requests is lame? instead,
+    # each request could individually tuple on the LBID to the result?
 
-    def fill_drained_at((nodes, draining, feeds)):
-        for node, feed in zip(draining, feeds):
-            node.drained_at = extract_CLB_drained_at(feed)
-        return nodes
-
-    return _retry(get_clbs()).on(fetch_nodes).on(fetch_drained_feeds).on(
-        fill_drained_at)
+    lb_reqs = [_retry(get_clb_nodes(lb_id).on(error=gone([])))
+               for lb_id in lb_ids]
+    #lb_reqs = map(compose(_retry, gone_sentinel([]), get_clb_nodes), lb_ids)
+    nodes = [CLBNode.from_node_json(lb_id, node)
+             for lb_id, nodes in zip(lb_ids, (yield parallel(lb_reqs)))
+             for node in nodes]
+    draining = [n for n in nodes
+                if n.description.condition == CLBNodeCondition.DRAINING]
+    feeds = yield parallel(
+        [_retry(get_clb_node_feed(n.description.lb_id, n.node_id).on(
+            error=gone(None)))
+         for n in draining]
+    )
+    node_id_to_feed = {n.node_id: feed for (n, feed) in zip(draining, feeds)}
+    def update_drained_at(node):
+        feed = node_id_to_feed.get(node.node_id)
+        if feed is not None:
+            return assoc_obj(node, drained_at=extract_CLB_drained_at(feed))
+        else:
+            return node
+    yield do_return(list(map(update_drained_at, nodes)))
 
 
 def extract_CLB_drained_at(feed):
