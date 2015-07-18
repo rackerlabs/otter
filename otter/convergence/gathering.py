@@ -13,7 +13,8 @@ from toolz.functoolz import compose, identity
 from toolz.itertoolz import concat
 
 from otter.auth import NoSuchEndpoint
-from otter.cloud_client import get_clb_nodes, service_request
+from otter.cloud_client import (
+    get_clb_node_feed, get_clb_nodes, get_clbs, service_request)
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
@@ -84,13 +85,6 @@ def get_all_server_details(changes_since=None, batch_size=100):
         return servers
 
     return get_server_details(query)
-
-
-def _discard_response((response, body)):
-    """
-    Takes a response, body tuple and discards the response.
-    """
-    return body
 
 
 def get_all_scaling_group_servers(changes_since=None,
@@ -183,20 +177,7 @@ def get_clb_contents():
         return retry_effect(
             eff, retry_times(5), exponential_backoff_interval(2))
 
-    def lb_req(method, url, json_response=True):
-        """Make a request to the LB service with retries."""
-        return retry(
-            service_request(
-                ServiceType.CLOUD_LOAD_BALANCERS,
-                method, url, json_response=json_response))
-
-    def _lb_path(lb_id):
-        """Return the URL path to lb with given id's nodes."""
-        return append_segments('loadbalancers', str(lb_id), 'nodes')
-
-    def fetch_nodes(result):
-        _response, body = result
-        lbs = body['loadBalancers']
+    def fetch_nodes(lbs):
         lb_ids = [lb['id'] for lb in lbs]
         lb_reqs = map(compose(retry, get_clb_nodes), lb_ids)
         return parallel(lb_reqs).on(lambda all_nodes: (lb_ids, all_nodes))
@@ -216,23 +197,17 @@ def get_clb_contents():
         draining = [n for n in nodes
                     if n.description.condition == CLBNodeCondition.DRAINING]
         return parallel(
-            [lb_req(
-                'GET',
-                append_segments(
-                    'loadbalancers',
-                    str(n.description.lb_id),
-                    'nodes',
-                    '{}.atom'.format(n.node_id)),
-                json_response=False).on(_discard_response)
-             for n in draining]).on(lambda feeds: (nodes, draining, feeds))
+            [retry(get_clb_node_feed(n.description.lb_id, n.node_id))
+             for n in draining]
+         ).on(lambda feeds: (nodes, draining, feeds))
 
     def fill_drained_at((nodes, draining, feeds)):
         for node, feed in zip(draining, feeds):
             node.drained_at = extract_CLB_drained_at(feed)
         return nodes
 
-    return lb_req('GET', 'loadbalancers').on(
-        fetch_nodes).on(fetch_drained_feeds).on(fill_drained_at)
+    return retry(get_clbs()).on(fetch_nodes).on(fetch_drained_feeds).on(
+        fill_drained_at)
 
 
 def extract_CLB_drained_at(feed):

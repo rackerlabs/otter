@@ -14,7 +14,7 @@ from effect import (
 
 from effect.async import perform_parallel_async
 from effect.testing import (
-    EQDispatcher, EQFDispatcher, SequenceDispatcher, Stub)
+    EQDispatcher, EQFDispatcher, Stub)
 
 import mock
 
@@ -435,7 +435,7 @@ class GetCLBContentsTests(SynchronousTestCase):
             self, 'otter.convergence.gathering.extract_CLB_drained_at',
             side_effect=lambda f: self.feeds[f])
 
-    def lb_req(self, method, url, json, response):
+    def lb_req(self, method, url, json_response, response):
         return (
             Retry(
                 effect=mock.ANY,
@@ -446,7 +446,7 @@ class GetCLBContentsTests(SynchronousTestCase):
             nested_sequence([
                 (service_request(
                     ServiceType.CLOUD_LOAD_BALANCERS,
-                    method, url, json_response=json).intent,
+                    method, url, json_response=json_response).intent,
                  lambda i: (StubResponse(200, {}), response))
             ])
         )
@@ -464,15 +464,18 @@ class GetCLBContentsTests(SynchronousTestCase):
                     'GET', 'loadbalancers/1/nodes', True,
                     {'nodes': [
                         {'id': '11', 'port': 20, 'address': 'a11',
-                         'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
+                         'weight': 2, 'condition': 'DRAINING',
+                         'type': 'PRIMARY'},
                         {'id': '12', 'port': 20, 'address': 'a12',
-                         'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}]}
+                         'weight': 2, 'condition': 'ENABLED',
+                         'type': 'PRIMARY'}]}
                 ),
                 self.lb_req(
                     'GET', 'loadbalancers/2/nodes', True,
                     {'nodes': [
                         {'id': '21', 'port': 20, 'address': 'a21',
-                         'weight': 3, 'condition': 'ENABLED', 'type': 'PRIMARY'},
+                         'weight': 3, 'condition': 'ENABLED',
+                         'type': 'PRIMARY'},
                         {'id': '22', 'port': 20, 'address': 'a22',
                          'condition': 'DRAINING', 'type': 'PRIMARY'}]}),
             ]),
@@ -530,7 +533,7 @@ class GetCLBContentsTests(SynchronousTestCase):
         """
         seq = [
             self.lb_req('GET', 'loadbalancers', True,
-                {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+                        {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             nested_parallel([
                 self.lb_req('GET', 'loadbalancers/1/nodes', True,
                             {'nodes': []}),
@@ -554,7 +557,7 @@ class GetCLBContentsTests(SynchronousTestCase):
                     {'nodes': [
                         {'id': '11', 'port': 20, 'address': 'a11',
                          'weight': 2, 'condition': 'ENABLED',
-                        'type': 'PRIMARY'}]}),
+                         'type': 'PRIMARY'}]}),
                 self.lb_req(
                     'GET', 'loadbalancers/2/nodes', True,
                     {'nodes': [

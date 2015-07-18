@@ -620,6 +620,9 @@ def remove_clb_nodes(lb_id, node_ids):
 
 
 def get_clb_nodes(lb_id):
+    """
+    Fetch the nodes of the given load balancer. Returns list of node JSON.
+    """
     return service_request(
         ServiceType.CLOUD_LOAD_BALANCERS,
         'GET',
@@ -629,6 +632,29 @@ def get_clb_nodes(lb_id):
             lambda c, b: _process_clb_api_error(c, b, lb_id))
     ).on(
         success=lambda (response, body): body['nodes'])
+
+
+def get_clbs():
+    """Fetch all LBs for a tenant. Returns list of loadbalancer JSON."""
+    return service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS, 'GET', 'loadbalancers',
+    ).on(
+        success=lambda (response, body): body['loadBalancers'])
+
+
+def get_clb_node_feed(lb_id, node_id):
+    """Get the atom feed associated with a CLB node. Returns feed as str."""
+    return service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'GET',
+        append_segments('loadbalancers', str(lb_id), 'nodes',
+                        '{}.atom'.format(node_id)),
+        json_response=False
+    ).on(
+        error=_only_json_api_errors(
+            lambda c, b: _process_clb_api_error(c, b, lb_id))
+    ).on(
+        success=lambda (response, body): body)
 
 
 def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
