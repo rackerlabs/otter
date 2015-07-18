@@ -176,16 +176,12 @@ def get_clb_contents():
     """Get Rackspace Cloud Load Balancer contents as list of `CLBNode`."""
     def gone(r):
         return catch((CLBDeletedError, NoSuchCLBError), lambda exc: r)
-    def gone_sentinel(r):
-        return lambda e: e.on(error=gone(r))
     lb_ids = [lb['id'] for lb in (yield _retry(get_clbs()))]
 
     # zipping the LBIDs with the results of the node requests is lame? instead,
     # each request could individually tuple on the LBID to the result?
-
     lb_reqs = [_retry(get_clb_nodes(lb_id).on(error=gone([])))
                for lb_id in lb_ids]
-    #lb_reqs = map(compose(_retry, gone_sentinel([]), get_clb_nodes), lb_ids)
     nodes = [CLBNode.from_node_json(lb_id, node)
              for lb_id, nodes in zip(lb_ids, (yield parallel(lb_reqs)))
              for node in nodes]
@@ -197,6 +193,7 @@ def get_clb_contents():
          for n in draining]
     )
     node_id_to_feed = {n.node_id: feed for (n, feed) in zip(draining, feeds)}
+
     def update_drained_at(node):
         feed = node_id_to_feed.get(node.node_id)
         if feed is not None:
