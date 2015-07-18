@@ -152,7 +152,6 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     :return: Servers as list of dicts
     :rtype: Effect
     """
-
     cache = cache_class(tenant_id, group_id)
     cached_servers, last_update = yield cache.get_servers(False)
     if last_update is None:
@@ -174,7 +173,6 @@ def get_clb_contents():
     """
     Get Rackspace Cloud Load Balancer contents as list of `CLBNode`.
     """
-
     def fetch_nodes(lbs):
         lb_ids = [lb['id'] for lb in lbs]
         lb_reqs = map(compose(_retry, get_clb_nodes), lb_ids)
