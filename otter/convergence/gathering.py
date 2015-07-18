@@ -31,6 +31,12 @@ from otter.util.retry import (
 from otter.util.timestamp import timestamp_to_epoch
 
 
+def _retry(eff):
+    """Retry an effect with a common policy."""
+    return retry_effect(
+        eff, retry_times(5), exponential_backoff_interval(2))
+
+
 class UnexpectedBehaviorError(Exception):
     """
     Error to be raised when something happens that Autoscale does not expect.
@@ -56,11 +62,9 @@ def get_all_server_details(changes_since=None, batch_size=100):
 
     def get_server_details(query_params):
         params = sorted(query_params.items())
-        eff = retry_effect(
+        eff = _retry(
             service_request(ServiceType.CLOUD_SERVERS, 'GET',
-                            "{}?{}".format(url,
-                                           urlencode(params, True))),
-            retry_times(5), exponential_backoff_interval(2))
+                            "{}?{}".format(url, urlencode(params, True))))
         return eff.on(continue_)
 
     def continue_(result):
@@ -171,13 +175,9 @@ def get_clb_contents():
     Get Rackspace Cloud Load Balancer contents as list of `CLBNode`.
     """
 
-    def retry(eff):
-        return retry_effect(
-            eff, retry_times(5), exponential_backoff_interval(2))
-
     def fetch_nodes(lbs):
         lb_ids = [lb['id'] for lb in lbs]
-        lb_reqs = map(compose(retry, get_clb_nodes), lb_ids)
+        lb_reqs = map(compose(_retry, get_clb_nodes), lb_ids)
         return parallel(lb_reqs).on(lambda all_nodes: (lb_ids, all_nodes))
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
@@ -186,7 +186,7 @@ def get_clb_contents():
         draining = [n for n in nodes
                     if n.description.condition == CLBNodeCondition.DRAINING]
         return parallel(
-            [retry(get_clb_node_feed(n.description.lb_id, n.node_id))
+            [_retry(get_clb_node_feed(n.description.lb_id, n.node_id))
              for n in draining]
          ).on(lambda feeds: (nodes, draining, feeds))
 
@@ -195,7 +195,7 @@ def get_clb_contents():
             node.drained_at = extract_CLB_drained_at(feed)
         return nodes
 
-    return retry(get_clbs()).on(fetch_nodes).on(fetch_drained_feeds).on(
+    return _retry(get_clbs()).on(fetch_nodes).on(fetch_drained_feeds).on(
         fill_drained_at)
 
 
