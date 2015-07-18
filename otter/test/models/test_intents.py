@@ -8,12 +8,14 @@ import mock
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.log.intents import get_log_dispatcher
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, UpdateGroupStatus, UpdateServersCache,
     get_model_dispatcher)
 from otter.models.interface import (
     IScalingGroupCollection, ScalingGroupStatus)
-from otter.test.utils import EffectServersCache, iMock, mock_group, mock_log
+from otter.test.utils import (
+    EffectServersCache, IsBoundWith, iMock, matches, mock_group, mock_log)
 
 
 class ScalingGroupIntentsTests(SynchronousTestCase):
@@ -25,15 +27,26 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         """
         Sample group, collection and dispatcher
         """
-        self.log = mock_log()
+        self.log = mock_log().bind(base_log=True)
         self.group = mock_group(None)
-        self.store = iMock(IScalingGroupCollection)
-        self.dispatcher = get_model_dispatcher(self.log, self.store)
 
-        def get_scaling_group(log, tenant_id, group_id):
-            return self.data[(log, tenant_id, group_id)]
+    def get_dispatcher(self, store):
+        return get_model_dispatcher(self.log, store)
 
-        self.store.get_scaling_group.side_effect = get_scaling_group
+    def get_store(self):
+        return iMock(IScalingGroupCollection)
+
+    def perform_with_group(self, eff, expected_lookup, group, disp=None):
+        """Run an effect that will look up group info."""
+        def gsg(log, tenant_id, group_id):
+            assert (log, tenant_id, group_id) == expected_lookup
+            return group
+        store = self.get_store()
+        store.get_scaling_group.side_effect = gsg
+        dispatcher = self.get_dispatcher(store)
+        if disp is not None:
+            dispatcher = ComposedDispatcher([dispatcher, disp])
+        return sync_perform(dispatcher, eff)
 
     def test_get_scaling_group_info(self):
         """
@@ -48,30 +61,61 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
 
         manifest = {}
         self.group.view_manifest.side_effect = view_manifest
-        self.data = {(self.log, '00', 'g1'): self.group}
-        info = sync_perform(
-            self.dispatcher,
-            Effect(GetScalingGroupInfo(tenant_id='00', group_id='g1')))
+        info = self.perform_with_group(
+            Effect(GetScalingGroupInfo(tenant_id='00', group_id='g1')),
+            (self.log, '00', 'g1'), self.group)
         self.assertEqual(info, (self.group, manifest))
+
+    def test_get_scaling_group_info_log_context(self):
+        """
+        When run in an effectful log context, the fields are bound to the log
+        passed to get_scaling_group.
+        """
+        manifest = {}
+
+        def view_manifest(with_policies, with_webhooks, get_deleting):
+            return manifest
+        self.group.view_manifest.side_effect = view_manifest
+        eff = Effect(GetScalingGroupInfo(tenant_id='00', group_id='g1'))
+        expected_lookup = (matches(IsBoundWith(base_log=True, effectful=True)),
+                           '00', 'g1')
+        result = self.perform_with_group(
+            eff, expected_lookup, self.group,
+            disp=get_log_dispatcher(self.log, {'effectful': True}))
+        self.assertEqual(result, (self.group, manifest))
 
     def test_delete_group(self):
         """
         Performing `DeleteGroup` calls group.delete_group
         """
-        self.data = {(self.log, '00', 'g1'): self.group}
         self.group.delete_group.return_value = succeed('del')
-        self.assertEqual(
-            sync_perform(
-                self.dispatcher,
-                Effect(DeleteGroup(tenant_id='00', group_id='g1'))),
-            'del')
+        result = self.perform_with_group(
+            Effect(DeleteGroup(tenant_id='00', group_id='g1')),
+            (self.log, '00', 'g1'), self.group)
+        self.assertEqual(result, 'del')
+
+    def test_delete_group_log_context(self):
+        """
+        When run in an effectful log context, the fields are bound to the log
+        passed to get_scaling_group.
+        """
+        self.group.delete_group.return_value = succeed('del')
+        expected_lookup = (matches(IsBoundWith(base_log=True, effectful=True)),
+                           '00', 'g1')
+        result = self.perform_with_group(
+            Effect(DeleteGroup(tenant_id='00', group_id='g1')),
+            expected_lookup, self.group,
+            disp=get_log_dispatcher(self.log, {'effectful': True}))
+        self.assertEqual(result, 'del')
 
     def test_update_group_status(self):
         """Performing :obj:`UpdateGroupStatus` invokes group.update_status."""
         eff = Effect(UpdateGroupStatus(scaling_group=self.group,
                                        status=ScalingGroupStatus.ERROR))
         self.group.update_status.return_value = None
-        self.assertIs(sync_perform(self.dispatcher, eff), None)
+        self.assertIs(
+            sync_perform(self.get_dispatcher(self.get_store()), eff),
+            None)
         self.group.update_status.assert_called_once_with(
             ScalingGroupStatus.ERROR)
 
@@ -79,6 +123,8 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
                 new=EffectServersCache)
     def test_perform_update_servers_cache(self):
         """
+        Performing :obj:`UpdateServersCache` invokes ``insert_servers`` on the
+        cache.
         """
         dt = datetime(1970, 1, 1)
         eff = Effect(UpdateServersCache('tid', 'gid', dt, [{'id': 'a'}]))
@@ -91,5 +137,5 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
 
         disp = ComposedDispatcher([
             TypeDispatcher({tuple: perform_update_tuple}),
-            self.dispatcher])
+            self.get_dispatcher(self.get_store())])
         self.assertIsNone(sync_perform(disp, eff))
