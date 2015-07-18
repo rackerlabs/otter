@@ -539,7 +539,7 @@ class CLBClientTests(SynchronousTestCase):
     @property
     def lb_id(self):
         """What is my LB ID"""
-        return u"123456"
+        return "123456"
 
     def assert_parses_common_clb_errors(self, intent, eff):
         """
@@ -573,7 +573,8 @@ class CLBClientTests(SynchronousTestCase):
                 sync_perform(
                     EQFDispatcher([(intent, service_request_eqf(resp))]),
                     eff)
-            self.assertEqual(cm.exception, err(msg, lb_id=self.lb_id))
+            self.assertEqual(cm.exception,
+                             err(msg, lb_id=six.text_type(self.lb_id)))
 
         # OverLimit Retry is different because it's produced by repose
         over_limit = stub_pure_response(
@@ -592,7 +593,8 @@ class CLBClientTests(SynchronousTestCase):
                 eff)
         self.assertEqual(
             cm.exception,
-            CLBRateLimitError("OverLimit Retry...", lb_id=self.lb_id))
+            CLBRateLimitError("OverLimit Retry...",
+                              lb_id=six.text_type(self.lb_id)))
 
         # Ignored errors
         bad_resps = [
@@ -638,7 +640,7 @@ class CLBClientTests(SynchronousTestCase):
 
         Parse the common CLB errors, and :class:`NoSuchCLBNodeError`.
         """
-        eff = change_clb_node(lb_id=self.lb_id, node_id=u'1234',
+        eff = change_clb_node(lb_id=self.lb_id, node_id='1234',
                               condition="DRAINING", weight=50)
         expected = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
@@ -667,7 +669,8 @@ class CLBClientTests(SynchronousTestCase):
             sync_perform(dispatcher, eff)
         self.assertEqual(
             cm.exception,
-            NoSuchCLBNodeError(msg, lb_id=self.lb_id, node_id=u'1234'))
+            NoSuchCLBNodeError(msg, lb_id=six.text_type(self.lb_id),
+                               node_id=u'1234'))
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)
@@ -710,7 +713,7 @@ class CLBClientTests(SynchronousTestCase):
             sync_perform(dispatcher, eff)
         self.assertEqual(
             cm.exception,
-            CLBDuplicateNodesError(msg, lb_id=self.lb_id))
+            CLBDuplicateNodesError(msg, lb_id=six.text_type(self.lb_id)))
 
         # CLBNodeLimitError failure
         msg = "Nodes must not exceed 25 per load balancer."
@@ -723,7 +726,7 @@ class CLBClientTests(SynchronousTestCase):
             sync_perform(dispatcher, eff)
         self.assertEqual(
             cm.exception,
-            CLBNodeLimitError(msg, lb_id=self.lb_id))
+            CLBNodeLimitError(msg, lb_id=six.text_type(self.lb_id)))
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)
