@@ -4,6 +4,8 @@ from __future__ import print_function
 
 import json
 
+from functools import partial, wraps
+
 from characteristic import Attribute, attributes
 
 from testtools.matchers import MatchesPredicateWithParams
@@ -11,6 +13,7 @@ from testtools.matchers import MatchesPredicateWithParams
 import treq
 
 from twisted.internet import reactor
+from twisted.internet.defer import inlineCallbacks
 from twisted.python.log import msg
 
 from otter.util.deferredutils import retry_and_timeout
@@ -34,6 +37,26 @@ def _pending_update_to_transient(f):
     if f.value.code == 422 and 'PENDING_UPDATE' in f.value.body:
         raise TransientRetryError()
     return f
+
+
+def _retry(reason, timeout=60, period=3, clock=reactor):
+    """
+    Helper that decorates a function to retry it until success it succeeds or
+    times out.  Assumes the function will raise :class:`TransientRetryError`
+    if it can be retried.
+    """
+    def decorator(f):
+        @wraps(f)
+        def retrier(*args, **kwargs):
+            return retry_and_timeout(
+                partial(f, *args, **kwargs), timeout,
+                can_retry=terminal_errors_except(TransientRetryError),
+                next_interval=repeating_interval(period),
+                clock=clock,
+                deferred_description=reason
+            )
+        return retrier
+    return decorator
 
 
 @attributes([
@@ -102,9 +125,10 @@ class CloudLoadBalancer(object):
         )
 
     def wait_for_state(
-        self, rcs, state_desired, timeout, period=10, clock=None
+        self, rcs, state_desired, timeout, period=10, clock=reactor
     ):
-        """Waits for the cloud load balancer to reach a certain state.  After
+        """
+        Wait for the cloud load balancer to reach a certain state.  After
         a timeout, a `TimeoutError` exception will occur.
 
         :param TestResources rcs: The resources used to make appropriate API
@@ -129,20 +153,13 @@ class CloudLoadBalancer(object):
 
             raise TransientRetryError()
 
+        @_retry("Waiting for cloud load balancer to reach state {}".format(
+                state_desired),
+                timeout=timeout, period=period, clock=clock)
         def poll():
             return self.get_state(rcs).addCallback(check)
 
-        return retry_and_timeout(
-            poll, timeout,
-            can_retry=terminal_errors_except(TransientRetryError),
-            next_interval=repeating_interval(period),
-            clock=clock or reactor,
-            deferred_description=(
-                "Waiting for cloud load balancer to reach state {}".format(
-                    state_desired
-                )
-            )
-        )
+        return poll()
 
     def stop(self, rcs):
         """Stops and deletes the cloud load balancer.
@@ -182,25 +199,41 @@ class CloudLoadBalancer(object):
                 .addCallback(self.treq.json_content)
                 .addCallback(record_results))
 
-    def delete(self, rcs, success_codes=None):
-        """Stops and deletes the cloud load balancer.
+    def delete(self, rcs, clock=reactor):
+        """
+        Delete the cloud load balancer.  This might not work due to the load
+        balancer being in an immutable state, but the error returned from
+        attempting the delete does not tell us which immutable state it is in.
+
+        So we also want to do a get, to see if we have to try again.
 
         :param TestResources rcs: The resources used to make appropriate API
             calls with.
-        :param list success_codes: A list of HTTP status codes to count as
-            a successful call.  If not provided, defaults to ``[202, 404]``
-            (404 is a successful result because deletes should be idempotent).
         """
-        return (
-            self.treq.delete(
+        @_retry("Trying to delete CLB", clock=clock)
+        @inlineCallbacks
+        def really_delete():
+            yield self.treq.delete(
                 self.endpoint(rcs),
                 headers=headers(str(rcs.token)),
                 pool=self.pool
-            ).addCallback(
-                check_success,
-                [202, 404] if success_codes is None else success_codes,
-                _treq=self.treq)
-        ).addCallback(lambda _: rcs)
+            ).addCallback(self.treq.content)
+
+            try:
+                state = yield self.get_state(rcs)
+            except APIError as e:
+                if e.code != 404:
+                    raise e
+            else:
+                if state['loadBalancer']['status'] not in (
+                        "PENDING_DELETE", "SUSPENDED", "ERROR", "DELETED"):
+                    raise TransientRetryError()
+                if state['loadBalancer']['status'] in ("ERROR", "SUSPENDED"):
+                    msg("Could not delete CLB {0} because it is in {1} state, "
+                        "but considering this good enough.".format(
+                            self.clb_id, state['loadBalancer']['status']))
+
+        return really_delete()
 
     def list_nodes(self, rcs):
         """
@@ -233,7 +266,7 @@ class CloudLoadBalancer(object):
         d.addCallback(self.treq.json_content)
         return d
 
-    def wait_for_nodes(self, rcs, matcher, timeout, period=10, clock=None):
+    def wait_for_nodes(self, rcs, matcher, timeout, period=10, clock=reactor):
         """
         Wait for the nodes on the load balancer to reflect a certain state,
         specified by matcher.
@@ -273,20 +306,15 @@ class CloudLoadBalancer(object):
                 raise TransientRetryError(mismatch.describe())
             return nodes['nodes']
 
+        @_retry("Waiting for nodes to reach state {0}".format(str(matcher)),
+                timeout=timeout, period=period, clock=clock)
         def poll():
             return self.list_nodes(rcs).addCallback(check)
 
-        return retry_and_timeout(
-            poll, timeout,
-            can_retry=terminal_errors_except(TransientRetryError),
-            next_interval=repeating_interval(period),
-            clock=clock or reactor,
-            deferred_description="Waiting for nodes to reach state {0}".format(
-                str(matcher))
-        )
+        return poll()
 
     def update_node(self, rcs, node_id, weight=None, condition=None,
-                    type=None, clock=None):
+                    type=None, clock=reactor):
         """
         Update a node's attributes.  At least one of the optional parameters
         must be provided.
@@ -308,6 +336,7 @@ class CloudLoadBalancer(object):
         data = [("weight", weight), ("condition", condition), ("type", type)]
         data = {k: v for k, v in data if v is not None}
 
+        @_retry("Trying to change node {0}".format(node_id), clock=clock)
         def really_change():
             d = self.treq.put(
                 "{0}/nodes/{1}".format(self.endpoint(rcs), node_id),
@@ -319,15 +348,9 @@ class CloudLoadBalancer(object):
             d.addCallbacks(self.treq.content, _pending_update_to_transient)
             return d
 
-        return retry_and_timeout(
-            really_change, 60,
-            can_retry=terminal_errors_except(TransientRetryError),
-            next_interval=repeating_interval(3),
-            clock=clock or reactor,
-            deferred_description="Trying to change node {0}".format(node_id)
-        )
+        return really_change()
 
-    def delete_nodes(self, rcs, node_ids, clock=None):
+    def delete_nodes(self, rcs, node_ids, clock=reactor):
         """
         Delete one or more nodes from a load balancer.
 
@@ -338,6 +361,9 @@ class CloudLoadBalancer(object):
 
         :return: An empty string if successful.
         """
+        @_retry("Trying to delete nodes {0}".format(
+                ", ".join(map(str, node_ids))),
+                clock=clock)
         def really_delete():
             d = self.treq.delete(
                 "{0}/nodes".format(self.endpoint(rcs)),
@@ -349,16 +375,9 @@ class CloudLoadBalancer(object):
             d.addCallbacks(self.treq.content, _pending_update_to_transient)
             return d
 
-        return retry_and_timeout(
-            really_delete, 60,
-            can_retry=terminal_errors_except(TransientRetryError),
-            next_interval=repeating_interval(3),
-            clock=clock or reactor,
-            deferred_description="Trying to delete nodes {0}".format(
-                ", ".join(map(str, node_ids)))
-        )
+        return really_delete()
 
-    def add_nodes(self, rcs, node_list, clock=None):
+    def add_nodes(self, rcs, node_list, clock=reactor):
         """
         Add one or more nodes to a cloud load balancer
 
@@ -371,6 +390,7 @@ class CloudLoadBalancer(object):
             lists the nodes
 
         """
+        @_retry("Trying to add nodes.", clock=clock)
         def really_add():
             d = self.treq.post(
                 "{0}/nodes".format(self.endpoint(rcs)),
@@ -383,13 +403,7 @@ class CloudLoadBalancer(object):
                            _pending_update_to_transient)
             return d
 
-        return retry_and_timeout(
-            really_add, 60,
-            can_retry=terminal_errors_except(TransientRetryError),
-            next_interval=repeating_interval(3),
-            clock=clock or reactor,
-            deferred_description="Trying to add nodes"
-        )
+        return really_add()
 
 
 HasLength = MatchesPredicateWithParams(

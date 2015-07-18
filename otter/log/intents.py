@@ -6,7 +6,8 @@ from functools import partial
 
 import attr
 
-from effect import ComposedDispatcher, Effect, TypeDispatcher, perform
+from effect import (
+    ComposedDispatcher, Effect, TypeDispatcher, perform, sync_performer)
 
 from toolz.dicttoolz import merge
 
@@ -44,6 +45,13 @@ class LogErr(object):
 
 
 @attr.s
+class GetFields(object):
+    """
+    Intent to get the fields bound in the effectful context.
+    """
+
+
+@attr.s
 class BoundFields(object):
     """
     Intent that binds log fields to an effect. Any log or err effect
@@ -73,6 +81,11 @@ def err(failure, msg, **fields):
     Return Effect of LogErr
     """
     return Effect(LogErr(failure, msg, fields))
+
+
+def get_fields():
+    """Return Effect(GetFields())."""
+    return Effect(GetFields())
 
 
 def perform_logging(log, fields, log_func, disp, intent, box):
@@ -108,5 +121,6 @@ def get_log_dispatcher(log, fields):
     return TypeDispatcher({
         BoundFields: partial(perform_logging, log, fields, bound_log),
         Log: partial(perform_logging, log, fields, log_msg),
-        LogErr: partial(perform_logging, log, fields, log_err)
+        LogErr: partial(perform_logging, log, fields, log_err),
+        GetFields: sync_performer(lambda d, i: fields),
     })

@@ -325,26 +325,34 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
 
 
 # ----- CLB requests and error parsing -----
+def _regex(pattern):
+    """
+    Compile a case-insensitive pattern.
+    """
+    return re.compile(pattern, re.I)
 
-_CLB_IMMUTABLE_PATTERN = re.compile(
-    "^Load Balancer '\d+' has a status of '[^']+' and is considered "
-    "immutable\.$")
-_CLB_NOT_ACTIVE_PATTERN = re.compile("^LoadBalancer is not ACTIVE$")
-_CLB_DELETED_PATTERN = re.compile(
-    "^(Load Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
-    "The load balancer is deleted and) considered immutable\.$")
-_CLB_NO_SUCH_NODE_PATTERN = re.compile(
-    "^Node with id #\d+ not found for loadbalancer #\d+$")
-_CLB_NO_SUCH_LB_PATTERN = re.compile(
-    "^Load balancer not found\.$")
-_CLB_DUPLICATE_NODES_PATTERN = re.compile(
-    "^Duplicate nodes detected. One or more nodes already configured "
-    "on load balancer\.$")
-_CLB_NODE_LIMIT_PATTERN = re.compile(
-    "^Nodes must not exceed \d+ per load balancer\.$")
-_CLB_NODE_REMOVED_PATTERN = re.compile(
-    "^Node ids ((?:\d+,)*(?:\d+)) are not a part of your loadbalancer\s*$")
-_CLB_OVER_LIMIT_PATTERN = re.compile("^OverLimit Retry\.{3}$")
+
+_CLB_IMMUTABLE_PATTERN = _regex(
+    "Load\s*Balancer '\d+' has a status of '[^']+' and is considered "
+    "immutable")
+_CLB_NOT_ACTIVE_PATTERN = _regex("Load\s*Balancer is not ACTIVE")
+_CLB_DELETED_PATTERN = _regex(
+    "(Load\s*Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
+    "The load balancer is deleted and) considered immutable")
+_CLB_MARKED_DELETED_PATTERN = _regex(
+    "The load\s*balancer is marked as deleted")
+_CLB_NO_SUCH_NODE_PATTERN = _regex(
+    "Node with id #\d+ not found for load\s*balancer #\d+$")
+_CLB_NO_SUCH_LB_PATTERN = _regex(
+    "Load\s*balancer not found")
+_CLB_DUPLICATE_NODES_PATTERN = _regex(
+    "Duplicate nodes detected. One or more nodes already configured "
+    "on load\s*balancer")
+_CLB_NODE_LIMIT_PATTERN = _regex(
+    "Nodes must not exceed \d+ per load\s*balancer")
+_CLB_NODE_REMOVED_PATTERN = _regex(
+    "Node ids ((?:\d+,)*(?:\d+)) are not a part of your load\s*balancer")
+_CLB_OVER_LIMIT_PATTERN = _regex("OverLimit Retry\.{3}")
 
 
 @attr.s(these={"message": attr.ib()}, init=False)
@@ -652,6 +660,7 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
           partial(CLBRateLimitError, lb_id=lb_id))] +
         _expand_clb_matches(
             [(422, _CLB_DELETED_PATTERN, CLBDeletedError),
+             (410, _CLB_MARKED_DELETED_PATTERN, CLBDeletedError),
              (422, _CLB_IMMUTABLE_PATTERN, CLBImmutableError),
              (422, _CLB_NOT_ACTIVE_PATTERN, CLBNotActiveError),
              (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)],
@@ -662,8 +671,8 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
 # ----- Nova requests and error parsing -----
 
 def _forbidden_plaintext(message):
-    return re.compile(
-        "^403 Forbidden\n\nAccess was denied to this resource\.\n\n ({0})$"
+    return _regex(
+        "403 Forbidden\s+Access was denied to this resource\.\s+({0})$"
         .format(message))
 
 _NOVA_403_NO_PUBLIC_NETWORK = _forbidden_plaintext(
@@ -673,9 +682,9 @@ _NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED = _forbidden_plaintext(
     "11111111-1111-1111-1111-111111111111\) required but missing")
 _NOVA_403_RACKCONNECT_NETWORK_REQUIRED = _forbidden_plaintext(
     "Exactly 1 isolated network\(s\) must be attached")
-_NOVA_403_QUOTA = re.compile(
-    "^Quota exceeded for (\S+): Requested \d+, but already used \d+ of \d+ "
-    "(\S+)$")
+_NOVA_403_QUOTA = _regex(
+    "Quota exceeded for (\S+): Requested \d+, but already used \d+ of \d+ "
+    "(\S+)")
 
 
 @attributes([Attribute('server_id', instance_of=six.text_type)])
@@ -722,7 +731,7 @@ class CreateServerOverQuoteError(ExceptionWithMessage):
     """
 
 
-_MAX_METADATA_PATTERN = re.compile('^Maximum number of metadata items .*$')
+_MAX_METADATA_PATTERN = _regex('Maximum number of metadata items')
 
 
 def set_nova_metadata_item(server_id, key, value):

@@ -1020,7 +1020,7 @@ def _delete_a_clb_and_scale(rcs, helper, group, scale_by, delete_clb=None):
     if delete_clb is not None:
         d = delete_clb(helper.clbs[0](rcs))
     else:
-        d = helper.clbs[0].delete(rcs, success_codes=[202])
+        d = helper.clbs[0].delete(rcs)
 
     policy = ScalingPolicy(scale_by=scale_by, scaling_group=group)
     d.addCallback(lambda _: policy.start(rcs, helper.test_case))

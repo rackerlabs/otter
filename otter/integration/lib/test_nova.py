@@ -14,9 +14,10 @@ from otter.util.http import headers
 
 class Response(object):
     """Fake response object"""
-    def __init__(self, code, headers={}):
+    def __init__(self, code, headers={}, strbody=""):
         self.code = code
         self.headers = headers
+        self.strbody = strbody
 
 
 def get_fake_treq(test_case, method, url, expected_args_and_kwargs, response):

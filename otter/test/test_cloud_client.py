@@ -561,6 +561,7 @@ class CLBClientTests(SynchronousTestCase):
              422, CLBDeletedError),
             ("Load balancer not found.", 404, NoSuchCLBError),
             ("LoadBalancer is not ACTIVE", 422, CLBNotActiveError),
+            ("The loadbalancer is marked as deleted.", 410, CLBDeletedError),
         ]
 
         for msg, code, err in json_responses_and_errs:

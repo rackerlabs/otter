@@ -31,7 +31,7 @@ from txeffect import exc_info_to_failure, perform
 from otter.auth import generate_authenticator
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType, get_service_configs
-from otter.convergence.gathering import get_scaling_group_servers
+from otter.convergence.gathering import get_all_scaling_group_servers
 from otter.effect_dispatcher import get_legacy_dispatcher
 from otter.log import log as otter_log
 from otter.util.fp import predicate_all
@@ -173,7 +173,7 @@ def get_all_metrics_effects(cass_groups, log, _print=False):
     tenanted_groups = groupby(lambda g: g['tenantId'], cass_groups)
     effs = []
     for tenant_id, groups in tenanted_groups.iteritems():
-        eff = get_scaling_group_servers(
+        eff = get_all_scaling_group_servers(
             server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'))
         eff = Effect(TenantScope(eff, tenant_id))
         eff = eff.on(partial(get_tenant_metrics, tenant_id, groups,
