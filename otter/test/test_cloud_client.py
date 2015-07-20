@@ -55,6 +55,7 @@ from otter.cloud_client import (
     get_cloud_client_dispatcher,
     get_server_details,
     perform_tenant_scope,
+    publish_to_cloudfeeds,
     remove_clb_nodes,
     service_request,
     set_nova_metadata_item)
@@ -72,13 +73,21 @@ from otter.util.pure_http import Request, has_code
 
 
 def make_service_configs():
+    """
+    Generate service configs for performing service requests.
+    """
     return {
         ServiceType.CLOUD_SERVERS: {
             'name': 'cloudServersOpenStack',
             'region': 'DFW'},
         ServiceType.CLOUD_LOAD_BALANCERS: {
             'name': 'cloudLoadBalancers',
-            'region': 'DFW'}
+            'region': 'DFW'},
+        ServiceType.CLOUD_FEEDS: {
+            'name': 'cloud_feeds',
+            'region': 'DFW',
+            'url': 'special cloudfeeds url'
+        }
     }
 
 
@@ -1109,3 +1118,35 @@ class NovaClientTests(SynchronousTestCase):
         for code, body in unparseable:
             with self.assertRaises(APIError):
                 _perform_one_request(expected.intent, real, code, body)
+
+
+class CloudFeedsTests(SynchronousTestCase):
+    """
+    Tests for cloud feed functions.
+    """
+    def test_publish_to_cloudfeeds(self):
+        """
+        Publish an event to cloudfeeds.  Successfully handle non-JSON data.
+        """
+        _log = object()
+        eff = publish_to_cloudfeeds({'event': 'stuff'}, log=_log)
+        expected = service_request(
+            ServiceType.CLOUD_FEEDS, 'POST',
+            'autoscale/events',
+            headers={'content-type': ['application/vnd.rackspace.atom+json']},
+            data={'event': 'stuff'}, log=_log, success_pred=has_code(201),
+            json_response=False)
+
+        # success
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(stub_pure_response('<this is xml>', 201)))])
+        resp, body = sync_perform(dispatcher, eff)
+        self.assertEqual(body, '<this is xml>')
+
+        # Add regression test that 202 should be an API error because this
+        # is a bug in CF
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(stub_pure_response('<this is xml>', 202)))])
+        self.assertRaises(APIError, sync_perform, dispatcher, eff)
