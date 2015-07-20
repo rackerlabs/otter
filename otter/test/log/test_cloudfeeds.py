@@ -271,10 +271,11 @@ class EventTests(SynchronousTestCase):
     def test_add_event_succeeds_if_request_succeeds(self):
         """
         Adding an event succeeds without retrying if the service request
-        succeeds.
+        succeeds.  Testing what response code causes a service request to
+        succeeds is beyond the scope of this test.
         """
         body = "<some xml>"
-        resp = stub_pure_response(body, 202)
+        resp = stub_pure_response(body, 201)
         response = [lambda _: (resp, body)]
         self.assertEqual(self._perform_add_event(response), (resp, body))
 
