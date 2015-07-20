@@ -730,7 +730,7 @@ def retry_sequence(expected_retry_intent, performers,
                 return Effect(Constant(
                     actual_retry_intent.should_retry.can_retry(failure)))
 
-        new_retry_intent = Effect(Retry(
+        new_retry_effect = Effect(Retry(
             effect=actual_retry_intent.effect,
             should_retry=should_retry))
 
@@ -742,7 +742,7 @@ def retry_sequence(expected_retry_intent, performers,
         seq = [(expected_retry_intent.effect.intent, performer)
                for performer in performers]
 
-        return perform_sequence(seq, new_retry_intent,
+        return perform_sequence(seq, new_retry_effect,
                                 ComposedDispatcher(_dispatchers))
 
     return (expected_retry_intent, perform_retry_without_delay)

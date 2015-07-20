@@ -10,8 +10,8 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.log.intents import get_log_dispatcher
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, UpdateGroupStatus, UpdateServersCache,
-    get_model_dispatcher)
+    DeleteGroup, GetScalingGroupInfo, UpdateGroupErrorReasons,
+    UpdateGroupStatus, UpdateServersCache, get_model_dispatcher)
 from otter.models.interface import (
     IScalingGroupCollection, ScalingGroupStatus)
 from otter.test.utils import (
@@ -123,8 +123,8 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
                 new=EffectServersCache)
     def test_perform_update_servers_cache(self):
         """
-        Performing :obj:`UpdateServersCache` invokes ``insert_servers`` on the
-        cache.
+        Performing :obj:`UpdateServersCache` updates using
+        CassScalingGroupServersCache
         """
         dt = datetime(1970, 1, 1)
         eff = Effect(UpdateServersCache('tid', 'gid', dt, [{'id': 'a'}]))
@@ -139,3 +139,12 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
             TypeDispatcher({tuple: perform_update_tuple}),
             self.get_dispatcher(self.get_store())])
         self.assertIsNone(sync_perform(disp, eff))
+
+    def test_perform_update_error_reasons(self):
+        """
+        Performing :obj:`UpdateGroupErrorReasons` calls `update_error_reasons`
+        """
+        self.group.update_error_reasons.return_value = None
+        intent = UpdateGroupErrorReasons(self.group, ['r1', 'r2'])
+        self.assertIsNone(sync_perform(self.dispatcher, Effect(intent)))
+        self.group.update_error_reasons.assert_called_once_with(['r1', 'r2'])

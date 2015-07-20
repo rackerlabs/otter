@@ -5,12 +5,14 @@ Tests for otter.cloudfeeds
 import uuid
 from functools import partial
 
-from effect import Effect, TypeDispatcher
+from effect import Effect, Func, TypeDispatcher
 
 import mock
 
 from twisted.internet.defer import fail, succeed
+from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
+from twisted.web.client import ResponseFailed
 
 from txeffect import deferred_performer
 
@@ -28,11 +30,21 @@ from otter.log.cloudfeeds import (
 )
 from otter.log.formatters import LogLevel
 from otter.log.intents import Log, LogErr
-from otter.test.utils import CheckFailure, mock_log, patch, resolve_effect
+from otter.test.utils import (
+    CheckFailure,
+    mock_log,
+    nested_sequence,
+    patch,
+    perform_sequence,
+    raise_,
+    retry_sequence,
+    stub_pure_response
+)
+from otter.util.http import APIError
 from otter.util.retry import (
+    Retry,
     ShouldDelayAndRetry,
-    exponential_backoff_interval,
-    retry_times
+    exponential_backoff_interval
 )
 
 
@@ -211,39 +223,72 @@ class EventTests(SynchronousTestCase):
         self.req['entry']['content']['event']['tenantId'] = tenant_id
         return self.req
 
-    def test_add_event(self):
+    def _perform_add_event(self, response_sequence):
         """
-        add_event pushes event by calling cloud feed with retries
+        Given a sequence of functions that take an intent and returns a
+        response (or raises an exception), perform :func:`add_event` and
+        return the result.
         """
         log = object()
         eff = add_event(self.event, 'tid', 'ord', log)
-
-        # effect is to generate UUID
-        self.assertIs(eff.intent.func, uuid.uuid4)
-        eff = resolve_effect(eff, uuid.UUID(int=0))
         uid = '00000000-0000-0000-0000-000000000000'
 
-        # effect scoped on on tenant id
-        self.assertIs(type(eff.intent), TenantScope)
-        self.assertEqual(eff.intent.tenant_id, 'tid')
+        svrq = service_request(
+            ServiceType.CLOUD_FEEDS, 'POST', 'autoscale/events',
+            headers={
+                'content-type': ['application/vnd.rackspace.atom+json']},
+            data=self._get_request('INFO', uid, 'tid'), log=log,
+            success_pred=has_code(201),
+            json_response=False)
 
-        # Wrapped effect is retry
-        eff = eff.intent.effect
-        self.assertEqual(
-            eff.intent.should_retry,
-            ShouldDelayAndRetry(can_retry=retry_times(5),
-                                next_interval=exponential_backoff_interval(2)))
+        seq = [
+            (Func(uuid.uuid4), lambda _: uid),
+            (TenantScope(mock.ANY, 'tid'), nested_sequence([
+                retry_sequence(
+                    Retry(effect=svrq, should_retry=ShouldDelayAndRetry(
+                        can_retry=mock.ANY,
+                        next_interval=exponential_backoff_interval(2))),
+                    response_sequence
+                )
+            ]))
+        ]
 
-        # effect wrapped in retry is ServiceRequest
-        eff = eff.intent.effect
-        self.assertEqual(
-            eff,
-            service_request(
-                ServiceType.CLOUD_FEEDS, 'POST', 'autoscale/events',
-                headers={
-                    'content-type': ['application/vnd.rackspace.atom+json']},
-                data=self._get_request('INFO', uid, 'tid'), log=log,
-                success_pred=has_code(201)))
+        return perform_sequence(seq, eff)
+
+    def test_add_event_succeeds_if_request_succeeds(self):
+        """
+        Adding an event succeeds without retrying if the service request
+        succeeds.
+        """
+        body = "<some xml>"
+        resp = stub_pure_response(body, 202)
+        response = [lambda _: (resp, body)]
+        self.assertEqual(self._perform_add_event(response), (resp, body))
+
+    def test_add_event_only_retries_5_times_on_non_4xx_api_errors(self):
+        """
+        Attempting to add an event is only retried up to a maximum of 5 times,
+        and only if it's not an 4XX APIError.
+        """
+        responses = [
+            lambda _: raise_(Exception("oh noes!")),
+            lambda _: raise_(ResponseFailed(Failure(Exception(":(")))),
+            lambda _: raise_(APIError(code=100, body="<some xml>")),
+            lambda _: raise_(APIError(code=202, body="<some xml>")),
+            lambda _: raise_(APIError(code=301, body="<some xml>")),
+            lambda _: raise_(APIError(code=501, body="<some xml>")),
+        ]
+        with self.assertRaises(APIError) as cm:
+            self._perform_add_event(responses)
+
+        self.assertEqual(cm.exception.code, 501)
+
+    def test_add_event_bails_on_4xx_api_errors(self):
+        """
+        If CF returns a 4xx error, adding an event is not retried.
+        """
+        response = [lambda _: raise_(APIError(code=409, body="<some xml>"))]
+        self.assertRaises(APIError, self._perform_add_event, response)
 
     def test_prepare_request_error(self):
         """
