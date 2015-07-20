@@ -63,7 +63,7 @@ class CFHelperTests(SynchronousTestCase):
                                  a=2, b=3)),
                 lambda _: 'logged')
         ]
-        self.assertEqual(perform_sequence(cf_msg('message', a=2, b=3), seq),
+        self.assertEqual(perform_sequence(seq, cf_msg('message', a=2, b=3)),
                          'logged')
 
     def test_cf_err(self):
@@ -77,7 +77,7 @@ class CFHelperTests(SynchronousTestCase):
                                  cloud_feed_id='uuid', a=2, b=3)),
                 lambda _: 'logged')
         ]
-        self.assertEqual(perform_sequence(cf_err('message', a=2, b=3), seq),
+        self.assertEqual(perform_sequence(seq, cf_err('message', a=2, b=3)),
                          'logged')
 
     def test_cf_fail(self):
@@ -92,7 +92,7 @@ class CFHelperTests(SynchronousTestCase):
                 lambda _: 'logged')
         ]
         self.assertEqual(
-            perform_sequence(cf_fail(f, 'message', a=2, b=3), seq),
+            perform_sequence(seq, cf_fail(f, 'message', a=2, b=3)),
             'logged')
 
 
