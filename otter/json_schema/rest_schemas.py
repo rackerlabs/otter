@@ -155,7 +155,12 @@ group_state = _openstackify_schema("group", {
         'errors': {
             'type': 'array',
             'required': False,
-            'items': {'type': 'string'}
+            'items': {
+                'type': 'object',
+                'properties': {
+                    'message': {'type': 'string', 'required': True}
+                }
+            }
         }
     },
     'additionalProperties': False

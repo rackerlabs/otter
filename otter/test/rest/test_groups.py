@@ -56,7 +56,21 @@ class FormatterHelpers(SynchronousTestCase):
         """
         Patch url root
         """
-        patch(self, 'otter.util.http.get_url_root', return_value="")
+        set_config_data({'url_root': 'root'})
+        self.addCleanup(set_config_data, None)
+
+    def links(self, server_id):
+        return [
+            {'href': 'https://root/servers/{}'.format(server_id),
+             'rel': 'self'},
+            {'href': 'https://root/servers/{}'.format(server_id),
+             'rel': 'bookmark'}
+        ]
+
+    def format(self, state, active=None):
+        formatted = format_state_dict(state, active)
+        validate(formatted, rest_schemas.group_state['properties']['group'])
+        return formatted
 
     def test_format_state_dict_has_active_and_pending(self):
         """
@@ -69,14 +83,14 @@ class FormatterHelpers(SynchronousTestCase):
         active server links and ids.
         """
         active = {
-            '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
-            '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
-            '3': {'name': 'n3', 'links': ['links3'], 'created': 't'}}
+            '1': {'name': 'n1', 'links': self.links('1'), 'created': 't'},
+            '2': {'name': 'n2', 'links': self.links('2'), 'created': 't'},
+            '3': {'name': 'n3', 'links': self.links('3'), 'created': 't'}}
         pending = {
             'j1': {'created': 't'},
             'j2': {'created': 't'},
             'j3': {'created': 't'}}
-        translated = format_state_dict(
+        translated = self.format(
             GroupState(
                 '11111',
                 'one',
@@ -94,9 +108,9 @@ class FormatterHelpers(SynchronousTestCase):
 
         self.assertEqual(translated, {
             'active': [
-                {'id': '1', 'links': ['links1']},
-                {'id': '2', 'links': ['links2']},
-                {'id': '3', 'links': ['links3']}
+                {'id': '1', 'links': self.links('1')},
+                {'id': '2', 'links': self.links('2')},
+                {'id': '3', 'links': self.links('3')}
             ],
             'name': 'test',
             'activeCapacity': 3,
@@ -113,9 +127,9 @@ class FormatterHelpers(SynchronousTestCase):
         capacity is got from the desired and active list provided
         """
         active = {
-            '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
-            '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
-            '3': {'name': 'n3', 'links': ['links3'], 'created': 't'}}
+            '1': {'name': 'n1', 'links': self.links('1'), 'created': 't'},
+            '2': {'name': 'n2', 'links': self.links('2'), 'created': 't'},
+            '3': {'name': 'n3', 'links': self.links('3'), 'created': 't'}}
         state = GroupState(
             '11111',
             'one',
@@ -127,20 +141,20 @@ class FormatterHelpers(SynchronousTestCase):
             True,
             ScalingGroupStatus.ACTIVE,
             desired=10)
-        result = format_state_dict(state, active)
+        result = self.format(state, active)
         self.assertEqual(result['desiredCapacity'], 10)
         self.assertEqual(result['pendingCapacity'], 7)
+        self.assertNotIn('errors', result)
 
-    @mock.patch('otter.rest.groups.config_value')
-    def test_format_state_different_status(self, config_value):
+    def test_format_state_different_status(self):
         """
         When a group's status is something other than ACTIVE, it's reflected in
         the output.
         """
         active = {
-            '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
-            '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
-            '3': {'name': 'n3', 'links': ['links3'], 'created': 't'}}
+            '1': {'name': 'n1', 'links': self.links('1'), 'created': 't'},
+            '2': {'name': 'n2', 'links': self.links('2'), 'created': 't'},
+            '3': {'name': 'n3', 'links': self.links('3'), 'created': 't'}}
         state = GroupState(
             '11111',
             'one',
@@ -152,8 +166,30 @@ class FormatterHelpers(SynchronousTestCase):
             True,
             ScalingGroupStatus.ERROR,
             desired=10)
-        result = format_state_dict(state, active)
+        result = self.format(state, active)
         self.assertEqual(result['status'], 'ERROR')
+        self.assertEqual(result['errors'], [])
+
+    def test_with_errors(self):
+        """
+        If group's status is ERROR and it has error_reasons in it, it is
+        formatted as list of {"message": ..} dicts
+        """
+        state = GroupState(
+            '11111',
+            'one',
+            'test',
+            {},
+            {},
+            None,
+            {},
+            True,
+            ScalingGroupStatus.ERROR,
+            desired=10,
+            error_reasons=['error1', 'error2'])
+        result = self.format(state)
+        self.assertEqual(
+            result['errors'], [{'message': 'error1'}, {'message': 'error2'}])
 
 
 class ExtractBoolArgTests(SynchronousTestCase):

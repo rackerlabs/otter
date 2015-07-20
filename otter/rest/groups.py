@@ -21,6 +21,7 @@ from otter.json_schema.group_schemas import (
 from otter.json_schema.rest_schemas import create_group_request
 from otter.log import log
 from otter.models.cass import CassScalingGroupServersCache
+from otter.models.interface import ScalingGroupStatus
 from otter.rest.bobby import get_bobby
 from otter.rest.configs import (
     OtterConfig,
@@ -84,7 +85,8 @@ def format_state_dict(state, active=None):
         ]
     }
     if state.status == ScalingGroupStatus.ERROR:
-        state_json['errors'] = state.error_reasons
+        state_json['errors'] = [
+            {'message': reason} for reason in state.error_reasons]
     return state_json
 
 

@@ -760,7 +760,6 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                        desired=0,
                                        error_reasons=[]))
 
-
     def test_modify_state_calls_modifier_with_group_and_state_and_others(self):
         """
         ``modify_state`` calls the modifier callable with the group and the
