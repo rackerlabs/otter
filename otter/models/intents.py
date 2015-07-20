@@ -81,6 +81,20 @@ def perform_update_servers_cache(disp, intent):
     return cache.insert_servers(intent.time, intent.servers, True)
 
 
+@attr.s
+class UpdateGroupErrorReasons(object):
+    """
+    Intent to update group's error reasons
+    """
+    group = attr.ib()
+    reasons = attr.ib()
+
+
+@deferred_performer
+def perform_update_error_reasons(disp, intent):
+    return intent.group.update_error_reasons(intent.reasons)
+
+
 def get_model_dispatcher(log, store):
     """Get a dispatcher that can handle all the model-related intents."""
     return TypeDispatcher({
@@ -88,5 +102,6 @@ def get_model_dispatcher(log, store):
             partial(perform_get_scaling_group_info, log, store),
         DeleteGroup: partial(perform_delete_group, log, store),
         UpdateGroupStatus: perform_update_group_status,
-        UpdateServersCache: perform_update_servers_cache
+        UpdateServersCache: perform_update_servers_cache,
+        UpdateGroupErrorReasons: perform_update_error_reasons
     })

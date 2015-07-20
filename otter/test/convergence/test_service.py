@@ -38,6 +38,7 @@ from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,
     UpdateGroupStatus,
+    UpdateGroupErrorReasons,
     UpdateServersCache)
 from otter.models.interface import (
     GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
@@ -928,7 +929,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                       status='ERROR',
                       reasons='Cloud Load Balancer does not exist: nolb1; '
                               'Cloud Load Balancer does not exist: nolb2')),
-             noop)
+             noop),
+            (UpdateGroupErrorReasons(
+                self.group,
+                ['Cloud Load Balancer does not exist: nolb1',
+                 'Cloud Load Balancer does not exist: nolb2']), noop)
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
