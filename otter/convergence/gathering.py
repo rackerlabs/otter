@@ -174,24 +174,35 @@ def get_scaling_group_servers(tenant_id, group_id, now,
 @do
 def get_clb_contents():
     """Get Rackspace Cloud Load Balancer contents as list of `CLBNode`."""
+
+    # If we get a CLBDeleted error while fetching feeds, we should throw away
+    # all nodes related to that load balancer, because we don't want to act on
+    # data that we know is invalid/outdated (for example, if we can't fetch a
+    # feed because CLB was deleted, we don't want to say that we have a node in
+    # DRAINING with draining time of 0; we should just say that the node is
+    # gone).
+
     def gone(r):
         return catch((CLBDeletedError, NoSuchCLBError), lambda exc: r)
     lb_ids = [lb['id'] for lb in (yield _retry(get_clbs()))]
 
     # zipping the LBIDs with the results of the node requests is lame? instead,
     # each request could individually tuple on the LBID to the result?
-    lb_reqs = [_retry(get_clb_nodes(lb_id).on(error=gone([])))
-               for lb_id in lb_ids]
-    nodes = [CLBNode.from_node_json(lb_id, node)
-             for lb_id, nodes in zip(lb_ids, (yield parallel(lb_reqs)))
-             for node in nodes]
-    draining = [n for n in nodes
+    node_reqs = [_retry(get_clb_nodes(lb_id).on(error=gone([])))
+                 for lb_id in lb_ids]
+    all_nodes = yield parallel(node_reqs)
+    lb_nodes = {lb_id: [CLBNode.from_node_json(lb_id, node) for node in nodes]
+                for lb_id, nodes in zip(lb_ids, all_nodes)}
+    draining = [n for n in concat(lb_nodes.values())
                 if n.description.condition == CLBNodeCondition.DRAINING]
     feeds = yield parallel(
         [_retry(get_clb_node_feed(n.description.lb_id, n.node_id).on(
             error=gone(None)))
          for n in draining]
     )
+    #for lb, nodes in lb_nodes.items():
+
+
     node_id_to_feed = {n.node_id: feed for (n, feed) in zip(draining, feeds)}
 
     def update_drained_at(node):
@@ -200,7 +211,7 @@ def get_clb_contents():
             return assoc_obj(node, drained_at=extract_CLB_drained_at(feed))
         else:
             return node
-    yield do_return(list(map(update_drained_at, nodes)))
+    yield do_return(list(map(update_drained_at, concat(lb_nodes.values()))))
 
 
 def extract_CLB_drained_at(feed):
