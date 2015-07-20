@@ -244,9 +244,6 @@ def ObserverWrapper(observer, hostname, seconds=None):
             if key not in PRIMITIVE_FIELDS:
                 log_params[key] = value
 
-        if 'audit_log' in eventDict:
-            log_params['audit_log_event_source'] = True
-
         observer(log_params)
 
     return Observer
