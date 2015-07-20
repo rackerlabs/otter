@@ -633,9 +633,9 @@ def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
 
     and maybe the partial will include the node ID too if it's provided.
     """
-    params = {"lb_id": lb_id}
+    params = {"lb_id": six.text_type(lb_id)}
     if node_id is not None:
-        params["node_id"] = node_id
+        params["node_id"] = six.text_type(node_id)
 
     return [(m[0], ("message",), m[1], partial(m[2], **params))
             for m in matches_tuples]
@@ -657,7 +657,7 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
         # overLimit is different than the other CLB messages because it's
         # produced by repose
         [(413, ("overLimit", "message"), _CLB_OVER_LIMIT_PATTERN,
-          partial(CLBRateLimitError, lb_id=lb_id))] +
+          partial(CLBRateLimitError, lb_id=six.text_type(lb_id)))] +
         _expand_clb_matches(
             [(422, _CLB_DELETED_PATTERN, CLBDeletedError),
              (410, _CLB_MARKED_DELETED_PATTERN, CLBDeletedError),
@@ -760,9 +760,10 @@ def set_nova_metadata_item(server_id, key, value):
     def _parse_known_errors(code, json_body):
         other_errors = [
             (404, ('itemNotFound', 'message'), None,
-             partial(NoSuchServerError, server_id=server_id)),
+             partial(NoSuchServerError, server_id=six.text_type(server_id))),
             (403, ('forbidden', 'message'), _MAX_METADATA_PATTERN,
-             partial(ServerMetadataOverLimitError, server_id=server_id)),
+             partial(ServerMetadataOverLimitError,
+                     server_id=six.text_type(server_id))),
         ]
         _match_errors(_nova_standard_errors + other_errors, code, json_body)
 
@@ -790,7 +791,7 @@ def get_server_details(server_id):
     def _parse_known_errors(code, json_body):
         other_errors = [
             (404, ('itemNotFound', 'message'), None,
-             partial(NoSuchServerError, server_id=server_id)),
+             partial(NoSuchServerError, server_id=six.text_type(server_id))),
         ]
         _match_errors(_nova_standard_errors + other_errors, code, json_body)
 
