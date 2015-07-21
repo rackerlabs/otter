@@ -1020,11 +1020,10 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             # in production, it's actually an invalid key and hence would
             # actually fail.
             mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
-            yield mimic_nova.sequenced_behaviors(
+            behavior_id = yield mimic_nova.sequenced_behaviors(
                 self.rcs,
                 criteria=[{"server_name": server_name_prefix + ".*"}],
                 behaviors=[
-                    {"name": "default"},
                     {"name": "fail",
                      "parameters": {"code": 400,
                                     "message": "Invalid key_name provided.",
@@ -1045,6 +1044,11 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             timeout=600)
 
         # fix group
+        if not not_mimic():
+            # if this is mimic, we have to make mimic stop failing fail for
+            # this server. in production, deleting the invalid key should
+            # succeed.
+            yield mimic_nova.delete_behavior(self.rcs, behavior_id)
         del launch_config['args']['server']['key_name']
         yield group.set_launch_config(self.rcs, launch_config)
         yield group.trigger_convergence(self.rcs)
@@ -1062,7 +1066,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
 
         # put group into error again
         policy = ScalingPolicy(scale_by=1, scaling_group=group)
-        yield policy.start(self.rcs. self)
+        yield policy.start(self.rcs, self)
 
         launch_config['args']["loadBalancers"] = [{
             "port": 80,
