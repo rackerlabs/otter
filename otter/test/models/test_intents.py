@@ -71,7 +71,7 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
     def test_get_scaling_group_info_log_context(self):
         """
         When run in an effectful log context, the fields are bound to the log
-        passed to get_scaling_group.
+        passed to delete_group.
         """
         manifest = {}
 
