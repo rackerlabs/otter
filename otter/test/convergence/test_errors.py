@@ -2,7 +2,11 @@ import traceback
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.cloud_client import CLBDeletedError, NoSuchCLBError
+from otter.cloud_client import (
+    CLBDeletedError,
+    CreateServerConfigurationError,
+    NoSuchCLBError
+)
 from otter.convergence.errors import present_reasons, structure_reason
 from otter.convergence.model import ErrorReason
 from otter.test.utils import raise_to_exc_info
@@ -26,7 +30,9 @@ class PresentReasonsTests(SynchronousTestCase):
             NoSuchCLBError(lb_id=u'lbid1'):
                 'Cloud Load Balancer does not exist: lbid1',
             CLBDeletedError(lb_id=u'lbid2'):
-                'Cloud Load Balancer is currently being deleted: lbid2'
+                'Cloud Load Balancer is currently being deleted: lbid2',
+            CreateServerConfigurationError("Your server is wrong"):
+                'Server launch configuration is invalid: Your server is wrong'
         }
         excs = excs.items()
         self.assertEqual(

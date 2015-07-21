@@ -6,7 +6,11 @@ from sumtypes import match
 
 from toolz.functoolz import identity
 
-from otter.cloud_client import CLBDeletedError, NoSuchCLBError
+from otter.cloud_client import (
+    CLBDeletedError,
+    CreateServerConfigurationError,
+    NoSuchCLBError
+)
 from otter.convergence.model import ErrorReason
 from otter.log.formatters import serialize_to_jsonable
 
@@ -41,6 +45,11 @@ def _present_no_such_clb_error(exception):
 def _present_clb_deleted_error(exception):
     return ("Cloud Load Balancer is currently being deleted: %s"
             % (exception.lb_id,))
+
+
+@_present_exception.register(CreateServerConfigurationError)
+def _present_server_configuration_error(exception):
+    return "Server launch configuration is invalid: %s" % (exception.message,)
 
 
 @match(ErrorReason)
