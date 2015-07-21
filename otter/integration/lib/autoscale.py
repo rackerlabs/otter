@@ -50,7 +50,8 @@ def extract_active_ids(group_status):
 
 def create_scaling_group_dict(
     image_ref=None, flavor_ref=None, min_entities=0, name=None,
-    max_entities=25, use_lbs=None, server_name_prefix=None
+    max_entities=25, use_lbs=None, server_name_prefix=None,
+    key_name=None
 ):
     """This function returns a dictionary containing a scaling group's JSON
     payload.  Note: this function does NOT create a scaling group.
@@ -73,6 +74,9 @@ def create_scaling_group_dict(
         invoking the o.l.CLB.scaling_group_spec() method on such objects.  If
         not given, no load balancers will be used.
     :param str server_name_prefix: Specifies a server name in the server
+        args that get passed to autoscale - autoscale will use this as the
+        prefix of all server names created by the group.
+    :param str key_name: Specifies an ssh key name in the server
         args that get passed to autoscale - autoscale will use this as the
         prefix of all server names created by the group.
 
@@ -119,6 +123,9 @@ def create_scaling_group_dict(
     if server_name_prefix is not None:
         launch_config_args["server"]["name"] = server_name_prefix
 
+    if key_name is not None:
+        launch_config_args["server"]["key_name"] = key_name
+
     return obj
 
 
@@ -136,7 +143,7 @@ class ScalingGroup(object):
 
     :ivar group_config: The complete JSON dictionary the group was
         created with - a dictionary including 'groupConfiguration',
-        'launhConfiguration', and maybe 'scalingPolicies'
+        'launchConfiguration', and maybe 'scalingPolicies'
 
     :ivar pool: a :class:`twisted.web.client.HTTPConnectionPool` to pass to
         all treq requests
