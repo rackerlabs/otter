@@ -1016,9 +1016,9 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         launch_config = deepcopy(group.group_config['launchConfiguration'])
 
         if not not_mimic():
-            # if this is mimic, we have to make mimic fail for this server
+            # if this is mimic, we have to make server creation fail.
             # in production, it's actually an invalid key and hence would
-            # actually fail.
+            # naturally fail.
             mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
             behavior_id = yield mimic_nova.sequenced_behaviors(
                 self.rcs,
@@ -1045,9 +1045,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
 
         # fix group
         if not not_mimic():
-            # if this is mimic, we have to make mimic stop failing fail for
-            # this server. in production, deleting the invalid key should
-            # succeed.
+            # if this is mimic, we have to make mimic stop failing.
+            # in production, deleting the invalid key should succeed.
             yield mimic_nova.delete_behavior(self.rcs, behavior_id)
         del launch_config['args']['server']['key_name']
         yield group.set_launch_config(self.rcs, launch_config)
