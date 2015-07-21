@@ -38,18 +38,19 @@ def _present_exception(exception):
 
 @_present_exception.register(NoSuchCLBError)
 def _present_no_such_clb_error(exception):
-    return "Cloud Load Balancer does not exist: %s" % (exception.lb_id,)
+    return "Cloud Load Balancer does not exist: {0}".format(exception.lb_id)
 
 
 @_present_exception.register(CLBDeletedError)
 def _present_clb_deleted_error(exception):
-    return ("Cloud Load Balancer is currently being deleted: %s"
-            % (exception.lb_id,))
+    return "Cloud Load Balancer is currently being deleted: {0}".format(
+        exception.lb_id)
 
 
 @_present_exception.register(CreateServerConfigurationError)
 def _present_server_configuration_error(exception):
-    return "Server launch configuration is invalid: %s" % (exception.message,)
+    return "Server launch configuration is invalid: {0}".format(
+        exception.message)
 
 
 @match(ErrorReason)
