@@ -1062,7 +1062,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                     'active': HasLength(1),
                     'status': Equals("ACTIVE"),
                 }),
-                Not(Contains('error'))
+                Not(Contains('errors'))
             ), timeout=600)
 
         # put group into error again
