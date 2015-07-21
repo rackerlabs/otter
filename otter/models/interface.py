@@ -54,7 +54,7 @@ class GroupState(object):
         self.policy_touched = policy_touched
         self.group_touched = group_touched
         self.status = status
-        self.error_reasons = error_reasons
+        self.error_reasons = tuple(error_reasons)
 
         if self.group_touched is None:
             self.group_touched = timestamp.MIN
