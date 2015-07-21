@@ -807,7 +807,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 nested_parallel([
                     (Log('convergence-create-servers',
                          {'num_servers': 1, 'server_config': {'foo': 'bar'},
-                          'cloud_feed': True}), noop)
+                          'cloud_feed': True, 'cloud_feed_id': mock.ANY}),
+                     noop)
                 ])
             ]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
@@ -925,7 +926,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              noop),
             (Log('group-status-error',
                  dict(isError=True, cloud_feed=True,
-                      status='ERROR',
+                      cloud_feed_id=mock.ANY, status='ERROR',
                       reasons='Cloud Load Balancer does not exist: nolb1; '
                               'Cloud Load Balancer does not exist: nolb2')),
              noop)
@@ -955,7 +956,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                status=ScalingGroupStatus.ACTIVE),
              noop),
             (Log('group-status-active',
-                 dict(cloud_feed=True, status='ACTIVE')), noop),
+                 dict(cloud_feed=True, cloud_feed_id=mock.ANY,
+                      status='ACTIVE')),
+             noop),
             (UpdateServersCache("tenant-id", "group-id", self.now,
                                 [{"id": "a", "_is_as_active": True},
                                  {"id": "b", "_is_as_active": True}]), noop)
@@ -980,7 +983,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                status=ScalingGroupStatus.ACTIVE),
              noop),
             (Log('group-status-active',
-                 dict(cloud_feed=True, status='ACTIVE')), noop),
+                 dict(cloud_feed=True, cloud_feed_id=mock.ANY,
+                      status='ACTIVE')),
+             noop),
             (UpdateServersCache("tenant-id", "group-id", self.now,
                                 [{"id": "a", "_is_as_active": True},
                                  {"id": "b", "_is_as_active": True}]), noop)
