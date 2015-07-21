@@ -174,7 +174,6 @@ def get_scaling_group_servers(tenant_id, group_id, now,
 @do
 def get_clb_contents():
     """Get Rackspace Cloud Load Balancer contents as list of `CLBNode`."""
-
     # If we get a CLBDeleted error while fetching feeds, we should throw away
     # all nodes related to that load balancer, because we don't want to act on
     # data that we know is invalid/outdated (for example, if we can't fetch a
@@ -185,9 +184,6 @@ def get_clb_contents():
     def gone(r):
         return catch((CLBDeletedError, NoSuchCLBError), lambda exc: r)
     lb_ids = [lb['id'] for lb in (yield _retry(get_clbs()))]
-
-    # zipping the LBIDs with the results of the node requests is lame? instead,
-    # each request could individually tuple on the LBID to the result?
     node_reqs = [_retry(get_clb_nodes(lb_id).on(error=gone([])))
                  for lb_id in lb_ids]
     all_nodes = yield parallel(node_reqs)
@@ -200,18 +196,20 @@ def get_clb_contents():
             error=gone(None)))
          for n in draining]
     )
-    #for lb, nodes in lb_nodes.items():
-
-
-    node_id_to_feed = {n.node_id: feed for (n, feed) in zip(draining, feeds)}
+    nodes_to_feeds = dict(zip(draining, feeds))
+    deleted_lbs = set([
+        node.description.lb_id
+        for (node, feed) in nodes_to_feeds.items() if feed is None])
 
     def update_drained_at(node):
-        feed = node_id_to_feed.get(node.node_id)
+        feed = nodes_to_feeds.get(node)
+        if node.description.lb_id in deleted_lbs:
+            return None
         if feed is not None:
             return assoc_obj(node, drained_at=extract_CLB_drained_at(feed))
         else:
             return node
-    yield do_return(list(map(update_drained_at, concat(lb_nodes.values()))))
+    yield do_return(list(filter(bool, map(update_drained_at, concat(lb_nodes.values())))))
 
 
 def extract_CLB_drained_at(feed):
