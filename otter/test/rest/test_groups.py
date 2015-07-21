@@ -149,7 +149,7 @@ class FormatterHelpers(SynchronousTestCase):
     def test_format_state_different_status(self):
         """
         When a group's status is something other than ACTIVE, it's reflected in
-        the output.
+        the output. "errors" is formatted as list of {"message": ..} dicts
         """
         active = {
             '1': {'name': 'n1', 'links': self.links('1'), 'created': 't'},
@@ -165,31 +165,12 @@ class FormatterHelpers(SynchronousTestCase):
             {},
             True,
             ScalingGroupStatus.ERROR,
-            desired=10)
+            desired=10,
+            error_reasons=['wat', 'noo'])
         result = self.format(state, active)
         self.assertEqual(result['status'], 'ERROR')
-        self.assertEqual(result['errors'], [])
-
-    def test_with_errors(self):
-        """
-        If group's status is ERROR and it has error_reasons in it, it is
-        formatted as list of {"message": ..} dicts
-        """
-        state = GroupState(
-            '11111',
-            'one',
-            'test',
-            {},
-            {},
-            None,
-            {},
-            True,
-            ScalingGroupStatus.ERROR,
-            desired=10,
-            error_reasons=['error1', 'error2'])
-        result = self.format(state)
         self.assertEqual(
-            result['errors'], [{'message': 'error1'}, {'message': 'error2'}])
+            result['errors'], [{'message': 'wat'}, {'message': 'noo'}])
 
 
 class ExtractBoolArgTests(SynchronousTestCase):
