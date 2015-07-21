@@ -45,7 +45,6 @@ from otter.integration.lib.trial_tools import (
     not_mimic,
     random_string,
     region,
-    skip_me,
     skip_if,
     tag
 )
