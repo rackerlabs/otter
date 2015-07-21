@@ -48,9 +48,6 @@
       "headers": ["http://redirected_to_api.com"],
       "body": "Moved to http://redirected_to_api.com"
     },
-    "elasticsearch": {
-      "host": "http://127.0.0.1:9200"
-    },
     "metrics": {
         "service": "cloudMetricsIngest",
         "region": "IAD",

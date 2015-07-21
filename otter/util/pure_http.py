@@ -8,7 +8,7 @@ from functools import partial, wraps
 
 from characteristic import attributes
 
-from effect import Effect, NoPerformerFoundError, sync_perform
+from effect import Effect
 
 from toolz.dicttoolz import merge
 from toolz.functoolz import memoize
@@ -17,8 +17,7 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 
 from txeffect import deferred_performer
 
-from otter.log import log as default_log
-from otter.log.intents import get_fields
+from otter.log.intents import merge_effectful_fields
 from otter.util import logging_treq
 from otter.util.http import APIError
 
@@ -50,15 +49,7 @@ def perform_request(dispatcher, intent):
 
     :return: A two-tuple of (HTTP Response, content as bytes)
     """
-    log = intent.log if intent.log is not None else default_log
-    try:
-        eff_fields = sync_perform(dispatcher, get_fields())
-    except NoPerformerFoundError:
-        # There's no BoundLog wrapping this intent; no effectful log fields to
-        # extract
-        pass
-    else:
-        log = log.bind(**eff_fields)
+    log = merge_effectful_fields(dispatcher, intent.log)
     response = yield intent.treq.request(intent.method.upper(), intent.url,
                                          headers=intent.headers,
                                          data=intent.data,

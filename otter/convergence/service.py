@@ -242,6 +242,8 @@ def convergence_failed(scaling_group, reasons):
     yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                    status=ScalingGroupStatus.ERROR))
     presented_reasons = sorted(present_reasons(reasons))
+    if len(presented_reasons) == 0:
+        presented_reasons = [u"Unknown error occurred"]
     yield cf_err(
         'group-status-error', status=ScalingGroupStatus.ERROR.name,
         reasons='; '.join(presented_reasons))

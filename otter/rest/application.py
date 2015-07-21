@@ -6,11 +6,10 @@ import json
 from twisted.internet.defer import maybeDeferred
 from twisted.web.server import Request
 
-from otter.rest.otterapp import OtterApp
 from otter.rest.groups import OtterGroups
-from otter.rest.webhooks import OtterExecute
 from otter.rest.limits import OtterLimits
-from otter.rest.history import OtterHistory
+from otter.rest.otterapp import OtterApp
+from otter.rest.webhooks import OtterExecute
 
 from otter.util.config import config_value
 
@@ -23,12 +22,10 @@ class Otter(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, region, health_check_function=None, es_host=None,
-                 _treq=None):
+    def __init__(self, store, region, health_check_function=None, _treq=None):
         self.store = store
         self.region = region
         self.health_check_function = health_check_function
-        self.es_host = es_host
         self.scheduler = None
         self.treq = _treq
 
@@ -76,15 +73,6 @@ class Otter(object):
         return group limit maximums
         """
         return OtterLimits(self.store, tenant_id).app.resource()
-
-    @app.route('/v1.0/<string:tenant_id>/history')
-    def history(self, request, tenant_id):
-        """
-        return audit history
-        """
-        history = OtterHistory(self.store, tenant_id, self.region, self.es_host,
-                               self.treq)
-        return history.app.resource()
 
     @app.route('/health', methods=['GET'])
     def health_check(self, request):

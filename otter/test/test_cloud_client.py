@@ -55,6 +55,7 @@ from otter.cloud_client import (
     get_cloud_client_dispatcher,
     get_server_details,
     perform_tenant_scope,
+    publish_to_cloudfeeds,
     remove_clb_nodes,
     service_request,
     set_nova_metadata_item)
@@ -72,13 +73,21 @@ from otter.util.pure_http import Request, has_code
 
 
 def make_service_configs():
+    """
+    Generate service configs for performing service requests.
+    """
     return {
         ServiceType.CLOUD_SERVERS: {
             'name': 'cloudServersOpenStack',
             'region': 'DFW'},
         ServiceType.CLOUD_LOAD_BALANCERS: {
             'name': 'cloudLoadBalancers',
-            'region': 'DFW'}
+            'region': 'DFW'},
+        ServiceType.CLOUD_FEEDS: {
+            'name': 'cloud_feeds',
+            'region': 'DFW',
+            'url': 'special cloudfeeds url'
+        }
     }
 
 
@@ -539,7 +548,7 @@ class CLBClientTests(SynchronousTestCase):
     @property
     def lb_id(self):
         """What is my LB ID"""
-        return u"123456"
+        return "123456"
 
     def assert_parses_common_clb_errors(self, intent, eff):
         """
@@ -573,7 +582,8 @@ class CLBClientTests(SynchronousTestCase):
                 sync_perform(
                     EQFDispatcher([(intent, service_request_eqf(resp))]),
                     eff)
-            self.assertEqual(cm.exception, err(msg, lb_id=self.lb_id))
+            self.assertEqual(cm.exception,
+                             err(msg, lb_id=six.text_type(self.lb_id)))
 
         # OverLimit Retry is different because it's produced by repose
         over_limit = stub_pure_response(
@@ -592,7 +602,8 @@ class CLBClientTests(SynchronousTestCase):
                 eff)
         self.assertEqual(
             cm.exception,
-            CLBRateLimitError("OverLimit Retry...", lb_id=self.lb_id))
+            CLBRateLimitError("OverLimit Retry...",
+                              lb_id=six.text_type(self.lb_id)))
 
         # Ignored errors
         bad_resps = [
@@ -638,7 +649,7 @@ class CLBClientTests(SynchronousTestCase):
 
         Parse the common CLB errors, and :class:`NoSuchCLBNodeError`.
         """
-        eff = change_clb_node(lb_id=self.lb_id, node_id=u'1234',
+        eff = change_clb_node(lb_id=self.lb_id, node_id='1234',
                               condition="DRAINING", weight=50)
         expected = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
@@ -667,7 +678,8 @@ class CLBClientTests(SynchronousTestCase):
             sync_perform(dispatcher, eff)
         self.assertEqual(
             cm.exception,
-            NoSuchCLBNodeError(msg, lb_id=self.lb_id, node_id=u'1234'))
+            NoSuchCLBNodeError(msg, lb_id=six.text_type(self.lb_id),
+                               node_id=u'1234'))
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)
@@ -710,7 +722,7 @@ class CLBClientTests(SynchronousTestCase):
             sync_perform(dispatcher, eff)
         self.assertEqual(
             cm.exception,
-            CLBDuplicateNodesError(msg, lb_id=self.lb_id))
+            CLBDuplicateNodesError(msg, lb_id=six.text_type(self.lb_id)))
 
         # CLBNodeLimitError failure
         msg = "Nodes must not exceed 25 per load balancer."
@@ -723,7 +735,7 @@ class CLBClientTests(SynchronousTestCase):
             sync_perform(dispatcher, eff)
         self.assertEqual(
             cm.exception,
-            CLBNodeLimitError(msg, lb_id=self.lb_id))
+            CLBNodeLimitError(msg, lb_id=six.text_type(self.lb_id)))
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)
@@ -1109,3 +1121,35 @@ class NovaClientTests(SynchronousTestCase):
         for code, body in unparseable:
             with self.assertRaises(APIError):
                 _perform_one_request(expected.intent, real, code, body)
+
+
+class CloudFeedsTests(SynchronousTestCase):
+    """
+    Tests for cloud feed functions.
+    """
+    def test_publish_to_cloudfeeds(self):
+        """
+        Publish an event to cloudfeeds.  Successfully handle non-JSON data.
+        """
+        _log = object()
+        eff = publish_to_cloudfeeds({'event': 'stuff'}, log=_log)
+        expected = service_request(
+            ServiceType.CLOUD_FEEDS, 'POST',
+            'autoscale/events',
+            headers={'content-type': ['application/vnd.rackspace.atom+json']},
+            data={'event': 'stuff'}, log=_log, success_pred=has_code(201),
+            json_response=False)
+
+        # success
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(stub_pure_response('<this is xml>', 201)))])
+        resp, body = sync_perform(dispatcher, eff)
+        self.assertEqual(body, '<this is xml>')
+
+        # Add regression test that 202 should be an API error because this
+        # is a bug in CF
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(stub_pure_response('<this is xml>', 202)))])
+        self.assertRaises(APIError, sync_perform, dispatcher, eff)
