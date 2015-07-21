@@ -939,6 +939,38 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             (StepResult.FAILURE, ScalingGroupStatus.ERROR))
 
+    def test_failure_unknown_reasons(self):
+        """
+        The group is put into ERROR state if any step returns FAILURE, and
+        unknown error is defaulted to fixed reason
+        """
+        exc_info = raise_to_exc_info(ValueError('wat'))
+
+        def plan(*args, **kwargs):
+            return [TestStep(Effect("fail"))]
+
+        sequence = [
+            nested_parallel([]),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            nested_parallel([
+                ("fail", lambda i: (StepResult.FAILURE,
+                                    [ErrorReason.Exception(exc_info)]))
+            ]),
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            (UpdateGroupStatus(scaling_group=self.group,
+                               status=ScalingGroupStatus.ERROR),
+             noop),
+            (Log('group-status-error',
+                 dict(isError=True, cloud_feed=True,
+                      status='ERROR', reasons='Unknown error occurred')),
+             noop),
+            (UpdateGroupErrorReasons(self.group, ['Unknown error occurred']),
+             noop)
+        ]
+        self.assertEqual(
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
+            (StepResult.FAILURE, ScalingGroupStatus.ERROR))
+
     def test_reactivate_group_on_success_after_steps(self):
         """
         When the group started in ERROR state, and convergence succeeds, the
