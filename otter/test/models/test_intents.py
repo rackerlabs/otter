@@ -36,7 +36,8 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
     def get_store(self):
         return iMock(IScalingGroupCollection)
 
-    def perform_with_group(self, eff, expected_lookup, group, disp=None):
+    def perform_with_group(self, eff, expected_lookup, group,
+                           fallback_dispatcher=None):
         """Run an effect that will look up group info."""
         def gsg(log, tenant_id, group_id):
             assert (log, tenant_id, group_id) == expected_lookup
@@ -44,8 +45,9 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         store = self.get_store()
         store.get_scaling_group.side_effect = gsg
         dispatcher = self.get_dispatcher(store)
-        if disp is not None:
-            dispatcher = ComposedDispatcher([dispatcher, disp])
+        if fallback_dispatcher is not None:
+            dispatcher = ComposedDispatcher([dispatcher,
+                                             fallback_dispatcher])
         return sync_perform(dispatcher, eff)
 
     def test_get_scaling_group_info(self):
@@ -81,7 +83,8 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
                            '00', 'g1')
         result = self.perform_with_group(
             eff, expected_lookup, self.group,
-            disp=get_log_dispatcher(self.log, {'effectful': True}))
+            fallback_dispatcher=get_log_dispatcher(self.log,
+                                                   {'effectful': True}))
         self.assertEqual(result, (self.group, manifest))
 
     def test_delete_group(self):
@@ -105,7 +108,8 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         result = self.perform_with_group(
             Effect(DeleteGroup(tenant_id='00', group_id='g1')),
             expected_lookup, self.group,
-            disp=get_log_dispatcher(self.log, {'effectful': True}))
+            fallback_dispatcher=get_log_dispatcher(self.log,
+                                                   {'effectful': True}))
         self.assertEqual(result, 'del')
 
     def test_update_group_status(self):
@@ -146,5 +150,6 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         """
         self.group.update_error_reasons.return_value = None
         intent = UpdateGroupErrorReasons(self.group, ['r1', 'r2'])
-        self.assertIsNone(sync_perform(self.dispatcher, Effect(intent)))
+        dispatcher = self.get_dispatcher(self.get_store())
+        self.assertIsNone(sync_perform(dispatcher, Effect(intent)))
         self.group.update_error_reasons.assert_called_once_with(['r1', 'r2'])
