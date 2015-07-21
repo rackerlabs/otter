@@ -12,6 +12,10 @@ msg_types = {
                        "to CLB {clb_id}"),
     "converge-all-groups": "Attempting to converge all dirty groups",
     "converge-all-groups-error": "Error while converging all groups",
+    "converge-buckets-acquired-error":
+        "Error during convergence when buckets were acquired",
+    "converge-divergent-changed-error":
+        "Error during convergence when ZK flag change was observed",
     "converge-divergent-flag-disappeared":
         "Divergent flag {znode} disappeared when trying to start convergence. "
         "This should be harmless.",

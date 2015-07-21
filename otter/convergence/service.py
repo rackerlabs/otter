@@ -601,7 +601,9 @@ class Converger(MultiService):
         """
         ceff = Effect(GetChildren(CONVERGENCE_DIRTY_DIR)).on(
             partial(self._converge_all, my_buckets))
-        return perform(self._dispatcher, self._with_conv_runid(ceff))
+        d = perform(self._dispatcher, self._with_conv_runid(ceff))
+        d.addErrback(self.log.err, 'converge-buckets-acquired-error')
+        return d
 
     def divergent_changed(self, children):
         """
@@ -619,7 +621,9 @@ class Converger(MultiService):
         if set(my_buckets).intersection(changed_buckets):
             # the return value is ignored, but we return this for testing
             eff = self._converge_all(my_buckets, children)
-            return perform(self._dispatcher, self._with_conv_runid(eff))
+            d = perform(self._dispatcher, self._with_conv_runid(eff))
+            d.addErrback(self.log.err, 'converge-divergent-changed-error')
+            return d
 
 # We're using a global for now because it's difficult to thread a new parameter
 # all the way through the REST objects to the controller code, where this
