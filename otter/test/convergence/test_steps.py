@@ -13,10 +13,9 @@ from testtools.matchers import ContainsAll
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import (
-    CLBDeletedError,
     CLBDuplicateNodesError,
-    CLBNodeLimitError,
     CLBImmutableError,
+    CLBNodeLimitError,
     CLBRateLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
@@ -26,7 +25,8 @@ from otter.cloud_client import (
     NovaRateLimitError,
     ServerMetadataOverLimitError,
     has_code,
-    service_request)
+    service_request,
+)
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
@@ -469,8 +469,7 @@ class StepAsEffectTests(SynchronousTestCase):
         if there is any other 4xx error, then
         the error is propagated up and the result is a failure.
         """
-        terminals = (CLBDeletedError(lb_id=u"12345"),
-                     CLBNodeLimitError(lb_id=u"12345"),
+        terminals = (CLBNodeLimitError(lb_id=u"12345"),
                      NoSuchCLBError(lb_id=u"12345"),
                      APIError(code=403, body="You're out of luck."),
                      APIError(code=422, body="Oh look another 422."))
@@ -609,8 +608,7 @@ class StepAsEffectTests(SynchronousTestCase):
         :obj:`AddNodesToCLB` succeeds if the CLB is not in existence (has been
         deleted or is not found).
         """
-        successes = (CLBDeletedError(lb_id=u"12345"),
-                     NoSuchCLBError(lb_id=u"12345"))
+        successes = [NoSuchCLBError(lb_id=u"12345")]
         eff = RemoveNodesFromCLB(lb_id='12345',
                                  node_ids=pset(['1', '2'])).as_effect()
 

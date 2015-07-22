@@ -27,11 +27,10 @@ from txeffect import perform
 
 from otter.auth import Authenticate, InvalidateToken
 from otter.cloud_client import (
-    CLBDeletedError,
     CLBDuplicateNodesError,
+    CLBImmutableError,
     CLBNodeLimitError,
     CLBNotActiveError,
-    CLBImmutableError,
     CLBRateLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
@@ -565,12 +564,12 @@ class CLBClientTests(SynchronousTestCase):
             ("Load Balancer '{0}' has a status of 'unexpected status' and is "
              "considered immutable.", 422, CLBImmutableError),
             ("Load Balancer '{0}' has a status of 'PENDING_DELETE' and is "
-             "considered immutable.", 422, CLBDeletedError),
+             "considered immutable.", 422, NoSuchCLBError),
             ("The load balancer is deleted and considered immutable.",
-             422, CLBDeletedError),
+             422, NoSuchCLBError),
             ("Load balancer not found.", 404, NoSuchCLBError),
             ("LoadBalancer is not ACTIVE", 422, CLBNotActiveError),
-            ("The loadbalancer is marked as deleted.", 410, CLBDeletedError),
+            ("The loadbalancer is marked as deleted.", 410, NoSuchCLBError),
         ]
 
         for msg, code, err in json_responses_and_errs:
