@@ -14,9 +14,9 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import (
     CLBDuplicateNodesError,
+    CLBImmutableError,
     CLBNodeLimitError,
     CLBNotFoundError,
-    CLBImmutableError,
     CLBRateLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,

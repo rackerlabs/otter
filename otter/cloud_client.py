@@ -396,8 +396,6 @@ class CLBImmutableError(Exception):
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
 class CLBNotFoundError(Exception):
     """A CLB doesn't exist. Superclass of other, more specific exceptions."""
-    message = attr.ib(default='')
-    lb_id = attr.ib()
 
 
 class CLBDeletedError(CLBNotFoundError):

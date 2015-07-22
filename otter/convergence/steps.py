@@ -16,11 +16,10 @@ from twisted.python.constants import NamedConstant
 from zope.interface import Interface, implementer
 
 from otter.cloud_client import (
-    CLBNotFoundError,
     CLBNodeLimitError,
+    CLBNotFoundError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
-    NoSuchCLBNodeError,
     add_clb_nodes,
     create_server,
     has_code,
@@ -279,7 +278,6 @@ class AddNodesToCLB(object):
                 'must re-gather after adding to CLB in order to update '
                 'the active cache'),
             error=_failure_reporter(CLBNotFoundError, CLBNodeLimitError))
-
 
 
 @implementer(IStep)
