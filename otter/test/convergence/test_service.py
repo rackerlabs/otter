@@ -962,7 +962,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                status=ScalingGroupStatus.ERROR),
              noop),
             (Log('group-status-error',
-                 dict(isError=True, cloud_feed=True,
+                 dict(isError=True, cloud_feed=True, cloud_feed_id=mock.ANY,
                       status='ERROR', reasons='Unknown error occurred')),
              noop),
             (UpdateGroupErrorReasons(self.group, ['Unknown error occurred']),
