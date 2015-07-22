@@ -394,15 +394,20 @@ class CLBImmutableError(Exception):
 
 
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
-class CLBDeletedError(Exception):
+class CLBNotFoundError(Exception):
+    """A CLB doesn't exist. Superclass of other, more specific exceptions."""
+    message = attr.ib(default='')
+    lb_id = attr.ib()
+
+
+class CLBDeletedError(CLBNotFoundError):
     """
     Error to be raised when the CLB has been deleted or is being deleted.
     This is distinct from it not existing.
     """
 
 
-@attributes([Attribute('lb_id', instance_of=six.text_type)])
-class NoSuchCLBError(Exception):
+class NoSuchCLBError(CLBNotFoundError):
     """
     Error to be raised when the CLB never existed in the first place (or it
     has been deleted so long that there is no longer a record of it).
