@@ -112,12 +112,6 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         '/{tenantId}/groups'
         """
         url = '%s/groups' % (self.url)
-        # Option "core" - Creates rack user only. See servermill build config
-        # option
-        if lc_metadata:
-            lc_metadata['build_config'] = 'core'
-        else:
-            lc_metadata = dict(build_config='core')
 
         # Setting network type for servers to be private by default so that
         # when testing against production, by default public IPs are not
