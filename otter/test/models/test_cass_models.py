@@ -393,6 +393,7 @@ scaling_group_entry = {
     'created_at': 23,
     'deleting': False,
     'status': 'ACTIVE',
+    'error_reasons': []
 }
 
 
@@ -552,14 +553,15 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             merge(scaling_group_entry,
                   {'tenantId': self.tenant_id,
                    'groupId': self.group_id,
-                   'desired': 10})
+                   'desired': 10,
+                   'error_reasons': ['a', 'b']})
         ]]
         d = self.group.view_state()
         r = self.successResultOf(d)
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, launch_config, '
             'active, pending, "groupTouched", "policyTouched", paused, '
-            'desired, created_at, status, deleting '
+            'desired, created_at, status, error_reasons, deleting '
             'FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
@@ -575,7 +577,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                  policy_touched={'PT': 'R'},
                                  paused=False,
                                  status=ScalingGroupStatus.ACTIVE,
-                                 desired=10)
+                                 desired=10,
+                                 error_reasons=['a', 'b'])
         self.assertEqual(r, group_state)
 
     def test_view_state_no_desired_capacity(self):
@@ -703,7 +706,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         viewCql = (
             'SELECT "tenantId", "groupId", group_config, launch_config, '
             'active, pending, "groupTouched", "policyTouched", paused, '
-            'desired, created_at, status, deleting '
+            'desired, created_at, status, error_reasons, deleting '
             'FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         delCql = ('DELETE FROM scaling_group '
@@ -734,6 +737,28 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                        True,
                                        ScalingGroupStatus.ACTIVE,
                                        desired=0))
+
+    def test_view_state_no_error_reasons(self):
+        """
+        view_state with None error_reasons returns state with [] error_reasons
+        """
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'error_reasons': None})
+        ]]
+        d = self.group.view_state()
+        r = self.successResultOf(d)
+        self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
+                                       'a',
+                                       {'A': 'R'}, {'P': 'R'},
+                                       '2014-01-01T00:00:05Z.1234',
+                                       {'PT': 'R'},
+                                       False,
+                                       ScalingGroupStatus.ACTIVE,
+                                       desired=0,
+                                       error_reasons=[]))
 
     def test_modify_state_calls_modifier_with_group_and_state_and_others(self):
         """
@@ -2267,6 +2292,7 @@ class ViewManifestTests(CassScalingGroupTestCase):
             'created_at': 23,
             'deleting': False,
             'status': 'ACTIVE',
+            'error_reasons': None
         }
         self.manifest = {
             'groupConfiguration': self.config,
@@ -2300,7 +2326,7 @@ class ViewManifestTests(CassScalingGroupTestCase):
         view_cql = (
             'SELECT "tenantId", "groupId", group_config, launch_config, '
             'active, pending, "groupTouched", "policyTouched", paused, '
-            'desired, created_at, status, deleting '
+            'desired, created_at, status, error_reasons, deleting '
             'FROM scaling_group '
             'WHERE "tenantId" = :tenantId '
             'AND "groupId" = :groupId')
@@ -3097,6 +3123,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'created_at': 23,
             'deleting': False,
             'status': 'ACTIVE',
+            'error_reasons': None
         }
 
     @mock.patch('otter.models.cass.WeakLocks', return_value=2)
@@ -3343,7 +3370,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'status, error_reasons '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
@@ -3373,7 +3400,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'status, error_reasons '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
@@ -3403,7 +3430,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, '
-            'created_at, status FROM scaling_group '
+            'created_at, status, error_reasons FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
@@ -3420,7 +3447,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'status, error_reasons '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false '
             'LIMIT :limit;')
@@ -3438,7 +3465,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'status, error_reasons '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false AND '
             '"groupId" > :marker LIMIT :limit;')
@@ -3464,7 +3491,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'status, error_reasons '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')

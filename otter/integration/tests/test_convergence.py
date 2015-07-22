@@ -45,7 +45,6 @@ from otter.integration.lib.trial_tools import (
     not_mimic,
     random_string,
     region,
-    skip_me,
     skip_if,
     tag
 )
@@ -991,7 +990,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             max_entities=10)
         yield self.helper.start_group_and_wait(group, rcs, desired=5)
 
-    @skip_me("Waiting for #1578 to be merged.")
     @inlineCallbacks
     def test_error_reasons_are_updated(self):
         """
