@@ -10,6 +10,7 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 
 from txeffect import deferred_performer
 
+from otter.log.intents import merge_effectful_fields
 from otter.models.cass import CassScalingGroupServersCache
 
 
@@ -29,6 +30,7 @@ def perform_get_scaling_group_info(log, store, dispatcher, intent):
     :param dispatcher: dispatcher provided by perform
     :param GetScalingGroupInfo intent: the intent
     """
+    log = merge_effectful_fields(dispatcher, log)
     group = store.get_scaling_group(log, intent.tenant_id, intent.group_id)
     manifest = yield group.view_manifest(with_policies=False,
                                          with_webhooks=False,
@@ -48,6 +50,7 @@ def perform_delete_group(log, store, dispatcher, intent):
     """
     Perform `DeleteGroup`
     """
+    log = merge_effectful_fields(dispatcher, log)
     group = store.get_scaling_group(log, intent.tenant_id, intent.group_id)
     return group.delete_group()
 

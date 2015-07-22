@@ -21,6 +21,7 @@ from otter.json_schema.group_schemas import (
 from otter.json_schema.rest_schemas import create_group_request
 from otter.log import log
 from otter.models.cass import CassScalingGroupServersCache
+from otter.models.interface import ScalingGroupStatus
 from otter.rest.bobby import get_bobby
 from otter.rest.configs import (
     OtterConfig,
@@ -69,7 +70,7 @@ def format_state_dict(state, active=None):
         pending = len(state.pending)
         desired = len(state.active) + pending
         active = state.active
-    return {
+    state_json = {
         'activeCapacity': len(active),
         'pendingCapacity': pending,
         'desiredCapacity': desired,
@@ -83,6 +84,10 @@ def format_state_dict(state, active=None):
             } for key, server_blob in active.iteritems()
         ]
     }
+    if state.status == ScalingGroupStatus.ERROR:
+        state_json['errors'] = [
+            {'message': reason} for reason in state.error_reasons]
+    return state_json
 
 
 def extract_bool_arg(request, key, default=False):
@@ -246,7 +251,6 @@ class OtterGroups(object):
                     "flavorRef": "2",
                     "OS-DCF:diskConfig": "AUTO",
                     "metadata": {
-                      "build_config": "core",
                       "meta_key_1": "meta_value_1",
                       "meta_key_2": "meta_value_2"
                     },
@@ -324,7 +328,6 @@ class OtterGroups(object):
                         }
                       ],
                       "metadata": {
-                        "build_config": "core",
                         "meta_key_1": "meta_value_1",
                         "meta_key_2": "meta_value_2"
                       }

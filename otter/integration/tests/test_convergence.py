@@ -5,17 +5,20 @@ Tests covering self-healing should be placed in a separate test file.
 from __future__ import print_function
 
 import os
+from copy import deepcopy
 from functools import wraps
 
 from testtools.matchers import (
     AfterPreprocessing,
     AllMatch,
+    Contains,
     ContainsDict,
     Equals,
     GreaterThan,
     LessThan,
     MatchesAll,
     MatchesSetwise,
+    Not,
     NotEquals
 )
 
@@ -43,7 +46,6 @@ from otter.integration.lib.trial_tools import (
     random_string,
     region,
     skip_if,
-    skip_me,
     tag
 )
 
@@ -873,7 +875,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                 }),
             ), timeout=600)
 
-    @skip_me("Autoscale does not yet handle Nova over-quota errors: #1470")
     @skip_if(not_mimic, "This requires Mimic for error injection.")
     @tag("CATC-025")
     @inlineCallbacks
@@ -988,6 +989,101 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=2,
             max_entities=10)
         yield self.helper.start_group_and_wait(group, rcs, desired=5)
+
+    @inlineCallbacks
+    def test_error_reasons_are_updated(self):
+        """
+        Error reasons appear if the group goes into an ERROR state, disappear
+        when the group fixes itself, and reappears (but with a new error
+        reason) if the group goes into ERROR again.
+
+        1. Create group with an invalid key name, because autoscale does not
+           verify the key and hence won't just 400 the create group request.
+        2. Assert group goes into error state with the reason being invalid
+           Server config.
+        3. Delete the key, and converge.
+        4. Assert group goes into active state.
+        5. Change the launch config to have an invalid load balancer.
+        6. Scale up.
+        7. Assert group goes into error state with the reason being an invalid
+           CLB.
+        """
+        group, server_name_prefix = self.helper.create_group(
+            min_entities=1, max_entities=10,
+            server_name_prefix="no-such-key",
+            key_name="invalid_key_name"
+        )
+        launch_config = deepcopy(group.group_config['launchConfiguration'])
+
+        if not not_mimic():
+            # if this is mimic, we have to make server creation fail.
+            # in production, it's actually an invalid key and hence would
+            # naturally fail.
+            mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+            behavior_id = yield mimic_nova.sequenced_behaviors(
+                self.rcs,
+                criteria=[{"server_name": server_name_prefix + ".*"}],
+                behaviors=[
+                    {"name": "fail",
+                     "parameters": {"code": 400,
+                                    "message": "Invalid key_name provided.",
+                                    "type": "badRequest"}}
+                ])
+
+        # group should go into error
+        yield group.start(self.rcs, self)
+        yield group.wait_for_state(
+            self.rcs,
+            ContainsDict({
+                'desiredCapacity': Equals(1),
+                'status': Equals("ERROR"),
+                'errors': MatchesSetwise(
+                    ContainsDict({'message': Contains('key_name')})
+                )
+            }),
+            timeout=600)
+
+        # fix group
+        if not not_mimic():
+            # if this is mimic, we have to make mimic stop failing.
+            # in production, deleting the invalid key should succeed.
+            yield mimic_nova.delete_behavior(self.rcs, behavior_id)
+        del launch_config['args']['server']['key_name']
+        yield group.set_launch_config(self.rcs, launch_config)
+        yield group.trigger_convergence(self.rcs)
+        yield group.wait_for_state(
+            self.rcs,
+            MatchesAll(
+                ContainsDict({
+                    'pendingCapacity': Equals(0),
+                    'desiredCapacity': Equals(1),
+                    'active': HasLength(1),
+                    'status': Equals("ACTIVE"),
+                }),
+                Not(Contains('errors'))
+            ), timeout=600)
+
+        # put group into error again
+        policy = ScalingPolicy(scale_by=1, scaling_group=group)
+        yield policy.start(self.rcs, self)
+
+        launch_config['args']["loadBalancers"] = [{
+            "port": 80,
+            "loadBalancerId": 00000000,  # doesn't exist
+        }]
+        yield group.set_launch_config(self.rcs, launch_config)
+        yield policy.execute(self.rcs)
+        yield group.wait_for_state(
+            self.rcs,
+            ContainsDict({
+                'desiredCapacity': Equals(2),
+                'status': Equals("ERROR"),
+                'errors': MatchesSetwise(
+                    ContainsDict({'message': Contains('Balancer')})
+                )
+
+            }),
+            timeout=600)
 
 
 def _catc_tags(start_num, end_num):

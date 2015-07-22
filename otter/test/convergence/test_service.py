@@ -808,7 +808,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 nested_parallel([
                     (Log('convergence-create-servers',
                          {'num_servers': 1, 'server_config': {'foo': 'bar'},
-                          'cloud_feed': True}), noop)
+                          'cloud_feed': True, 'cloud_feed_id': mock.ANY}),
+                     noop)
                 ])
             ]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
@@ -926,7 +927,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              noop),
             (Log('group-status-error',
                  dict(isError=True, cloud_feed=True,
-                      status='ERROR',
+                      cloud_feed_id=mock.ANY, status='ERROR',
                       reasons='Cloud Load Balancer does not exist: nolb1; '
                               'Cloud Load Balancer does not exist: nolb2')),
              noop),
@@ -934,6 +935,38 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 self.group,
                 ['Cloud Load Balancer does not exist: nolb1',
                  'Cloud Load Balancer does not exist: nolb2']), noop)
+        ]
+        self.assertEqual(
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
+            (StepResult.FAILURE, ScalingGroupStatus.ERROR))
+
+    def test_failure_unknown_reasons(self):
+        """
+        The group is put into ERROR state if any step returns FAILURE, and
+        unknown error is defaulted to fixed reason
+        """
+        exc_info = raise_to_exc_info(ValueError('wat'))
+
+        def plan(*args, **kwargs):
+            return [TestStep(Effect("fail"))]
+
+        sequence = [
+            nested_parallel([]),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            nested_parallel([
+                ("fail", lambda i: (StepResult.FAILURE,
+                                    [ErrorReason.Exception(exc_info)]))
+            ]),
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            (UpdateGroupStatus(scaling_group=self.group,
+                               status=ScalingGroupStatus.ERROR),
+             noop),
+            (Log('group-status-error',
+                 dict(isError=True, cloud_feed=True, cloud_feed_id=mock.ANY,
+                      status='ERROR', reasons='Unknown error occurred')),
+             noop),
+            (UpdateGroupErrorReasons(self.group, ['Unknown error occurred']),
+             noop)
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
@@ -960,7 +993,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                status=ScalingGroupStatus.ACTIVE),
              noop),
             (Log('group-status-active',
-                 dict(cloud_feed=True, status='ACTIVE')), noop),
+                 dict(cloud_feed=True, cloud_feed_id=mock.ANY,
+                      status='ACTIVE')),
+             noop),
             (UpdateServersCache("tenant-id", "group-id", self.now,
                                 [{"id": "a", "_is_as_active": True},
                                  {"id": "b", "_is_as_active": True}]), noop)
@@ -985,7 +1020,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                status=ScalingGroupStatus.ACTIVE),
              noop),
             (Log('group-status-active',
-                 dict(cloud_feed=True, status='ACTIVE')), noop),
+                 dict(cloud_feed=True, cloud_feed_id=mock.ANY,
+                      status='ACTIVE')),
+             noop),
             (UpdateServersCache("tenant-id", "group-id", self.now,
                                 [{"id": "a", "_is_as_active": True},
                                  {"id": "b", "_is_as_active": True}]), noop)

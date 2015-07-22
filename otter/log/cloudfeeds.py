@@ -4,7 +4,6 @@ Publishing events to Cloud feeds
 
 import uuid
 from copy import deepcopy
-from functools import partial
 
 from characteristic import attributes
 
@@ -50,25 +49,37 @@ log_cf_mapping = {
 }
 
 
+def _cf_log_with_id(log_effect, *args, **kwargs):
+    """
+    Helper helper function to generate a cloud feed ID before logging a
+    log cloud feed event.
+    """
+    def log_to_cf(uid):
+        kwargs.update({'cloud_feed': True, 'cloud_feed_id': uid})
+        return log_effect(*args, **kwargs)
+
+    return Effect(Func(uuid.uuid4)).on(str).on(log_to_cf)
+
+
 def cf_msg(msg, **fields):
     """
     Helper function to log cloud feeds event
     """
-    return msg_effect(msg, cloud_feed=True, **fields)
+    return _cf_log_with_id(msg_effect, msg, **fields)
 
 
 def cf_err(msg, **fields):
     """
     Log cloud feed error event without failure
     """
-    return msg_effect(msg, isError=True, cloud_feed=True, **fields)
+    return _cf_log_with_id(msg_effect, msg, isError=True, **fields)
 
 
 def cf_fail(failure, msg, **fields):
     """
     Log cloud feed error event with failure
     """
-    return err_effect(failure, msg, cloud_feed=True, **fields)
+    return _cf_log_with_id(err_effect, failure, msg, **fields)
 
 
 def sanitize_event(event):
@@ -98,13 +109,14 @@ def sanitize_event(event):
            'exception' in cf_event['message']):
             raise UnsuitableMessage(cf_event['message'])
 
-    if 'tenant_id' not in event:
+    if 'tenant_id' not in event or 'cloud_feed_id' not in event:
         raise UnsuitableMessage(cf_event['message'])
 
     return (cf_event,
             error,
             epoch_to_utctimestr(event["time"]),
-            event['tenant_id'])
+            event['tenant_id'],
+            event['cloud_feed_id'])
 
 
 request_format = {
@@ -150,23 +162,19 @@ def add_event(event, admin_tenant_id, region, log):
     """
     Add event to cloud feeds
     """
-    event, error, timestamp, event_tenant_id = sanitize_event(event)
-    eff = Effect(Func(uuid.uuid4)).on(str).on(
-        partial(prepare_request, request_format, event,
-                error, timestamp, region, event_tenant_id))
+    event, error, timestamp, event_tenant_id, event_id = sanitize_event(event)
+    req = prepare_request(request_format, event, error, timestamp, region,
+                          event_tenant_id, event_id)
 
-    def _send_event(req):
-        eff = retry_effect(
-            publish_to_cloudfeeds(req, log=log),
-            compose_retries(
-                lambda f: (not f.check(APIError) or
-                           f.value.code < 400 or
-                           f.value.code >= 500),
-                retry_times(5)),
-            exponential_backoff_interval(2))
-        return Effect(TenantScope(tenant_id=admin_tenant_id, effect=eff))
-
-    return eff.on(_send_event)
+    eff = retry_effect(
+        publish_to_cloudfeeds(req, log=log),
+        compose_retries(
+            lambda f: (not f.check(APIError) or
+                       f.value.code < 400 or
+                       f.value.code >= 500),
+            retry_times(5)),
+        exponential_backoff_interval(2))
+    return Effect(TenantScope(tenant_id=admin_tenant_id, effect=eff))
 
 
 @attributes(['reactor', 'authenticator', 'tenant_id', 'region',

@@ -230,8 +230,7 @@ def makeService(config):
         s.addService(FunctionalService(stop=partial(
             call_after_supervisor, cassandra_cluster.disconnect, supervisor)))
 
-    otter = Otter(store, region, health_checker.health_check,
-                  es_host=config_value('elasticsearch.host'))
+    otter = Otter(store, region, health_checker.health_check)
     site = Site(otter.app.resource())
     site.displayTracebacks = False
 

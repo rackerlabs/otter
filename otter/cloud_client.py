@@ -389,23 +389,14 @@ class CLBImmutableError(Exception):
     temporarily immutable.
 
     This exception is _not_ used when the status is PENDING_DELETE. See
-    :obj:`CLBDeletedError`.
-    """
-
-
-@attributes([Attribute('lb_id', instance_of=six.text_type)])
-class CLBDeletedError(Exception):
-    """
-    Error to be raised when the CLB has been deleted or is being deleted.
-    This is distinct from it not existing.
+    :obj:`NoSuchCLBError`.
     """
 
 
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
 class NoSuchCLBError(Exception):
     """
-    Error to be raised when the CLB never existed in the first place (or it
-    has been deleted so long that there is no longer a record of it).
+    Error to be raised when the CLB does not exist or is being deleted.
     """
 
 
@@ -514,7 +505,7 @@ def add_clb_nodes(lb_id, nodes):
 
     :return: :class:`ServiceRequest` effect
 
-    :raises: :class:`CLBImmutableError`, :class:`CLBDeletedError`,
+    :raises: :class:`CLBImmutableError`,
         :class:`NoSuchCLBError`, :class:`CLBDuplicateNodesError`,
         :class:`APIError`
     """
@@ -552,7 +543,7 @@ def change_clb_node(lb_id, node_id, condition, weight):
 
     :return: :class:`ServiceRequest` effect
 
-    :raises: :class:`CLBImmutableError`, :class:`CLBDeletedError`,
+    :raises: :class:`CLBImmutableError`,
         :class:`NoSuchCLBError`, :class:`NoSuchCLBNodeError`, :class:`APIError`
     """
     eff = service_request(
@@ -688,7 +679,7 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
     :param dict json_body: The error message, parsed as a JSON dict.
     :param string lb_id: The load balancer ID
 
-    :raises: :class:`CLBImmutableError`, :class:`CLBDeletedError`,
+    :raises: :class:`CLBImmutableError`,
         :class:`NoSuchCLBError`, :class:`APIError` by itself
     """
     mappings = (
@@ -697,8 +688,8 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
         [(413, ("overLimit", "message"), _CLB_OVER_LIMIT_PATTERN,
           partial(CLBRateLimitError, lb_id=six.text_type(lb_id)))] +
         _expand_clb_matches(
-            [(422, _CLB_DELETED_PATTERN, CLBDeletedError),
-             (410, _CLB_MARKED_DELETED_PATTERN, CLBDeletedError),
+            [(422, _CLB_DELETED_PATTERN, NoSuchCLBError),
+             (410, _CLB_MARKED_DELETED_PATTERN, NoSuchCLBError),
              (422, _CLB_IMMUTABLE_PATTERN, CLBImmutableError),
              (422, _CLB_NOT_ACTIVE_PATTERN, CLBNotActiveError),
              (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)],

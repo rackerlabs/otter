@@ -147,8 +147,8 @@ _cql_create_group = (
 _cql_view_manifest = (
     'SELECT "tenantId", "groupId", group_config, '
     'launch_config, active, pending, "groupTouched", '
-    '"policyTouched", paused, desired, created_at, status, deleting '
-    'FROM {cf} '
+    '"policyTouched", paused, desired, created_at, status, error_reasons, '
+    'deleting FROM {cf} '
     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", data, version) '
@@ -211,8 +211,8 @@ _cql_delete_one_webhook = (
     '"webhookId" = :webhookId')
 _cql_list_states = (
     'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at, status '
-    'FROM {cf} WHERE "tenantId"=:tenantId AND deleting=false;')
+    '"groupTouched", "policyTouched", paused, desired, created_at, status, '
+    'error_reasons FROM {cf} WHERE "tenantId"=:tenantId AND deleting=false;')
 _cql_list_policy = (
     'SELECT "policyId", data FROM {cf} WHERE '
     '"tenantId" = :tenantId AND "groupId" = :groupId;')
@@ -497,6 +497,7 @@ def _unmarshal_state(state_dict):
         state_dict["paused"],
         status,
         desired=desired_capacity,
+        error_reasons=(state_dict["error_reasons"] or []),
     )
 
 
