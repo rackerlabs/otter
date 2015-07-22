@@ -26,14 +26,14 @@ from toolz.functoolz import compose
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import NoSuchEndpoint
-from otter.cloud_client import CLBDeletedError, NoSuchCLBError, service_request
+from otter.cloud_client import CLBDeletedError, service_request
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
     UnexpectedBehaviorError,
     extract_CLB_drained_at,
     get_all_convergence_data,
-    get_all_server_details,
     get_all_scaling_group_servers,
+    get_all_server_details,
     get_clb_contents,
     get_rcv3_contents,
     get_scaling_group_servers,
@@ -54,7 +54,6 @@ from otter.test.utils import (
     nested_sequence,
     patch,
     perform_sequence,
-    raise_,
     resolve_effect,
     resolve_retry_stubs,
     resolve_stubs,
@@ -442,9 +441,9 @@ class GetCLBContentsTests(SynchronousTestCase):
         specify the result.
         """
         if isinstance(response, Exception):
-            handler = lambda i: raise_(response)
+            def handler(i): raise response
         else:
-            handler = lambda i: (StubResponse(200, {}), response)
+            def handler(i): return (StubResponse(200, {}), response)
         return (
             Retry(
                 effect=mock.ANY,
@@ -650,7 +649,7 @@ class GetCLBContentsTests(SynchronousTestCase):
             ]),
         ]
         eff = get_clb_contents()
-        draining, enabled = CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED
+        draining = CLBNodeCondition.DRAINING
         make_desc = partial(CLBDescription, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
             perform_sequence(seq, eff),

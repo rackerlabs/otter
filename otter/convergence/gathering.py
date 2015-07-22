@@ -209,7 +209,8 @@ def get_clb_contents():
             return assoc_obj(node, drained_at=extract_CLB_drained_at(feed))
         else:
             return node
-    yield do_return(list(filter(bool, map(update_drained_at, concat(lb_nodes.values())))))
+    nodes = map(update_drained_at, concat(lb_nodes.values()))
+    yield do_return(list(filter(bool, nodes)))
 
 
 def extract_CLB_drained_at(feed):
