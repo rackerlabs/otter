@@ -16,7 +16,6 @@ from twisted.python.constants import NamedConstant
 from zope.interface import Interface, implementer
 
 from otter.cloud_client import (
-    CLBDeletedError,
     CLBNodeLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
@@ -279,8 +278,7 @@ class AddNodesToCLB(object):
             success=_success_reporter(
                 'must re-gather after adding to CLB in order to update '
                 'the active cache'),
-            error=_failure_reporter(CLBDeletedError, CLBNodeLimitError,
-                                    NoSuchCLBError))
+            error=_failure_reporter(CLBNodeLimitError, NoSuchCLBError))
 
 
 @implementer(IStep)
@@ -300,8 +298,7 @@ class RemoveNodesFromCLB(object):
         # Since we're deleting a node, we'll ignore any errors which indicate
         # that the node doesn't exist.
         return eff.on(
-            error=_ignore_errors(
-                CLBDeletedError, NoSuchCLBError, NoSuchCLBNodeError)
+            error=_ignore_errors(NoSuchCLBError, NoSuchCLBNodeError)
         ).on(
             success=lambda r: (StepResult.SUCCESS, []),
             error=_failure_reporter())

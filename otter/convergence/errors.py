@@ -7,7 +7,6 @@ from sumtypes import match
 from toolz.functoolz import identity
 
 from otter.cloud_client import (
-    CLBDeletedError,
     CreateServerConfigurationError,
     NoSuchCLBError
 )
@@ -39,12 +38,6 @@ def _present_exception(exception):
 @_present_exception.register(NoSuchCLBError)
 def _present_no_such_clb_error(exception):
     return "Cloud Load Balancer does not exist: {0}".format(exception.lb_id)
-
-
-@_present_exception.register(CLBDeletedError)
-def _present_clb_deleted_error(exception):
-    return "Cloud Load Balancer is currently being deleted: {0}".format(
-        exception.lb_id)
 
 
 @_present_exception.register(CreateServerConfigurationError)
