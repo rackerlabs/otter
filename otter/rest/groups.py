@@ -246,7 +246,6 @@ class OtterGroups(object):
                     "flavorRef": "2",
                     "OS-DCF:diskConfig": "AUTO",
                     "metadata": {
-                      "build_config": "core",
                       "meta_key_1": "meta_value_1",
                       "meta_key_2": "meta_value_2"
                     },
@@ -324,7 +323,6 @@ class OtterGroups(object):
                         }
                       ],
                       "metadata": {
-                        "build_config": "core",
                         "meta_key_1": "meta_value_1",
                         "meta_key_2": "meta_value_2"
                       }
