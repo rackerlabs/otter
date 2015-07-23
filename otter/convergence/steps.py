@@ -20,6 +20,7 @@ from otter.cloud_client import (
     CLBNotFoundError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
+    NoSuchCLBNodeError,
     add_clb_nodes,
     create_server,
     has_code,
@@ -297,7 +298,7 @@ class RemoveNodesFromCLB(object):
         # Since we're deleting a node, we'll ignore any errors which indicate
         # that the node doesn't exist.
         return eff.on(
-            error=_ignore_errors(CLBNotFoundError)
+            error=_ignore_errors(CLBNotFoundError, NoSuchCLBNodeError)
         ).on(
             success=lambda r: (StepResult.SUCCESS, []),
             error=_failure_reporter())
