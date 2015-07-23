@@ -50,11 +50,12 @@ export AS_NOVA_SC_KEY=cloudServersOpenStack
 # different key in the service catalog.
 export AS_CLB_SC_KEY=cloudLoadBalancers
 
-# Uncomment this if you are running tests against Mimic.
+# Comment this out if you aren't running tests against Mimic.
 export AS_USING_MIMIC=true
 
-# Uncomment this to change the default value of the otter build timeout for
-# testing
+# The number of seconds to wait for servers to build. When using mimic this
+# can be very low (like 30 seconds). Comment this out to use the normal
+# production value (which is much, much higher than 30 seconds).
 export AS_BUILD_TIMEOUT_SECONDS=30
 
 # This is a test tenant that is enabled for convergence in Otter.  This will
