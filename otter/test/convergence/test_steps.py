@@ -13,6 +13,7 @@ from testtools.matchers import ContainsAll
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import (
+    CLBDeletedError,
     CLBDuplicateNodesError,
     CLBImmutableError,
     CLBNodeLimitError,
@@ -469,6 +470,7 @@ class StepAsEffectTests(SynchronousTestCase):
         the error is propagated up and the result is a failure.
         """
         terminals = (CLBNotFoundError(lb_id=u"12345"),
+                     CLBDeletedError(lb_id=u"12345"),
                      CLBNodeLimitError(lb_id=u"12345"),
                      APIError(code=403, body="You're out of luck."),
                      APIError(code=422, body="Oh look another 422."))

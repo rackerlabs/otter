@@ -100,9 +100,9 @@ def _failure_reporter(*terminal_err_types):
         err_type, error, traceback = exc_tuple
 
         terminal_error = (
-            err_type in terminal_err_types or
-            (err_type == APIError and 400 <= error.code < 500)
-        )
+            any(issubclass(err_type, etype)
+                for etype in terminal_err_types) or
+            err_type == APIError and 400 <= error.code < 500)
 
         if terminal_error:
             return StepResult.FAILURE, [ErrorReason.Exception(exc_tuple)]
