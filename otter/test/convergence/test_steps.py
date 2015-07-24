@@ -21,6 +21,7 @@ from otter.cloud_client import (
     CLBRateLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
+    NoSuchCLBError,
     NoSuchServerError,
     NovaComputeFaultError,
     NovaRateLimitError,
@@ -471,6 +472,7 @@ class StepAsEffectTests(SynchronousTestCase):
         """
         terminals = (CLBNotFoundError(lb_id=u"12345"),
                      CLBDeletedError(lb_id=u"12345"),
+                     NoSuchCLBError(lb_id=u"12345"),
                      CLBNodeLimitError(lb_id=u"12345"),
                      APIError(code=403, body="You're out of luck."),
                      APIError(code=422, body="Oh look another 422."))
