@@ -280,6 +280,8 @@ def makeService(config):
             scheduler = setup_scheduler(s, store, kz_client)
             health_checker.checks['scheduler'] = scheduler.health_check
             otter.scheduler = scheduler
+            # Give dispatcher to Otter REST object
+            otter.dispatcher = dispatcher
             # Set the client after starting
             # NOTE: There is small amount of time when the start is
             # not finished and the kz_client is not set in which case

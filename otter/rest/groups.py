@@ -120,11 +120,12 @@ class OtterGroups(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id):
+    def __init__(self, store, tenant_id, dispatcher):
         self.log = log.bind(system='otter.rest.groups',
                             tenant_id=tenant_id)
         self.store = store
         self.tenant_id = tenant_id
+        self.dispatcher = dispatcher
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -449,7 +450,8 @@ class OtterGroups(object):
         Routes requiring a specific group_id are delegated to
         OtterGroup.
         """
-        return OtterGroup(self.store, self.tenant_id, group_id).app.resource()
+        return OtterGroup(self.store, self.tenant_id,
+                          group_id, self.dispatcher).app.resource()
 
 
 def get_active_cache(reactor, connection, tenant_id, group_id):
@@ -468,13 +470,14 @@ class OtterGroup(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, group_id):
+    def __init__(self, store, tenant_id, group_id, dispatcher):
         self.log = log.bind(system='otter.rest.group',
                             tenant_id=tenant_id,
                             scaling_group_id=group_id)
         self.store = store
         self.tenant_id = tenant_id
         self.group_id = group_id
+        self.dispatcher = dispatcher
 
     def with_active_cache(self, get_func, *args, **kwargs):
         """
@@ -659,10 +662,21 @@ class OtterGroup(object):
         """
         Trigger convergence on given scaling group
         """
+
+        def is_group_paused(group, state):
+            if state.paused:
+                raise controller.GroupPausedError(
+                    group.tenant_id, group.uuid, "converge")
+            return state
+
         if tenant_is_enabled(self.tenant_id, config_value):
+            group = self.store.get_scaling_group(
+                self.log, self.tenant_id, self.group_id)
             cs = get_convergence_starter()
-            return cs.start_convergence(self.log, self.tenant_id,
-                                        self.group_id)
+            d = group.modify_state(is_group_paused)
+            return d.addCallback(
+                lambda _: cs.start_convergence(self.log, self.tenant_id,
+                                               self.group_id))
         else:
             request.setResponseCode(404)
 
@@ -679,7 +693,7 @@ class OtterGroup(object):
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.group_id)
         return controller.pause_scaling_group(
-            self.log, transaction_id(request), group)
+            self.log, transaction_id(request), group, self.dispatcher)
 
     @app.route('/resume/', methods=['POST'])
     @with_transaction_id()

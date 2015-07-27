@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from effect import (
     ComposedDispatcher,
+    Effect,
     sync_perform)
 from effect.testing import SequenceDispatcher
 
@@ -24,7 +25,8 @@ from otter.cloud_client import (
 from otter.convergence.model import DRAINING_METADATA
 from otter.convergence.service import (
     ConvergenceStarter, get_convergence_starter, set_convergence_starter)
-from otter.models.intents import GetScalingGroupInfo
+from otter.log.intents import BoundFields, Log
+from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
 from otter.models.interface import (
     GroupNotEmptyError, GroupState, IScalingGroup, NoSuchPolicyError,
     NoSuchScalingGroupError, ScalingGroupStatus)
@@ -37,8 +39,11 @@ from otter.test.utils import (
     matches,
     mock_group as util_mock_group,
     mock_log,
+    nested_parallel,
     nested_sequence,
+    noop,
     patch,
+    perform_sequence,
     raise_,
     test_dispatcher)
 from otter.util.config import set_config_data
@@ -46,7 +51,61 @@ from otter.util.fp import assoc_obj
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN
+from otter.util.zk import DeleteNode
 from otter.worker_intents import EvictServerFromScalingGroup
+
+
+class PauseGroupTests(SynchronousTestCase):
+    """
+    Tests for `conv_pause_group_eff`
+    """
+
+    def setUp(self):
+        self.group = util_mock_group(sample_group_state(), "tid", "gid")
+        self.log = mock_log()
+
+    def test_conv_pause_group_eff(self):
+        """
+        `conv_pause_group_eff` returns effect that modifies group state paused
+        and deletes divergent flag with bound log context
+        """
+        eff = controller.conv_pause_group_eff(self.group, "transid")
+        seq = [
+            (BoundFields(mock.ANY, dict(transaction_id="transid",
+                                        tenant_id="tid",
+                                        scaling_group_id="gid")),
+             nested_sequence([
+                 nested_parallel([
+                     (ModifyGroupStatePaused(self.group, True), noop),
+                     (DeleteNode(path="/groups/divergent/tid_gid", version=-1),
+                      noop),
+                     (Log("mark-clean-success", {}), noop)
+                 ])
+             ]))
+        ]
+        self.assertEqual(perform_sequence(seq, eff), [None, None])
+
+    @mock.patch("otter.controller.conv_pause_group_eff",
+                return_value=Effect("pause"))
+    def test_pause_group_conv(self, mock_cpge):
+        """
+        `pause_scaling_group` performs effect got from conv_pause_group_eff
+        for convergence tenants
+        """
+        set_config_data({"convergence-tenants": ["tid"]})
+        self.addCleanup(set_config_data, None)
+        dispatcher = SequenceDispatcher([("pause", lambda i: "paused")])
+        d = controller.pause_scaling_group(
+            self.log, "transid", self.group, dispatcher)
+        self.assertEqual(self.successResultOf(d), "paused")
+
+    def test_pause_group_worker(self):
+        """
+        `pause_scaling_group` is not implemented for worker tenants
+        """
+        self.assertRaises(
+            NotImplementedError, controller.pause_scaling_group, self.log,
+            "transid", self.group, object())
 
 
 class CalculateDeltaTestCase(SynchronousTestCase):
