@@ -11,6 +11,7 @@ from twisted.internet.defer import gatherResults, succeed
 from txeffect import perform
 
 from otter import controller
+from otter.controller import GroupPausedError
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.service import get_convergence_starter
 from otter.effect_dispatcher import get_working_cql_dispatcher
@@ -665,8 +666,7 @@ class OtterGroup(object):
 
         def is_group_paused(group, state):
             if state.paused:
-                raise controller.GroupPausedError(
-                    group.tenant_id, group.uuid, "converge")
+                raise GroupPausedError(group.tenant_id, group.uuid, "converge")
             return state
 
         if tenant_is_enabled(self.tenant_id, config_value):

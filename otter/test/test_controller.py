@@ -903,19 +903,29 @@ class DeleteGroupTests(SynchronousTestCase):
         # converger not called
         self.assertFalse(self.mock_tcd.called)
 
-    def test_convergence_tenant_force(self):
+    def setup_conv(self):
+        set_config_data({'convergence-tenants': ['tid']})
+        self.addCleanup(set_config_data, {})
+        self.mock_tcd.return_value = defer.succeed('tcd')
+
+    def test_convergence_tenant_force(self, paused=False):
         """
         Updates DELETED status for convergence tenant and starts convergence
         """
-        set_config_data({'convergence-tenants': ['tid']})
-        self.addCleanup(set_config_data, {})
-
-        self.mock_tcd.return_value = defer.succeed('tcd')
+        self.setup_conv()
+        self.state.paused = paused
         d = controller.delete_group(self.log, 'transid', self.group, True)
         self.assertEqual(self.successResultOf(d), 'tcd')
         # delete_group() or modify_state() not called
         self.assertFalse(self.group.delete_group.called)
         self.assertFalse(self.group.modify_state.called)
+
+    def test_convergence_tenant_force_group_paused(self):
+        """
+        Updates DELETED status for convergence tenant and starts convergence
+        even if group is paused
+        """
+        self.test_convergence_tenant_force(True)
 
     def test_convergence_tenant_no_force(self):
         """
@@ -923,9 +933,7 @@ class DeleteGroupTests(SynchronousTestCase):
         convergence deletion only if desired=0. This desired check is done
         under lock using `modify_state`
         """
-        set_config_data({'convergence-tenants': ['tid']})
-        self.addCleanup(set_config_data, {})
-        self.mock_tcd.return_value = defer.succeed('tcd')
+        self.setup_conv()
         self.group.pause_modify_state = True
 
         d = controller.delete_group(self.log, 'transid', self.group, False)
@@ -944,21 +952,15 @@ class DeleteGroupTests(SynchronousTestCase):
         # delete_group() not called
         self.assertFalse(self.group.delete_group.called)
 
-    def test_convergence_tenant_no_force_with_servers(self):
+    def assert_raises_in_modify_state(self, excp_type):
         """
-        When deleting convergence group without force, `delete_group` raises
-        `GroupNotEmptyError` if desired > 0. This desired check is done
-        under lock using `modify_state`
+        Assert that given exception occurs inside modify_state
         """
-        set_config_data({'convergence-tenants': ['tid']})
-        self.addCleanup(set_config_data, {})
-        self.mock_tcd.return_value = defer.succeed('tcd')
-        self.state.desired = 1
         self.group.pause_modify_state = True
 
         d = controller.delete_group(self.log, 'transid', self.group, False)
 
-        # trigger_convergence has been called and no result because
+        # trigger_convergence has not been called and no result because
         # modify_state is paused
         self.assertNoResult(d)
         self.assertTrue(self.group.modify_state.called)
@@ -970,10 +972,30 @@ class DeleteGroupTests(SynchronousTestCase):
 
         # unpause modify_state
         self.group.modify_state_pause_d.callback(None)
-        self.failureResultOf(d, GroupNotEmptyError)
+        self.failureResultOf(d, excp_type)
 
         # delete_group() not called
         self.assertFalse(self.group.delete_group.called)
+
+    def test_convergence_tenant_no_force_with_servers(self):
+        """
+        When deleting convergence group without force, `delete_group` raises
+        `GroupNotEmptyError` if desired > 0. This desired check is done
+        under lock using `modify_state`
+        """
+        self.setup_conv()
+        self.state.desired = 1
+        self.assert_raises_in_modify_state(GroupNotEmptyError)
+
+    def test_convergence_tenant_no_force_group_paused(self):
+        """
+        When deleting convergence group without force, `delete_group` raises
+        `GroupPausedError` if group is paused. This check is done
+        under lock using `modify_state`
+        """
+        self.setup_conv()
+        self.state.paused = True
+        self.assert_raises_in_modify_state(controller.GroupPausedError)
 
 
 class EmptyGroupTests(SynchronousTestCase):
@@ -1088,7 +1110,10 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
         """
         self.mocks = mock_controller_utilities(self)
         self.mock_log = mock.MagicMock()
-        self.mock_state = mock_group_state()
+        self.mock_state = GroupState(
+            "tid", "gid", "g", {"a": "a", "b": "b", "c": "c"},
+            {"d": "d", "e": "e"}, None, {}, False, ScalingGroupStatus.ACTIVE,
+            desired=5, now=mock.Mock(return_value="now"))
         self.group = mock_group()
 
     def test_maybe_execute_scaling_policy_no_such_policy(self):
@@ -1109,6 +1134,21 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
 
         self.assertEqual(len(self.group.view_config.mock_calls), 0)
         self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
+
+    def test_group_paused(self):
+        """
+        Raises `GroupPausedError` if group is paused and does not do anything
+        else
+        """
+        self.mock_state.paused = True
+        self.assertRaises(
+            controller.GroupPausedError,
+            controller.maybe_execute_scaling_policy,
+            self.mock_log, 'transaction', self.group, self.mock_state, 'pol1')
+        # Nothing else is called
+        self.assertFalse(self.group.view_config.called)
+        self.assertFalse(self.group.view_launch_config.called)
+        self.assertEqual(self.mock_state.policy_touched, {})
 
     def test_execute_launch_config_success_on_positive_delta(self):
         """
@@ -1144,7 +1184,7 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
             self.mocks['calculate_delta'].return_value)
 
         # state should have been updated
-        self.mock_state.mark_executed.assert_called_once_with('pol1')
+        self.assertEqual(self.mock_state.policy_touched["pol1"], "now")
 
     def test_execute_launch_config_failure_on_positive_delta(self):
         """
@@ -1178,7 +1218,7 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
             self.mocks['calculate_delta'].return_value)
 
         # state should not have been updated
-        self.assertEqual(self.mock_state.mark_executed.call_count, 0)
+        self.assertEqual(self.mock_state.policy_touched, {})
 
     def test_maybe_execute_scaling_policy_cooldown_failure(self):
         """
@@ -1202,7 +1242,7 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
         self.assertEqual(self.mocks['execute_launch_config'].call_count, 0)
 
         # state should not have been updated
-        self.assertEqual(self.mock_state.mark_executed.call_count, 0)
+        self.assertEqual(self.mock_state.policy_touched, {})
 
     def test_maybe_execute_scaling_policy_zero_delta(self):
         """
@@ -1252,7 +1292,7 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
             len(self.mocks['execute_launch_config'].mock_calls), 0)
 
         # state should have been updated
-        self.mock_state.mark_executed.assert_called_once_with('pol1')
+        self.assertEqual(self.mock_state.policy_touched["pol1"], "now")
 
     def test_audit_log_events_logged_on_positive_delta(self):
         """
@@ -1265,11 +1305,12 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
                                                     'pol1')
         self.assertEqual(self.successResultOf(d), self.mock_state)
         log.msg.assert_called_with(
-            'Starting {convergence_delta} new servers to satisfy desired capacity',
-            scaling_group_id=self.group.uuid, event_type="convergence.scale_up",
-            convergence_delta=5, desired_capacity=5, pending_capacity=2,
-            active_capacity=3, audit_log=True, policy_id=None,
-            webhook_id=None)
+            ('Starting {convergence_delta} new servers to satisfy '
+             'desired capacity'),
+            scaling_group_id=self.group.uuid,
+            event_type="convergence.scale_up", convergence_delta=5,
+            desired_capacity=5, pending_capacity=2, current_capacity=3,
+            audit_log=True, policy_id=None, webhook_id=None)
 
     def test_audit_log_events_logged_on_negative_delta(self):
         """
@@ -1283,9 +1324,10 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
         self.assertEqual(self.successResultOf(d), self.mock_state)
         log.msg.assert_called_with(
             'Deleting 5 servers to satisfy desired capacity',
-            scaling_group_id=self.group.uuid, event_type="convergence.scale_down",
+            scaling_group_id=self.group.uuid,
+            event_type="convergence.scale_down",
             convergence_delta=-5, desired_capacity=5, pending_capacity=2,
-            active_capacity=3, audit_log=True, policy_id=None,
+            current_capacity=3, audit_log=True, policy_id=None,
             webhook_id=None)
 
 
