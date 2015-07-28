@@ -487,7 +487,8 @@ class OtterGroup(object):
                 self.group_id)
         else:
             cache_d = succeed(None)
-        return gatherResults([get_func(*args, **kwargs), cache_d])
+        return gatherResults([get_func(*args, **kwargs), cache_d],
+                             consumeErrors=True)
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
