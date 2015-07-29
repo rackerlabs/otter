@@ -13,6 +13,7 @@ from testtools.matchers import ContainsAll
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import (
+    CLBDeletedError,
     CLBDuplicateNodesError,
     CLBImmutableError,
     CLBNodeLimitError,
@@ -26,8 +27,7 @@ from otter.cloud_client import (
     NovaRateLimitError,
     ServerMetadataOverLimitError,
     has_code,
-    service_request,
-)
+    service_request)
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
