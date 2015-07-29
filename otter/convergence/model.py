@@ -497,6 +497,22 @@ class CLBNode(object):
         """
         return self.description.condition != CLBNodeCondition.DISABLED
 
+    @classmethod
+    def from_node_json(cls, lb_id, json):
+        """
+        Create an instance of this class based on node JSON data from the CLB
+        API.
+        """
+        return cls(
+            node_id=str(json['id']),
+            address=json['address'],
+            description=CLBDescription(
+                lb_id=str(lb_id),
+                port=json['port'],
+                weight=json.get('weight', 1),
+                condition=CLBNodeCondition.lookupByName(json['condition']),
+                type=CLBNodeType.lookupByName(json['type'])))
+
 
 @implementer(ILBDescription)
 @attributes([Attribute("lb_id", instance_of=basestring)])

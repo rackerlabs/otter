@@ -230,6 +230,43 @@ class CLBNodeTests(SynchronousTestCase):
                        address='10.1.1.1', drained_at=0.0, connections=1)
         self.assertFalse(node.is_active())
 
+    def test_from_node_json_no_weight(self):
+        """
+        A node's JSON representation can be parsed to a :obj:`CLBNode` object
+        with a `CLBDescription`. When weight is not specified it defaults to 1.
+        """
+        node_json = {'id': 'node1', 'address': '1.2.3.4', 'port': 20,
+                     'condition': 'DRAINING', 'type': 'SECONDARY'}
+        node = CLBNode.from_node_json(123, node_json)
+        self.assertEqual(
+            node,
+            CLBNode(node_id='node1', address='1.2.3.4',
+                    connections=None, drained_at=0.0,
+                    description=CLBDescription(
+                        lb_id='123', port=20,
+                        weight=1,
+                        condition=CLBNodeCondition.DRAINING,
+                        type=CLBNodeType.SECONDARY)))
+
+    def test_from_node_json_with_weight(self):
+        """
+        A node's JSON representation can be parsed to a :obj:`CLBNode` object
+        with a `CLBDescription`. When weight is not specified it defaults to 1.
+        """
+        node_json = {'id': 'node1', 'address': '1.2.3.4', 'port': 20,
+                     'condition': 'DRAINING', 'type': 'SECONDARY',
+                     'weight': 50}
+        node = CLBNode.from_node_json(123, node_json)
+        self.assertEqual(
+            node,
+            CLBNode(node_id='node1', address='1.2.3.4',
+                    connections=None, drained_at=0.0,
+                    description=CLBDescription(
+                        lb_id='123', port=20,
+                        weight=50,
+                        condition=CLBNodeCondition.DRAINING,
+                        type=CLBNodeType.SECONDARY)))
+
 
 class ServiceMetadataTests(SynchronousTestCase):
     """
