@@ -17,7 +17,11 @@ from otter.cloud_client import TenantScope, publish_to_cloudfeeds
 from otter.effect_dispatcher import get_legacy_dispatcher
 from otter.log import log as otter_log
 from otter.log.formatters import (
-    ErrorFormattingWrapper, LogLevel, PEP3101FormattingWrapper)
+    ErrorFormattingWrapper,
+    LogLevel,
+    PEP3101FormattingWrapper,
+    copying_wrapper
+)
 from otter.log.intents import err as err_effect, msg as msg_effect
 from otter.log.spec import SpecificationObserverWrapper
 from otter.util.http import APIError
@@ -219,6 +223,7 @@ def get_cf_observer(reactor, authenticator, tenant_id, region,
     cf_observer = CloudFeedsObserver(
         reactor=reactor, authenticator=authenticator, tenant_id=tenant_id,
         region=region, service_configs=service_configs)
-    return SpecificationObserverWrapper(
+    return copying_wrapper(
+        SpecificationObserverWrapper(
             PEP3101FormattingWrapper(
-                ErrorFormattingWrapper(cf_observer)))
+                ErrorFormattingWrapper(cf_observer))))

@@ -407,7 +407,8 @@ class CloudFeedsObserverTests(SynchronousTestCase):
         """
         def wrapper(name, observer):
             def _observer(e):
-                observer(e + name)
+                e.update({name: 'done'})
+                observer(e)
             return _observer
 
         patch(self, 'otter.log.cloudfeeds.SpecificationObserverWrapper',
@@ -419,6 +420,7 @@ class CloudFeedsObserverTests(SynchronousTestCase):
 
         def cf_observer_called(text):
             self.cf_observer_text = text
+
         mock_cfo = patch(self, 'otter.log.cloudfeeds.CloudFeedsObserver')
         cfo_class = mock_cfo.return_value
         cfo_class.side_effect = cf_observer_called
@@ -429,5 +431,13 @@ class CloudFeedsObserverTests(SynchronousTestCase):
             reactor=0, authenticator=1, tenant_id=2, region=3,
             service_configs=4)
 
-        cfo('test')
-        self.assertEqual(self.cf_observer_text, 'testspecpeperror')
+        event_dict = {'init': 'test'}
+        cfo({'init': 'test'})
+        self.assertEqual(self.cf_observer_text,
+                         {'init': 'test',
+                          'spec': 'done',
+                          'pep': 'done',
+                          'error': 'done'})
+        self.assertEqual(event_dict, {'init': 'test'},
+                         "the original event dict shouldn't be mutated "
+                         "in case there is another observer chain.")

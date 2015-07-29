@@ -269,7 +269,6 @@ def throttling_wrapper(observer):
         return True
 
     def emit(event):
-        event = event.copy()
         template = _get_matching_template(event)
         if template is not None:
             event_counts[template] += 1
@@ -281,4 +280,14 @@ def throttling_wrapper(observer):
         else:
             return observer(event)
 
+    return emit
+
+
+def copying_wrapper(observer):
+    """
+    An observer that copies the event-dict, so if there is more than one
+    observer chain that mutates events, we don't get any errors.
+    """
+    def emit(event_dict):
+        return observer(event_dict.copy())
     return emit
