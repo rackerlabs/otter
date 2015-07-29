@@ -389,12 +389,23 @@ class CLBImmutableError(Exception):
     temporarily immutable.
 
     This exception is _not_ used when the status is PENDING_DELETE. See
-    :obj:`NoSuchCLBError`.
+    :obj:`CLBDeletedError`.
     """
 
 
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
-class NoSuchCLBError(Exception):
+class CLBNotFoundError(Exception):
+    """A CLB doesn't exist. Superclass of other, more specific exceptions."""
+
+
+class CLBDeletedError(CLBNotFoundError):
+    """
+    Error to be raised when the CLB has been deleted or is being deleted.
+    This is distinct from it not existing.
+    """
+
+
+class NoSuchCLBError(CLBNotFoundError):
     """
     Error to be raised when the CLB does not exist or is being deleted.
     """
