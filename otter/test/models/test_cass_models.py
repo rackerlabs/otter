@@ -3763,8 +3763,10 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         self.tenant_id = 'tid'
         self.group_id = 'gid'
         self.params = {"tenantId": self.tenant_id, "groupId": self.group_id}
+        clock = Clock()
+        clock.advance(2.5)
         self.cache = CassScalingGroupServersCache(
-            self.tenant_id, self.group_id)
+            self.tenant_id, self.group_id, clock)
         self.dt = datetime(2010, 10, 20, 10, 0, 0)
 
     def _test_get_servers(self, only_as_active, query_result, exp_result):
@@ -3844,7 +3846,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
 
     def _test_insert_servers(self, eff):
         query = (
-            'BEGIN BATCH '
+            'BEGIN BATCH USING TIMESTAMP 2.5 '
             'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
             'server_id, server_blob, server_as_active) '
             'VALUES(:tenantId, :groupId, :last_update, :server_id0, '
@@ -3897,8 +3899,9 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         self.assertEqual(
             self.cache.delete_servers(),
             cql_eff(('DELETE FROM servers_cache WHERE '
-                     '"tenantId" = :tenantId AND "groupId" = :groupId'),
-                    self.params))
+                     '"tenantId" = :tenantId AND "groupId" = :groupId '
+                     'USING TIMESTAMP :ts'),
+                    merge(self.params, {"ts": 2.5})))
 
 
 class CassAdminTestCase(SynchronousTestCase):

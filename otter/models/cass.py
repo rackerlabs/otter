@@ -1742,11 +1742,16 @@ class CassScalingGroupServersCache(object):
     Collection of cache of scaling group servers
     """
 
-    def __init__(self, tenant_id, group_id):
+    def __init__(self, tenant_id, group_id, clock=None):
         self.tenantId = tenant_id
         self.groupId = group_id
         self.table = "servers_cache"
         self.params = {"tenantId": self.tenantId, "groupId": self.groupId}
+        if clock is None:
+            from twisted.internet import reactor
+            self.clock = reactor
+        else:
+            self.clock = clock
 
     @do
     def get_servers(self, only_as_active):
@@ -1789,17 +1794,18 @@ class CassScalingGroupServersCache(object):
             queries.append(query.format(cf=self.table, i=i))
         if clear_others:
             return self.delete_servers().on(
-                lambda _: cql_eff(batch(queries), params))
+                lambda _: cql_eff(
+                    batch(queries, self.clock.seconds()), params))
         else:
-            return cql_eff(batch(queries), params)
+            return cql_eff(batch(queries, self.clock.seconds()), params)
 
     def delete_servers(self):
         """
         See :method:`IScalingGroupServersCache.delete_servers`
         """
-        return cql_eff(
-            _cql_delete_all_in_group.format(cf=self.table, name=''),
-            self.params)
+        query = (_cql_delete_all_in_group.format(cf=self.table, name='') +
+                 " USING TIMESTAMP :ts")
+        return cql_eff(query, merge(self.params, {"ts": self.clock.seconds()}))
 
 
 @implementer(IAdmin)
