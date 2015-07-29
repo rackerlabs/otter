@@ -59,6 +59,7 @@ from otter.test.utils import (
     resolve_stubs,
     server
 )
+from otter.util.fp import assoc_obj
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import timestamp_to_epoch
@@ -423,6 +424,51 @@ class ExtractDrainedTests(SynchronousTestCase):
         self.assertRaises(ValueError, extract_CLB_drained_at, feed)
 
 
+def lb_req(method, url, json_response, response):
+    """
+    Return a SequenceDispatcher two-tuple to match a service request and
+    specify the result.
+    """
+    if isinstance(response, Exception):
+        def handler(i): raise response
+    else:
+        def handler(i): return (StubResponse(200, {}), response)
+    return (
+        Retry(
+            effect=mock.ANY,
+            should_retry=ShouldDelayAndRetry(
+                can_retry=retry_times(5),
+                next_interval=exponential_backoff_interval(2))
+        ),
+        nested_sequence([
+            (service_request(
+                ServiceType.CLOUD_LOAD_BALANCERS,
+                method, url, json_response=json_response).intent,
+             handler)
+        ])
+    )
+
+
+def nodes_req(lb_id, nodes):
+    return lb_req('GET', 'loadbalancers/{}/nodes'.format(lb_id),
+                  True, {'nodes': nodes})
+
+
+def feed_req(lb_id, node_id, response):
+    return lb_req(
+        'GET', 'loadbalancers/{}/nodes/{}.atom'.format(lb_id, node_id),
+        False, response)
+
+
+def node(id, address, port=20, weight=2, condition='ENABLED',
+         type='PRIMARY'):
+    d = {'id': id, 'port': port, 'address': address, 'condition': condition,
+         'type': type}
+    if weight is not None:
+        d['weight'] = weight
+    return d
+
+
 class GetCLBContentsTests(SynchronousTestCase):
     """
     Tests for :func:`otter.convergence.get_clb_contents`
@@ -435,100 +481,36 @@ class GetCLBContentsTests(SynchronousTestCase):
             self, 'otter.convergence.gathering.extract_CLB_drained_at',
             side_effect=lambda f: self.feeds[f])
 
-    def lb_req(self, method, url, json_response, response):
-        """
-        Return a SequenceDispatcher two-tuple to match a service request and
-        specify the result.
-        """
-        if isinstance(response, Exception):
-            def handler(i): raise response
-        else:
-            def handler(i): return (StubResponse(200, {}), response)
-        return (
-            Retry(
-                effect=mock.ANY,
-                should_retry=ShouldDelayAndRetry(
-                    can_retry=retry_times(5),
-                    next_interval=exponential_backoff_interval(2))
-            ),
-            nested_sequence([
-                (service_request(
-                    ServiceType.CLOUD_LOAD_BALANCERS,
-                    method, url, json_response=json_response).intent,
-                 handler)
-            ])
-        )
-
     def test_success(self):
         """
         Gets LB contents with drained_at correctly
         """
+        node11 = node('11', 'a11', condition='DRAINING')
+        node12 = node('12', 'a12')
+        node21 = node('21', 'a21', weight=3)
+        node22 = node('22', 'a22', weight=None, condition='DRAINING')
         seq = [
-            self.lb_req(
-                'GET', 'loadbalancers', True,
-                {'loadBalancers': [{'id': 1}, {'id': 2}]}),
-            nested_parallel([
-                self.lb_req(
-                    'GET', 'loadbalancers/1/nodes', True,
-                    {'nodes': [
-                        {'id': '11', 'port': 20, 'address': 'a11',
-                         'weight': 2, 'condition': 'DRAINING',
-                         'type': 'PRIMARY'},
-                        {'id': '12', 'port': 20, 'address': 'a12',
-                         'weight': 2, 'condition': 'ENABLED',
-                         'type': 'PRIMARY'}]}
-                ),
-                self.lb_req(
-                    'GET', 'loadbalancers/2/nodes', True,
-                    {'nodes': [
-                        {'id': '21', 'port': 20, 'address': 'a21',
-                         'weight': 3, 'condition': 'ENABLED',
-                         'type': 'PRIMARY'},
-                        {'id': '22', 'port': 20, 'address': 'a22',
-                         'condition': 'DRAINING', 'type': 'PRIMARY'}]}),
-            ]),
-            nested_parallel([
-                self.lb_req(
-                    'GET', 'loadbalancers/1/nodes/11.atom', False, '11feed'),
-                self.lb_req(
-                    'GET', 'loadbalancers/2/nodes/22.atom', False, '22feed'),
-            ]),
+            lb_req('GET', 'loadbalancers', True,
+                   {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            nested_parallel([nodes_req(1, [node11, node12]),
+                             nodes_req(2, [node21, node22])]),
+            nested_parallel([feed_req(1, '11', '11feed'),
+                             feed_req(2, '22', '22feed')]),
         ]
         eff = get_clb_contents()
-        draining, enabled = CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED
-        make_desc = partial(CLBDescription, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
             perform_sequence(seq, eff),
-            [CLBNode(node_id='11',
-                     address='a11',
-                     drained_at=1.0,
-                     description=make_desc(lb_id='1',
-                                           weight=2,
-                                           condition=draining)),
-             CLBNode(node_id='12',
-                     address='a12',
-                     description=make_desc(lb_id='1',
-                                           weight=2,
-                                           condition=enabled)),
-             CLBNode(node_id='21',
-                     address='a21',
-                     description=make_desc(lb_id='2',
-                                           weight=3,
-                                           condition=enabled)),
-             CLBNode(node_id='22',
-                     address='a22',
-                     drained_at=2.0,
-                     description=make_desc(lb_id='2',
-                                           weight=1,
-                                           condition=draining))])
+            [assoc_obj(CLBNode.from_node_json(1, node11), drained_at=1.0),
+             CLBNode.from_node_json(1, node12),
+             CLBNode.from_node_json(2, node21),
+             assoc_obj(CLBNode.from_node_json(2, node22), drained_at=2.0)])
 
     def test_no_lb(self):
         """
         Return empty list if there are no LB
         """
         seq = [
-            self.lb_req('GET', 'loadbalancers', True,
-                        {'loadBalancers': []}),
+            lb_req('GET', 'loadbalancers', True, {'loadBalancers': []}),
             nested_parallel([]),  # No LBs to fetch
             nested_parallel([]),  # No nodes to fetch
         ]
@@ -540,14 +522,9 @@ class GetCLBContentsTests(SynchronousTestCase):
         Return empty if there are LBs but no nodes in them
         """
         seq = [
-            self.lb_req('GET', 'loadbalancers', True,
-                        {'loadBalancers': [{'id': 1}, {'id': 2}]}),
-            nested_parallel([
-                self.lb_req('GET', 'loadbalancers/1/nodes', True,
-                            {'nodes': []}),
-                self.lb_req('GET', 'loadbalancers/2/nodes', True,
-                            {'nodes': []}),
-            ]),
+            lb_req('GET', 'loadbalancers', True,
+                   {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            nested_parallel([nodes_req(1, []), nodes_req(2, [])]),
             nested_parallel([]),  # No nodes to fetch
         ]
         self.assertEqual(perform_sequence(seq, get_clb_contents()), [])
@@ -557,22 +534,10 @@ class GetCLBContentsTests(SynchronousTestCase):
         Doesnt fetch feeds if all nodes are ENABLED
         """
         seq = [
-            self.lb_req('GET', 'loadbalancers', True,
-                        {'loadBalancers': [{'id': 1}, {'id': 2}]}),
-            nested_parallel([
-                self.lb_req(
-                    'GET', 'loadbalancers/1/nodes', True,
-                    {'nodes': [
-                        {'id': '11', 'port': 20, 'address': 'a11',
-                         'weight': 2, 'condition': 'ENABLED',
-                         'type': 'PRIMARY'}]}),
-                self.lb_req(
-                    'GET', 'loadbalancers/2/nodes', True,
-                    {'nodes': [
-                        {'id': '21', 'port': 20, 'address': 'a21',
-                         'weight': 2, 'condition': 'ENABLED',
-                         'type': 'PRIMARY'}]}),
-            ]),
+            lb_req('GET', 'loadbalancers', True,
+                   {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            nested_parallel([nodes_req(1, [node('11', 'a11')]),
+                             nodes_req(2, [node('21', 'a21')])]),
             nested_parallel([])  # No nodes to fetch
         ]
         make_desc = partial(CLBDescription, port=20, weight=2,
@@ -592,18 +557,12 @@ class GetCLBContentsTests(SynchronousTestCase):
         returned for it.
         """
         seq = [
-            self.lb_req('GET', 'loadbalancers', True,
-                        {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            lb_req('GET', 'loadbalancers', True,
+                   {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             nested_parallel([
-                self.lb_req(
-                    'GET', 'loadbalancers/1/nodes', True,
-                    {'nodes': [
-                        {'id': '11', 'port': 20, 'address': 'a11',
-                         'weight': 2, 'condition': 'ENABLED',
-                         'type': 'PRIMARY'}]}),
-                self.lb_req(
-                    'GET', 'loadbalancers/2/nodes', True,
-                    CLBDeletedError(lb_id=u'2')),
+                nodes_req(1, [node('11', 'a11')]),
+                lb_req('GET', 'loadbalancers/2/nodes', True,
+                       CLBDeletedError(lb_id=u'2')),
             ]),
             nested_parallel([])  # No nodes to fetch
         ]
@@ -621,43 +580,24 @@ class GetCLBContentsTests(SynchronousTestCase):
         If a load balancer gets deleted while fetching feeds, no nodes will be
         returned for it.
         """
+        node21 = node('21', 'a21', condition='DRAINING', weight=None)
         seq = [
-            self.lb_req(
+            lb_req(
                 'GET', 'loadbalancers', True,
                 {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             nested_parallel([
-                self.lb_req(
-                    'GET', 'loadbalancers/1/nodes', True,
-                    {'nodes': [
-                        {'id': '11', 'port': 20, 'address': 'a11',
-                         'condition': 'DRAINING', 'type': 'PRIMARY'},
-                        {'id': '12', 'port': 20, 'address': 'a12',
-                         'condition': 'ENABLED', 'type': 'PRIMARY'}]}
-                ),
-                self.lb_req(
-                    'GET', 'loadbalancers/2/nodes', True,
-                    {'nodes': [
-                        {'id': '21', 'port': 20, 'address': 'a21',
-                         'condition': 'DRAINING', 'type': 'PRIMARY'}]}),
+                nodes_req(1, [node('11', 'a11', condition='DRAINING'),
+                              node('12', 'a12')]),
+                nodes_req(2, [node21])
             ]),
             nested_parallel([
-                self.lb_req(
-                    'GET', 'loadbalancers/1/nodes/11.atom', False,
-                    CLBDeletedError(lb_id=u'1')),
-                self.lb_req(
-                    'GET', 'loadbalancers/2/nodes/21.atom', False, '22feed'),
-            ]),
+                feed_req(1, '11', CLBDeletedError(lb_id=u'1')),
+                feed_req(2, '21', '22feed')]),
         ]
         eff = get_clb_contents()
-        draining = CLBNodeCondition.DRAINING
-        make_desc = partial(CLBDescription, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
             perform_sequence(seq, eff),
-            [CLBNode(node_id='21',
-                     address='a21',
-                     drained_at=2.0,
-                     description=make_desc(lb_id='2',
-                                           condition=draining))])
+            [assoc_obj(CLBNode.from_node_json(2, node21), drained_at=2.0)])
 
 
 class GetRCv3ContentsTests(SynchronousTestCase):
