@@ -407,7 +407,8 @@ class CLBDeletedError(CLBNotFoundError):
 
 class NoSuchCLBError(CLBNotFoundError):
     """
-    Error to be raised when the CLB does not exist or is being deleted.
+    Error to be raised when the CLB never existed in the first place (or it
+    has been deleted so long that there is no longer a record of it).
     """
 
 
