@@ -26,7 +26,7 @@ from toolz.functoolz import compose
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import NoSuchEndpoint
-from otter.cloud_client import CLBDeletedError, service_request
+from otter.cloud_client import service_request
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
     UnexpectedBehaviorError,
