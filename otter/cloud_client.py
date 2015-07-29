@@ -517,7 +517,7 @@ def add_clb_nodes(lb_id, nodes):
 
     :return: :class:`ServiceRequest` effect
 
-    :raises: :class:`CLBImmutableError`,
+    :raises: :class:`CLBImmutableError`, :class:`CLBDeletedError`,
         :class:`NoSuchCLBError`, :class:`CLBDuplicateNodesError`,
         :class:`APIError`
     """
@@ -555,7 +555,7 @@ def change_clb_node(lb_id, node_id, condition, weight):
 
     :return: :class:`ServiceRequest` effect
 
-    :raises: :class:`CLBImmutableError`,
+    :raises: :class:`CLBImmutableError`, :class:`CLBDeletedError`,
         :class:`NoSuchCLBError`, :class:`NoSuchCLBNodeError`, :class:`APIError`
     """
     eff = service_request(
@@ -691,7 +691,7 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
     :param dict json_body: The error message, parsed as a JSON dict.
     :param string lb_id: The load balancer ID
 
-    :raises: :class:`CLBImmutableError`,
+    :raises: :class:`CLBImmutableError`, :class:`CLBDeletedError`,
         :class:`NoSuchCLBError`, :class:`APIError` by itself
     """
     mappings = (
@@ -700,8 +700,8 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
         [(413, ("overLimit", "message"), _CLB_OVER_LIMIT_PATTERN,
           partial(CLBRateLimitError, lb_id=six.text_type(lb_id)))] +
         _expand_clb_matches(
-            [(422, _CLB_DELETED_PATTERN, NoSuchCLBError),
-             (410, _CLB_MARKED_DELETED_PATTERN, NoSuchCLBError),
+            [(422, _CLB_DELETED_PATTERN, CLBDeletedError),
+             (410, _CLB_MARKED_DELETED_PATTERN, CLBDeletedError),
              (422, _CLB_IMMUTABLE_PATTERN, CLBImmutableError),
              (422, _CLB_NOT_ACTIVE_PATTERN, CLBNotActiveError),
              (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)],
