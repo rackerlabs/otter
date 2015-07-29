@@ -134,9 +134,11 @@ class SetInTests(SynchronousTestCase):
 
 
 class AssocObjTests(SynchronousTestCase):
+    """Tests for :func:`assoc_obj`."""
+
     def test_assoc(self):
         """
-        Assoc creates a new object that's a copy of the old one, with the
+        Creates a new object that's a copy of the old one, with the
         specified attributes rebound. Existing attributes are identical.
         """
         class Foo(object):
