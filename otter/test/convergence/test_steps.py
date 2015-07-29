@@ -611,7 +611,9 @@ class StepAsEffectTests(SynchronousTestCase):
         :obj:`AddNodesToCLB` succeeds if the CLB is not in existence (has been
         deleted or is not found).
         """
-        successes = [CLBNotFoundError(lb_id=u'12345')]
+        successes = [CLBNotFoundError(lb_id=u'12345'),
+                     CLBDeletedError(lb_id=u'12345'),
+                     NoSuchCLBError(lb_id=u'12345')]
         eff = RemoveNodesFromCLB(lb_id='12345',
                                  node_ids=pset(['1', '2'])).as_effect()
 
