@@ -16,10 +16,8 @@ from otter.auth import NoSuchEndpoint
 from otter.cloud_client import service_request
 from otter.constants import ServiceType
 from otter.convergence.model import (
-    CLBDescription,
     CLBNode,
     CLBNodeCondition,
-    CLBNodeType,
     NovaServer,
     RCv3Description,
     RCv3Node,
