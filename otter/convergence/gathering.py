@@ -16,10 +16,8 @@ from otter.auth import NoSuchEndpoint
 from otter.cloud_client import service_request
 from otter.constants import ServiceType
 from otter.convergence.model import (
-    CLBDescription,
     CLBNode,
     CLBNodeCondition,
-    CLBNodeType,
     NovaServer,
     RCv3Description,
     RCv3Node,
@@ -203,15 +201,7 @@ def get_clb_contents():
 
     def fetch_drained_feeds((ids, all_lb_nodes)):
         nodes = [
-            CLBNode(
-                node_id=str(node['id']),
-                address=node['address'],
-                description=CLBDescription(
-                    lb_id=str(_id),
-                    port=node['port'],
-                    weight=node.get('weight', 1),
-                    condition=CLBNodeCondition.lookupByName(node['condition']),
-                    type=CLBNodeType.lookupByName(node['type'])))
+            CLBNode.from_node_json(_id, node)
             for _id, nodes in zip(ids, all_lb_nodes) for node in nodes]
         draining = [n for n in nodes
                     if n.description.condition == CLBNodeCondition.DRAINING]
