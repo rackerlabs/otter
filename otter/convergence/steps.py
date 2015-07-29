@@ -278,7 +278,7 @@ class AddNodesToCLB(object):
             success=_success_reporter(
                 'must re-gather after adding to CLB in order to update '
                 'the active cache'),
-            error=_failure_reporter(CLBNodeLimitError, NoSuchCLBError))
+            error=_failure_reporter(CLBNotFoundError, CLBNodeLimitError))
 
 
 @implementer(IStep)
@@ -298,7 +298,7 @@ class RemoveNodesFromCLB(object):
         # Since we're deleting a node, we'll ignore any errors which indicate
         # that the node doesn't exist.
         return eff.on(
-            error=_ignore_errors(NoSuchCLBError, NoSuchCLBNodeError)
+            error=_ignore_errors(CLBNotFoundError, NoSuchCLBNodeError)
         ).on(
             success=lambda r: (StepResult.SUCCESS, []),
             error=_failure_reporter())

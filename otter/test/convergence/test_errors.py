@@ -3,6 +3,7 @@ import traceback
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import (
+    CLBDeletedError,
     CreateServerConfigurationError,
     NoSuchCLBError
 )
@@ -28,6 +29,8 @@ class PresentReasonsTests(SynchronousTestCase):
         excs = {
             NoSuchCLBError(lb_id=u'lbid1'):
                 'Cloud Load Balancer does not exist: lbid1',
+            CLBDeletedError(lb_id=u'lbid2'):
+                'Cloud Load Balancer is currently being deleted: lbid2',
             CreateServerConfigurationError("Your server is wrong"):
                 'Server launch configuration is invalid: Your server is wrong'
         }
