@@ -84,7 +84,10 @@ def predicate_any(*preds):
 
 
 def assoc_obj(o, **k):
-    """Update attributes on an object, returning a new one."""
+    """
+    Update attributes on an object, returning a new one (after performing a
+    shallow copy).
+    """
     new_o = copy(o)
     new_o.__dict__.update(k)
     return new_o
