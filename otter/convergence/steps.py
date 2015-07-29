@@ -16,11 +16,10 @@ from twisted.python.constants import NamedConstant
 from zope.interface import Interface, implementer
 
 from otter.cloud_client import (
-    CLBDeletedError,
     CLBNodeLimitError,
+    CLBNotFoundError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
-    NoSuchCLBError,
     NoSuchCLBNodeError,
     add_clb_nodes,
     create_server,
@@ -101,9 +100,9 @@ def _failure_reporter(*terminal_err_types):
         err_type, error, traceback = exc_tuple
 
         terminal_error = (
-            err_type in terminal_err_types or
-            (err_type == APIError and 400 <= error.code < 500)
-        )
+            any(issubclass(err_type, etype)
+                for etype in terminal_err_types) or
+            err_type == APIError and 400 <= error.code < 500)
 
         if terminal_error:
             return StepResult.FAILURE, [ErrorReason.Exception(exc_tuple)]
@@ -279,8 +278,7 @@ class AddNodesToCLB(object):
             success=_success_reporter(
                 'must re-gather after adding to CLB in order to update '
                 'the active cache'),
-            error=_failure_reporter(CLBDeletedError, CLBNodeLimitError,
-                                    NoSuchCLBError))
+            error=_failure_reporter(CLBNotFoundError, CLBNodeLimitError))
 
 
 @implementer(IStep)
@@ -300,8 +298,7 @@ class RemoveNodesFromCLB(object):
         # Since we're deleting a node, we'll ignore any errors which indicate
         # that the node doesn't exist.
         return eff.on(
-            error=_ignore_errors(
-                CLBDeletedError, NoSuchCLBError, NoSuchCLBNodeError)
+            error=_ignore_errors(CLBNotFoundError, NoSuchCLBNodeError)
         ).on(
             success=lambda r: (StepResult.SUCCESS, []),
             error=_failure_reporter())
