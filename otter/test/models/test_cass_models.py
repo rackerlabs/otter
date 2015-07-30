@@ -499,9 +499,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             self.b = b
             return 45
 
-        d = f(2, 3)
+        r = f(2, 3)
         # Wrapped function's return is same
-        self.assertEqual(self.successResultOf(d), 45)
+        self.assertEqual(r, 45)
         # Timestamp and arguments are passed correctly
         self.assertEqual(self.ts, 23566783)
         self.assertEqual(self.a, 2)

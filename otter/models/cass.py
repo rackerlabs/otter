@@ -694,9 +694,7 @@ class CassScalingGroup(object):
         """
         @functools.wraps(func)
         def wrapper(*args):
-            d = defer.maybeDeferred(get_client_ts, self.reactor)
-            d.addCallback(lambda ts: func(ts, *args))
-            return d
+            return func(get_client_ts(self.reactor), *args)
         return wrapper
 
     def view_manifest(self, with_policies=True, with_webhooks=False,
