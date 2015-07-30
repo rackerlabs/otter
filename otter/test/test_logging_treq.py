@@ -43,38 +43,33 @@ class LoggingTreqTest(SynchronousTestCase):
         self.url = 'myurl'
 
     def _assert_success_logging(self, method, status, request_time,
-                                url_params=None, headers=None,
-                                request_id='uuid'):
+                                url_params=None):
         """
         msg expected to be made on a successful request are logged
         """
-        if headers is None:
-            headers = {'1': '2'}
-
         self.assertEqual(self.log.msg.mock_calls, [
             mock.call(mock.ANY, url=self.url, system="treq.request",
-                      method=method, treq_request_id=request_id,
+                      method=method, treq_request_id='uuid',
                       url_params=url_params),
             mock.call(
-                mock.ANY, url=self.url, status_code=status, headers=headers,
+                mock.ANY, url=self.url, status_code=status, headers={'1': '2'},
                 system="treq.request", request_time=request_time,
-                method=method, treq_request_id=request_id,
+                method=method, treq_request_id='uuid',
                 url_params=url_params)
         ])
 
-    def _assert_failure_logging(self, method, exception_type, request_time,
-                                request_id='uuid'):
+    def _assert_failure_logging(self, method, exception_type, request_time):
         """
         msg expected to be made on a failed request are logged
         """
         self.assertEqual(self.log.msg.mock_calls, [
             mock.call(mock.ANY, url=self.url, system="treq.request",
-                      method=method, treq_request_id=request_id,
+                      method=method, treq_request_id='uuid',
                       url_params=None),
             mock.call(
                 mock.ANY, url=self.url, reason=CheckFailure(exception_type),
                 system="treq.request", request_time=request_time,
-                method=method, treq_request_id=request_id, url_params=None)
+                method=method, treq_request_id='uuid', url_params=None)
         ])
 
     def test_request(self):
@@ -107,38 +102,21 @@ class LoggingTreqTest(SynchronousTestCase):
         self.assertIs(self.successResultOf(d), self.response)
         self._assert_success_logging('get', 204, 5, url_params=params)
 
-    def test_headers_are_preserved(self):
+    def test_headers_are_preserved_except_request_id(self):
         """
         `headers` are passed through as is, with an `x-otter-request-id` added.
+        If the header `x-otter-request-id` is supplied in the existing headers,
+        it is replaced.
         """
         headers = {'header1': ['val1'], 'header2': ['val2'],
-                   'x-otter-almost-it': ['unchanged']}
+                   'x-otter-almost-it': ['unchanged'],
+                   'x-otter-request-id': ['different-value']}
         new_headers = headers.copy()
         new_headers['x-otter-request-id'] = ['uuid']
         logging_treq.request('get', self.url, headers=headers, log=self.log,
                              clock=self.clock)
         self.treq.request.assert_called_once_with(
             method='get', url=self.url, headers=new_headers)
-
-    def test_x_otter_request_id_header_is_preserved_success(self):
-        """
-        If the header `x-otter-request-id` is supplied in the existing headers,
-        it is not replaced and instead is used as the transaction ID in
-        success logging.
-        """
-        headers = {'header1': ['val1'], 'header2': ['val2'],
-                   'x-otter-request-id': ['different_value']}
-        d = logging_treq.request('get', self.url, headers=headers,
-                                 log=self.log, clock=self.clock)
-        self.assertNoResult(d)
-        self.clock.advance(5)
-        self.treq.request.return_value.callback(self.response)
-
-        self.treq.request.assert_called_once_with(
-            method='get', url=self.url, headers=headers)
-        self.assertIs(self.successResultOf(d), self.response)
-        self._assert_success_logging(
-            'get', 204, 5, request_id='different_value')
 
     def test_request_failure(self):
         """
@@ -156,22 +134,6 @@ class LoggingTreqTest(SynchronousTestCase):
 
         self.failureResultOf(d, DummyException)
         self._assert_failure_logging('patch', DummyException, 5)
-
-    def test_x_otter_request_id_header_is_preserved_failure(self):
-        """
-        If the header `x-otter-request-id` is supplied in the existing headers,
-        it is not replaced and instead is used as the transaction ID in
-        success logging.
-        """
-        headers = {'header1': ['val1'], 'header2': ['val2'],
-                   'x-otter-request-id': ['different_value']}
-        d = logging_treq.request('get', self.url, headers=headers,
-                                 log=self.log, clock=self.clock)
-        self.clock.advance(1)
-        self.treq.request.return_value.errback(Failure(DummyException('e')))
-        self.failureResultOf(d, DummyException)
-        self._assert_failure_logging(
-            'get', DummyException, 1, request_id='different_value')
 
     def test_request_timeout(self):
         """

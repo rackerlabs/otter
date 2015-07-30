@@ -30,8 +30,8 @@ def _log_request(treq_call, url, **kwargs):
     method = kwargs.get('method', treq_call.__name__)
 
     kwargs.setdefault('headers', {})
-    treq_transaction = kwargs['headers'].setdefault('x-otter-request-id',
-                                                    [str(uuid4())])[0]
+    treq_transaction = str(uuid4())
+    kwargs['headers']['x-otter-request-id'] = [treq_transaction]
 
     log = log.bind(system='treq.request', url=url, method=method,
                    url_params=kwargs.get('params'),
