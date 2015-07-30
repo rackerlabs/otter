@@ -60,6 +60,7 @@ from otter.cloud_client import (
     service_request,
     set_nova_metadata_item)
 from otter.constants import ServiceType
+from otter.log.intents import Log
 from otter.test.utils import (
     StubResponse,
     resolve_effect,
@@ -818,17 +819,20 @@ class CLBClientTests(SynchronousTestCase):
         self.assertIs(perform_sequence(seq, eff), None)
 
 
-def _perform_one_request(intent, effect, response_code, response_body):
+def _perform_one_request(intent, effect, response_code, response_body,
+                         log_intent=None):
     """
     Perform a request effect using EQFDispatcher, providing the given
     body and status code.
     """
-    dispatcher = EQFDispatcher([(
+    seq = [(
         intent,
         service_request_eqf(
             stub_pure_response(response_body, response_code))
-    )])
-    return sync_perform(dispatcher, effect)
+    )]
+    if log_intent is not None:
+        seq.append((log_intent, lambda _: None))
+    return perform_sequence(seq, effect)
 
 
 class NovaClientTests(SynchronousTestCase):
@@ -1026,12 +1030,21 @@ class NovaClientTests(SynchronousTestCase):
     def test_create_server_success(self):
         """
         Creating a server, when Nova responds with a 202, returns Nova's
-        response with the body as a JSON dictionary.
+        response with the body as a JSON dictionary.  It logs this response
+        minus the adminstrative password.
         """
+        server_body = {'server': {'id': 'server_id', 'adminPass': "12345"}}
+        log_intent = Log('request-create-server', {
+            'url': "original/request/URL",
+            'method': 'method',
+            'request_id': "original-request-id",
+            'response_body': '{"server": {"id": "server_id"}}'
+        })
         expected, real = self._setup_for_create_server()
-        resp, body = _perform_one_request(expected.intent, real, 202,
-                                          json.dumps({'server': 'args'}))
-        self.assertEqual(body, {'server': 'args'})
+        resp, body = _perform_one_request(
+            expected.intent, real, 202,
+            json.dumps(server_body), log_intent)
+        self.assertEqual(body, server_body)
 
     def test_create_server_standard_errors(self):
         """
