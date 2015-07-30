@@ -14,7 +14,7 @@ from toolz.itertoolz import concat
 
 from otter.auth import NoSuchEndpoint
 from otter.cloud_client import (
-    CLBDeletedError, NoSuchCLBError,
+    CLBNotFoundError,
     get_clb_node_feed, get_clb_nodes, get_clbs, service_request)
 from otter.constants import ServiceType
 from otter.convergence.model import (
@@ -174,7 +174,7 @@ def get_scaling_group_servers(tenant_id, group_id, now,
 @do
 def get_clb_contents():
     """Get Rackspace Cloud Load Balancer contents as list of `CLBNode`."""
-    # If we get a CLBDeleted error while fetching feeds, we should throw away
+    # If we get a CLBNotFoundError while fetching feeds, we should throw away
     # all nodes related to that load balancer, because we don't want to act on
     # data that we know is invalid/outdated (for example, if we can't fetch a
     # feed because CLB was deleted, we don't want to say that we have a node in
@@ -182,7 +182,7 @@ def get_clb_contents():
     # gone).
 
     def gone(r):
-        return catch((CLBDeletedError, NoSuchCLBError), lambda exc: r)
+        return catch(CLBNotFoundError, lambda exc: r)
     lb_ids = [lb['id'] for lb in (yield _retry(get_clbs()))]
     node_reqs = [_retry(get_clb_nodes(lb_id).on(error=gone([])))
                  for lb_id in lb_ids]
