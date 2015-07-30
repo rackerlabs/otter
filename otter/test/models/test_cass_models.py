@@ -3846,7 +3846,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
 
     def _test_insert_servers(self, eff):
         query = (
-            'BEGIN BATCH USING TIMESTAMP 2.5 '
+            'BEGIN BATCH USING TIMESTAMP 2500000.0 '
             'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
             'server_id, server_blob, server_as_active) '
             'VALUES(:tenantId, :groupId, :last_update, :server_id0, '
@@ -3901,7 +3901,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
             cql_eff(('DELETE FROM servers_cache WHERE '
                      '"tenantId" = :tenantId AND "groupId" = :groupId '
                      'USING TIMESTAMP :ts'),
-                    merge(self.params, {"ts": 2.5})))
+                    merge(self.params, {"ts": 2500000.0})))
 
 
 class CassAdminTestCase(SynchronousTestCase):

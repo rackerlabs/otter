@@ -1795,9 +1795,10 @@ class CassScalingGroupServersCache(object):
         if clear_others:
             return self.delete_servers().on(
                 lambda _: cql_eff(
-                    batch(queries, self.clock.seconds()), params))
+                    batch(queries, self.clock.seconds() * 1000000), params))
         else:
-            return cql_eff(batch(queries, self.clock.seconds()), params)
+            return cql_eff(batch(queries, self.clock.seconds() * 1000000),
+                           params)
 
     def delete_servers(self):
         """
@@ -1805,7 +1806,8 @@ class CassScalingGroupServersCache(object):
         """
         query = (_cql_delete_all_in_group.format(cf=self.table, name='') +
                  " USING TIMESTAMP :ts")
-        return cql_eff(query, merge(self.params, {"ts": self.clock.seconds()}))
+        return cql_eff(
+            query, merge(self.params, {"ts": self.clock.seconds() * 1000000}))
 
 
 @implementer(IAdmin)
