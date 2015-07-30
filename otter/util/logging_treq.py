@@ -38,9 +38,6 @@ def _log_request(treq_call, url, **kwargs):
                    treq_request_id=treq_transaction)
     start_time = clock.seconds()
 
-    kwargs.setdefault('headers', {})
-    kwargs['headers'].setdefault('x-otter-request-id', [treq_transaction])
-
     log.msg("Request to {method} {url} starting.")
     d = treq_call(url=url, **kwargs)
 
