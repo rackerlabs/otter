@@ -91,7 +91,7 @@ class LoggingTreqTest(SynchronousTestCase):
     def test_url_params(self):
         """`params` is logged as `url_params`."""
         params = {'key': 'val'}
-        d = logging_treq.request('get', self.url, headers={}, data='',
+        d = logging_treq.request('get', self.url, data='',
                                  log=self.log, params=params, clock=self.clock)
         self.clock.advance(5)
         self.treq.request.return_value.callback(self.response)
@@ -105,7 +105,7 @@ class LoggingTreqTest(SynchronousTestCase):
         """
         On failed call to request, failure is returned and request logged
         """
-        d = logging_treq.request('patch', self.url, headers={}, data='',
+        d = logging_treq.request('patch', self.url, data='',
                                  log=self.log, clock=self.clock)
         self.treq.request.assert_called_once_with(
             method='patch', url=self.url,
@@ -122,7 +122,7 @@ class LoggingTreqTest(SynchronousTestCase):
         """
         A request times out after 45 seconds, and the failure is logged
         """
-        d = logging_treq.request('patch', self.url, headers={}, data='',
+        d = logging_treq.request('patch', self.url, data='',
                                  log=self.log, clock=self.clock)
         self.treq.request.assert_called_once_with(
             method='patch', url=self.url,
