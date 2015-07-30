@@ -26,7 +26,7 @@ from toolz.functoolz import compose
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import NoSuchEndpoint
-from otter.cloud_client import CLBDeletedError, service_request
+from otter.cloud_client import CLBNotFoundError, service_request
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
     UnexpectedBehaviorError,
@@ -562,7 +562,7 @@ class GetCLBContentsTests(SynchronousTestCase):
             nested_parallel([
                 nodes_req(1, [node('11', 'a11')]),
                 lb_req('GET', 'loadbalancers/2/nodes', True,
-                       CLBDeletedError(lb_id=u'2')),
+                       CLBNotFoundError(lb_id=u'2')),
             ]),
             nested_parallel([])  # No nodes to fetch
         ]
@@ -591,7 +591,7 @@ class GetCLBContentsTests(SynchronousTestCase):
                 nodes_req(2, [node21])
             ]),
             nested_parallel([
-                feed_req(1, '11', CLBDeletedError(lb_id=u'1')),
+                feed_req(1, '11', CLBNotFoundError(lb_id=u'1')),
                 feed_req(2, '21', '22feed')]),
         ]
         eff = get_clb_contents()
