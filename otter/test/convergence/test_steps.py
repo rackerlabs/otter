@@ -279,13 +279,12 @@ class DeleteServerTests(SynchronousTestCase):
         self.assertEqual(
             eff.intent,
             service_request(
-                ServiceType.CLOUD_SERVERS, 'GET', 'servers/sid/details',
-                success_pred=has_code(200, 404),
-                json_response=False).intent)
+                ServiceType.CLOUD_SERVERS, 'GET', 'servers/sid',
+                success_pred=has_code(200, 404)).intent)
         r = resolve_effect(
             eff,
             (StubResponse(200, {}),
-             json.dumps({'server': {"OS-EXT-STS:task_state": 'deleting'}})))
+             {'server': {"OS-EXT-STS:task_state": 'deleting'}}))
         self.assertIsNone(r)
 
     def test_delete_and_verify_verify_404(self):
@@ -297,7 +296,7 @@ class DeleteServerTests(SynchronousTestCase):
         eff = resolve_effect(
             eff, service_request_error_response(APIError(204, {})),
             is_error=True)
-        r = resolve_effect(eff, (StubResponse(404, {}), "not json"))
+        r = resolve_effect(eff, (StubResponse(404, {}), {"itemNotFound": {}}))
         self.assertIsNone(r)
 
     def test_delete_and_verify_verify_unexpectedstatus(self):
@@ -314,7 +313,7 @@ class DeleteServerTests(SynchronousTestCase):
             resolve_effect,
             eff,
             (StubResponse(200, {}),
-             json.dumps({'server': {"OS-EXT-STS:task_state": 'bad'}}))
+             {'server': {"OS-EXT-STS:task_state": 'bad'}})
         )
 
 

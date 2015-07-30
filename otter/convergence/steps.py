@@ -1,5 +1,4 @@
 """Steps for convergence."""
-import json
 import re
 
 from functools import partial
@@ -174,10 +173,10 @@ def delete_and_verify(server_id):
     only when looking at the extended status of a server.
     """
 
-    def check_task_state((resp, server_text)):
+    def check_task_state((resp, server_blob)):
         if resp.code == 404:
             return
-        server_details = json.loads(server_text)['server']
+        server_details = server_blob['server']
         is_deleting = server_details.get("OS-EXT-STS:task_state", "")
         if is_deleting.strip().lower() != "deleting":
             raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
@@ -185,12 +184,10 @@ def delete_and_verify(server_id):
     def verify((_type, error, traceback)):
         if error.code != 204:
             raise _type, error, traceback
-        # Not requiring json response because 404 response is not JSON
         ver_eff = service_request(
             ServiceType.CLOUD_SERVERS, 'GET',
-            append_segments('servers', server_id, 'details'),
-            success_pred=has_code(200, 404),
-            json_response=False)
+            append_segments('servers', server_id),
+            success_pred=has_code(200, 404))
         return ver_eff.on(check_task_state)
 
     return service_request(
