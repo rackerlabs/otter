@@ -3763,10 +3763,10 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         self.tenant_id = 'tid'
         self.group_id = 'gid'
         self.params = {"tenantId": self.tenant_id, "groupId": self.group_id}
-        clock = Clock()
-        clock.advance(2.5)
+        self.clock = Clock()
+        self.clock.advance(2.5)
         self.cache = CassScalingGroupServersCache(
-            self.tenant_id, self.group_id, clock)
+            self.tenant_id, self.group_id, self.clock)
         self.dt = datetime(2010, 10, 20, 10, 0, 0)
 
     def _test_get_servers(self, only_as_active, query_result, exp_result):
@@ -3844,9 +3844,9 @@ class CassGroupServersCacheTests(SynchronousTestCase):
               "server_as_active": True}],
             ([{"d": "e"}], self.dt))
 
-    def _test_insert_servers(self, eff):
+    def _test_insert_servers(self, eff, ts=2500000):
         query = (
-            'BEGIN BATCH USING TIMESTAMP 2500000.0 '
+            'BEGIN BATCH USING TIMESTAMP {} '
             'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
             'server_id, server_blob, server_as_active) '
             'VALUES(:tenantId, :groupId, :last_update, :server_id0, '
@@ -3854,7 +3854,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
             'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
             'server_id, server_blob, server_as_active) '
             'VALUES(:tenantId, :groupId, :last_update, :server_id1, '
-            ':server_blob1, :server_as_active1); APPLY BATCH;')
+            ':server_blob1, :server_as_active1); APPLY BATCH;').format(ts)
         self.params.update(
             {"server_id0": "a", "server_blob0": '{"id": "a"}',
              "server_as_active0": True,
@@ -3881,8 +3881,9 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         eff = self.cache.insert_servers(
             self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}], True)
         self.assertEqual(eff.intent, "delete")
+        self.clock.advance(1)
         eff = resolve_effect(eff, None)
-        self._test_insert_servers(eff)
+        self._test_insert_servers(eff, 3500000)
 
     def test_insert_empty(self):
         """
@@ -3898,10 +3899,9 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         """
         self.assertEqual(
             self.cache.delete_servers(),
-            cql_eff(('DELETE FROM servers_cache WHERE '
-                     '"tenantId" = :tenantId AND "groupId" = :groupId '
-                     'USING TIMESTAMP :ts'),
-                    merge(self.params, {"ts": 2500000.0})))
+            cql_eff(('DELETE FROM servers_cache USING TIMESTAMP :ts WHERE '
+                     '"tenantId"=:tenantId AND "groupId"=:groupId'),
+                    merge(self.params, {"ts": 2500000})))
 
 
 class CassAdminTestCase(SynchronousTestCase):

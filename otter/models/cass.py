@@ -600,9 +600,9 @@ class WeakLocks(object):
 
 def get_client_ts(reactor):
     """
-    Return EPOCH with microseconds precision as a `Deferred`
+    Return EPOCH with microseconds precision synchronously
     """
-    return defer.succeed(int(reactor.seconds() * 1000000))
+    return int(reactor.seconds() * 1000000)
 
 
 def _check_deleting(group, get_deleting=False):
@@ -694,7 +694,7 @@ class CassScalingGroup(object):
         """
         @functools.wraps(func)
         def wrapper(*args):
-            d = get_client_ts(self.reactor)
+            d = defer.maybeDeferred(get_client_ts, self.reactor)
             d.addCallback(lambda ts: func(ts, *args))
             return d
         return wrapper
@@ -1795,19 +1795,19 @@ class CassScalingGroupServersCache(object):
         if clear_others:
             return self.delete_servers().on(
                 lambda _: cql_eff(
-                    batch(queries, self.clock.seconds() * 1000000), params))
+                    batch(queries, get_client_ts(self.clock)), params))
         else:
-            return cql_eff(batch(queries, self.clock.seconds() * 1000000),
-                           params)
+            return cql_eff(batch(queries, get_client_ts(self.clock)), params)
 
     def delete_servers(self):
         """
         See :method:`IScalingGroupServersCache.delete_servers`
         """
-        query = (_cql_delete_all_in_group.format(cf=self.table, name='') +
-                 " USING TIMESTAMP :ts")
+        query = ('DELETE FROM {cf} USING TIMESTAMP :ts '
+                 'WHERE "tenantId"=:tenantId AND "groupId"=:groupId')
         return cql_eff(
-            query, merge(self.params, {"ts": self.clock.seconds() * 1000000}))
+            query.format(cf=self.table),
+            merge(self.params, {"ts": get_client_ts(self.clock)}))
 
 
 @implementer(IAdmin)
