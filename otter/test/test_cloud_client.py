@@ -63,10 +63,11 @@ from otter.constants import ServiceType
 from otter.log.intents import Log
 from otter.test.utils import (
     StubResponse,
-    resolve_effect,
-    stub_pure_response,
     nested_sequence,
-    perform_sequence)
+    perform_sequence,
+    resolve_effect,
+    stub_pure_response
+)
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.config import set_config_data
 from otter.util.http import APIError, headers
