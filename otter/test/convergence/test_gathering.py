@@ -558,11 +558,11 @@ class GetCLBContentsTests(SynchronousTestCase):
         returned for it.
         """
         seq = [
-            lb_req('GET', 'loadbalancers', True,
+            lb_req('loadbalancers', True,
                    {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             nested_parallel([
                 nodes_req(1, [node('11', 'a11')]),
-                lb_req('GET', 'loadbalancers/2/nodes', True,
+                lb_req('loadbalancers/2/nodes', True,
                        CLBNotFoundError(lb_id=u'2')),
             ]),
             nested_parallel([])  # No nodes to fetch
@@ -583,17 +583,16 @@ class GetCLBContentsTests(SynchronousTestCase):
         """
         node21 = node('21', 'a21', condition='DRAINING', weight=None)
         seq = [
-            lb_req(
-                'GET', 'loadbalancers', True,
-                {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            lb_req('loadbalancers', True,
+                   {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             nested_parallel([
                 nodes_req(1, [node('11', 'a11', condition='DRAINING'),
                               node('12', 'a12')]),
                 nodes_req(2, [node21])
             ]),
             nested_parallel([
-                feed_req(1, '11', CLBNotFoundError(lb_id=u'1')),
-                feed_req(2, '21', '22feed')]),
+                node_feed_req(1, '11', CLBNotFoundError(lb_id=u'1')),
+                node_feed_req(2, '21', '22feed')]),
         ]
         eff = get_clb_contents()
         self.assertEqual(
