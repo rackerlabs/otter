@@ -424,10 +424,11 @@ class ExtractDrainedTests(SynchronousTestCase):
         self.assertRaises(ValueError, extract_CLB_drained_at, feed)
 
 
-def lb_req(method, url, json_response, response):
+def lb_req(url, json_response, response):
     """
-    Return a SequenceDispatcher two-tuple to match a service request and
-    specify the result.
+    Return a SequenceDispatcher two-tuple that matches a service request to a
+    particular load balancer endpoint (using GET), and returns the given
+    ``response`` as the content in an HTTP 200 ``StubResponse``.
     """
     if isinstance(response, Exception):
         def handler(i): raise response
@@ -443,20 +444,20 @@ def lb_req(method, url, json_response, response):
         nested_sequence([
             (service_request(
                 ServiceType.CLOUD_LOAD_BALANCERS,
-                method, url, json_response=json_response).intent,
+                'GET', url, json_response=json_response).intent,
              handler)
         ])
     )
 
 
 def nodes_req(lb_id, nodes):
-    return lb_req('GET', 'loadbalancers/{}/nodes'.format(lb_id),
+    return lb_req('loadbalancers/{}/nodes'.format(lb_id),
                   True, {'nodes': nodes})
 
 
-def feed_req(lb_id, node_id, response):
+def node_feed_req(lb_id, node_id, response):
     return lb_req(
-        'GET', 'loadbalancers/{}/nodes/{}.atom'.format(lb_id, node_id),
+        'loadbalancers/{}/nodes/{}.atom'.format(lb_id, node_id),
         False, response)
 
 
@@ -490,12 +491,12 @@ class GetCLBContentsTests(SynchronousTestCase):
         node21 = node('21', 'a21', weight=3)
         node22 = node('22', 'a22', weight=None, condition='DRAINING')
         seq = [
-            lb_req('GET', 'loadbalancers', True,
+            lb_req('loadbalancers', True,
                    {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             nested_parallel([nodes_req(1, [node11, node12]),
                              nodes_req(2, [node21, node22])]),
-            nested_parallel([feed_req(1, '11', '11feed'),
-                             feed_req(2, '22', '22feed')]),
+            nested_parallel([node_feed_req(1, '11', '11feed'),
+                             node_feed_req(2, '22', '22feed')]),
         ]
         eff = get_clb_contents()
         self.assertEqual(
@@ -510,7 +511,7 @@ class GetCLBContentsTests(SynchronousTestCase):
         Return empty list if there are no LB
         """
         seq = [
-            lb_req('GET', 'loadbalancers', True, {'loadBalancers': []}),
+            lb_req('loadbalancers', True, {'loadBalancers': []}),
             nested_parallel([]),  # No LBs to fetch
             nested_parallel([]),  # No nodes to fetch
         ]
@@ -522,7 +523,7 @@ class GetCLBContentsTests(SynchronousTestCase):
         Return empty if there are LBs but no nodes in them
         """
         seq = [
-            lb_req('GET', 'loadbalancers', True,
+            lb_req('loadbalancers', True,
                    {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             nested_parallel([nodes_req(1, []), nodes_req(2, [])]),
             nested_parallel([]),  # No nodes to fetch
@@ -534,7 +535,7 @@ class GetCLBContentsTests(SynchronousTestCase):
         Doesnt fetch feeds if all nodes are ENABLED
         """
         seq = [
-            lb_req('GET', 'loadbalancers', True,
+            lb_req('loadbalancers', True,
                    {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             nested_parallel([nodes_req(1, [node('11', 'a11')]),
                              nodes_req(2, [node('21', 'a21')])]),

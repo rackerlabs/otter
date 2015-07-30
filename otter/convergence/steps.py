@@ -172,10 +172,10 @@ def delete_and_verify(server_id):
     only when looking at the extended status of a server.
     """
 
-    def check_task_state((resp, json_blob)):
+    def check_task_state((resp, server_blob)):
         if resp.code == 404:
             return
-        server_details = json_blob['server']
+        server_details = server_blob['server']
         is_deleting = server_details.get("OS-EXT-STS:task_state", "")
         if is_deleting.strip().lower() != "deleting":
             raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
@@ -185,7 +185,7 @@ def delete_and_verify(server_id):
             raise _type, error, traceback
         ver_eff = service_request(
             ServiceType.CLOUD_SERVERS, 'GET',
-            append_segments('servers', server_id, 'details'),
+            append_segments('servers', server_id),
             success_pred=has_code(200, 404))
         return ver_eff.on(check_task_state)
 
@@ -208,7 +208,7 @@ class DeleteServer(object):
         """Produce a :obj:`Effect` to delete a server."""
 
         eff = retry_effect(
-            delete_and_verify(self.server_id), can_retry=retry_times(10),
+            delete_and_verify(self.server_id), can_retry=retry_times(3),
             next_interval=exponential_backoff_interval(2))
 
         def report_success(result):
