@@ -24,6 +24,7 @@ def _log_request(treq_call, url, **kwargs):
     """
     clock = kwargs.pop('clock', reactor)
     log = kwargs.pop('log', None)
+
     if not log:
         log = default_log
     method = kwargs.get('method', treq_call.__name__)
@@ -33,6 +34,9 @@ def _log_request(treq_call, url, **kwargs):
                    url_params=kwargs.get('params'),
                    treq_request_id=treq_transaction)
     start_time = clock.seconds()
+
+    kwargs.setdefault('headers', {})
+    kwargs['headers'].setdefault('x-otter-request-id', [treq_transaction])
 
     log.msg("Request to {method} {url} starting.")
     d = treq_call(url=url, **kwargs)
