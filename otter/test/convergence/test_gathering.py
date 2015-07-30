@@ -455,7 +455,7 @@ def nodes_req(lb_id, nodes):
                   True, {'nodes': nodes})
 
 
-def feed_req(lb_id, node_id, response):
+def node_feed_req(lb_id, node_id, response):
     return lb_req(
         'loadbalancers/{}/nodes/{}.atom'.format(lb_id, node_id),
         False, response)
@@ -495,8 +495,8 @@ class GetCLBContentsTests(SynchronousTestCase):
                    {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             nested_parallel([nodes_req(1, [node11, node12]),
                              nodes_req(2, [node21, node22])]),
-            nested_parallel([feed_req(1, '11', '11feed'),
-                             feed_req(2, '22', '22feed')]),
+            nested_parallel([node_feed_req(1, '11', '11feed'),
+                             node_feed_req(2, '22', '22feed')]),
         ]
         eff = get_clb_contents()
         self.assertEqual(
