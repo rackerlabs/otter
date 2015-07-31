@@ -139,7 +139,7 @@ class LoggingTreqTest(SynchronousTestCase):
         """
         A request times out after 45 seconds, and the failure is logged
         """
-        d = logging_treq.request('patch', self.url, data='',
+        d = logging_treq.request('patch', self.url, data='', headers=None,
                                  log=self.log, clock=self.clock)
         self.treq.request.assert_called_once_with(
             method='patch', url=self.url,

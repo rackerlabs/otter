@@ -30,6 +30,9 @@ def _log_request(treq_call, url, **kwargs):
     method = kwargs.get('method', treq_call.__name__)
 
     kwargs.setdefault('headers', {})
+    if kwargs['headers'] is None:
+        kwargs['headers'] = {}
+
     treq_transaction = str(uuid4())
     kwargs['headers']['x-otter-request-id'] = [treq_transaction]
 
