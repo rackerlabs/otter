@@ -27,12 +27,15 @@ from functools import partial
 
 from effect import (
     Effect,
+    catch,
     parallel,
     parallel_all_errors)
 
 from effect.do import do, do_return
 
 import iso8601
+
+from kazoo.exceptions import NoNodeError
 
 from six import reraise
 
@@ -101,11 +104,14 @@ def conv_pause_group_eff(group, transaction_id):
     """
     Pause scaling group of convergence enabled tenant
     """
-    eff = parallel([Effect(ModifyGroupStatePaused(group, True)),
-                    delete_divergent_flag(group.tenant_id, group.uuid, -1)])
+    # Ignore divergent flag not being there since group may not be
+    # converging at this time
+    del_eff = delete_divergent_flag(group.tenant_id, group.uuid, -1).on(
+        error=catch(NoNodeError, lambda _: None))
+    eff = parallel([Effect(ModifyGroupStatePaused(group, True)), del_eff])
     return with_log(eff, transaction_id=transaction_id,
                     tenant_id=group.tenant_id,
-                    scaling_group_id=group.uuid)
+                    scaling_group_id=group.uuid).on(lambda _: None)
 
 
 def pause_scaling_group(log, transaction_id, scaling_group, dispatcher):

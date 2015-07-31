@@ -9,6 +9,8 @@ from effect import (
     sync_perform)
 from effect.testing import SequenceDispatcher
 
+from kazoo.exceptions import NoNodeError
+
 import mock
 
 from testtools.matchers import ContainsDict, Equals
@@ -25,7 +27,7 @@ from otter.cloud_client import (
 from otter.convergence.model import DRAINING_METADATA
 from otter.convergence.service import (
     ConvergenceStarter, get_convergence_starter, set_convergence_starter)
-from otter.log.intents import BoundFields, Log
+from otter.log.intents import BoundFields, Log, LogErr
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
 from otter.models.interface import (
     GroupNotEmptyError, GroupState, IScalingGroup, NoSuchPolicyError,
@@ -34,6 +36,7 @@ from otter.supervisor import (
     CannotDeleteServerBelowMinError,
     ServerNotFoundError)
 from otter.test.utils import (
+    CheckFailure,
     StubResponse,
     iMock,
     matches,
@@ -83,7 +86,30 @@ class PauseGroupTests(SynchronousTestCase):
                  ])
              ]))
         ]
-        self.assertEqual(perform_sequence(seq, eff), [None, None])
+        self.assertEqual(perform_sequence(seq, eff), None)
+
+    def test_conv_pause_group_eff_ignores_nonodeerror(self):
+        """
+        `conv_pause_group_eff` ignores NoNodeError when deleting divergent flag
+        """
+        eff = controller.conv_pause_group_eff(self.group, "transid")
+        seq = [
+            (BoundFields(mock.ANY, dict(transaction_id="transid",
+                                        tenant_id="tid",
+                                        scaling_group_id="gid")),
+             nested_sequence([
+                 nested_parallel([
+                     (ModifyGroupStatePaused(self.group, True), noop),
+                     (DeleteNode(path="/groups/divergent/tid_gid", version=-1),
+                      lambda i: raise_(NoNodeError("badnode"))),
+                     (LogErr(CheckFailure(NoNodeError), "mark-clean-failure",
+                             dict(path="/groups/divergent/tid_gid",
+                                  dirty_version=-1)),
+                      noop)
+                 ])
+             ]))
+        ]
+        self.assertEqual(perform_sequence(seq, eff), None)
 
     @mock.patch("otter.controller.conv_pause_group_eff",
                 return_value=Effect("pause"))
