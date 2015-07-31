@@ -13,7 +13,8 @@ from testtools.matchers import (
 
 from twisted.internet import reactor
 
-from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
+from twisted.internet.defer import (
+    Deferred, gatherResults, inlineCallbacks, returnValue)
 
 from twisted.web.client import HTTPConnectionPool
 
@@ -286,3 +287,12 @@ def random_string(byte_len=4):
     The string will be 2 * ``byte_len`` in length.
     """
     return os.urandom(byte_len).encode('hex')
+
+
+def sleep(reactor, seconds):
+    """
+    Sleep for given seconds
+    """
+    d = Deferred()
+    reactor.callLater(seconds, d.callback, None)
+    return d
