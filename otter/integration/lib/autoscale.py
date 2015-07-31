@@ -266,14 +266,14 @@ class ScalingGroup(object):
 
         return self.replace_group_config(rcs, new_config)
 
-    def trigger_convergence(self, rcs):
+    def trigger_convergence(self, rcs, success_codes=None):
         """
         Trigger convergence on a group
         """
         d = self.treq.post(
             "{}/converge".format(self._endpoint(rcs)),
             headers=headers(str(rcs.token)), pool=self.pool)
-        return d.addCallback(check_success, [204])
+        return d.addCallback(check_success, success_codes or [204])
 
     def stop(self, rcs):
         """Clean up a scaling group.  Although safe to call yourself, you
