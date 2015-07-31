@@ -291,7 +291,7 @@ class ScalingGroup(object):
 
         return self.delete_scaling_group(rcs)
 
-    def delete_scaling_group(self, rcs):
+    def delete_scaling_group(self, rcs, force="true", success_codes=None):
         """Unconditionally delete the scaling group.  You may call this only
         once.
 
@@ -304,12 +304,10 @@ class ScalingGroup(object):
         """
 
         return (self.treq.delete(
-            "%s/groups/%s?force=true" % (
-                str(rcs.endpoints["otter"]), self.group_id
-            ),
+            "{}?force={}".format(self._endpoint(rcs), force),
             headers=headers(str(rcs.token)),
             pool=self.pool
-        ).addCallback(check_success, [204, 404]))
+        ).addCallback(check_success, success_codes or [204, 404]))
 
     def get_scaling_group_state(self, rcs, success_codes=None):
         """Retrieve the state of the scaling group.
