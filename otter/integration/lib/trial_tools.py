@@ -3,6 +3,7 @@ A set of helpers for writing trial tests
 """
 
 import os
+from datetime import datetime, timedelta
 
 from testtools.matchers import (
     AfterPreprocessing,
@@ -92,6 +93,12 @@ def get_resource_mapping():
         res['mimic_nova'] = (mimic_nova_key,)
         res['mimic_clb'] = (mimic_clb_key,)
     return res
+
+
+def get_utcstr_from_now(seconds):
+    """ Get UTC timestamp from now in ISO 8601 format """
+    return "{}Z".format(
+        (datetime.utcnow() + timedelta(seconds=seconds)).isoformat())
 
 
 class TestHelper(object):
