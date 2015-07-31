@@ -527,6 +527,7 @@ the scaling group.
     Attribute('scaling_group', instance_of=ScalingGroup),
     Attribute('set_to', default_value=None),
     Attribute('scale_percent', default_value=None),
+    Attribute('schedule', default_value=None),
     Attribute('name', instance_of=str, default_value='integration-test-policy')
 ])
 class ScalingPolicy(object):
@@ -542,6 +543,8 @@ class ScalingPolicy(object):
     :param int set_to: The number of servers to set as the desired capacity
     :param float scale_percent: The percentage by which to scale the group up
         (positive) or down (negative)
+    :param dict schedule: "args" argument of policy if this is scheduled
+        policy
     :param str name: A string to use as the name of the scaling policy. A
         timestamp will be appended automatically for differentiation.
     """
@@ -565,9 +568,13 @@ class ScalingPolicy(object):
         self.policy = [{
             "name": name_time,
             "cooldown": 0,
-            "type": "webhook",
             change_type: change_factor
         }]
+        if self.schedule is not None:
+            self.policy[0]["type"] = "schedule"
+            self.policy[0]["args"] = self.schedule
+        else:
+            self.policy[0]["type"] = "webhook"
 
     def stop(self, rcs):
         """Disposes of the policy.
