@@ -38,7 +38,8 @@ class LoggingTreqTest(SynchronousTestCase):
         self.response = mock.MagicMock(code=204, headers={'1': '2'})
 
         patch(self, 'otter.util.logging_treq.treq', self.treq)
-
+        patch(self, 'otter.util.logging_treq.uuid4',
+              mock.MagicMock(spec=[], return_value='uuid'))
         self.url = 'myurl'
 
     def _assert_success_logging(self, method, status, request_time,
@@ -48,12 +49,13 @@ class LoggingTreqTest(SynchronousTestCase):
         """
         self.assertEqual(self.log.msg.mock_calls, [
             mock.call(mock.ANY, url=self.url, system="treq.request",
-                      method=method, treq_request_id=mock.ANY,
+                      method=method, treq_request_id='uuid',
                       url_params=url_params),
             mock.call(
                 mock.ANY, url=self.url, status_code=status, headers={'1': '2'},
                 system="treq.request", request_time=request_time,
-                method=method, treq_request_id=mock.ANY, url_params=url_params)
+                method=method, treq_request_id='uuid',
+                url_params=url_params)
         ])
 
     def _assert_failure_logging(self, method, exception_type, request_time):
@@ -62,12 +64,12 @@ class LoggingTreqTest(SynchronousTestCase):
         """
         self.assertEqual(self.log.msg.mock_calls, [
             mock.call(mock.ANY, url=self.url, system="treq.request",
-                      method=method, treq_request_id=mock.ANY,
+                      method=method, treq_request_id='uuid',
                       url_params=None),
             mock.call(
                 mock.ANY, url=self.url, reason=CheckFailure(exception_type),
                 system="treq.request", request_time=request_time,
-                method=method, treq_request_id=mock.ANY, url_params=None)
+                method=method, treq_request_id='uuid', url_params=None)
         ])
 
     def test_request(self):
@@ -77,7 +79,8 @@ class LoggingTreqTest(SynchronousTestCase):
         d = logging_treq.request('patch', self.url, headers={}, data='',
                                  log=self.log, clock=self.clock)
         self.treq.request.assert_called_once_with(
-            method='patch', url=self.url, headers={}, data='')
+            method='patch', url=self.url,
+            headers={'x-otter-request-id': ['uuid']}, data='')
         self.assertNoResult(d)
 
         self.clock.advance(5)
@@ -89,23 +92,41 @@ class LoggingTreqTest(SynchronousTestCase):
     def test_url_params(self):
         """`params` is logged as `url_params`."""
         params = {'key': 'val'}
-        d = logging_treq.request('get', self.url, headers={}, data='',
+        d = logging_treq.request('get', self.url, data='',
                                  log=self.log, params=params, clock=self.clock)
         self.clock.advance(5)
         self.treq.request.return_value.callback(self.response)
         self.treq.request.assert_called_once_with(
-            method='get', url=self.url, headers={}, data='', params=params)
+            method='get', url=self.url,
+            headers={'x-otter-request-id': ['uuid']}, data='', params=params)
         self.assertIs(self.successResultOf(d), self.response)
         self._assert_success_logging('get', 204, 5, url_params=params)
+
+    def test_headers_are_preserved_except_request_id(self):
+        """
+        `headers` are passed through as is, with an `x-otter-request-id` added.
+        If the header `x-otter-request-id` is supplied in the existing headers,
+        it is replaced.
+        """
+        headers = {'header1': ['val1'], 'header2': ['val2'],
+                   'x-otter-almost-it': ['unchanged'],
+                   'x-otter-request-id': ['different-value']}
+        new_headers = headers.copy()
+        new_headers['x-otter-request-id'] = ['uuid']
+        logging_treq.request('get', self.url, headers=headers, log=self.log,
+                             clock=self.clock)
+        self.treq.request.assert_called_once_with(
+            method='get', url=self.url, headers=new_headers)
 
     def test_request_failure(self):
         """
         On failed call to request, failure is returned and request logged
         """
-        d = logging_treq.request('patch', self.url, headers={}, data='',
+        d = logging_treq.request('patch', self.url, data='',
                                  log=self.log, clock=self.clock)
         self.treq.request.assert_called_once_with(
-            method='patch', url=self.url, headers={}, data='')
+            method='patch', url=self.url,
+            headers={'x-otter-request-id': ['uuid']}, data='')
         self.assertNoResult(d)
 
         self.clock.advance(5)
@@ -118,10 +139,11 @@ class LoggingTreqTest(SynchronousTestCase):
         """
         A request times out after 45 seconds, and the failure is logged
         """
-        d = logging_treq.request('patch', self.url, headers={}, data='',
+        d = logging_treq.request('patch', self.url, data='',
                                  log=self.log, clock=self.clock)
         self.treq.request.assert_called_once_with(
-            method='patch', url=self.url, headers={}, data='')
+            method='patch', url=self.url,
+            headers={'x-otter-request-id': ['uuid']}, data='')
         self.assertNoResult(d)
 
         self.clock.advance(45)
@@ -137,7 +159,8 @@ class LoggingTreqTest(SynchronousTestCase):
                              clock=self.clock)
 
         treq_function = getattr(self.treq, method)
-        treq_function.assert_called_once_with(url=self.url, headers={}, data='')
+        treq_function.assert_called_once_with(
+            url=self.url, headers={'x-otter-request-id': ['uuid']}, data='')
 
         self.assertNoResult(d)
 
@@ -156,7 +179,8 @@ class LoggingTreqTest(SynchronousTestCase):
                              clock=self.clock)
 
         treq_function = getattr(self.treq, method)
-        treq_function.assert_called_once_with(url=self.url, headers={}, data='')
+        treq_function.assert_called_once_with(
+            url=self.url, headers={'x-otter-request-id': ['uuid']}, data='')
         self.assertNoResult(d)
 
         self.clock.advance(5)
@@ -174,7 +198,8 @@ class LoggingTreqTest(SynchronousTestCase):
                              clock=self.clock)
 
         treq_function = getattr(self.treq, method)
-        treq_function.assert_called_once_with(url=self.url, headers={}, data='')
+        treq_function.assert_called_once_with(
+            url=self.url, headers={'x-otter-request-id': ['uuid']}, data='')
         self.assertNoResult(d)
 
         self.clock.advance(45)
