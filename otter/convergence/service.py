@@ -11,11 +11,11 @@ from datetime import datetime
 from functools import partial
 from hashlib import sha1
 
-from effect import Effect, FirstError, Func, catch, parallel
+from effect import Effect, FirstError, Func, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
 
-from kazoo.exceptions import BadVersionError
+from kazoo.exceptions import BadVersionError, NoNodeError
 from kazoo.recipe.partitioner import PartitionState
 
 from pyrsistent import pset
@@ -316,6 +316,7 @@ def mark_divergent(tenant_id, group_id):
     return eff
 
 
+@do
 def delete_divergent_flag(tenant_id, group_id, version):
     """
     Delete the dirty flag, if its version hasn't changed. See comment in
@@ -325,17 +326,20 @@ def delete_divergent_flag(tenant_id, group_id, version):
     """
     flag = format_dirty_flag(tenant_id, group_id)
     path = CONVERGENCE_DIRTY_DIR + '/' + flag
-    return Effect(DeleteNode(path=path, version=version)).on(
-        success=lambda r: msg('mark-clean-success'),
+    fields = dict(path=path, dirty_version=version)
+    try:
+        yield Effect(DeleteNode(path=path, version=version))
+    except BadVersionError:
         # BadVersionError shouldn't be logged as an error because it's an
         # expected occurrence any time convergence is requested multiple times
         # rapidly.
-        error=catch(
-            BadVersionError, lambda e: msg('mark-clean-skipped',
-                                           path=path, dirty_version=version))
-    ).on(
-        error=lambda e: err(exc_info_to_failure(e), 'mark-clean-failure',
-                            path=path, dirty_version=version))
+        yield msg('mark-clean-skipped', **fields)
+    except NoNodeError:
+        yield msg('mark-clean-not-found', **fields)
+    except Exception:
+        yield err(None, 'mark-clean-failure', **fields)
+    else:
+        yield msg('mark-clean-success')
 
 
 class ConvergenceStarter(object):
