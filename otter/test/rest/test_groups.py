@@ -1154,9 +1154,25 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.addCleanup(set_config_data, {})
         cs = mock_gcs.return_value
         cs.start_convergence.return_value = defer.succeed(None)
+        self.mock_state = GroupState(
+            '11111', 'one', '', {}, {}, None, {}, False,
+            ScalingGroupStatus.ACTIVE)
         self.assert_status_code(
             204, endpoint='{}converge'.format(self.endpoint), method='POST')
         cs.start_convergence.assert_called_once_with(mock.ANY, '11111', 'one')
+
+    def test_group_paused_converge(self):
+        """
+        Calling `../converge` on paused group will return 403 GroupPausedError
+        for convergence tenant
+        """
+        set_config_data({'convergence-tenants': ['11111']})
+        self.addCleanup(set_config_data, {})
+        self.mock_state = GroupState(
+            '11111', 'one', '', {}, {}, None, {}, True,  # group paused
+            ScalingGroupStatus.ACTIVE)
+        self.assert_status_code(
+            403, endpoint='{}converge'.format(self.endpoint), method='POST')
 
     def test_group_converge_worker_tenant(self):
         """
@@ -1263,6 +1279,7 @@ class GroupPauseTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         Pausing should call the controller's ``pause_scaling_group`` function
         """
+        self.otter.dispatcher = "disp"
         mock_pause = patch(
             self, 'otter.rest.groups.controller.pause_scaling_group',
             return_value=defer.succeed(None))
@@ -1270,13 +1287,7 @@ class GroupPauseTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(response_body, "")
 
         mock_pause.assert_called_once_with(mock.ANY, 'transaction-id',
-                                           self.mock_group)
-
-    def test_pause_not_implemented(self):
-        """
-        Resume currently raises 501 not implemented
-        """
-        self.assert_status_code(501, method="POST")
+                                           self.mock_group, "disp")
 
 
 class GroupResumeTestCase(RestAPITestMixin, SynchronousTestCase):

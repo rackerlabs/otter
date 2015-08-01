@@ -43,6 +43,7 @@ from otter.integration.lib.trial_tools import (
     get_identity,
     get_resource_mapping,
     not_mimic,
+    otter_build_timeout,
     random_string,
     region,
     skip_if,
@@ -53,10 +54,6 @@ from otter.integration.lib.trial_tools import (
 # if this is None, the test will be skipped
 convergence_tenant_auth_errors = os.environ.get(
     'AS_CONVERGENCE_TENANT_FOR_AUTH_ERRORS')
-
-
-# otter configuration options for testing
-otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
 
 
 class TestConvergence(unittest.TestCase):

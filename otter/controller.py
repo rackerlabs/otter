@@ -27,6 +27,7 @@ from functools import partial
 
 from effect import (
     Effect,
+    parallel,
     parallel_all_errors)
 
 from effect.do import do, do_return
@@ -48,10 +49,12 @@ from otter.cloud_client import (
     set_nova_metadata_item)
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.model import DRAINING_METADATA, group_id_from_metadata
-from otter.convergence.service import get_convergence_starter
+from otter.convergence.service import (
+    delete_divergent_flag, get_convergence_starter)
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
-from otter.models.intents import GetScalingGroupInfo
+from otter.log.intents import with_log
+from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
 from otter.models.interface import GroupNotEmptyError, ScalingGroupStatus
 from otter.supervisor import (
     CannotDeleteServerBelowMinError,
@@ -81,7 +84,31 @@ class CannotExecutePolicyError(Exception):
             .format(t=tenant_id, g=group_id, p=policy_id, w=why))
 
 
-def pause_scaling_group(log, transaction_id, scaling_group):
+class GroupPausedError(Exception):
+    """
+    Exception to be raised when an operation cannot be performed because
+    group is paused
+    """
+    def __init__(self, tenant_id, group_id, operation, extra=None):
+        fmt = "Cannot {o} for group {g} for tenant {t} because group is paused"
+        if extra is not None:
+            fmt = "{}. {}".format(fmt, extra)
+        super(GroupPausedError, self).__init__(
+            fmt.format(t=tenant_id, g=group_id, o=operation))
+
+
+def conv_pause_group_eff(group, transaction_id):
+    """
+    Pause scaling group of convergence enabled tenant
+    """
+    eff = parallel([Effect(ModifyGroupStatePaused(group, True)),
+                    delete_divergent_flag(group.tenant_id, group.uuid, -1)])
+    return with_log(eff, transaction_id=transaction_id,
+                    tenant_id=group.tenant_id,
+                    scaling_group_id=group.uuid).on(lambda _: None)
+
+
+def pause_scaling_group(log, transaction_id, scaling_group, dispatcher):
     """
     Pauses the scaling group, causing all scaling policy executions to be
     rejected until unpaused.  This is an idempotent change, if it's already
@@ -91,7 +118,10 @@ def pause_scaling_group(log, transaction_id, scaling_group):
 
     :return: None
     """
-    raise NotImplementedError('Pause is not yet implemented')
+    if not tenant_is_enabled(scaling_group.tenant_id, config_value):
+        raise NotImplementedError("Pause is not yet implemented")
+    return perform(dispatcher,
+                   conv_pause_group_eff(scaling_group, transaction_id))
 
 
 def resume_scaling_group(log, transaction_id, scaling_group):
@@ -174,6 +204,10 @@ def delete_group(log, trans_id, group, force):
     """
 
     def check_and_delete(_group, state):
+        if state.paused:
+            raise GroupPausedError(
+                _group.tenant_id, _group.uuid, "delete group",
+                "Please use ?force=true to delete paused group")
         if state.desired == 0:
             d = trigger_convergence_deletion(log, group)
             return d.addCallback(lambda _: state)
@@ -336,17 +370,25 @@ def maybe_execute_scaling_policy(
     :return: a ``Deferred`` that fires with the updated
         :class:`otter.models.interface.GroupState` if successful
 
-    :raises: :class:`NoSuchScalingGroupError` if this scaling group does not exist
+    :raises: :class:`NoSuchScalingGroupError` if this scaling group does not
+        exist
     :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-    :raises: :class:`CannotExecutePolicyException` if the policy cannot be executed
+    :raises: :class:`CannotExecutePolicyException` if the policy cannot be
+        executed
 
-    :raises: Some exception about why you don't want to execute the policy. This
-        Exception should also have an audit log id
+    :raises: Some exception about why you don't want to execute the policy.
+        This Exception should also have an audit log id
     """
-    bound_log = log.bind(scaling_group_id=scaling_group.uuid, policy_id=policy_id)
+    bound_log = log.bind(scaling_group_id=scaling_group.uuid,
+                         policy_id=policy_id)
     bound_log.msg("beginning to execute scaling policy")
 
-    # make sure that the policy (and the group) exists before doing anything else
+    if state.paused:
+        raise GroupPausedError(scaling_group.tenant_id, scaling_group.uuid,
+                               "execute policy {}".format(policy_id))
+
+    # make sure that the policy (and the group) exists before doing
+    # anything else
     deferred = scaling_group.get_policy(policy_id, version)
 
     def _do_get_configs(policy):
