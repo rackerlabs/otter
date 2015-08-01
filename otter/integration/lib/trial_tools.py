@@ -230,6 +230,15 @@ class TestHelper(object):
         returnValue(
             [server for server in servers if server['id'] in server_ids])
 
+    @inlineCallbacks
+    def assert_group_state(self, group, matcher):
+        """
+        Assert state of group conforms to the matcher
+        """
+        resp, state = yield group.get_scaling_group_state(self.test_case.rcs,
+                                                          [200])
+        self.test_case.assertIsNone(matcher.match(state["group"]))
+
 
 def tag(*tags):
     """
