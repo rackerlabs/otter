@@ -57,6 +57,7 @@ from otter.cloud_client import (
     get_clbs,
     get_cloud_client_dispatcher,
     get_server_details,
+    list_servers_details_page,
     perform_tenant_scope,
     publish_to_cloudfeeds,
     remove_clb_nodes,
@@ -1173,6 +1174,28 @@ class NovaClientTests(SynchronousTestCase):
         for code, body in unparseable:
             with self.assertRaises(APIError):
                 _perform_one_request(expected.intent, real, code, body)
+
+    def test_list_servers_details_page(self):
+        """
+        :func:`list_servers_details_page` returns the JSON response from
+        listing servers details.
+        """
+        params = {'limit': '100', 'marker': '1'}
+        body = {'servers': [], 'servers_links': []}
+        eff = list_servers_details_page(params)
+        expected_intent = service_request(
+            ServiceType.CLOUD_SERVERS,
+            'GET', 'servers/detail',
+            params=params).intent
+        seq = [(
+            expected_intent,
+            service_request_eqf(stub_pure_response(json.dumps(body), 200)))
+        ]
+        resp, response_json = perform_sequence(seq, eff)
+        self.assertEqual(response_json, body)
+
+        self.assert_handles_nova_compute_fault(expected_intent, eff)
+        self.assert_handles_nova_rate_limiting(expected_intent, eff)
 
 
 class CloudFeedsTests(SynchronousTestCase):

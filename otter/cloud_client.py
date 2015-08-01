@@ -785,6 +785,7 @@ def set_nova_metadata_item(server_id, key, value):
 
     Succeed on 200.
 
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
     :raise: :class:`NoSuchServer`, :class:`MetadataOverLimit`,
         :class:`NovaRateLimitError`, :class:`NovaComputeFaultError`,
         :class:`APIError`
@@ -819,6 +820,7 @@ def get_server_details(server_id):
 
     Succeed on 200.
 
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
     :raise: :class:`NoSuchServer`, :class:`NovaRateLimitError`,
         :class:`NovaComputeFaultError`, :class:`APIError`
     """
@@ -849,6 +851,7 @@ def create_server(server_args):
     Succeed on 202, and only reauthenticate on 401 because 403s may be terminal
     errors.
 
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
     :raise: :class:`CreateServerConfigurationError`,
         :class:`CreateServerOverQuoteError`, :class:`NovaRateLimitError`,
         :class:`NovaComputFaultError`, :class:`APIError`
@@ -886,6 +889,32 @@ def create_server(server_args):
     return (eff
             .on(error=catch(APIError, _parse_known_string_errors))
             .on(error=_parse_known_json_errors))
+
+
+def list_servers_details_page(parameters=None):
+    """
+    List a single page of servers details given filtering and pagination
+    parameters.
+
+    :ivar dict parameters: A dictionary with pagination information,
+        changes-since filters, and name filters.
+
+    Succeed on 200.
+
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
+    :raise: :class:`NovaRateLimitError`, :class:`NovaComputeFaultError`,
+        :class:`APIError`
+    """
+    @_only_json_api_errors
+    def _parse_known_errors(code, json_body):
+        _match_errors(_nova_standard_errors, code, json_body)
+
+    return (
+        service_request(
+            ServiceType.CLOUD_SERVERS,
+            'GET', append_segments('servers', 'detail'),
+            params=parameters)
+        .on(error=_parse_known_errors))
 
 
 _nova_standard_errors = [
