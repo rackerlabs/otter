@@ -10,10 +10,11 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.log.intents import get_log_dispatcher
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, UpdateGroupErrorReasons,
-    UpdateGroupStatus, UpdateServersCache, get_model_dispatcher)
+    DeleteGroup, GetScalingGroupInfo, ModifyGroupStatePaused,
+    UpdateGroupErrorReasons, UpdateGroupStatus, UpdateServersCache,
+    get_model_dispatcher)
 from otter.models.interface import (
-    IScalingGroupCollection, ScalingGroupStatus)
+    GroupState, IScalingGroupCollection, ScalingGroupStatus)
 from otter.test.utils import (
     EffectServersCache, IsBoundWith, iMock, matches, mock_group, mock_log)
 
@@ -28,7 +29,9 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         Sample group, collection and dispatcher
         """
         self.log = mock_log().bind(base_log=True)
-        self.group = mock_group(None)
+        self.state = GroupState('tid', 'gid', 'g', {}, {}, None, {}, True,
+                                ScalingGroupStatus.ACTIVE)
+        self.group = mock_group(self.state)
 
     def get_dispatcher(self, store):
         return get_model_dispatcher(self.log, store)
@@ -153,3 +156,15 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         dispatcher = self.get_dispatcher(self.get_store())
         self.assertIsNone(sync_perform(dispatcher, Effect(intent)))
         self.group.update_error_reasons.assert_called_once_with(['r1', 'r2'])
+
+    def test_modify_group_state_paused(self):
+        dispatcher = self.get_dispatcher(self.get_store())
+        r = sync_perform(dispatcher,
+                         Effect(ModifyGroupStatePaused(self.group, False)))
+        self.assertIsNone(r)
+        # Returned state has updated paused
+        modified_state = self.group.modify_state_values[-1]
+        # Nothing else is modified
+        self.assertEqual(modified_state.paused, False)
+        modified_state.paused = True
+        self.assertEqual(self.state, modified_state)
