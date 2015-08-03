@@ -164,6 +164,8 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         self.assertIsNone(r)
         # Returned state has updated paused
         modified_state = self.group.modify_state_values[-1]
+        # Returned state object is different than original
+        self.assertIsNot(self.state, modified_state)
         # Nothing else is modified
         self.assertEqual(modified_state.paused, False)
         modified_state.paused = True
