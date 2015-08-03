@@ -28,6 +28,8 @@ class Otter(object):
         self.health_check_function = health_check_function
         self.scheduler = None
         self.treq = _treq
+        # Effect dispatcher for all otter intents
+        self.dispatcher = None
 
     @app.route('/', methods=['GET'])
     def base(self, request):
@@ -57,15 +59,15 @@ class Otter(object):
         """
         group routes delegated to OtterGroups.
         """
-        return OtterGroups(self.store, tenant_id).app.resource()
+        return OtterGroups(
+            self.store, tenant_id, self.dispatcher).app.resource()
 
-    @app.route('/v1.0/execute/<string:capability_version>/<string:capability_hash>/')
-    def execute(self, request, capability_version, capability_hash):
+    @app.route('/v1.0/execute/<string:cap_version>/<string:cap_hash>/')
+    def execute(self, request, cap_version, cap_hash):
         """
         execute route handled by OtterExecute
         """
-        return OtterExecute(self.store, capability_version,
-                            capability_hash).app.resource()
+        return OtterExecute(self.store, cap_version, cap_hash).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/limits')
     def limits(self, request, tenant_id):
