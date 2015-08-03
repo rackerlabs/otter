@@ -52,6 +52,9 @@ from otter.cloud_client import (
     change_clb_node,
     concretize_service_request,
     create_server,
+    get_clb_node_feed,
+    get_clb_nodes,
+    get_clbs,
     get_cloud_client_dispatcher,
     get_server_details,
     perform_tenant_scope,
@@ -62,10 +65,11 @@ from otter.cloud_client import (
 from otter.constants import ServiceType
 from otter.test.utils import (
     StubResponse,
-    resolve_effect,
-    stub_pure_response,
     nested_sequence,
-    perform_sequence)
+    perform_sequence,
+    resolve_effect,
+    stub_json_response,
+    stub_pure_response)
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.config import set_config_data
 from otter.util.http import APIError, headers
@@ -816,6 +820,54 @@ class CLBClientTests(SynchronousTestCase):
              service_request_eqf(response2))
         ]
         self.assertIs(perform_sequence(seq, eff), None)
+
+    def test_get_clbs(self):
+        """Returns all the load balancer details from the LBs endpoint."""
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS, 'GET', 'loadbalancers')
+        req = get_clbs()
+        seq = [
+            (expected.intent,
+             lambda i: stub_json_response({'loadBalancers': 'lbs!'}))]
+        self.assertEqual(perform_sequence(seq, req), 'lbs!')
+
+    def test_get_clb_nodes(self):
+        """:func:`get_clb_nodes` returns all the nodes for a LB."""
+        req = get_clb_nodes(self.lb_id)
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'GET', 'loadbalancers/123456/nodes')
+        seq = [
+            (expected.intent,
+             lambda i: stub_json_response({'nodes': 'nodes!'}))]
+        self.assertEqual(perform_sequence(seq, req), 'nodes!')
+
+    def test_get_clb_nodes_error_handling(self):
+        """:func:`get_clb_nodes` parses the common CLB errors."""
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'GET', 'loadbalancers/123456/nodes')
+        self.assert_parses_common_clb_errors(
+            expected.intent, get_clb_nodes(self.lb_id))
+
+    def test_get_clb_node_feed(self):
+        """:func:`get_clb_node_feed` returns the Atom feed for a CLB node."""
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'GET', 'loadbalancers/123456/nodes/node1.atom',
+            json_response=False)
+        seq = [(expected.intent, lambda i: stub_pure_response('feed!'))]
+        req = get_clb_node_feed(self.lb_id, 'node1')
+        self.assertEqual(perform_sequence(seq, req), 'feed!')
+
+    def test_get_clb_node_feed_error_handling(self):
+        """:func:`get_clb_node_feed` parses the common CLB errors."""
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'GET', 'loadbalancers/123456/nodes/node1.atom',
+            json_response=False)
+        self.assert_parses_common_clb_errors(
+            expected.intent, get_clb_node_feed(self.lb_id, 'node1'))
 
 
 def _perform_one_request(intent, effect, response_code, response_body):

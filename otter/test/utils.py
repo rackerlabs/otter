@@ -401,6 +401,14 @@ def stub_pure_response(body, code=200, response_headers=None):
     return (StubResponse(code, response_headers), body)
 
 
+def stub_json_response(body, code=200, response_headers=None):
+    """
+    Return the type of two-tuple response that ServiceRequest returns when
+    json_response=True.
+    """
+    return (StubResponse(code, response_headers), body)
+
+
 class StubTreq(object):
     """
     A stub version of otter.utils.logging_treq that returns canned responses

@@ -26,7 +26,7 @@ from toolz.functoolz import compose
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import NoSuchEndpoint
-from otter.cloud_client import service_request
+from otter.cloud_client import CLBNotFoundError, service_request
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
     UnexpectedBehaviorError,
@@ -551,6 +551,53 @@ class GetCLBContentsTests(SynchronousTestCase):
                      description=make_desc(lb_id='1')),
              CLBNode(node_id='21', address='a21',
                      description=make_desc(lb_id='2'))])
+
+    def test_lb_disappeared_during_node_fetch(self):
+        """
+        If a load balancer gets deleted while fetching nodes, no nodes will be
+        returned for it.
+        """
+        seq = [
+            lb_req('loadbalancers', True,
+                   {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            nested_parallel([
+                nodes_req(1, [node('11', 'a11')]),
+                lb_req('loadbalancers/2/nodes', True,
+                       CLBNotFoundError(lb_id=u'2')),
+            ]),
+            nested_parallel([])  # No nodes to fetch
+        ]
+        make_desc = partial(CLBDescription, port=20, weight=2,
+                            condition=CLBNodeCondition.ENABLED,
+                            type=CLBNodeType.PRIMARY)
+        eff = get_clb_contents()
+        self.assertEqual(
+            perform_sequence(seq, eff),
+            [CLBNode(node_id='11', address='a11',
+                     description=make_desc(lb_id='1'))])
+
+    def test_lb_disappeared_during_feed_fetch(self):
+        """
+        If a load balancer gets deleted while fetching feeds, no nodes will be
+        returned for it.
+        """
+        node21 = node('21', 'a21', condition='DRAINING', weight=None)
+        seq = [
+            lb_req('loadbalancers', True,
+                   {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            nested_parallel([
+                nodes_req(1, [node('11', 'a11', condition='DRAINING'),
+                              node('12', 'a12')]),
+                nodes_req(2, [node21])
+            ]),
+            nested_parallel([
+                node_feed_req(1, '11', CLBNotFoundError(lb_id=u'1')),
+                node_feed_req(2, '21', '22feed')]),
+        ]
+        eff = get_clb_contents()
+        self.assertEqual(
+            perform_sequence(seq, eff),
+            [assoc_obj(CLBNode.from_node_json(2, node21), drained_at=2.0)])
 
 
 class GetRCv3ContentsTests(SynchronousTestCase):
