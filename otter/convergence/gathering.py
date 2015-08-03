@@ -13,7 +13,9 @@ from toolz.functoolz import compose, identity
 from toolz.itertoolz import concat
 
 from otter.auth import NoSuchEndpoint
-from otter.cloud_client import service_request
+from otter.cloud_client import (
+    CLBNotFoundError,
+    get_clb_node_feed, get_clb_nodes, get_clbs, service_request)
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBNode,
@@ -24,10 +26,17 @@ from otter.convergence.model import (
     group_id_from_metadata)
 from otter.indexer import atom
 from otter.models.cass import CassScalingGroupServersCache
+from otter.util.fp import assoc_obj
 from otter.util.http import append_segments
 from otter.util.retry import (
     exponential_backoff_interval, retry_effect, retry_times)
 from otter.util.timestamp import timestamp_to_epoch
+
+
+def _retry(eff):
+    """Retry an effect with a common policy."""
+    return retry_effect(
+        eff, retry_times(5), exponential_backoff_interval(2))
 
 
 class UnexpectedBehaviorError(Exception):
@@ -55,11 +64,9 @@ def get_all_server_details(changes_since=None, batch_size=100):
 
     def get_server_details(query_params):
         params = sorted(query_params.items())
-        eff = retry_effect(
+        eff = _retry(
             service_request(ServiceType.CLOUD_SERVERS, 'GET',
-                            "{}?{}".format(url,
-                                           urlencode(params, True))),
-            retry_times(5), exponential_backoff_interval(2))
+                            "{}?{}".format(url, urlencode(params, True))))
         return eff.on(continue_)
 
     def continue_(result):
@@ -82,13 +89,6 @@ def get_all_server_details(changes_since=None, batch_size=100):
         return servers
 
     return get_server_details(query)
-
-
-def _discard_response((response, body)):
-    """
-    Takes a response, body tuple and discards the response.
-    """
-    return body
 
 
 def get_all_scaling_group_servers(changes_since=None,
@@ -154,7 +154,6 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     :return: Servers as list of dicts
     :rtype: Effect
     """
-
     cache = cache_class(tenant_id, group_id)
     cached_servers, last_update = yield cache.get_servers(False)
     if last_update is None:
@@ -172,57 +171,46 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     yield do_return(servers)
 
 
+@do
 def get_clb_contents():
-    """
-    Get Rackspace Cloud Load Balancer contents as list of `CLBNode`.
-    """
+    """Get Rackspace Cloud Load Balancer contents as list of `CLBNode`."""
+    # If we get a CLBNotFoundError while fetching feeds, we should throw away
+    # all nodes related to that load balancer, because we don't want to act on
+    # data that we know is invalid/outdated (for example, if we can't fetch a
+    # feed because CLB was deleted, we don't want to say that we have a node in
+    # DRAINING with draining time of 0; we should just say that the node is
+    # gone).
 
-    def lb_req(method, url, json_response=True):
-        """Make a request to the LB service with retries."""
-        return retry_effect(
-            service_request(
-                ServiceType.CLOUD_LOAD_BALANCERS,
-                method, url, json_response=json_response),
-            retry_times(5), exponential_backoff_interval(2))
+    def gone(r):
+        return catch(CLBNotFoundError, lambda exc: r)
+    lb_ids = [lb['id'] for lb in (yield _retry(get_clbs()))]
+    node_reqs = [_retry(get_clb_nodes(lb_id).on(error=gone([])))
+                 for lb_id in lb_ids]
+    all_nodes = yield parallel(node_reqs)
+    lb_nodes = {lb_id: [CLBNode.from_node_json(lb_id, node) for node in nodes]
+                for lb_id, nodes in zip(lb_ids, all_nodes)}
+    draining = [n for n in concat(lb_nodes.values())
+                if n.description.condition == CLBNodeCondition.DRAINING]
+    feeds = yield parallel(
+        [_retry(get_clb_node_feed(n.description.lb_id, n.node_id).on(
+            error=gone(None)))
+         for n in draining]
+    )
+    nodes_to_feeds = dict(zip(draining, feeds))
+    deleted_lbs = set([
+        node.description.lb_id
+        for (node, feed) in nodes_to_feeds.items() if feed is None])
 
-    def _lb_path(lb_id):
-        """Return the URL path to lb with given id's nodes."""
-        return append_segments('loadbalancers', str(lb_id), 'nodes')
-
-    def fetch_nodes(result):
-        _response, body = result
-        lbs = body['loadBalancers']
-        lb_ids = [lb['id'] for lb in lbs]
-        lb_reqs = [
-            lb_req('GET', _lb_path(lb_id)).on(
-                lambda (response, body): body['nodes'])
-            for lb_id in lb_ids]
-        return parallel(lb_reqs).on(lambda all_nodes: (lb_ids, all_nodes))
-
-    def fetch_drained_feeds((ids, all_lb_nodes)):
-        nodes = [
-            CLBNode.from_node_json(_id, node)
-            for _id, nodes in zip(ids, all_lb_nodes) for node in nodes]
-        draining = [n for n in nodes
-                    if n.description.condition == CLBNodeCondition.DRAINING]
-        return parallel(
-            [lb_req(
-                'GET',
-                append_segments(
-                    'loadbalancers',
-                    str(n.description.lb_id),
-                    'nodes',
-                    '{}.atom'.format(n.node_id)),
-                json_response=False).on(_discard_response)
-             for n in draining]).on(lambda feeds: (nodes, draining, feeds))
-
-    def fill_drained_at((nodes, draining, feeds)):
-        for node, feed in zip(draining, feeds):
-            node.drained_at = extract_CLB_drained_at(feed)
-        return nodes
-
-    return lb_req('GET', 'loadbalancers').on(
-        fetch_nodes).on(fetch_drained_feeds).on(fill_drained_at)
+    def update_drained_at(node):
+        feed = nodes_to_feeds.get(node)
+        if node.description.lb_id in deleted_lbs:
+            return None
+        if feed is not None:
+            return assoc_obj(node, drained_at=extract_CLB_drained_at(feed))
+        else:
+            return node
+    nodes = map(update_drained_at, concat(lb_nodes.values()))
+    yield do_return(list(filter(bool, nodes)))
 
 
 def extract_CLB_drained_at(feed):

@@ -600,9 +600,9 @@ class WeakLocks(object):
 
 def get_client_ts(reactor):
     """
-    Return EPOCH with microseconds precision as a `Deferred`
+    Return EPOCH with microseconds precision synchronously
     """
-    return defer.succeed(int(reactor.seconds() * 1000000))
+    return int(reactor.seconds() * 1000000)
 
 
 def _check_deleting(group, get_deleting=False):
@@ -694,9 +694,7 @@ class CassScalingGroup(object):
         """
         @functools.wraps(func)
         def wrapper(*args):
-            d = get_client_ts(self.reactor)
-            d.addCallback(lambda ts: func(ts, *args))
-            return d
+            return func(get_client_ts(self.reactor), *args)
         return wrapper
 
     def view_manifest(self, with_policies=True, with_webhooks=False,
@@ -1742,11 +1740,16 @@ class CassScalingGroupServersCache(object):
     Collection of cache of scaling group servers
     """
 
-    def __init__(self, tenant_id, group_id):
+    def __init__(self, tenant_id, group_id, clock=None):
         self.tenantId = tenant_id
         self.groupId = group_id
         self.table = "servers_cache"
         self.params = {"tenantId": self.tenantId, "groupId": self.groupId}
+        if clock is None:
+            from twisted.internet import reactor
+            self.clock = reactor
+        else:
+            self.clock = clock
 
     @do
     def get_servers(self, only_as_active):
@@ -1789,17 +1792,20 @@ class CassScalingGroupServersCache(object):
             queries.append(query.format(cf=self.table, i=i))
         if clear_others:
             return self.delete_servers().on(
-                lambda _: cql_eff(batch(queries), params))
+                lambda _: cql_eff(
+                    batch(queries, get_client_ts(self.clock)), params))
         else:
-            return cql_eff(batch(queries), params)
+            return cql_eff(batch(queries, get_client_ts(self.clock)), params)
 
     def delete_servers(self):
         """
         See :method:`IScalingGroupServersCache.delete_servers`
         """
+        query = ('DELETE FROM {cf} USING TIMESTAMP :ts '
+                 'WHERE "tenantId"=:tenantId AND "groupId"=:groupId')
         return cql_eff(
-            _cql_delete_all_in_group.format(cf=self.table, name=''),
-            self.params)
+            query.format(cf=self.table),
+            merge(self.params, {"ts": get_client_ts(self.clock)}))
 
 
 @implementer(IAdmin)
