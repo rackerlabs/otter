@@ -150,7 +150,7 @@ def setup_test_log_observer(testcase):
     file for the duration of the test.  Also cleans up the observer and the
     temp file object after the test is over.
     """
-    logfile = open(testcase.mktemp(), 'wb')
+    logfile = open("{0}.log".format(testcase.id()), 'ab')
     observer = copying_wrapper(
         PEP3101FormattingWrapper(
             ErrorFormattingWrapper(
