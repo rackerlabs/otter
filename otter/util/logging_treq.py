@@ -21,9 +21,22 @@ def _log_request(treq_call, url, **kwargs):
     :param log: If provided, an instance of BoundLog.
         Defaults to ``otter.log.default_log`` if not provided.
     :type log: BoundLog or None.
+
+    Supported non-treq keyword arguments::
+
+    - ``clock`` - a reactor to use for timing requests - will use the default
+        reactor if not provided.
+    - ``log`` - a BoundLog instance - will use the default BoundLog instance
+        in :obj:`otter.log` if not provided.
+    - ``log_response`` - a boolean as to whether or not the response bodies
+        should be logged as bytes.  Defaults to False, because this can be
+        dangerous as it may log secret information such as admin passwords.
+
+    Note that the `headers` are modified to include a treq-specific request ID.
     """
     clock = kwargs.pop('clock', reactor)
     log = kwargs.pop('log', None)
+    log_response = kwargs.pop('log_response', False)
 
     if not log:
         log = default_log
@@ -47,17 +60,27 @@ def _log_request(treq_call, url, **kwargs):
     timeout_deferred(d, 45, clock)
 
     def log_request(response):
-        request_time = clock.seconds() - start_time
-        log.msg(
-            ("Request to {method} {url} resulted in a {status_code} response "
-             "after {request_time} seconds."),
-            status_code=response.code, headers=response.headers,
-            request_time=request_time)
+        kwargs = {'request_time': clock.seconds() - start_time,
+                  'status_code': response.code,
+                  'headers': response.headers}
+        message = (
+            "Request to {method} {url} resulted in a {status_code} response "
+            "after {request_time} seconds.")
+
+        if log_response:
+            return (
+                treq.content(response)
+                .addCallback(
+                    lambda b: log.msg(message, response_body=b, **kwargs))
+                .addCallback(lambda _: response))
+
+        log.msg(message, **kwargs)
         return response
 
     def log_failure(failure):
         request_time = clock.seconds() - start_time
-        log.msg("Request to {method} {url} failed after {request_time} seconds.",
+        log.msg("Request to {method} {url} failed after {request_time} "
+                "seconds.",
                 reason=failure, request_time=request_time)
         return failure
 

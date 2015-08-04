@@ -2,9 +2,10 @@
 Tests for logging treq
 """
 import mock
+
 import treq
 
-from twisted.internet.defer import Deferred
+from twisted.internet.defer import Deferred, succeed
 from twisted.internet.task import Clock
 from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
@@ -43,19 +44,28 @@ class LoggingTreqTest(SynchronousTestCase):
         self.url = 'myurl'
 
     def _assert_success_logging(self, method, status, request_time,
-                                url_params=None):
+                                url_params=None, body=None):
         """
         msg expected to be made on a successful request are logged
         """
+        response_kwargs = {
+            'url': self.url,
+            'status_code': status,
+            'headers': {'1': '2'},
+            'method': method,
+            'treq_request_id': 'uuid',
+            'url_params': url_params,
+            'system': "treq.request",
+            'request_time': request_time
+        }
+        if body is not None:
+            response_kwargs['response_body'] = body
+
         self.assertEqual(self.log.msg.mock_calls, [
             mock.call(mock.ANY, url=self.url, system="treq.request",
                       method=method, treq_request_id='uuid',
                       url_params=url_params),
-            mock.call(
-                mock.ANY, url=self.url, status_code=status, headers={'1': '2'},
-                system="treq.request", request_time=request_time,
-                method=method, treq_request_id='uuid',
-                url_params=url_params)
+            mock.call(mock.ANY, **response_kwargs)
         ])
 
     def _assert_failure_logging(self, method, exception_type, request_time):
@@ -88,6 +98,20 @@ class LoggingTreqTest(SynchronousTestCase):
 
         self.assertIs(self.successResultOf(d), self.response)
         self._assert_success_logging('patch', 204, 5)
+
+    def test_request_with_response_logging(self):
+        """
+        On a successful request with response logging turned on, response is
+        returned and request with body is logged.
+        """
+        self.treq.request.return_value.callback(self.response)
+        self.treq.content.return_value = succeed("this is the body")
+
+        d = logging_treq.request('patch', self.url, headers={}, data='',
+                                 log=self.log, clock=self.clock,
+                                 log_response=True)
+        self.assertIs(self.successResultOf(d), self.response)
+        self._assert_success_logging('patch', 204, 0, body='this is the body')
 
     def test_url_params(self):
         """`params` is logged as `url_params`."""
