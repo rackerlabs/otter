@@ -84,6 +84,7 @@ class PauseTests(unittest.TestCase):
         yield group.start(self.rcs, self)
         one_building = ContainsDict({"pendingCapacity": Equals(1),
                                      "activeCapacity": Equals(0),
+                                     "desiredCapacity": Equals(1),
                                      "status": Equals("ACTIVE")})
         yield self.helper.assert_group_state(group, one_building)
         yield group.pause(self.rcs)
@@ -133,6 +134,7 @@ class PauseTests(unittest.TestCase):
         yield self.helper.assert_group_state(
             group,
             ContainsDict({"pendingCapacity": Equals(0),
+                          "desiredCapacity": Equals(0),
                           "activeCapacity": Equals(0)}))
 
     @inlineCallbacks
