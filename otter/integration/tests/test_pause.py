@@ -4,8 +4,10 @@ endpoints
 """
 from testtools.matchers import ContainsDict, Equals
 
+import treq
+
 from twisted.internet import reactor
-from twisted.internet.defer import inlineCallbacks
+from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.trial import unittest
 
 from otter.integration.lib.autoscale import ScalingPolicy
@@ -113,6 +115,25 @@ class PauseTests(unittest.TestCase):
         yield group.pause(self.rcs)
         policy = ScalingPolicy(set_to=1, scaling_group=group)
         yield policy.start(self.rcs, self)
+        returnValue((group, policy))
+
+    @inlineCallbacks
+    def test_pause_and_create_execute_webhook(self):
+        """
+        Webhook can be created on a paused group but it cannot be executed
+        """
+        group, policy = yield self.test_pause_and_create_policy()
+        webhook = policy.create_webhook(self.rcs)
+        # execute webhook and wait for sometime for execution to take place
+        resp = yield treq.post(webhook.capurl, pool=self.helper.pool)
+        self.assertEqual(resp.code, 202)
+        yield treq.content(resp)
+        yield sleep(reactor, 2)
+        # The group has no impact
+        yield self.assert_group_state(
+            group,
+            ContainsDict({"pendingCapacity": Equals(0),
+                          "activeCapacity": Equals(0)}))
 
     @inlineCallbacks
     def test_pause_and_converge(self):
