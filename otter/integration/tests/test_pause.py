@@ -13,12 +13,14 @@ from otter.integration.lib.mimic import MimicNova
 from otter.integration.lib.resources import TestResources
 from otter.integration.lib.trial_tools import (
     TestHelper,
+    convergence_interval,
     get_identity,
     get_resource_mapping,
     get_utcstr_from_now,
-    otter_build_timeout,
+    not_mimic,
     region,
     scheduler_interval,
+    skip_if,
     sleep
 )
 
@@ -56,6 +58,7 @@ class PauseTests(unittest.TestCase):
         yield self.helper.assert_group_state(
             group, ContainsDict({"paused": Equals(True)}))
 
+    @skip_if(not_mimic, "This requires mimic for long builds")
     @inlineCallbacks
     def test_pause_stops_convergence(self):
         """
@@ -67,12 +70,13 @@ class PauseTests(unittest.TestCase):
         5. Notice that group continues to think that server is building
         """
         mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        server_build_time = convergence_interval + 5
         yield mimic_nova.sequenced_behaviors(
             self.rcs,
             criteria=[{"server_name": "pause-stops-convergence" + ".*"}],
             behaviors=[
                 {"name": "build",
-                 "parameters": {"duration": otter_build_timeout - 5}}
+                 "parameters": {"duration": server_build_time}}
             ])
         group, _ = self.helper.create_group(min_entities=1)
         yield group.start(self.rcs, self)
@@ -81,7 +85,10 @@ class PauseTests(unittest.TestCase):
                                      "status": Equals("ACTIVE")})
         yield self.helper.assert_group_state(group, one_building)
         yield group.pause(self.rcs)
-        yield sleep(reactor, otter_build_timeout)
+        # Wait for server to build and few more convergence cycles after that
+        yield sleep(reactor,
+                    server_build_time + convergence_interval * 2)
+        # The group still thinks that server is building
         yield self.helper.assert_group_state(group, one_building)
 
     @inlineCallbacks

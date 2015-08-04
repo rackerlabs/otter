@@ -46,8 +46,9 @@ endpoint = os.environ['AS_IDENTITY']
 flavor_ref = os.environ['AS_FLAVOR_REF']
 image_ref = os.environ['AS_IMAGE_REF']
 region = os.environ['AS_REGION']
-scheduler_interval = os.environ.get("AS_SCHEDULER_INTERVAL", 10)
+scheduler_interval = float(os.environ.get("AS_SCHEDULER_INTERVAL", "10"))
 otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
+convergence_interval = float(os.environ.get("AS_CONVERGENCE_INTERVAL", "10"))
 
 # Get vs dict lookup because it will return None if not found,
 # not throw an exception.  None is a valid value for convergence_tenant.
