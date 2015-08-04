@@ -69,6 +69,7 @@ from otter.test.utils import (
     StubResponse,
     nested_sequence,
     perform_sequence,
+    raise_,
     resolve_effect,
     stub_json_response,
     stub_pure_response)
@@ -1256,6 +1257,18 @@ class NovaClientTests(SynchronousTestCase):
              service_request_eqf(stub_pure_response(resps[0], 200))),
             (self._list_server_details_intent({'marker': ['3']}),
              service_request_eqf(stub_pure_response(resps[1], 200)))
+        ]
+        self.assertRaises(NovaComputeFaultError, perform_sequence, seq, eff)
+
+    def test_list_servers_details_all_propagates_errors(self):
+        """
+        :func:`list_servers_details_all` propagates exceptions from making
+        the individual requests (from :func:`list_servers_details_page`).
+        """
+        eff = list_servers_details_all({'marker': ['1']})
+        seq = [
+            (self._list_server_details_intent({'marker': ['1']}),
+             lambda _: raise_(NovaComputeFaultError('error')))
         ]
         self.assertRaises(NovaComputeFaultError, perform_sequence, seq, eff)
 
