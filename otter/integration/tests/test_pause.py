@@ -123,14 +123,14 @@ class PauseTests(unittest.TestCase):
         Webhook can be created on a paused group but it cannot be executed
         """
         group, policy = yield self.test_pause_and_create_policy()
-        webhook = policy.create_webhook(self.rcs)
+        webhook = yield policy.create_webhook(self.rcs)
         # execute webhook and wait for sometime for execution to take place
         resp = yield treq.post(webhook.capurl, pool=self.helper.pool)
         self.assertEqual(resp.code, 202)
         yield treq.content(resp)
         yield sleep(reactor, 2)
         # The group has no impact
-        yield self.assert_group_state(
+        yield self.helper.assert_group_state(
             group,
             ContainsDict({"pendingCapacity": Equals(0),
                           "activeCapacity": Equals(0)}))
