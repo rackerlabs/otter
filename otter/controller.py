@@ -50,10 +50,10 @@ from otter.cloud_client import (
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.model import DRAINING_METADATA, group_id_from_metadata
 from otter.convergence.service import (
-    delete_divergent_flag, get_convergence_starter)
+    delete_divergent_flag, get_convergence_starter, mark_divergent)
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
-from otter.log.intents import with_log
+from otter.log.intents import msg, with_log
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
 from otter.models.interface import GroupNotEmptyError, ScalingGroupStatus
 from otter.supervisor import (
@@ -124,7 +124,19 @@ def pause_scaling_group(log, transaction_id, scaling_group, dispatcher):
                    conv_pause_group_eff(scaling_group, transaction_id))
 
 
-def resume_scaling_group(log, transaction_id, scaling_group):
+def conv_resume_group_eff(trans_id, group):
+    """
+    Resume scaling group of convergence enabled tenant
+    """
+    eff = parallel([
+        Effect(ModifyGroupStatePaused(group, False)),
+        mark_divergent(group.tenant_id, group.uuid).on(
+            lambda _: msg("mark-dirty-success"))])
+    return with_log(eff, transaction_id=trans_id, tenant_id=group.tenant_id,
+                    scaling_group_id=group.uuid).on(lambda _: None)
+
+
+def resume_scaling_group(log, transaction_id, scaling_group, dispatcher):
     """
     Resumes the scaling group, causing all scaling policy executions to be
     evaluated as normal again.  This is an idempotent change, if it's already
@@ -134,7 +146,11 @@ def resume_scaling_group(log, transaction_id, scaling_group):
 
     :return: None
     """
-    raise NotImplementedError('Resume is not yet implemented')
+    if not tenant_is_enabled(scaling_group.tenant_id, config_value):
+        raise NotImplementedError(
+            'Resume is not implemented for legacy groups')
+    return perform(dispatcher,
+                   conv_resume_group_eff(transaction_id, scaling_group))
 
 
 def _do_convergence_audit_log(_, log, delta, state):

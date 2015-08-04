@@ -51,13 +51,13 @@ from otter.util.fp import assoc_obj
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN
-from otter.util.zk import DeleteNode
+from otter.util.zk import CreateOrSet, DeleteNode
 from otter.worker_intents import EvictServerFromScalingGroup
 
 
 class PauseGroupTests(SynchronousTestCase):
     """
-    Tests for `conv_pause_group_eff`
+    Tests for pausing and resuming group functions
     """
 
     def setUp(self):
@@ -105,6 +105,50 @@ class PauseGroupTests(SynchronousTestCase):
         """
         self.assertRaises(
             NotImplementedError, controller.pause_scaling_group, self.log,
+            "transid", self.group, object())
+
+    def test_resume_group_eff(self):
+        """
+        `conv_resume_group_eff` returns Effect to update group state paused
+        and mark divergent flag
+        """
+        eff = controller.conv_resume_group_eff("transid", self.group)
+        seq = [
+            (BoundFields(mock.ANY, dict(transaction_id="transid",
+                                        tenant_id="tid",
+                                        scaling_group_id="gid")),
+             nested_sequence([
+                 nested_parallel([
+                     (ModifyGroupStatePaused(self.group, False), noop),
+                     (CreateOrSet(path="/groups/divergent/tid_gid",
+                                  content="dirty"),
+                      noop),
+                     (Log("mark-dirty-success", {}), noop)
+                 ])
+             ]))
+        ]
+        self.assertEqual(perform_sequence(seq, eff), None)
+
+    @mock.patch("otter.controller.conv_resume_group_eff",
+                return_value=Effect("resume"))
+    def test_resume_group_conv(self, mock_crge):
+        """
+        `resume_scaling_group` performs effect got from conv_resume_group_eff
+        for convergence tenants
+        """
+        set_config_data({"convergence-tenants": ["tid"]})
+        self.addCleanup(set_config_data, None)
+        dispatcher = SequenceDispatcher([("resume", lambda i: "resumed")])
+        d = controller.resume_scaling_group(
+            self.log, "transid", self.group, dispatcher)
+        self.assertEqual(self.successResultOf(d), "resumed")
+
+    def test_resume_group_worker(self):
+        """
+        `resume_scaling_group` is not implemented for worker tenants
+        """
+        self.assertRaises(
+            NotImplementedError, controller.resume_scaling_group, self.log,
             "transid", self.group, object())
 
 
