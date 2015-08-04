@@ -682,7 +682,8 @@ class ScalingPolicy(object):
         Create webhook and return `Webhook` object as Deferred
         """
         d = treq.post(
-            "{}/webhooks".format(self.link), headers=headers(str(rcs.token)),
+            "{}/webhooks".format(self.link.rstrip("/")),
+            headers=headers(str(rcs.token)),
             data=json.dumps([{"name": "integration-test-webhook"}]),
             pool=self.scaling_group.pool)
         d.addCallback(check_success, [201])
@@ -700,7 +701,7 @@ class Webhook(object):
     def from_json(cls, blob):
         return Webhook(
             id=blob["id"], name=blob["name"],
-            link=next(link["href"] for link in blob["links"]
+            link=next(str(link["href"]) for link in blob["links"]
                       if link["rel"] == "self"),
-            capurl=next(link["href"] for link in blob["links"]
+            capurl=next(str(link["href"]) for link in blob["links"]
                         if link["rel"] == "capability"))
