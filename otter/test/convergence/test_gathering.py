@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from functools import partial
-from urllib import urlencode
 
 from effect import (
     ComposedDispatcher,
@@ -26,10 +25,13 @@ from toolz.functoolz import compose
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import NoSuchEndpoint
-from otter.cloud_client import CLBNotFoundError, service_request
+from otter.cloud_client import (
+    CLBNotFoundError,
+    NovaComputeFaultError,
+    service_request
+)
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
-    UnexpectedBehaviorError,
     extract_CLB_drained_at,
     get_all_convergence_data,
     get_all_scaling_group_servers,
@@ -55,7 +57,6 @@ from otter.test.utils import (
     patch,
     perform_sequence,
     resolve_effect,
-    resolve_retry_stubs,
     resolve_stubs,
     server
 )
@@ -76,9 +77,9 @@ def _request(requests):
 
 
 def resolve_svcreq(eff, result, service_type,
-                   method, url, headers=None, data=None):
+                   method, url, params=None, headers=None, data=None):
     expected_eff = service_request(
-        service_type, method, url, headers=headers, data=data)
+        service_type, method, url, params=params, headers=headers, data=data)
     assert eff.intent == expected_eff.intent, "%r != %r" % (
         eff.intent, expected_eff.intent)
     return resolve_effect(eff, result)
@@ -91,8 +92,11 @@ def svc_request_args(**params):
     changes_since = params.pop('changes_since', None)
     if changes_since is not None:
         params['changes-since'] = changes_since.isoformat() + 'Z'
-    return (ServiceType.CLOUD_SERVERS, 'GET',
-            'servers/detail?{}'.format(urlencode(sorted(params.items()))))
+    return {
+        'service_type': ServiceType.CLOUD_SERVERS,
+        'method': 'GET',
+        'params': {k: [str(v)] for k, v in params.iteritems()},
+        'url': 'servers/detail'}
 
 
 class GetAllServerDetailsTests(SynchronousTestCase):
@@ -112,10 +116,9 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         """
         fake_response = object()
         body = {'servers': self.servers}
-        eff = get_all_server_details(batch_size=10)
-        svcreq = resolve_retry_stubs(eff)
+        svcreq = get_all_server_details(batch_size=10)
         result = resolve_svcreq(
-            svcreq, (fake_response, body), *svc_request_args(limit=10))
+            svcreq, (fake_response, body), **svc_request_args(limit=10))
         self.assertEqual(result, self.servers)
 
     def test_get_all_ignores_non_next_links(self):
@@ -127,10 +130,9 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         body = {'servers': self.servers,
                 'server_links': [{
                     'href': 'https://ignoreme/path?bleh=1', 'rel': 'prev'}]}
-        eff = get_all_server_details(batch_size=10)
-        svcreq = resolve_retry_stubs(eff)
+        svcreq = get_all_server_details(batch_size=10)
         result = resolve_svcreq(
-            svcreq, (fake_response, body), *svc_request_args(limit=10))
+            svcreq, (fake_response, body), **svc_request_args(limit=10))
         self.assertEqual(result, self.servers)
 
     def test_get_all_with_link_to_next_page(self):
@@ -140,32 +142,32 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         """
         servers = [{'id': i} for i in range(20)]
         # first request
-        svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
+        svcreq = get_all_server_details(batch_size=10)
         fake_response = object()
         body = {'servers': servers[:10],
                 'servers_links': [{
                     'href': 'https://ignoreme/path?limit=10&marker=9',
                     'rel': 'next'}]}
         result = resolve_svcreq(
-            svcreq, (fake_response, body), *svc_request_args(limit=10))
+            svcreq, (fake_response, body), **svc_request_args(limit=10))
         self.assertIsInstance(result, Effect)
 
         # next request, because previous had a next link
-        next_req = resolve_retry_stubs(result)
+        next_req = result
         body = {'servers': servers[10:],
                 'servers_links': [{
                     'href': 'https://ignoreme/path?limit=10&marker=19',
                     'rel': 'next'}]}
         result = resolve_svcreq(
             next_req, (fake_response, body),
-            *svc_request_args(limit=10, marker=9))
+            **svc_request_args(limit=10, marker=9))
         self.assertIsInstance(result, Effect)
 
         # third request, because previous had a next link
-        next_req = resolve_retry_stubs(result)
+        next_req = result
         body = {'servers': []}
         result = resolve_svcreq(next_req, (fake_response, body),
-                                *svc_request_args(limit=10, marker=19))
+                                **svc_request_args(limit=10, marker=19))
 
         self.assertEqual(result, servers)
 
@@ -177,25 +179,25 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         """
         servers = [{'id': i} for i in range(20)]
         # first request
-        svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
+        svcreq = get_all_server_details(batch_size=10)
         fake_response = object()
         body = {'servers': servers[:10],
                 'servers_links': [{
                     'href': 'https://ignoreme/path?anything=1',
                     'rel': 'next'}]}
         result = resolve_svcreq(svcreq, (fake_response, body),
-                                *svc_request_args(limit=10))
+                                **svc_request_args(limit=10))
         self.assertIsInstance(result, Effect)
 
         # next request, because previous had a next link
-        next_req = resolve_retry_stubs(result)
+        next_req = result
         body = {'servers': servers[10:],
                 'servers_links': [{
                     'href': 'https://ignoreme/path?anything=1',
                     'rel': 'next'}]}
-        self.assertRaises(UnexpectedBehaviorError,
+        self.assertRaises(NovaComputeFaultError,
                           resolve_svcreq, next_req, (fake_response, body),
-                          *svc_request_args(anything=1))
+                          **svc_request_args(anything=1))
 
     def test_with_changes_since(self):
         """
@@ -205,20 +207,11 @@ class GetAllServerDetailsTests(SynchronousTestCase):
         fake_response = object()
         body = {'servers': self.servers}
         since = datetime(2010, 10, 10, 10, 10, 0)
-        eff = get_all_server_details(changes_since=since, batch_size=10)
-        svcreq = resolve_retry_stubs(eff)
+        svcreq = get_all_server_details(changes_since=since, batch_size=10)
         result = resolve_svcreq(
             svcreq, (fake_response, body),
-            *svc_request_args(changes_since=since, limit=10))
+            **svc_request_args(changes_since=since, limit=10))
         self.assertEqual(result, self.servers)
-
-    def test_retry(self):
-        """The HTTP requests are retried with some appropriate policy."""
-        eff = get_all_server_details(batch_size=10)
-        self.assertEqual(
-            eff.intent.should_retry,
-            ShouldDelayAndRetry(can_retry=retry_times(5),
-                                next_interval=exponential_backoff_interval(2)))
 
 
 class GetAllScalingGroupServersTests(SynchronousTestCase):
@@ -229,20 +222,19 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
     def setUp(self):
         """Save basic reused data."""
         self.req = (ServiceType.CLOUD_SERVERS, 'GET',
-                    'servers/detail?limit=100')
+                    'servers/detail', {'limit': ['100']})
 
     def test_with_changes_since(self):
         """
         If given, servers are fetched based on changes_since
         """
         since = datetime(2010, 10, 10, 10, 10, 0)
-        eff = resolve_retry_stubs(
-            get_all_scaling_group_servers(changes_since=since))
+        eff = get_all_scaling_group_servers(changes_since=since)
         fake_response = object()
         body = {'servers': []}
         result = resolve_svcreq(
             eff, (fake_response, body),
-            *svc_request_args(changes_since=since, limit=100))
+            **svc_request_args(changes_since=since, limit=100))
         self.assertEqual(result, {})
 
     def test_filters_no_metadata(self):
@@ -250,7 +242,7 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
         Servers without metadata are not included in the result.
         """
         servers = [{'id': i} for i in range(10)]
-        eff = resolve_retry_stubs(get_all_scaling_group_servers())
+        eff = get_all_scaling_group_servers()
         fake_response = object()
         body = {'servers': servers}
         result = resolve_svcreq(eff, (fake_response, body), *self.req)
@@ -262,7 +254,7 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
         in it
         """
         servers = [{'id': i, 'metadata': {}} for i in range(10)]
-        eff = resolve_retry_stubs(get_all_scaling_group_servers())
+        eff = get_all_scaling_group_servers()
         fake_response = object()
         body = {'servers': servers}
         result = resolve_svcreq(eff, (fake_response, body), *self.req)
@@ -279,7 +271,7 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
              for i in range(5, 8)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
         servers = as_servers + [{'metadata': 'junk'}] * 3
-        eff = resolve_retry_stubs(get_all_scaling_group_servers())
+        eff = get_all_scaling_group_servers()
         fake_response = object()
         body = {'servers': servers}
         result = resolve_svcreq(eff, (fake_response, body), *self.req)
@@ -297,9 +289,8 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
             [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i}
              for i in range(5, 8)])
         servers = as_servers + [{'metadata': 'junk'}] * 3
-        eff = resolve_retry_stubs(
-            get_all_scaling_group_servers(
-                server_predicate=lambda s: s['id'] % 3 == 0))
+        eff = get_all_scaling_group_servers(
+            server_predicate=lambda s: s['id'] % 3 == 0)
         fake_response = object()
         body = {'servers': servers}
         result = resolve_svcreq(eff, (fake_response, body), *self.req)
