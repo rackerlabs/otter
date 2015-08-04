@@ -676,3 +676,31 @@ class ScalingPolicy(object):
             # So, we forcefully return our resources here.
             .addCallback(lambda _, x: x, rcs)
         )
+
+    def create_webhook(self, rcs):
+        """
+        Create webhook and return `Webhook` object as Deferred
+        """
+        d = treq.post(
+            "{}/webhooks".format(self.link), headers=headers(str(rcs.token)),
+            data=json.dumps([{"name": "integration-test-webhook"}]),
+            pool=self.scaling_group.pool)
+        d.addCallback(check_success, [201])
+        d.addCallback(treq.json_content)
+        return d.addCallback(lambda r: Webhook.from_json(r["webhooks"][0]))
+
+
+@attributes(["id", "name", "link", "capurl"])
+class Webhook(object):
+    """
+    Scaling group's policy's webhook
+    """
+
+    @classmethod
+    def from_json(cls, blob):
+        return Webhook(
+            id=blob["id"], name=blob["name"],
+            link=next(link["href"] for link in blob["links"]
+                      if link["rel"] == "self"),
+            capurl=next(link["href"] for link in blob["links"]
+                        if link["rel"] == "capability"))
