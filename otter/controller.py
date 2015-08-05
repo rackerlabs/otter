@@ -119,7 +119,7 @@ def pause_scaling_group(log, transaction_id, scaling_group, dispatcher):
     :return: None
     """
     if not tenant_is_enabled(scaling_group.tenant_id, config_value):
-        raise NotImplementedError("Pause is not yet implemented")
+        raise NotImplementedError("Pause is not implemented for legay groups")
     return perform(dispatcher,
                    conv_pause_group_eff(scaling_group, transaction_id))
 
