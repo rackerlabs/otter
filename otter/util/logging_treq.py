@@ -37,7 +37,12 @@ class LoggingTreq(object):
     clock = attr.ib(default=reactor)
     log = attr.ib(default=default_log)
     log_response = attr.ib(default=False)
-    pool = attr.ib(default=None)
+
+    def __getattr__(self, name):
+        """
+        Handle anything else that should be on treq.
+        """
+        return getattr(treq, name)
 
     def request(self, method, url, **kwargs):
         """Wrapper around :py:func:`treq.request` that logs the request."""

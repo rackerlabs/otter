@@ -338,3 +338,18 @@ class LoggingTreqTest(SynchronousTestCase):
         On timed out call to delete, failure is returned and request logged
         """
         self._test_method_timeout('delete')
+
+    def test_contents(self):
+        """
+        ``content``, ``json_content``, and ``text_content`` are just directly
+        mapped to treq.
+        """
+        ltreq_instance = logging_treq.LoggingTreq()
+        for name in ('content', 'json_content', 'text_content'):
+            for obj in (ltreq_instance, logging_treq):
+                # patching won't change things that were defined at import time
+                expected = (getattr(self.treq, name), getattr(treq, name))
+                actual = getattr(obj, name)
+                self.assertIn(actual, expected,
+                              "{0}.{1} ({2}) is not treq.{1} ({3} or {4})"
+                              .format(obj.__name__, name, actual, *expected))
