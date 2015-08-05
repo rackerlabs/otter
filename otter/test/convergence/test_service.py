@@ -114,10 +114,10 @@ class ConvergerTests(SynchronousTestCase):
         return self.fake_partitioner
 
     def _log_sequence(self, intents):
-        uid = uuid.uuid1()
+        uid = uuid.uuid4()
         exp_uid = str(uid)
         return SequenceDispatcher([
-            (Func(uuid.uuid1), lambda i: uid),
+            (Func(uuid.uuid4), lambda i: uid),
             (BoundFields(effect=mock.ANY,
                          fields={'otter_service': 'converger',
                                  'converger_run_id': exp_uid}),

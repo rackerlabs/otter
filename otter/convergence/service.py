@@ -595,7 +595,7 @@ class Converger(MultiService):
         """
         Return Effect wrapped with converger_run_id log field
         """
-        return Effect(Func(uuid.uuid1)).on(str).on(
+        return Effect(Func(uuid.uuid4)).on(str).on(
             lambda uid: with_log(eff, otter_service='converger',
                                  converger_run_id=uid))
 
