@@ -1,8 +1,6 @@
 """Code related to gathering data to inform convergence."""
 from datetime import timedelta
 from functools import partial
-from urllib import urlencode
-from urlparse import parse_qs, urlparse
 
 from effect import catch, parallel
 from effect.do import do, do_return
@@ -15,7 +13,11 @@ from toolz.itertoolz import concat
 from otter.auth import NoSuchEndpoint
 from otter.cloud_client import (
     CLBNotFoundError,
-    get_clb_node_feed, get_clb_nodes, get_clbs, service_request)
+    get_clb_node_feed,
+    get_clb_nodes,
+    get_clbs,
+    list_servers_details_all,
+    service_request)
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBNode,
@@ -39,12 +41,6 @@ def _retry(eff):
         eff, retry_times(5), exponential_backoff_interval(2))
 
 
-class UnexpectedBehaviorError(Exception):
-    """
-    Error to be raised when something happens that Autoscale does not expect.
-    """
-
-
 def get_all_server_details(changes_since=None, batch_size=100):
     """
     Return all servers of a tenant.
@@ -55,40 +51,11 @@ def get_all_server_details(changes_since=None, batch_size=100):
 
     NOTE: This really screams to be a independent fxcloud-type API
     """
-    url = append_segments('servers', 'detail')
-    query = {'limit': batch_size}
+    query = {'limit': [str(batch_size)]}
     if changes_since is not None:
-        query['changes-since'] = '{0}Z'.format(changes_since.isoformat())
+        query['changes-since'] = ['{0}Z'.format(changes_since.isoformat())]
 
-    last_link = []
-
-    def get_server_details(query_params):
-        params = sorted(query_params.items())
-        eff = _retry(
-            service_request(ServiceType.CLOUD_SERVERS, 'GET',
-                            "{}?{}".format(url, urlencode(params, True))))
-        return eff.on(continue_)
-
-    def continue_(result):
-        _response, body = result
-        servers = body['servers']
-        # Only continue if pagination is supported and there is another page
-        continuation = [link['href'] for link in body.get('servers_links', [])
-                        if link['rel'] == 'next']
-        if continuation:
-            # blow up if we try to fetch the same link twice
-            if last_link and last_link[-1] == continuation[0]:
-                raise UnexpectedBehaviorError(
-                    "When gathering server details, got the same 'next' link "
-                    "twice from Nova: {0}".format(last_link[-1]))
-
-            last_link[:] = [continuation[0]]
-            parsed = urlparse(continuation[0])
-            more_eff = get_server_details(parse_qs(parsed.query))
-            return more_eff.on(lambda more_servers: servers + more_servers)
-        return servers
-
-    return get_server_details(query)
+    return list_servers_details_all(query)
 
 
 def get_all_scaling_group_servers(changes_since=None,

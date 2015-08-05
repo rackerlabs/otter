@@ -35,6 +35,8 @@ msg_types = {
     "mark-dirty-failure": "Failed to mark group {scaling_group_id} dirty",
     "remove-server-clb": ("Removing server {server_id} with IP address "
                           "{ip_address} from CLB {clb_id}"),
+    "request-create-server": (
+        "Request to create a server succeeded with response: {response_body}"),
 
     # CF-published log messages
     "cf-add-failure": "Failed to add event to cloud feeds",
