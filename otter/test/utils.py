@@ -34,6 +34,7 @@ from twisted.application.service import Service
 from twisted.internet import defer
 from twisted.internet.defer import Deferred, maybeDeferred, succeed
 from twisted.python.failure import Failure
+from twisted.web.http_headers import Headers
 
 from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
@@ -369,6 +370,15 @@ def mock_log(*args, **kwargs):
     return BoundLog(msg, err)
 
 
+class StubClientRequest(object):
+    """
+    A fake request object attached to a Twisted response object
+    """
+    method = "method"
+    absoluteURI = "original/request/URL"
+    headers = Headers({'x-otter-request-id': ['original-request-id']})
+
+
 class StubResponse(object):
     """
     A fake pre-built Twisted Web Response object.
@@ -376,6 +386,7 @@ class StubResponse(object):
     def __init__(self, code, headers, data=None):
         self.code = code
         self.headers = headers
+        self.request = StubClientRequest()
         # Data is not part of twisted response object
         self._data = data
 
@@ -398,6 +409,14 @@ def stub_pure_response(body, code=200, response_headers=None):
         body = json.dumps(body)
     if response_headers is None:
         response_headers = {}
+    return (StubResponse(code, response_headers), body)
+
+
+def stub_json_response(body, code=200, response_headers=None):
+    """
+    Return the type of two-tuple response that ServiceRequest returns when
+    json_response=True.
+    """
     return (StubResponse(code, response_headers), body)
 
 

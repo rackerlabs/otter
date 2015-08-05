@@ -24,15 +24,19 @@ msg_types = {
     "execute-convergence-results": (
         "Got result of {worst_status} after executing convergence"),
     "launch-servers": "Launching {num_servers} servers",
+    "mark-clean-failure": "Failed to mark group {scaling_group_id} clean",
+    "mark-clean-not-found": (
+        "Dirty flag of group {scaling_group_id} not found when deleting"),
     "mark-clean-skipped": (
         "Not marking group {scaling_group_id} clean because another "
         "convergence was requested."),
     "mark-clean-success": "Marked group {scaling_group_id} clean",
-    "mark-clean-failure": "Failed to mark group {scaling_group_id} clean",
     "mark-dirty-success": "Marked group {scaling_group_id} dirty",
     "mark-dirty-failure": "Failed to mark group {scaling_group_id} dirty",
     "remove-server-clb": ("Removing server {server_id} with IP address "
                           "{ip_address} from CLB {clb_id}"),
+    "request-create-server": (
+        "Request to create a server succeeded with response: {response_body}"),
 
     # CF-published log messages
     "cf-add-failure": "Failed to add event to cloud feeds",

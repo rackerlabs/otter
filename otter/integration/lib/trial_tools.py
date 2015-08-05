@@ -3,6 +3,7 @@ A set of helpers for writing trial tests
 """
 
 import os
+from datetime import datetime, timedelta
 
 from testtools.matchers import (
     AfterPreprocessing,
@@ -13,7 +14,8 @@ from testtools.matchers import (
 
 from twisted.internet import reactor
 
-from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
+from twisted.internet.defer import (
+    Deferred, gatherResults, inlineCallbacks, returnValue)
 
 from twisted.web.client import HTTPConnectionPool
 
@@ -44,6 +46,9 @@ endpoint = os.environ['AS_IDENTITY']
 flavor_ref = os.environ['AS_FLAVOR_REF']
 image_ref = os.environ['AS_IMAGE_REF']
 region = os.environ['AS_REGION']
+scheduler_interval = float(os.environ.get("AS_SCHEDULER_INTERVAL", "10"))
+otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
+convergence_interval = float(os.environ.get("AS_CONVERGENCE_INTERVAL", "10"))
 
 # Get vs dict lookup because it will return None if not found,
 # not throw an exception.  None is a valid value for convergence_tenant.
@@ -91,6 +96,12 @@ def get_resource_mapping():
         res['mimic_nova'] = (mimic_nova_key,)
         res['mimic_clb'] = (mimic_clb_key,)
     return res
+
+
+def get_utcstr_from_now(seconds):
+    """ Get UTC timestamp from now in ISO 8601 format """
+    return "{}Z".format(
+        (datetime.utcnow() + timedelta(seconds=seconds)).isoformat())
 
 
 class TestHelper(object):
@@ -220,6 +231,15 @@ class TestHelper(object):
         returnValue(
             [server for server in servers if server['id'] in server_ids])
 
+    @inlineCallbacks
+    def assert_group_state(self, group, matcher):
+        """
+        Assert state of group conforms to the matcher
+        """
+        resp, state = yield group.get_scaling_group_state(self.test_case.rcs,
+                                                          [200])
+        self.test_case.assertIsNone(matcher.match(state["group"]))
+
 
 def tag(*tags):
     """
@@ -286,3 +306,12 @@ def random_string(byte_len=4):
     The string will be 2 * ``byte_len`` in length.
     """
     return os.urandom(byte_len).encode('hex')
+
+
+def sleep(reactor, seconds):
+    """
+    Sleep for given seconds
+    """
+    d = Deferred()
+    reactor.callLater(seconds, d.callback, None)
+    return d

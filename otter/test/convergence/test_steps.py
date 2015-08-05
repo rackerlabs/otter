@@ -56,6 +56,7 @@ from otter.convergence.steps import (
     _rcv3_check_bulk_delete,
     delete_and_verify,
 )
+from otter.log.intents import Log
 from otter.test.utils import (
     StubResponse,
     matches,
@@ -140,10 +141,20 @@ class CreateServerTests(SynchronousTestCase):
         """
         eff = CreateServer(
             server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
-        eff = resolve_effect(eff, 'random-name')
-
+        seq = [
+            (Func(generate_server_name), lambda _: 'random-name'),
+            (service_request(
+                ServiceType.CLOUD_SERVERS,
+                'POST',
+                'servers',
+                data={'server': {'name': 'random-name', 'flavorRef': '1'}},
+                success_pred=has_code(202),
+                reauth_codes=(401,)).intent,
+             lambda _: (StubResponse(202, {}), {"server": {}})),
+            (Log('request-create-server', ANY), lambda _: None)
+        ]
         self.assertEqual(
-            resolve_effect(eff, (StubResponse(202, {}), {"server": {}})),
+            perform_sequence(seq, eff),
             (StepResult.RETRY,
              [ErrorReason.String('waiting for server to become active')]))
 

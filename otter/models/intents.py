@@ -12,6 +12,7 @@ from txeffect import deferred_performer
 
 from otter.log.intents import merge_effectful_fields
 from otter.models.cass import CassScalingGroupServersCache
+from otter.util.fp import assoc_obj
 
 
 @attributes(['tenant_id', 'group_id'])
@@ -98,6 +99,25 @@ def perform_update_error_reasons(disp, intent):
     return intent.group.update_error_reasons(intent.reasons)
 
 
+@attr.s
+class ModifyGroupStatePaused(object):
+    """
+    Intent to update group state pause
+    """
+    group = attr.ib()
+    paused = attr.ib()
+
+
+@deferred_performer
+def perform_modify_group_state_paused(disp, intent):
+    """ Perform `ModifyGroupStatePaused` """
+
+    def update_paused(_group, state):
+        return assoc_obj(state, paused=intent.paused)
+
+    return intent.group.modify_state(update_paused)
+
+
 def get_model_dispatcher(log, store):
     """Get a dispatcher that can handle all the model-related intents."""
     return TypeDispatcher({
@@ -106,5 +126,6 @@ def get_model_dispatcher(log, store):
         DeleteGroup: partial(perform_delete_group, log, store),
         UpdateGroupStatus: perform_update_group_status,
         UpdateServersCache: perform_update_servers_cache,
-        UpdateGroupErrorReasons: perform_update_error_reasons
+        UpdateGroupErrorReasons: perform_update_error_reasons,
+        ModifyGroupStatePaused: perform_modify_group_state_paused
     })
