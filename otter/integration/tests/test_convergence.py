@@ -228,7 +228,8 @@ class TestConvergence(unittest.TestCase):
         rcs = TestResources()
 
         def create_clb_first():
-            self.clb = CloudLoadBalancer(pool=self.helper.pool)
+            self.clb = CloudLoadBalancer(
+                pool=self.helper.pool, treq=self.helper.treq)
             self.helper.clbs = [self.clb]
             return (
                 self.identity.authenticate_user(
@@ -254,7 +255,8 @@ class TestConvergence(unittest.TestCase):
         self.removed_ids = ids
         self.addCleanup(delete_servers, ids, rcs, self.helper.pool)
         return gatherResults([
-            NovaServer(id=_id, pool=self.helper.pool).update_metadata({}, rcs)
+            NovaServer(id=_id, treq=self.helper.treq, pool=self.helper.pool)
+            .update_metadata({}, rcs)
             for _id in ids]).addCallback(lambda _: rcs)
 
 
@@ -353,7 +355,7 @@ def _deleter(helper, rcs, server_ids):
     A disabler function to be passed to :func:`_oob_disable_then` that deletes
     the servers out of band.
     """
-    return delete_servers(server_ids, rcs, pool=helper.pool)
+    return delete_servers(server_ids, rcs, pool=helper.pool, _treq=helper.treq)
 
 
 def _errorer(helper, rcs, server_ids):
@@ -361,7 +363,8 @@ def _errorer(helper, rcs, server_ids):
     A disabler function to be passed to :func:`_oob_disable_then` that invokes
     Mimic to set the server statuses to "ERROR"
     """
-    return MimicNova(pool=helper.pool).change_server_statuses(
+    n = MimicNova(pool=helper.pool, treq=helper.treq)
+    return n.change_server_statuses(
         rcs, {server_id: "ERROR" for server_id in server_ids})
 
 
@@ -629,7 +632,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=2, max_entities=10,
             server_name_prefix="build-to-error"
         )
-        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        mimic_nova = MimicNova(pool=self.helper.pool, treq=self.helper.treq,
+                               test_case=self)
         d = mimic_nova.sequenced_behaviors(
             self.rcs,
             criteria=[{"server_name": server_name_prefix + ".*"}],
@@ -641,7 +645,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         d.addCallback(
             lambda _: self.helper.start_group_and_wait(group, self.rcs))
         d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
-                      matcher=HasLength(2), timeout=600)
+                      matcher=HasLength(2), timeout=600,
+                      _treq=self.helper.treq)
         d.addCallback(lambda _: group)
         return d
 
@@ -665,7 +670,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=2, max_entities=10,
             server_name_prefix="build-timeout"
         )
-        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self,
+                               treq=self.helper.treq)
         yield mimic_nova.sequenced_behaviors(
             self.rcs,
             criteria=[{"server_name": server_name_prefix + ".*"}],
@@ -683,7 +689,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             matcher=MatchesSetwise(
                 ContainsDict({'status': Equals('ACTIVE')}),
                 ContainsDict({'status': Equals('BUILD')}),
-            ))
+            ),
+            _treq=self.helper.treq)
 
         # the above ensures that there is one server with status BUILD
         building_server_id = next(s['id'] for s in initial_servers
@@ -708,7 +715,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                 AllMatch(ContainsDict({'status': Equals('ACTIVE'),
                                        'id': NotEquals(building_server_id)})),
                 HasLength(2)
-            ))
+            ),
+            _treq=self.helper.treq)
         returnValue(group)
 
     @skip_if(not_mimic, "This requires Mimic for error injection.")
@@ -778,7 +786,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=2, max_entities=10,
             server_name_prefix="false-negative"
         )
-        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self,
+                               treq=self.helper.treq)
         d = mimic_nova.sequenced_behaviors(
             self.rcs,
             criteria=[{"server_name": server_name_prefix + ".*"}],
@@ -792,7 +801,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
         d.addCallback(
             lambda _: self.helper.start_group_and_wait(group, self.rcs))
         d.addCallback(wait_for_servers, pool=self.helper.pool, group=group,
-                      matcher=HasLength(2), timeout=600)
+                      matcher=HasLength(2), timeout=600,
+                      _treq=self.helper.treq)
         return d
 
     @skip_if(not_mimic, "This requires Mimic for error injection.")
@@ -812,7 +822,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             server_name_prefix="intermittent-errors"
         )
 
-        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self,
+                               treq=self.helper.treq)
         yield mimic_nova.sequenced_behaviors(
             self.rcs,
             criteria=[{"server_name": server_name_prefix + ".*"}],
@@ -848,7 +859,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=3, max_entities=10,
             server_name_prefix="nova_400s"
         )
-        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self,
+                               treq=self.helper.treq)
 
         message_400 = "Can not find requested image"
 
@@ -887,7 +899,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=2, max_entities=10,
             server_name_prefix="over-quota"
         )
-        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+        mimic_nova = MimicNova(pool=self.helper.pool, test_case=self,
+                               treq=self.helper.treq)
         over_quota_message = (
             "Quota exceeded for ram: Requested 1024, but already used 131072 "
             "of 131072 ram")
@@ -968,7 +981,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
 
         # inject behavior errors for this user, so that when otter
         # impersonates, it gets failures
-        mimic_identity = MimicIdentity(pool=self.helper.pool, test_case=self)
+        mimic_identity = MimicIdentity(pool=self.helper.pool, test_case=self,
+                                       treq=self.helper.treq)
         yield mimic_identity.sequenced_behaviors(
             self.identity.endpoint,
             criteria=[{"username": new_username + ".*"}],
@@ -1016,7 +1030,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             # if this is mimic, we have to make server creation fail.
             # in production, it's actually an invalid key and hence would
             # naturally fail.
-            mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+            mimic_nova = MimicNova(pool=self.helper.pool, test_case=self,
+                                   treq=self.helper.treq)
             behavior_id = yield mimic_nova.sequenced_behaviors(
                 self.rcs,
                 criteria=[{"server_name": server_name_prefix + ".*"}],
@@ -1321,7 +1336,8 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
         """
         group, _ = self.helper.create_group(min_entities=1)
 
-        mimic_clb = MimicCLB(pool=self.helper.pool, test_case=self)
+        mimic_clb = MimicCLB(pool=self.helper.pool, test_case=self,
+                             treq=self.helper.treq)
 
         policy_scale_up = ScalingPolicy(
             scale_by=1,
@@ -1361,7 +1377,8 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
         """
         group, _ = self.helper.create_group()
 
-        mimic_clb = MimicCLB(pool=self.helper.pool, test_case=self)
+        mimic_clb = MimicCLB(pool=self.helper.pool, test_case=self,
+                             treq=self.helper.treq)
 
         policy_scale_down = ScalingPolicy(
             scale_by=-2,
