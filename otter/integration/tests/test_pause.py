@@ -35,8 +35,6 @@ class PauseTests(unittest.TestCase):
     Tests for `../groups/groupId/pause` endpoint
     """
 
-    skip = "Until #1604 is implemented"
-
     def setUp(self):
         self.helper = TestHelper(self)
         self.rcs = TestResources()
