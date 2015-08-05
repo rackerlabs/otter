@@ -908,24 +908,16 @@ class DeleteGroupTests(SynchronousTestCase):
         self.addCleanup(set_config_data, {})
         self.mock_tcd.return_value = defer.succeed('tcd')
 
-    def test_convergence_tenant_force(self, paused=False):
+    def test_convergence_tenant_force(self):
         """
         Updates DELETED status for convergence tenant and starts convergence
         """
         self.setup_conv()
-        self.state.paused = paused
         d = controller.delete_group(self.log, 'transid', self.group, True)
         self.assertEqual(self.successResultOf(d), 'tcd')
         # delete_group() or modify_state() not called
         self.assertFalse(self.group.delete_group.called)
         self.assertFalse(self.group.modify_state.called)
-
-    def test_convergence_tenant_force_group_paused(self):
-        """
-        Updates DELETED status for convergence tenant and starts convergence
-        even if group is paused
-        """
-        self.test_convergence_tenant_force(True)
 
     def test_convergence_tenant_no_force(self):
         """
@@ -938,41 +930,16 @@ class DeleteGroupTests(SynchronousTestCase):
 
         d = controller.delete_group(self.log, 'transid', self.group, False)
 
-        # trigger_convergence has been called and no result because
+        # trigger_convergence_deletion has not been called because
         # modify_state is paused
         self.assertNoResult(d)
         self.assertTrue(self.group.modify_state.called)
         self.mock_tcd.assert_called_once_with(self.log, self.group)
         self.assertEqual(self.group.modify_state_values, [self.state])
 
-        # unpause modify_state
+        # unpause modify_state and result is available
         self.group.modify_state_pause_d.callback(None)
         self.assertIsNone(self.successResultOf(d))
-
-        # delete_group() not called
-        self.assertFalse(self.group.delete_group.called)
-
-    def assert_raises_in_modify_state(self, excp_type):
-        """
-        Assert that given exception occurs inside modify_state
-        """
-        self.group.pause_modify_state = True
-
-        d = controller.delete_group(self.log, 'transid', self.group, False)
-
-        # trigger_convergence has not been called and no result because
-        # modify_state is paused
-        self.assertNoResult(d)
-        self.assertTrue(self.group.modify_state.called)
-        # Nothing returned from modifier since it raised error
-        self.assertEqual(self.group.modify_state_values, [])
-
-        # trigger_convergence_deletion is not called
-        self.assertFalse(self.mock_tcd.called)
-
-        # unpause modify_state
-        self.group.modify_state_pause_d.callback(None)
-        self.failureResultOf(d, excp_type)
 
         # delete_group() not called
         self.assertFalse(self.group.delete_group.called)
@@ -985,17 +952,26 @@ class DeleteGroupTests(SynchronousTestCase):
         """
         self.setup_conv()
         self.state.desired = 1
-        self.assert_raises_in_modify_state(GroupNotEmptyError)
+        self.group.pause_modify_state = True
 
-    def test_convergence_tenant_no_force_group_paused(self):
-        """
-        When deleting convergence group without force, `delete_group` raises
-        `GroupPausedError` if group is paused. This check is done
-        under lock using `modify_state`
-        """
-        self.setup_conv()
-        self.state.paused = True
-        self.assert_raises_in_modify_state(controller.GroupPausedError)
+        d = controller.delete_group(self.log, 'transid', self.group, False)
+
+        # trigger_convergence_deletion has not been called because
+        # modify_state is paused
+        self.assertNoResult(d)
+        self.assertTrue(self.group.modify_state.called)
+        # Nothing returned from modifier since it raised error
+        self.assertEqual(self.group.modify_state_values, [])
+
+        # trigger_convergence_deletion is not called
+        self.assertFalse(self.mock_tcd.called)
+
+        # unpause modify_state
+        self.group.modify_state_pause_d.callback(None)
+        self.failureResultOf(d, GroupNotEmptyError)
+
+        # delete_group() not called
+        self.assertFalse(self.group.delete_group.called)
 
 
 class EmptyGroupTests(SynchronousTestCase):

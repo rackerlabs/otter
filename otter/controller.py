@@ -204,10 +204,6 @@ def delete_group(log, trans_id, group, force):
     """
 
     def check_and_delete(_group, state):
-        if state.paused:
-            raise GroupPausedError(
-                _group.tenant_id, _group.uuid, "delete group",
-                "Please use ?force=true to delete paused group")
         if state.desired == 0:
             d = trigger_convergence_deletion(log, group)
             return d.addCallback(lambda _: state)
