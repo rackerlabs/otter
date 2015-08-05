@@ -30,6 +30,7 @@ from txeffect import deferred_performer, perform as twisted_perform
 
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType
+from otter.log.intents import msg as msg_effect
 from otter.util.config import config_value
 from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.http import headers as otter_headers
@@ -323,6 +324,38 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
                              service_configs, throttler),
         _Throttle: _perform_throttle,
     })
+
+
+# ----- Logging responses -----
+
+
+def log_success_response(msg_type, response_body_filter):
+    """
+    :param str msg_type: A string representing the message type of the log
+        message
+    :param callable response_body_filter: A callable that takes a the response
+        body and returns a version of the body that should be logged - this
+        should not mutate the original response body.
+    :return: a function that accepts success result from a `ServiceRequest` and
+        log the response body.  This assumes a JSON response, which is a
+        tuple of (response, response_content).  (non-JSON responses do not
+        currently include the original response)
+    """
+    def _log_it(result):
+        resp, json_body = result
+        # So we can link it to any non-cloud_client logs
+        request_id = resp.request.headers.getRawHeaders(
+            'x-otter-request-id', [None])[0]
+
+        eff = msg_effect(
+            msg_type,
+            method=resp.request.method,
+            url=resp.request.absoluteURI,
+            response_body=json.dumps(response_body_filter(json_body)),
+            request_id=request_id)
+        return eff.on(lambda _: result)
+
+    return _log_it
 
 
 # ----- CLB requests and error parsing -----
@@ -887,9 +920,16 @@ def create_server(server_args):
 
         six.reraise(*api_error_exc_info)
 
+    def _remove_admin_pass_for_logging(response):
+        return {'server': {
+            k: v for k, v in response['server'].items() if k != "adminPass"
+        }}
+
     return (eff
             .on(error=catch(APIError, _parse_known_string_errors))
-            .on(error=_parse_known_json_errors))
+            .on(error=_parse_known_json_errors)
+            .on(log_success_response('request-create-server',
+                                     _remove_admin_pass_for_logging)))
 
 
 def list_servers_details_page(parameters=None):
