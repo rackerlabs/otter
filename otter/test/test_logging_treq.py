@@ -99,20 +99,6 @@ class LoggingTreqTest(SynchronousTestCase):
         self.assertIs(self.successResultOf(d), self.response)
         self._assert_success_logging('patch', 204, 5)
 
-    def test_request_with_response_logging(self):
-        """
-        On a successful request with response logging turned on, response is
-        returned and request with body is logged.
-        """
-        self.treq.request.return_value.callback(self.response)
-        self.treq.content.return_value = succeed("this is the body")
-
-        d = logging_treq.request('patch', self.url, headers={}, data='',
-                                 log=self.log, clock=self.clock,
-                                 log_response=True)
-        self.assertIs(self.successResultOf(d), self.response)
-        self._assert_success_logging('patch', 204, 0, body='this is the body')
-
     def test_url_params(self):
         """`params` is logged as `url_params`."""
         params = {'key': 'val'}
@@ -174,9 +160,24 @@ class LoggingTreqTest(SynchronousTestCase):
         self.failureResultOf(d, TimedOutError)
         self._assert_failure_logging('patch', TimedOutError, 45)
 
+    def test_request_with_response_logging(self):
+        """
+        On a successful request with response logging turned on, response is
+        returned and request with body is logged.
+        """
+        self.treq.request.return_value.callback(self.response)
+        self.treq.content.return_value = succeed("this is the body")
+
+        ltreq = logging_treq.LoggingTreq(log_response=True)
+        d = ltreq.request('patch', self.url, headers={}, data='',
+                          log=self.log, clock=self.clock)
+        self.assertIs(self.successResultOf(d), self.response)
+        self._assert_success_logging('patch', 204, 0, body='this is the body')
+
     def _test_method_success(self, method):
         """
-        On successful call to ``method``, response is returned and request logged
+        On successful call to ``method``, response is returned and request
+        logged.
         """
         request_function = getattr(logging_treq, method)
         d = request_function(url=self.url, headers={}, data='', log=self.log,
