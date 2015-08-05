@@ -4,6 +4,7 @@ Integration point for HTTP clients in otter.
 import json
 import re
 from functools import partial, wraps
+from urlparse import parse_qs, urlparse
 
 import attr
 
@@ -785,6 +786,7 @@ def set_nova_metadata_item(server_id, key, value):
 
     Succeed on 200.
 
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
     :raise: :class:`NoSuchServer`, :class:`MetadataOverLimit`,
         :class:`NovaRateLimitError`, :class:`NovaComputeFaultError`,
         :class:`APIError`
@@ -819,6 +821,7 @@ def get_server_details(server_id):
 
     Succeed on 200.
 
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
     :raise: :class:`NoSuchServer`, :class:`NovaRateLimitError`,
         :class:`NovaComputeFaultError`, :class:`APIError`
     """
@@ -849,6 +852,7 @@ def create_server(server_args):
     Succeed on 202, and only reauthenticate on 401 because 403s may be terminal
     errors.
 
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
     :raise: :class:`CreateServerConfigurationError`,
         :class:`CreateServerOverQuoteError`, :class:`NovaRateLimitError`,
         :class:`NovaComputFaultError`, :class:`APIError`
@@ -886,6 +890,75 @@ def create_server(server_args):
     return (eff
             .on(error=catch(APIError, _parse_known_string_errors))
             .on(error=_parse_known_json_errors))
+
+
+def list_servers_details_page(parameters=None):
+    """
+    List a single page of servers details given filtering and pagination
+    parameters.
+
+    :ivar dict parameters: A dictionary with pagination information,
+        changes-since filters, and name filters.
+
+    Succeed on 200.
+
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
+    :raise: :class:`NovaRateLimitError`, :class:`NovaComputeFaultError`,
+        :class:`APIError`
+    """
+    @_only_json_api_errors
+    def _parse_known_errors(code, json_body):
+        _match_errors(_nova_standard_errors, code, json_body)
+
+    return (
+        service_request(
+            ServiceType.CLOUD_SERVERS,
+            'GET', append_segments('servers', 'detail'),
+            params=parameters)
+        .on(error=_parse_known_errors))
+
+
+def list_servers_details_all(parameters=None):
+    """
+    List all pages of servers details, starting at the page specified by the
+    given filtering and pagination parameters.
+
+    :ivar dict parameters: A dictionary with pagination information,
+        changes-since filters, and name filters.
+
+    Succeed on 200.
+
+    :return: a `list` of server details `dict`s
+    :raise: :class:`NovaRateLimitError`, :class:`NovaComputeFaultError`,
+        :class:`APIError`
+    """
+    last_link = []
+
+    def continue_(result, servers_so_far=None):
+        if servers_so_far is None:
+            servers_so_far = []
+
+        _response, body = result
+        servers = servers_so_far + body['servers']
+
+        # Only continue if pagination is supported and there is another page
+        continuation = [link['href'] for link in body.get('servers_links', [])
+                        if link['rel'] == 'next']
+        if continuation:
+            # blow up if we try to fetch the same link twice
+            if last_link and last_link[-1] == continuation[0]:
+                raise NovaComputeFaultError(
+                    "When gathering server details, got the same 'next' link "
+                    "twice from Nova: {0}".format(last_link[-1]))
+
+            last_link[:] = [continuation[0]]
+            parsed_query = parse_qs(urlparse(continuation[0]).query)
+            return list_servers_details_page(parsed_query).on(
+                partial(continue_, servers_so_far=servers))
+
+        return servers
+
+    return list_servers_details_page(parameters).on(continue_)
 
 
 _nova_standard_errors = [

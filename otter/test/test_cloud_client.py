@@ -57,6 +57,8 @@ from otter.cloud_client import (
     get_clbs,
     get_cloud_client_dispatcher,
     get_server_details,
+    list_servers_details_all,
+    list_servers_details_page,
     perform_tenant_scope,
     publish_to_cloudfeeds,
     remove_clb_nodes,
@@ -67,6 +69,7 @@ from otter.test.utils import (
     StubResponse,
     nested_sequence,
     perform_sequence,
+    raise_,
     resolve_effect,
     stub_json_response,
     stub_pure_response)
@@ -1173,6 +1176,101 @@ class NovaClientTests(SynchronousTestCase):
         for code, body in unparseable:
             with self.assertRaises(APIError):
                 _perform_one_request(expected.intent, real, code, body)
+
+    def _list_server_details_intent(self, params):
+        """Return the expected intent for listing servers given parameters."""
+        return service_request(
+            ServiceType.CLOUD_SERVERS,
+            'GET', 'servers/detail',
+            params=params).intent
+
+    def test_list_servers_details_page(self):
+        """
+        :func:`list_servers_details_page` returns the JSON response from
+        listing servers details.
+        """
+        params = {'limit': ['100'], 'marker': ['1']}
+        body = {'servers': [], 'servers_links': []}
+        eff = list_servers_details_page(params)
+        expected_intent = self._list_server_details_intent(params)
+        seq = [(
+            expected_intent,
+            service_request_eqf(stub_pure_response(json.dumps(body), 200)))
+        ]
+        resp, response_json = perform_sequence(seq, eff)
+        self.assertEqual(response_json, body)
+
+        self.assert_handles_nova_compute_fault(expected_intent, eff)
+        self.assert_handles_nova_rate_limiting(expected_intent, eff)
+
+    def test_list_servers_details_all_gets_until_no_next_link(self):
+        """
+        :func:`list_servers_details_all` follows the servers links until there
+        are no more links, and returns a list of servers as the result.  It
+        ignores any non-next links.
+        """
+        resps = map(json.dumps, [
+            {'servers': ['1', '2'],
+             'servers_links': [{'href': 'doesnt_matter_url?marker=3',
+                                'rel': 'next'}]},
+            {'servers': ['3', '4'],
+             'servers_links': [{'href': 'doesnt_matter_url?marker=5',
+                                'rel': 'next'},
+                               {'href': 'doesnt_matter_url?marker=1',
+                                'rel': 'prev'}]},
+            {'servers': ['5', '6'],
+             'servers_links': [{'href': 'doesnt_matter_url?marker=3',
+                                'rel': 'prev'}]}
+        ])
+
+        eff = list_servers_details_all({'marker': ['1']})
+        seq = [
+            (self._list_server_details_intent({'marker': ['1']}),
+             service_request_eqf(stub_pure_response(resps[0], 200))),
+            (self._list_server_details_intent({'marker': ['3']}),
+             service_request_eqf(stub_pure_response(resps[1], 200))),
+            (self._list_server_details_intent({'marker': ['5']}),
+             service_request_eqf(stub_pure_response(resps[2], 200)))
+        ]
+        result = perform_sequence(seq, eff)
+        self.assertEqual(result, ['1', '2', '3', '4', '5', '6'])
+
+    def test_list_servers_details_all_blows_up_if_got_same_link_twice(self):
+        """
+        :func:`list_servers_details_all` raises an exception if Nova returns
+        the same next link twice in a row.
+        """
+        resps = map(json.dumps, [
+            {'servers': ['1', '2'],
+             'servers_links': [{'href': 'doesnt_matter_url?marker=3',
+                                'rel': 'next'}]},
+            {'servers': ['3', '4'],
+             'servers_links': [{'href': 'doesnt_matter_url?marker=3',
+                                'rel': 'next'},
+                               {'href': 'doesnt_matter_url?marker=1',
+                                'rel': 'prev'}]}
+        ])
+
+        eff = list_servers_details_all({'marker': ['1']})
+        seq = [
+            (self._list_server_details_intent({'marker': ['1']}),
+             service_request_eqf(stub_pure_response(resps[0], 200))),
+            (self._list_server_details_intent({'marker': ['3']}),
+             service_request_eqf(stub_pure_response(resps[1], 200)))
+        ]
+        self.assertRaises(NovaComputeFaultError, perform_sequence, seq, eff)
+
+    def test_list_servers_details_all_propagates_errors(self):
+        """
+        :func:`list_servers_details_all` propagates exceptions from making
+        the individual requests (from :func:`list_servers_details_page`).
+        """
+        eff = list_servers_details_all({'marker': ['1']})
+        seq = [
+            (self._list_server_details_intent({'marker': ['1']}),
+             lambda _: raise_(NovaComputeFaultError('error')))
+        ]
+        self.assertRaises(NovaComputeFaultError, perform_sequence, seq, eff)
 
 
 class CloudFeedsTests(SynchronousTestCase):
