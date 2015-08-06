@@ -318,7 +318,7 @@ class UpstreamErrorTests(SynchronousTestCase):
         Wraps any other error and has message and details accordingly
         """
         err = UpstreamError(Failure(ValueError('heh')), 'identity',
-                                    'stuff', 'xkcd.com')
+                            'stuff', 'xkcd.com')
         self.assertEqual(str(err), 'identity error: heh (stuff)')
         self.assertEqual(err.details, {
             'system': 'identity', 'operation': 'stuff', 'url': 'xkcd.com'})

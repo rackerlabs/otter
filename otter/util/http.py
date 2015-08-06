@@ -6,7 +6,7 @@ from itertools import chain
 from urllib import quote, urlencode
 from urlparse import parse_qs, urlsplit, urlunsplit
 
-from characteristic import Attribute, attributes
+from characteristic import attributes
 
 from toolz.dicttoolz import get_in
 
