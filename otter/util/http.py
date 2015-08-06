@@ -96,11 +96,17 @@ class UpstreamError(Exception):
         self.url = url
         msg = self.system + ' error: '
         if self.reason.check(APIError):
-            self.apierr_message = _extract_error_message(self.system, self.reason.value.body,
-                                                         'Could not parse API error body')
-            msg += '{} - {}'.format(self.reason.value.code, self.apierr_message)
+            if system in ('nova', 'clb', 'identity'):
+                self.apierr_message = _extract_error_message(
+                    self.system, self.reason.value.body,
+                    'Could not parse API error body')
+            else:
+                self.apierr_message = self.reason.value.body
+            msg += '{} - {}'.format(
+                self.reason.value.code, self.apierr_message)
         else:
             msg += str(self.reason.value)
+        msg += " ({0})".format(operation)
         super(UpstreamError, self).__init__(msg)
 
     @property
