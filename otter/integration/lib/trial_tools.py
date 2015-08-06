@@ -1,7 +1,7 @@
 """
 A set of helpers for writing trial tests
 """
-
+import json
 import os
 from datetime import datetime, timedelta
 
@@ -16,6 +16,8 @@ from twisted.internet import reactor
 
 from twisted.internet.defer import (
     Deferred, gatherResults, inlineCallbacks, returnValue)
+
+from twisted.python.log import addObserver, removeObserver
 
 from twisted.web.client import HTTPConnectionPool
 
@@ -39,6 +41,13 @@ from otter.integration.lib.nova import (
     wait_for_servers
 )
 
+from otter.log.formatters import (
+    ErrorFormattingWrapper,
+    LoggingEncoder,
+    PEP3101FormattingWrapper,
+    StreamObserverWrapper,
+    copying_wrapper
+)
 
 username = os.environ['AS_USERNAME']
 password = os.environ['AS_PASSWORD']
@@ -98,6 +107,66 @@ def get_resource_mapping():
     return res
 
 
+def filter_logs(observer):
+    """
+    Filter out logs like
+    "Starting factory <twisted.web.client_HTTP11ClientFactory".
+    """
+    def emit(eventdict):
+        if ('message' not in eventdict or
+                all([not m.startswith("Starting factory") and
+                     not m.startswith("Stopping factory")
+                     for m in eventdict['message']])):
+            observer(eventdict)
+    return emit
+
+
+def pretty_print_logs(observer):
+    """
+    A log observer formatter for test logs.  Prints log messages like::
+
+        MESSAGE
+        {
+            rest of JSON dict
+        }
+
+        --------
+
+        MESSAGE
+        {
+            rest of JSON dict
+        }
+
+        ...
+    """
+    def emit(eventdict):
+        if 'message' in eventdict:
+            message = ''.join(eventdict.pop('message'))
+        observer({'message': "\n".join(
+            ["", message, json.dumps(eventdict, cls=LoggingEncoder, indent=2),
+             "", "-" * 8]
+        )})
+    return emit
+
+
+def setup_test_log_observer(testcase):
+    """
+    Create a log observer that writes a particular test's logs to a temporary
+    file for the duration of the test.  Also cleans up the observer and the
+    temp file object after the test is over.
+    """
+    logfile = open("{0}.log".format(testcase.id()), 'ab')
+    observer = copying_wrapper(
+        PEP3101FormattingWrapper(
+            ErrorFormattingWrapper(
+                filter_logs(
+                    pretty_print_logs(
+                        StreamObserverWrapper(logfile))))))
+    addObserver(observer)
+    testcase.addCleanup(removeObserver, observer)
+    testcase.addCleanup(logfile.close)
+
+
 def get_utcstr_from_now(seconds):
     """ Get UTC timestamp from now in ISO 8601 format """
     return "{}Z".format(
@@ -113,6 +182,7 @@ class TestHelper(object):
         """
         Set up the test case, HTTP pool, identity, and cleanup.
         """
+        setup_test_log_observer(test_case)
         self.test_case = test_case
         self.pool = HTTPConnectionPool(reactor, False)
         self.test_case.addCleanup(self.pool.closeCachedConnections)
