@@ -23,6 +23,7 @@ from otter.integration.lib.trial_tools import (
     region,
     scheduler_interval,
     skip_if,
+    skip_me,
     sleep
 )
 
@@ -32,7 +33,7 @@ timeout_default = 600
 
 class PauseTests(unittest.TestCase):
     """
-    Tests for `../groups/groupId/pause` endpoint
+    Tests for `../groups/groupId/pause` and `../groups/groupId/resume` endpoint
     """
 
     def setUp(self):
@@ -91,6 +92,54 @@ class PauseTests(unittest.TestCase):
                     server_build_time + convergence_interval * 2)
         # The group still thinks that server is building
         yield self.helper.assert_group_state(group, one_building)
+        returnValue(group)
+
+    @skip_me("Until resume is implemented: #1605")
+    @skip_if(not_mimic, "This requires mimic for server build time")
+    @inlineCallbacks
+    def test_resume(self):
+        """
+        Calling resume on a paused group changes {"paused": False} in group
+        state and triggers convergence. The group can then execute policy,
+        webhook or trigger convergence
+        """
+        group = yield self.test_pause_stops_convergence()
+        yield group.resume()
+        yield self.helper.assert_group_state(
+            group, ContainsDict({"paused": Equals(False)}))
+        yield group.wait_for_state(
+            self.rcs,
+            ContainsDict({"activeCapacity": Equals(1),
+                          "pendingCapacity": Equals(0),
+                          "desiredCapacity": Equals(1),
+                          "status": Equals("ACTIVE")}))
+
+        # can create and execute policy
+        policy = ScalingPolicy(set_to=1, scaling_group=group)
+        yield policy.start(self.rcs, self)
+        yield policy.execute(self.rcs)
+        yield group.wait_for_state(
+            self.rcs,
+            ContainsDict({"activeCapacity": Equals(2),
+                          "pendingCapacity": Equals(0),
+                          "desiredCapacity": Equals(2),
+                          "status": Equals("ACTIVE")}))
+
+        # can create and execute webhooks
+        webhook = yield policy.create_webhook(self.rcs)
+        resp = yield treq.post(webhook.capurl, pool=self.helper.pool)
+        self.assertEqual(resp.code, 202)
+        yield treq.content(resp)
+        yield sleep(reactor, 2)
+        yield group.wait_for_state(
+            self.rcs,
+            ContainsDict({"activeCapacity": Equals(3),
+                          "pendingCapacity": Equals(0),
+                          "desiredCapacity": Equals(3),
+                          "status": Equals("ACTIVE")}))
+
+        # can trigger convergence
+        yield group.trigger_convergence(self.rcs)
 
     @inlineCallbacks
     def test_pause_and_execute_policy(self):
