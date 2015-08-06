@@ -113,7 +113,8 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         # Create another loadbalancer not to be used in autoscale
         # The CLB will not be added to the helper, since when the helper
         # creates a group, it automatically adds the clb
-        clb_other = CloudLoadBalancer(pool=self.helper.pool)
+        clb_other = CloudLoadBalancer(pool=self.helper.pool,
+                                      treq=self.helper.treq)
 
         yield clb_other.start(self.rcs, self)
         yield clb_other.wait_for_state(
@@ -187,7 +188,8 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         # Create another loadbalancer not to be used in autoscale
         # The CLB will not be added to the helper, since when the helper
         # creates a group, it automatically adds the clb
-        clb_other = CloudLoadBalancer(pool=self.helper.pool)
+        clb_other = CloudLoadBalancer(pool=self.helper.pool,
+                                      treq=self.helper.treq)
 
         yield clb_other.start(self.rcs, self)
         yield clb_other.wait_for_state(

@@ -41,6 +41,8 @@ from otter.integration.lib.nova import (
     wait_for_servers
 )
 
+from otter.log import log
+
 from otter.log.formatters import (
     ErrorFormattingWrapper,
     LoggingEncoder,
@@ -48,6 +50,9 @@ from otter.log.formatters import (
     StreamObserverWrapper,
     copying_wrapper
 )
+
+from otter.util.logging_treq import LoggingTreq
+
 
 username = os.environ['AS_USERNAME']
 password = os.environ['AS_PASSWORD']
@@ -185,9 +190,10 @@ class TestHelper(object):
         setup_test_log_observer(test_case)
         self.test_case = test_case
         self.pool = HTTPConnectionPool(reactor, False)
+        self.treq = LoggingTreq(log=log, log_response=True)
         self.test_case.addCleanup(self.pool.closeCachedConnections)
 
-        self.clbs = [CloudLoadBalancer(pool=self.pool)
+        self.clbs = [CloudLoadBalancer(pool=self.pool, treq=self.treq)
                      for _ in range(num_clbs)]
 
     def create_group(self, **kwargs):
@@ -212,6 +218,7 @@ class TestHelper(object):
         return (
             ScalingGroup(
                 group_config=create_scaling_group_dict(**kwargs),
+                treq=self.treq,
                 pool=self.pool),
             server_name_prefix)
 
