@@ -442,6 +442,15 @@ class ScalingGroup(object):
             headers=headers(str(rcs.token)), pool=self.pool)
         return d.addCallback(check_success, [204])
 
+    def resume(self, rcs):
+        """
+        Resume group
+        """
+        d = self.treq.post(
+            "{}/resume".format(self._endpoint(rcs)),
+            headers=headers(str(rcs.token)), pool=self.pool)
+        return d.addCallback(check_success, [204])
+
     def wait_for_state(self, rcs, matcher, timeout=600, period=10, clock=None):
         """
         Wait for the state on the scaling group to match the provided matchers,
