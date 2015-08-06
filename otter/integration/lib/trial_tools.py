@@ -112,13 +112,13 @@ def filter_logs(observer):
     Filter out logs like
     "Starting factory <twisted.web.client_HTTP11ClientFactory".
     """
-    def filter(eventdict):
+    def emit(eventdict):
         if ('message' not in eventdict or
                 all([not m.startswith("Starting factory") and
                      not m.startswith("Stopping factory")
                      for m in eventdict['message']])):
             observer(eventdict)
-    return filter
+    return emit
 
 
 def pretty_print_logs(observer):
