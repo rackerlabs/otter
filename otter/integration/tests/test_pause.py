@@ -115,7 +115,7 @@ class PauseTests(unittest.TestCase):
                           "status": Equals("ACTIVE")}))
 
         # can create and execute policy
-        policy = ScalingPolicy(set_to=1, scaling_group=group)
+        policy = ScalingPolicy(scale_by=1, scaling_group=group)
         yield policy.start(self.rcs, self)
         yield policy.execute(self.rcs)
         yield group.wait_for_state(
