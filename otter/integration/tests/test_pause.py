@@ -35,8 +35,6 @@ class PauseTests(unittest.TestCase):
     Tests for `../groups/groupId/pause` endpoint
     """
 
-    skip = "Until #1604 is implemented"
-
     def setUp(self):
         self.helper = TestHelper(self)
         self.rcs = TestResources()
@@ -167,23 +165,3 @@ class PauseTests(unittest.TestCase):
                 "pendingCapacity": Equals(0),
                 "activeCapacity": Equals(0),
                 "desiredCapacity": Equals(0)}))
-
-    @inlineCallbacks
-    def test_delete_paused_group(self):
-        """
-        Deleting a paused group with force=false results in 403
-        """
-        group, _ = self.helper.create_group()
-        yield group.start(self.rcs, self)
-        yield group.pause(self.rcs)
-        yield group.delete_scaling_group(self.rcs, "false", [403])
-
-    @inlineCallbacks
-    def test_force_delete_paused_group(self):
-        """
-        Deleting a paused froup with force=true succeeds
-        """
-        group, _ = self.helper.create_group()
-        yield group.start(self.rcs, self)
-        yield group.pause(self.rcs)
-        yield group.delete_scaling_group(self.rcs, "true")

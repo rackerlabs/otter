@@ -678,6 +678,9 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         dispatcher = mock_setup_converger.call_args[0][2]
 
+        # Check dispatcher is set in otter object
+        self.assertIs(self.Otter.return_value.dispatcher, dispatcher)
+
         for intent in full_intents():
             self.assertIsNot(dispatcher(intent), None)
 
