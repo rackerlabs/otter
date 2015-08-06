@@ -91,7 +91,8 @@ class HTTPUtilityTests(SynchronousTestCase):
         body, and HTTP headers, and will expose these in public attributes and
         have a reasonable string representation.
         """
-        e = APIError(404, "Not Found.", Headers({'header': ['value']}))
+        e = APIError(404, "Not Found.", Headers({'header': ['value']}),
+                     'GET', 'http://myurl.com')
 
         self.assertEqual(e.code, 404)
         self.assertEqual(e.body, "Not Found.")
@@ -99,22 +100,24 @@ class HTTPUtilityTests(SynchronousTestCase):
         self.assertEqual(
             str(e),
             ("API Error code=404, body='Not Found.', "
-             "headers=Headers({'header': ['value']})"))
+             "headers=Headers({'header': ['value']}) (GET http://myurl.com)"))
 
     def test_api_error_with_Nones(self):
         """
         An APIError will be instantiated with an HTTP Code, an HTTP response
         body, and HTTP headers, and will expose these in public attributes and
-        have a reasonable string representation even if the body and headers
-        are None.
+        have a reasonable string representation even if the body, headers,
+        method, and url are not provided.
         """
         e = APIError(404, None)
 
         self.assertEqual(e.code, 404)
         self.assertEqual(e.body, None)
         self.assertEqual(e.headers, None)
-        self.assertEqual(str(e),
-                         ("API Error code=404, body=None, headers=None"))
+        self.assertEqual(
+            str(e),
+            "API Error code=404, body=None, headers=None (no_method no_url)"
+        )
 
     def test_check_success(self):
         """
