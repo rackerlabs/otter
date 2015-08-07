@@ -37,6 +37,7 @@ msg_types = {
                           "{ip_address} from CLB {clb_id}"),
     "request-create-server": (
         "Request to create a server succeeded with response: {response_body}"),
+    "request-list-servers-details": ("Request to list servers succeeded"),
 
     # CF-published log messages
     "cf-add-failure": "Failed to add event to cloud feeds",
