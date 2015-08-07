@@ -1,5 +1,4 @@
 """Code related to gathering data to inform convergence."""
-from datetime import timedelta
 from functools import partial
 
 from effect import catch, parallel
@@ -7,7 +6,7 @@ from effect.do import do, do_return
 
 from toolz.curried import filter, groupby, keyfilter, map
 from toolz.dicttoolz import get_in, merge
-from toolz.functoolz import compose, identity
+from toolz.functoolz import compose, curry, identity
 from toolz.itertoolz import concat
 
 from otter.auth import NoSuchEndpoint
@@ -84,21 +83,27 @@ def get_all_scaling_group_servers(changes_since=None,
     return get_all_server_details(changes_since).on(servers_apply)
 
 
-def merge_servers(first, second):
+def updated_deleted_servers(old, new):
     """
-    Return servers got by merging the two sets of servers where second
-    takes precedence over first
+    Return servers with servers not found in new list marked as deleted
 
-    :param list first: List of server dicts
-    :param list second: List of server dicts
-    :return: List of merged server dicts
+    :param list old: List of old servers
+    :param list second: List of latest servers
+    :return: List of updated servers
     """
+
     def sdict(servers):
         return {s['id']: s for s in servers}
 
-    return merge(sdict(first), sdict(second)).values()
+    old = sdict(old)
+    new = sdict(new)
+    deleted_ids = set(old.keys()) - set(new.keys())
+    for s in deleted_ids:
+        old[s]["status"] = "DELETED"
+    return merge(old, new).values()
 
 
+@curry
 def server_of_group(group_id, server):
     """
     Return True if server belongs to group_id. False otherwise
@@ -125,16 +130,10 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     cached_servers, last_update = yield cache.get_servers(False)
     if last_update is None:
         servers = (yield all_as_servers()).get(group_id, [])
-    elif now - last_update >= timedelta(days=30):
-        last_update = now - timedelta(days=30)
-        changes, current = yield parallel([
-            all_servers(last_update), all_servers()])
-        servers = merge_servers(changes, current)
-        servers = list(filter(partial(server_of_group, group_id), servers))
     else:
-        changes = yield all_servers(last_update)
-        servers = merge_servers(cached_servers, changes)
-        servers = list(filter(partial(server_of_group, group_id), servers))
+        current = yield all_servers()
+        servers = updated_deleted_servers(cached_servers, current)
+        servers = list(filter(server_of_group(group_id), servers))
     yield do_return(servers)
 
 
