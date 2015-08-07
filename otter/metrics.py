@@ -253,8 +253,38 @@ def connect_cass_servers(reactor, config):
         seed_endpoints, config['keyspace'], disconnect_on_cancel=True)
 
 
+def log_divergent_groups(divergent_groups, log, group_metrics, timeout):
+    """
+    Log groups that have not changed and been divergent for long time
+    """
+    dg = divergent_groups
+    converged, diverged = partition_bool(
+        lambda gm: gm.actual + gm.pending == gm.desired, group_metrics)
+    for gm in converged:
+        dg.pop((gm.tenant_id, gm.group_id))
+    now = datetime.now()
+    for gm in diverged:
+        pair = (gm.tenant_id, gm.group_id)
+        if pair in dg:
+            last_time, values = dg[pair]
+            if values != hash((gm.desired, gm.actual, gm.pending)):
+                del gd[pair]
+                continue
+            time_diff = now - last_time
+            if time_diff.total_seconds() > timeout:
+                log.err("Group {group_id} of {tenant_id} remains diverged "
+                        "for {divergent_time}", tenant_id=tenant_id,
+                        group_id=group_id, desired=gm.desired,
+                        actual=gm.actual, pending=gm.actual,
+                        divergent_time=str(time_diff))
+            dg[pair] = now, values
+        else:
+            dg[pair] = now, hash((gm.desired, gm.actual, gm.pending))
+
+
 @defer.inlineCallbacks
 def collect_metrics(reactor, config, log, client=None, authenticator=None,
+                    divergent_groups=None,
                     _print=False, perform=perform,
                     get_legacy_dispatcher=get_legacy_dispatcher):
     """
@@ -291,6 +321,8 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
             group_pred=lambda g: g['status'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
         dispatcher, cass_groups, log, _print=_print)
+
+    log_divergent_groups(group_metrics)
 
     # Calculate total desired, actual and pending
     total_desired, total_actual, total_pending = 0, 0, 0
@@ -349,12 +381,13 @@ class MetricsService(Service, object):
         Initialize the service by connecting to Cassandra and setting up
         authenticator
 
-        :param reactor: Twisted reactor
+        :param reactor: Twisted reactor for connection purposes
         :param dict config: All the config necessary to run the service.
             Comes from config file
-        :param IReactorTime clock: Optional reactor for testing timer
+        :param IReactorTime clock: Optional reactor for timer purpose
         """
         self._client = connect_cass_servers(reactor, config['cassandra'])
+        divergent_groups = {}
 
         def collect(*a, **k):
             return collect_metrics(*a, **k).addErrback(log.err)
@@ -362,7 +395,8 @@ class MetricsService(Service, object):
         self._service = TimerService(
             get_in(['metrics', 'interval'], config, default=60), collect,
             reactor, config, log, client=self._client,
-            authenticator=generate_authenticator(reactor, config['identity']))
+            authenticator=generate_authenticator(reactor, config['identity']),
+            divergent_groups=divergent_groups)
         self._service.clock = clock or reactor
 
     def startService(self):
