@@ -438,7 +438,7 @@ class CollectMetricsTests(SynchronousTestCase):
         from nova and it is added to blueflood
         """
         _reactor = mock.Mock()
-        d = collect_metrics(_reactor, self.config, log=self.log,
+        d = collect_metrics(_reactor, self.config, self.log,
                             perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
@@ -459,7 +459,7 @@ class CollectMetricsTests(SynchronousTestCase):
         """
         self.config['convergence-tenants'] = ['foo', 'bar']
         _reactor = mock.Mock()
-        d = collect_metrics(_reactor, self.config, log=self.log,
+        d = collect_metrics(_reactor, self.config, self.log,
                             perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
@@ -479,7 +479,7 @@ class CollectMetricsTests(SynchronousTestCase):
         Uses client provided and does not disconnect it before returning
         """
         client = mock.Mock(spec=['disconnect'])
-        d = collect_metrics(mock.Mock(), self.config, client=client,
+        d = collect_metrics(mock.Mock(), self.config, self.log, client=client,
                             perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
@@ -491,8 +491,8 @@ class CollectMetricsTests(SynchronousTestCase):
         Uses authenticator provided instead of creating new
         """
         _reactor, auth = mock.Mock(), mock.Mock()
-        d = collect_metrics(_reactor, self.config, authenticator=auth,
-                            perform=self._fake_perform, log=self.log,
+        d = collect_metrics(_reactor, self.config, self.log, authenticator=auth,
+                            perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
         self.get_all_metrics.assert_called_once_with(
@@ -543,7 +543,7 @@ class ServiceTests(SynchronousTestCase):
     def _cm_called(self, calls):
         self.assertEqual(len(self.mock_cm.mock_calls), calls)
         self.mock_cm.assert_called_with(
-            'r', self.config, client=self.client, log=self.log,
+            'r', self.config, self.log, client=self.client,
             authenticator=matches(Provides(IAuthenticator)))
 
     @mock.patch('otter.metrics.MetricsService')

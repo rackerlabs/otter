@@ -37,10 +37,6 @@ from otter.log import log as otter_log
 from otter.util.fp import predicate_all
 
 
-# TODO: Remove this and pass it from service to other functions
-metrics_log = otter_log.bind(system='otter.metrics')
-
-
 QUERY_GROUPS_OF_TENANTS = (
     'SELECT '
     '"tenantId", "groupId", desired, active, pending, created_at, status, '
@@ -258,8 +254,8 @@ def connect_cass_servers(reactor, config):
 
 
 @defer.inlineCallbacks
-def collect_metrics(reactor, config, client=None, authenticator=None,
-                    _print=False, log=None, perform=perform,
+def collect_metrics(reactor, config, log, client=None, authenticator=None,
+                    _print=False, perform=perform,
                     get_legacy_dispatcher=get_legacy_dispatcher):
     """
     Start collecting the metrics
@@ -282,8 +278,6 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
     authenticator = authenticator or generate_authenticator(reactor,
                                                             config['identity'])
     service_configs = get_service_configs(config)
-    log = log or metrics_log
-
     dispatcher = get_legacy_dispatcher(reactor, authenticator, log,
                                        service_configs)
 
@@ -364,9 +358,8 @@ class MetricsService(Service, object):
         collect = lambda *a, **k: collect_metrics(*a, **k).addErrback(log.err)
         self._service = TimerService(
             get_in(['metrics', 'interval'], config, default=60), collect,
-            reactor, config, client=self._client,
-            authenticator=generate_authenticator(reactor, config['identity']),
-            log=log)
+            reactor, config, log, client=self._client,
+            authenticator=generate_authenticator(reactor, config['identity']))
         self._service.clock = clock or reactor
 
     def startService(self):
@@ -385,6 +378,9 @@ class MetricsService(Service, object):
         return d.addCallback(lambda _: self._client.disconnect())
 
 
+metrics_log = otter_log.bind(system='otter.metrics')
+
+
 def makeService(config):
     """
     Set up the otter-metrics service.
@@ -396,4 +392,4 @@ def makeService(config):
 if __name__ == '__main__':
     config = json.load(open(sys.argv[1]))
     # TODO: Take _print as cmd-line arg and pass it.
-    task.react(collect_metrics, (config, None, None, True))
+    task.react(collect_metrics, (config, metrics_log, None, None, True))
