@@ -23,7 +23,6 @@ from otter.integration.lib.trial_tools import (
     region,
     scheduler_interval,
     skip_if,
-    skip_me,
     sleep
 )
 
