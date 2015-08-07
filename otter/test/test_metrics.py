@@ -491,8 +491,8 @@ class CollectMetricsTests(SynchronousTestCase):
         Uses authenticator provided instead of creating new
         """
         _reactor, auth = mock.Mock(), mock.Mock()
-        d = collect_metrics(_reactor, self.config, self.log, authenticator=auth,
-                            perform=self._fake_perform,
+        d = collect_metrics(_reactor, self.config, self.log,
+                            authenticator=auth, perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
         self.get_all_metrics.assert_called_once_with(

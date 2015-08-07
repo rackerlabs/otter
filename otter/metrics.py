@@ -355,7 +355,10 @@ class MetricsService(Service, object):
         :param IReactorTime clock: Optional reactor for testing timer
         """
         self._client = connect_cass_servers(reactor, config['cassandra'])
-        collect = lambda *a, **k: collect_metrics(*a, **k).addErrback(log.err)
+
+        def collect(*a, **k):
+            return collect_metrics(*a, **k).addErrback(log.err)
+
         self._service = TimerService(
             get_in(['metrics', 'interval'], config, default=60), collect,
             reactor, config, log, client=self._client,
