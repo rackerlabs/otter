@@ -37,8 +37,7 @@ from otter.metrics import (
     get_scaling_groups,
     get_specific_scaling_groups,
     get_tenant_metrics,
-    makeService,
-    metrics_log,
+    makeService
 )
 from otter.test.test_auth import identity_config
 from otter.test.utils import (
@@ -326,10 +325,11 @@ class GetAllMetricsTests(SynchronousTestCase):
 
     def test_get_all_metrics(self):
         """Gets group's metrics"""
-        def _game(groups, logs, _print=False):
+        def _game(groups, log, _print=False):
+            self.assertEqual(log, "log")
             return [Effect(Constant(['foo', 'bar'])),
                     Effect(Constant(['baz']))]
-        d = get_all_metrics(base_dispatcher, object(),
+        d = get_all_metrics(base_dispatcher, object(), "log",
                             get_all_metrics_effects=_game)
         self.assertEqual(set(self.successResultOf(d)),
                          set(['foo', 'bar', 'baz']))
@@ -340,9 +340,10 @@ class GetAllMetricsTests(SynchronousTestCase):
         elements are ignored.
         """
         def _game(groups, log, _print=False):
+            self.assertEqual(log, "log")
             return [Effect(Constant(None)),
                     Effect(Constant(['foo']))]
-        d = get_all_metrics(base_dispatcher, object(),
+        d = get_all_metrics(base_dispatcher, object(), "log",
                             get_all_metrics_effects=_game)
         self.assertEqual(self.successResultOf(d), ['foo'])
 
@@ -401,6 +402,7 @@ class CollectMetricsTests(SynchronousTestCase):
         self.get_scaling_groups = patch(
             self, 'otter.metrics.get_scaling_groups',
             return_value=succeed(self.groups))
+        self.log = mock_log()
 
         self.metrics = [GroupMetrics('t', 'g1', 3, 2, 0),
                         GroupMetrics('t2', 'g1', 4, 4, 1),
@@ -436,7 +438,7 @@ class CollectMetricsTests(SynchronousTestCase):
         from nova and it is added to blueflood
         """
         _reactor = mock.Mock()
-        d = collect_metrics(_reactor, self.config,
+        d = collect_metrics(_reactor, self.config, log=self.log,
                             perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
@@ -445,10 +447,9 @@ class CollectMetricsTests(SynchronousTestCase):
         self.get_scaling_groups.assert_called_once_with(
             self.client, props=['status'], group_pred=IsCallable())
         self.get_all_metrics.assert_called_once_with(
-            self.dispatcher, self.groups, _print=False)
+            self.dispatcher, self.groups, self.log, _print=False)
         self.add_to_cloud_metrics.assert_called_once_with(
-            self.config['metrics']['ttl'], 'r', 107, 26, 1,
-            log=metrics_log)
+            self.config['metrics']['ttl'], 'r', 107, 26, 1, log=self.log)
         self.client.disconnect.assert_called_once_with()
 
     def test_metrics_collected_convergence_tenants(self):
@@ -458,7 +459,7 @@ class CollectMetricsTests(SynchronousTestCase):
         """
         self.config['convergence-tenants'] = ['foo', 'bar']
         _reactor = mock.Mock()
-        d = collect_metrics(_reactor, self.config,
+        d = collect_metrics(_reactor, self.config, log=self.log,
                             perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
@@ -467,10 +468,10 @@ class CollectMetricsTests(SynchronousTestCase):
         self.get_specific_scaling_groups.assert_called_once_with(
             self.client, tenant_ids=['foo', 'bar'])
         self.get_all_metrics.assert_called_once_with(
-            self.dispatcher, self.groups, _print=False)
+            self.dispatcher, self.groups, self.log, _print=False)
         self.add_to_cloud_metrics.assert_called_once_with(
             self.config['metrics']['ttl'], 'r', 107, 26, 1,
-            log=metrics_log)
+            log=self.log)
         self.client.disconnect.assert_called_once_with()
 
     def test_with_client(self):
@@ -491,11 +492,11 @@ class CollectMetricsTests(SynchronousTestCase):
         """
         _reactor, auth = mock.Mock(), mock.Mock()
         d = collect_metrics(_reactor, self.config, authenticator=auth,
-                            perform=self._fake_perform,
+                            perform=self._fake_perform, log=self.log,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
         self.assertIsNone(self.successResultOf(d))
         self.get_all_metrics.assert_called_once_with(
-            self.dispatcher, self.groups, _print=False)
+            self.dispatcher, self.groups, self.log, _print=False)
 
 
 class APIOptionsTests(SynchronousTestCase):
@@ -542,7 +543,7 @@ class ServiceTests(SynchronousTestCase):
     def _cm_called(self, calls):
         self.assertEqual(len(self.mock_cm.mock_calls), calls)
         self.mock_cm.assert_called_with(
-            'r', self.config, client=self.client,
+            'r', self.config, client=self.client, log=self.log,
             authenticator=matches(Provides(IAuthenticator)))
 
     @mock.patch('otter.metrics.MetricsService')

@@ -196,7 +196,7 @@ def _perform_limited_effects(dispatcher, effects, limit):
     return defer.gatherResults(defs)
 
 
-def get_all_metrics(dispatcher, cass_groups, _print=False,
+def get_all_metrics(dispatcher, cass_groups, log, _print=False,
                     get_all_metrics_effects=get_all_metrics_effects):
     """
     Gather server data and produce metrics for all groups across all tenants
@@ -208,7 +208,7 @@ def get_all_metrics(dispatcher, cass_groups, _print=False,
 
     :return: ``list`` of `GroupMetrics` as `Deferred`
     """
-    effs = get_all_metrics_effects(cass_groups, metrics_log, _print=_print)
+    effs = get_all_metrics_effects(cass_groups, log, _print=_print)
     d = _perform_limited_effects(dispatcher, effs, 10)
     d.addCallback(filter(lambda x: x is not None))
     return d.addCallback(lambda x: reduce(operator.add, x, []))
@@ -259,8 +259,7 @@ def connect_cass_servers(reactor, config):
 
 @defer.inlineCallbacks
 def collect_metrics(reactor, config, client=None, authenticator=None,
-                    _print=False,
-                    perform=perform,
+                    _print=False, log=None, perform=perform,
                     get_legacy_dispatcher=get_legacy_dispatcher):
     """
     Start collecting the metrics
@@ -283,8 +282,9 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
     authenticator = authenticator or generate_authenticator(reactor,
                                                             config['identity'])
     service_configs = get_service_configs(config)
+    log = log or metrics_log
 
-    dispatcher = get_legacy_dispatcher(reactor, authenticator, metrics_log,
+    dispatcher = get_legacy_dispatcher(reactor, authenticator, log,
                                        service_configs)
 
     # calculate metrics
@@ -296,7 +296,7 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
             _client, props=['status'],
             group_pred=lambda g: g['status'] != 'DISABLED')
     group_metrics = yield get_all_metrics(
-        dispatcher, cass_groups, _print=_print)
+        dispatcher, cass_groups, log, _print=_print)
 
     # Calculate total desired, actual and pending
     total_desired, total_actual, total_pending = 0, 0, 0
@@ -304,7 +304,7 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
         total_desired += group_metric.desired
         total_actual += group_metric.actual
         total_pending += group_metric.pending
-    metrics_log.msg(
+    log.msg(
         'total desired: {td}, total_actual: {ta}, total pending: {tp}',
         td=total_desired, ta=total_actual, tp=total_pending)
     if _print:
@@ -314,10 +314,10 @@ def collect_metrics(reactor, config, client=None, authenticator=None,
     # Add to cloud metrics
     eff = add_to_cloud_metrics(
         config['metrics']['ttl'], config['region'], total_desired,
-        total_actual, total_pending, log=metrics_log)
+        total_actual, total_pending, log=log)
     eff = Effect(TenantScope(eff, config['metrics']['tenant_id']))
     yield perform(dispatcher, eff)
-    metrics_log.msg('added to cloud metrics')
+    log.msg('added to cloud metrics')
     if _print:
         print('added to cloud metrics')
         group_metrics.sort(key=lambda g: abs(g.desired - g.actual),
@@ -365,7 +365,8 @@ class MetricsService(Service, object):
         self._service = TimerService(
             get_in(['metrics', 'interval'], config, default=60), collect,
             reactor, config, client=self._client,
-            authenticator=generate_authenticator(reactor, config['identity']))
+            authenticator=generate_authenticator(reactor, config['identity']),
+            log=log)
         self._service.clock = clock or reactor
 
     def startService(self):
