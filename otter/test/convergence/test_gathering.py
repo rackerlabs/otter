@@ -27,7 +27,6 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.auth import NoSuchEndpoint
 from otter.cloud_client import (
     CLBNotFoundError,
-    NovaComputeFaultError,
     service_request
 )
 from otter.constants import ServiceType
@@ -48,6 +47,7 @@ from otter.convergence.model import (
     RCv3Description,
     RCv3Node,
     ServerState)
+from otter.log.intents import Log
 from otter.test.utils import (
     EffectServersCache,
     StubResponse,
@@ -56,7 +56,6 @@ from otter.test.utils import (
     nested_sequence,
     patch,
     perform_sequence,
-    resolve_effect,
     resolve_stubs,
     server
 )
@@ -74,15 +73,6 @@ def _request(requests):
                                                  requests.keys()))
         return Effect(Stub(Constant(response)))
     return request
-
-
-def resolve_svcreq(eff, result, service_type,
-                   method, url, params=None, headers=None, data=None):
-    expected_eff = service_request(
-        service_type, method, url, params=params, headers=headers, data=data)
-    assert eff.intent == expected_eff.intent, "%r != %r" % (
-        eff.intent, expected_eff.intent)
-    return resolve_effect(eff, result)
 
 
 def svc_request_args(**params):
@@ -135,7 +125,7 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
     def setUp(self):
         """Save basic reused data."""
         self.req = (ServiceType.CLOUD_SERVERS, 'GET',
-                    'servers/detail', {'limit': ['100']})
+                    'servers/detail', None, None, {'limit': ['100']})
 
     def test_with_changes_since(self):
         """
@@ -143,11 +133,15 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
         """
         since = datetime(2010, 10, 10, 10, 10, 0)
         eff = get_all_scaling_group_servers(changes_since=since)
-        fake_response = StubResponse(200, None)
         body = {'servers': []}
-        result = resolve_svcreq(
-            eff, (fake_response, body),
-            **svc_request_args(changes_since=since, limit=100))
+
+        sequence = [
+            (service_request(
+                **svc_request_args(changes_since=since, limit=100)).intent,
+             lambda i: (StubResponse(200, None), body)),
+            (Log(mock.ANY, mock.ANY), lambda i: None)
+        ]
+        result = perform_sequence(sequence, eff)
         self.assertEqual(result, {})
 
     def test_filters_no_metadata(self):
@@ -156,9 +150,13 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
         """
         servers = [{'id': i} for i in range(10)]
         eff = get_all_scaling_group_servers()
-        fake_response = StubResponse(200, None)
         body = {'servers': servers}
-        result = resolve_svcreq(eff, (fake_response, body), *self.req)
+        sequence = [
+            (service_request(*self.req).intent,
+             lambda i: (StubResponse(200, None), body)),
+            (Log(mock.ANY, mock.ANY), lambda i: None)
+        ]
+        result = perform_sequence(sequence, eff)
         self.assertEqual(result, {})
 
     def test_filters_no_as_metadata(self):
@@ -168,9 +166,13 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
         """
         servers = [{'id': i, 'metadata': {}} for i in range(10)]
         eff = get_all_scaling_group_servers()
-        fake_response = StubResponse(200, None)
         body = {'servers': servers}
-        result = resolve_svcreq(eff, (fake_response, body), *self.req)
+        sequence = [
+            (service_request(*self.req).intent,
+             lambda i: (StubResponse(200, None), body)),
+            (Log(mock.ANY, mock.ANY), lambda i: None)
+        ]
+        result = perform_sequence(sequence, eff)
         self.assertEqual(result, {})
 
     def test_returns_as_servers(self):
@@ -185,9 +187,13 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
         servers = as_servers + [{'metadata': 'junk'}] * 3
         eff = get_all_scaling_group_servers()
-        fake_response = StubResponse(200, None)
         body = {'servers': servers}
-        result = resolve_svcreq(eff, (fake_response, body), *self.req)
+        sequence = [
+            (service_request(*self.req).intent,
+             lambda i: (StubResponse(200, None), body)),
+            (Log(mock.ANY, mock.ANY), lambda i: None)
+        ]
+        result = perform_sequence(sequence, eff)
         self.assertEqual(
             result,
             {'a': as_servers[:5] + [as_servers[-1]], 'b': as_servers[5:8]})
@@ -204,9 +210,13 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
         servers = as_servers + [{'metadata': 'junk'}] * 3
         eff = get_all_scaling_group_servers(
             server_predicate=lambda s: s['id'] % 3 == 0)
-        fake_response = StubResponse(200, None)
         body = {'servers': servers}
-        result = resolve_svcreq(eff, (fake_response, body), *self.req)
+        sequence = [
+            (service_request(*self.req).intent,
+             lambda i: (StubResponse(200, None), body)),
+            (Log(mock.ANY, mock.ANY), lambda i: None)
+        ]
+        result = perform_sequence(sequence, eff)
         self.assertEqual(
             result,
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
