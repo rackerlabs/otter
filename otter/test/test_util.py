@@ -300,7 +300,7 @@ class UpstreamErrorTests(SynchronousTestCase):
     def test_apierror_unparsed(self):
         """
         Wraps APIError from identity and uses default string if unable to
-        parses error body
+        parse error body
         """
         body = json.dumps({"identityFault": {"m": "ba"}})
         apie = APIError(410, body, {})
