@@ -649,7 +649,8 @@ class CLBClientTests(SynchronousTestCase):
                     eff)
             self.assertEqual(
                 cm.exception,
-                APIError(headers={}, code=resp[0].code, body=resp[1]))
+                APIError(headers={}, code=resp[0].code, body=resp[1],
+                         method='method', url='original/request/URL'))
 
     def test_change_clb_node(self):
         """

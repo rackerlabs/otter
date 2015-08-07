@@ -98,7 +98,8 @@ def check_response(pred, result):
     if pred(response, content):
         return result
     else:
-        raise APIError(response.code, content, response.headers)
+        raise APIError(response.code, content, response.headers,
+                       response.request.method, response.request.absoluteURI)
 
 
 @memoize
