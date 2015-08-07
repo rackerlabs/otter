@@ -1198,6 +1198,18 @@ class NovaClientTests(SynchronousTestCase):
             'GET', 'servers/detail',
             params=params).intent
 
+    def _list_server_details_log_intent(self, body):
+        """
+        Return a :obj:`Log` intent for listing server details.
+        """
+        return Log(
+            'request-list-servers-details',
+            {'url': "original/request/URL",
+             'method': 'method',
+             'request_id': "original-request-id",
+             'response_body': json.dumps(body, sort_keys=True)}
+        )
+
     def test_list_servers_details_page(self):
         """
         :func:`list_servers_details_page` returns the JSON response from
@@ -1207,9 +1219,10 @@ class NovaClientTests(SynchronousTestCase):
         body = {'servers': [], 'servers_links': []}
         eff = list_servers_details_page(params)
         expected_intent = self._list_server_details_intent(params)
-        seq = [(
-            expected_intent,
-            service_request_eqf(stub_pure_response(json.dumps(body), 200)))
+        seq = [
+            (expected_intent,
+             service_request_eqf(stub_pure_response(json.dumps(body), 200))),
+            (self._list_server_details_log_intent(body), lambda _: None)
         ]
         resp, response_json = perform_sequence(seq, eff)
         self.assertEqual(response_json, body)
@@ -1223,7 +1236,7 @@ class NovaClientTests(SynchronousTestCase):
         are no more links, and returns a list of servers as the result.  It
         ignores any non-next links.
         """
-        resps = map(json.dumps, [
+        bodies = [
             {'servers': ['1', '2'],
              'servers_links': [{'href': 'doesnt_matter_url?marker=3',
                                 'rel': 'next'}]},
@@ -1235,16 +1248,20 @@ class NovaClientTests(SynchronousTestCase):
             {'servers': ['5', '6'],
              'servers_links': [{'href': 'doesnt_matter_url?marker=3',
                                 'rel': 'prev'}]}
-        ])
+        ]
+        resps = [json.dumps(d) for d in bodies]
 
         eff = list_servers_details_all({'marker': ['1']})
         seq = [
             (self._list_server_details_intent({'marker': ['1']}),
              service_request_eqf(stub_pure_response(resps[0], 200))),
+            (self._list_server_details_log_intent(bodies[0]), lambda _: None),
             (self._list_server_details_intent({'marker': ['3']}),
              service_request_eqf(stub_pure_response(resps[1], 200))),
+            (self._list_server_details_log_intent(bodies[1]), lambda _: None),
             (self._list_server_details_intent({'marker': ['5']}),
-             service_request_eqf(stub_pure_response(resps[2], 200)))
+             service_request_eqf(stub_pure_response(resps[2], 200))),
+            (self._list_server_details_log_intent(bodies[2]), lambda _: None)
         ]
         result = perform_sequence(seq, eff)
         self.assertEqual(result, ['1', '2', '3', '4', '5', '6'])
@@ -1254,7 +1271,7 @@ class NovaClientTests(SynchronousTestCase):
         :func:`list_servers_details_all` raises an exception if Nova returns
         the same next link twice in a row.
         """
-        resps = map(json.dumps, [
+        bodies = [
             {'servers': ['1', '2'],
              'servers_links': [{'href': 'doesnt_matter_url?marker=3',
                                 'rel': 'next'}]},
@@ -1263,14 +1280,17 @@ class NovaClientTests(SynchronousTestCase):
                                 'rel': 'next'},
                                {'href': 'doesnt_matter_url?marker=1',
                                 'rel': 'prev'}]}
-        ])
+        ]
+        resps = [json.dumps(d) for d in bodies]
 
         eff = list_servers_details_all({'marker': ['1']})
         seq = [
             (self._list_server_details_intent({'marker': ['1']}),
              service_request_eqf(stub_pure_response(resps[0], 200))),
+            (self._list_server_details_log_intent(bodies[0]), lambda _: None),
             (self._list_server_details_intent({'marker': ['3']}),
-             service_request_eqf(stub_pure_response(resps[1], 200)))
+             service_request_eqf(stub_pure_response(resps[1], 200))),
+            (self._list_server_details_log_intent(bodies[1]), lambda _: None)
         ]
         self.assertRaises(NovaComputeFaultError, perform_sequence, seq, eff)
 
