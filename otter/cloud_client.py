@@ -21,6 +21,7 @@ from effect import (
 import six
 
 from toolz.dicttoolz import get_in
+from toolz.functoolz import identity
 from toolz.itertoolz import concat
 
 from twisted.internet.defer import DeferredLock
@@ -351,7 +352,8 @@ def log_success_response(msg_type, response_body_filter):
             msg_type,
             method=resp.request.method,
             url=resp.request.absoluteURI,
-            response_body=json.dumps(response_body_filter(json_body)),
+            response_body=json.dumps(response_body_filter(json_body),
+                                     sort_keys=True),
             request_id=request_id)
         return eff.on(lambda _: result)
 
@@ -955,7 +957,9 @@ def list_servers_details_page(parameters=None):
             ServiceType.CLOUD_SERVERS,
             'GET', append_segments('servers', 'detail'),
             params=parameters)
-        .on(error=_parse_known_errors))
+        .on(error=_parse_known_errors)
+        .on(log_success_response('request-list-servers-details', identity))
+    )
 
 
 def list_servers_details_all(parameters=None):
