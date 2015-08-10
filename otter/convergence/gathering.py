@@ -5,7 +5,7 @@ from effect import catch, parallel
 from effect.do import do, do_return
 
 from toolz.curried import filter, groupby, keyfilter, map
-from toolz.dicttoolz import get_in, merge
+from toolz.dicttoolz import assoc, get_in, merge
 from toolz.functoolz import compose, curry, identity
 from toolz.itertoolz import concat
 
@@ -99,8 +99,8 @@ def mark_deleted_servers(old, new):
     old = sdict(old)
     new = sdict(new)
     deleted_ids = set(old.keys()) - set(new.keys())
-    for s in deleted_ids:
-        old[s]["status"] = "DELETED"
+    for sid in deleted_ids:
+        old[sid] = assoc(old[sid], "status", "DELETED")
     return merge(old, new).values()
 
 

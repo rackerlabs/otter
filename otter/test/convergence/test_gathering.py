@@ -337,21 +337,24 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         """
         asmetakey = "rax:autoscale:group:id"
         cache = [
-            {'id': 'a', 'metadata': {asmetakey: "gid"}},
-            {'id': 'b', 'metadata': {asmetakey: "gid"}},
-            {'id': 'd', 'metadata': {asmetakey: "gid"}}]
+            {'id': 'a', 'metadata': {asmetakey: "gid"}},  # gets updated
+            {'id': 'b', 'metadata': {asmetakey: "gid"}},  # deleted
+            {'id': 'd', 'metadata': {asmetakey: "gid"}},  # meta removed
+            {'id': 'c', 'metadata': {asmetakey: "gid"}}]  # same
         current = [
             {'id': 'a', 'b': 'c', 'metadata': {asmetakey: "gid"}},
-            {'id': 'd', 'metadata': {"changed": "yes"}}]
+            {'id': 'z', 'z': 'w', 'metadata': {asmetakey: "gid"}},  # new
+            {'id': 'd', 'metadata': {"changed": "yes"}},
+            {'id': 'c', 'metadata': {asmetakey: "gid"}}]
         last_update = datetime(2010, 5, 20)
         sequence = [
             (("cachegstidgid", False), lambda i: (cache, last_update)),
             (("alls",), lambda i: current)]
-        exp_cache_server = deepcopy(cache[1])
-        exp_cache_server["status"] = "DELETED"
+        del_cache_server = deepcopy(cache[1])
+        del_cache_server["status"] = "DELETED"
         self.assertEqual(
             self.freeze(perform_sequence(sequence, self._invoke())),
-            self.freeze([exp_cache_server, current[0]]))
+            self.freeze([del_cache_server, cache[-1]] + current[0:2]))
 
     def test_mark_deleted_servers_precedence(self):
         """
