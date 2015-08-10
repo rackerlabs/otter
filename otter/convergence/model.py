@@ -10,7 +10,9 @@ from attr.validators import instance_of
 
 from characteristic import Attribute, attributes
 
-from pyrsistent import PMap, PSet, freeze, pmap, pset, pvector
+from pyrsistent import PMap, PSet, freeze, pmap, pset, pvector, thaw
+
+from six import string_types
 
 from sumtypes import constructor, sumtype
 
@@ -193,16 +195,7 @@ def _lbs_from_metadata(metadata):
     return pset(desired_lbs)
 
 
-@attributes(['id', 'state', 'created', 'image_id', 'flavor_id',
-             # because type(pvector()) is pvectorc.PVector,
-             # which != pyrsistent.PVector
-             Attribute('links', default_factory=pvector,
-                       instance_of=type(pvector())),
-             Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
-             Attribute('servicenet_address',
-                       default_value='',
-                       instance_of=basestring),
-             Attribute('json', instance_of=PMap, default_factory=pmap)])
+@attr.s
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -222,10 +215,20 @@ class NovaServer(object):
     :var dict json: JSON dict received from Nova from which this server
         is created
     """
-
-    def __init__(self):
-        assert self.state in ServerState.iterconstants(), \
-            "%r is not a ServerState" % (self.state,)
+    id = attr.ib()
+    state = attr.ib(
+        validator=lambda _1, _2, val: val in list(ServerState.iterconstants()))
+    created = attr.ib()
+    image_id = attr.ib()
+    flavor_id = attr.ib()
+    # type(pvector()) is pvectorc.PVector, which != pyrsistent.PVector
+    links = attr.ib(default=attr.Factory(pvector),
+                    validator=instance_of(type(pvector())))
+    desired_lbs = attr.ib(default=attr.Factory(pset),
+                          validator=instance_of(PSet))
+    servicenet_address = attr.ib(default='',
+                                 validator=instance_of(string_types))
+    json = attr.ib(default=attr.Factory(pmap), validator=instance_of(PMap))
 
     @classmethod
     def from_server_details_json(cls, server_json):
