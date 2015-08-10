@@ -1301,6 +1301,7 @@ class GroupResumeTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         Resume should call the controller's ``resume_scaling_group`` function
         """
+        self.otter.dispatcher = "disp"
         mock_resume = patch(
             self, 'otter.rest.groups.controller.resume_scaling_group',
             return_value=defer.succeed(None))
@@ -1308,13 +1309,7 @@ class GroupResumeTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(response_body, "")
 
         mock_resume.assert_called_once_with(mock.ANY, 'transaction-id',
-                                            self.mock_group)
-
-    def test_resume_not_implemented(self):
-        """
-        Resume currently raises 501 not implemented
-        """
-        self.assert_status_code(501, method="POST")
+                                            self.mock_group, "disp")
 
 
 class GroupServersTests(RestAPITestMixin, SynchronousTestCase):

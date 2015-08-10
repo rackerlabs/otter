@@ -23,7 +23,6 @@ from otter.integration.lib.trial_tools import (
     region,
     scheduler_interval,
     skip_if,
-    skip_me,
     sleep
 )
 
@@ -31,7 +30,7 @@ from otter.integration.lib.trial_tools import (
 timeout_default = 600
 
 
-class PauseTests(unittest.TestCase):
+class PauseResumeTests(unittest.TestCase):
     """
     Tests for `../groups/groupId/pause` and `../groups/groupId/resume` endpoint
     """
@@ -94,7 +93,6 @@ class PauseTests(unittest.TestCase):
         yield self.helper.assert_group_state(group, one_building)
         returnValue(group)
 
-    @skip_me("Until resume is implemented: #1605")
     @skip_if(not_mimic, "This requires mimic for server build time")
     @inlineCallbacks
     def test_resume(self):
@@ -104,7 +102,7 @@ class PauseTests(unittest.TestCase):
         webhook or trigger convergence
         """
         group = yield self.test_pause_stops_convergence()
-        yield group.resume()
+        yield group.resume(self.rcs)
         yield self.helper.assert_group_state(
             group, ContainsDict({"paused": Equals(False)}))
         yield group.wait_for_state(
