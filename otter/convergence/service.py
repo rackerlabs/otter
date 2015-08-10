@@ -5,46 +5,32 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 :obj:`Converger`.
 """
 
-# # Note [Single convergence iteration]
-#
-# An individual convergence iteration goes through these steps:
-# - gather data (from nova, CLB, RCv3, etc)
-# - calculate some steps to reach the desired state (not necessarily all of
-#   them)
-# - run those steps
-#
-# That's only one iteration -- See [Convergence cycles] for the whole cycle.
-
-
 # # Note [Convergence cycles]
 #
-# To sum up the whole process with some pseudo-code:
+# A very abstract version of our convergence cycle:
+# - CYCLE (every N seconds)
+# - find all of my divergent groups
+# - for each group (that's not in `currently_converging`)
+#   - add to currently_converging
+#   - run a single convergence iteration
+#   - remove from currently_converging
+# - IF group is fully converged, delete divergent flag
+# - ELSE goto CYCLE
 #
-# - Regularly list divergent flags OR receive notification via ZK that
-#   divergent flags have been modified
-# - Filter out any groups which are in `currently_converging`
-# - For each not-currently-converging divergent group (in parallel):
-#   - Add the group to `currently_converging`
-#   - Perform the [Single convergence iteration]
-#   - Remove the group from `currently_converging`
-#   - If the iteration was successful, attempt to delete the divergent flag
-#     *only if its version has not changed*. See [Divergent flags] for why.
+# Importantly for the cycle logic, divergent flags are not deleted when the
+# group has not yet fully converged. This is the mechanism by which the
+# "cycling" actually happens -- we repeatedly run a convergence iteration until
+# we determine it's fully converged, and then we finally delete the flag. See
+# [Divergent flags] for more details about the divergent flag.
 #
-# A lot of care is taken to avoid running iterations concurrently for the same
-# group -- see note [Divergent flags], which takes care of concurrency
-# *between nodes*.
+# So: currently_converging lasts for a single *iteration*,
+#     divergent flags last for a whole *cycle*.
 #
-# In addition to the divergent flags, we also need to keep track of which
-# groups are being converged *within a node* since we may receive multiple
-# requests to converge the same group in a short period of time. We do this
-# with a simple set of group IDs called `currency_converging`. If a group is in
-# that set when we receive a new convergence request, the request is pretty
-# much dropped on the floor, but this isn't a problem because the [Divergent
-# flags] system will ensure we eventually process that request.
-#
-# Note that "request" as used in the previous paragraph is an abstraction;
-# sometimes we receive notification that the ZK divergent flags have changed.
-# We also poll the ZK divergent flags regularly (and asynchronously!).
+# `currently_converging` is a set of group IDs that are being converged *within
+# a node*. We keep track of this since we receive notifications that groups are
+# divergent asynchronously with the actual convergence process. If a group is
+# in that set when we notice a divergent flag, we ignore it, *without* deleting
+# the divergent flag, so we will still check that group on the next cycle.
 
 
 # # Note [Divergent flags]
