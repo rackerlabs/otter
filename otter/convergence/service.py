@@ -29,7 +29,6 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 #   - Remove the group from `currently_converging`
 #   - If the iteration was successful, attempt to delete the divergent flag
 #     *only if its version has not changed*. See [Divergent flags] for why.
-#   -
 #
 # A lot of care is taken to avoid running iterations concurrently for the same
 # group -- see note [Divergent flags], which takes care of concurrency
