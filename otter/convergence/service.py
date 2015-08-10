@@ -9,7 +9,7 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 #
 # A very abstract version of our convergence cycle:
 # - CYCLE (every N seconds)
-# - find all of my divergent groups
+# - find all divergent flags for this node's groups
 # - for each group (that's not in `currently_converging`)
 #   - add to currently_converging
 #   - run a single convergence iteration
