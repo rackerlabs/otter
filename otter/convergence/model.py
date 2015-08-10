@@ -195,7 +195,15 @@ def _lbs_from_metadata(metadata):
     return pset(desired_lbs)
 
 
-@attr.s
+def _validate_state(_1, _2, state):
+    """
+    Assert that a state is in ServerState
+    """
+    if state not in ServerState.iterconstants():
+        raise AssertionError("{0} is not a ServerState".format(state))
+
+
+@attr.s(repr=False)
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -216,8 +224,7 @@ class NovaServer(object):
         is created
     """
     id = attr.ib()
-    state = attr.ib(
-        validator=lambda _1, _2, val: val in list(ServerState.iterconstants()))
+    state = attr.ib(validator=_validate_state)
     created = attr.ib()
     image_id = attr.ib()
     flavor_id = attr.ib()
@@ -262,6 +269,26 @@ class NovaServer(object):
             desired_lbs=_lbs_from_metadata(metadata),
             servicenet_address=_servicenet_address(server_json),
             json=freeze(server_json))
+
+    def __repr__(self):
+        """
+        Make the repr a little more friendly - and with less redundant/unused
+        information.
+        """
+        kvpairs = []
+        # this gives us an ordered list
+        for a in attr.fields(self.__class__):
+            value = thaw(getattr(self, a.name))
+            if a.name == "json":
+                value = {k: v for k, v in value.items() if k in
+                         ('status', 'metadata', 'updated', 'name',
+                          'OS-EXT-STS:task_state')}
+            kvpairs.append("{0}={1}".format(a.name, repr(value)))
+        return "<{0}({1})>".format(self.__class__.__name__, ", ".join(kvpairs))
+
+    def __str__(self):
+        """Return the repr"""
+        return repr(self)
 
 
 def group_id_from_metadata(metadata):

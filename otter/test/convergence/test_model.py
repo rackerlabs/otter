@@ -375,9 +375,10 @@ class AutoscaleMetadataTests(SynchronousTestCase):
                          expected)
 
 
-class ToNovaServerTests(SynchronousTestCase):
+class NovaServerTests(SynchronousTestCase):
     """
-    Tests for :func:`NovaServer.from_server_details_json`
+    Tests for :func:`NovaServer.from_server_details_json` and
+    ``repr(NovaServer)``.
     """
     def setUp(self):
         """
@@ -614,6 +615,36 @@ class ToNovaServerTests(SynchronousTestCase):
                        servicenet_address='',
                        links=freeze(self.links[0]),
                        json=freeze(self.servers[0])))
+
+    def test_repr_nova(self):
+        """
+        The repr of a Nova server includes thawed data structures and shortened
+        JSON.
+        """
+        server_json = self.servers[0]
+        # add a bunch more fields
+        server_json.update({
+            'metadata': {'some': 'stuff'},
+            'OS-EXT-STS:task_state': None,
+            'updated': self.createds[0][0],
+            'user': '12345',
+            'hostId': '12356773526246'
+        })
+        server = NovaServer.from_server_details_json(server_json)
+        expected_json = {
+            'status': server_json['status'],
+            'OS-EXT-STS:task_state': None,
+            'updated': self.createds[0][0],
+            'metadata': {'some': 'stuff'}
+        }
+        self.assertEqual(
+            repr(server),
+            "<NovaServer(id={0}, state={1}, created={2}, image_id={3}, "
+            "flavor_id={4}, links={5}, desired_lbs={6}, "
+            "servicenet_address={7}, json={8})>".format(*[repr(i) for i in [
+                'a', ServerState.ACTIVE, float(self.createds[0][1]),
+                'valid_image', 'valid_flavor', self.links[0], set(), '',
+                expected_json]]))
 
 
 class IPAddressTests(SynchronousTestCase):
