@@ -83,12 +83,13 @@ def get_all_scaling_group_servers(changes_since=None,
     return get_all_server_details(changes_since).on(servers_apply)
 
 
-def updated_deleted_servers(old, new):
+def mark_deleted_servers(old, new):
     """
-    Return servers with servers not found in new list marked as deleted
+    Given dictionaries containing old and new servers, return a list of all
+    servers, with the deleted ones annotated with a status of DELETED.
 
     :param list old: List of old servers
-    :param list second: List of latest servers
+    :param list new: List of latest servers
     :return: List of updated servers
     """
 
@@ -132,7 +133,7 @@ def get_scaling_group_servers(tenant_id, group_id, now,
         servers = (yield all_as_servers()).get(group_id, [])
     else:
         current = yield all_servers()
-        servers = updated_deleted_servers(cached_servers, current)
+        servers = mark_deleted_servers(cached_servers, current)
         servers = list(filter(server_of_group(group_id), servers))
     yield do_return(servers)
 

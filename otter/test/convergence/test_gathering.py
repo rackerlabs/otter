@@ -40,7 +40,7 @@ from otter.convergence.gathering import (
     get_clb_contents,
     get_rcv3_contents,
     get_scaling_group_servers,
-    updated_deleted_servers)
+    mark_deleted_servers)
 from otter.convergence.model import (
     CLBDescription,
     CLBNode,
@@ -353,9 +353,9 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             self.freeze(perform_sequence(sequence, self._invoke())),
             self.freeze([exp_cache_server, current[0]]))
 
-    def test_updated_deleted_servers_precedence(self):
+    def test_mark_deleted_servers_precedence(self):
         """
-        In :func:`updated_deleted_servers`, if old list has common servers with
+        In :func:`mark_deleted_servers`, if old list has common servers with
         new list, the new one takes precedence
         """
         old = [{'id': 'a', 'a': 1}, {'id': 'b', 'b': 2}]
@@ -363,16 +363,16 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         old_server = deepcopy(old[0])
         old_server["status"] = "DELETED"
         self.assertEqual(
-            self.freeze(updated_deleted_servers(old, new)),
+            self.freeze(mark_deleted_servers(old, new)),
             self.freeze([old_server] + new))
 
-    def test_updated_deleted_servers_no_old(self):
+    def test_mark_deleted_servers_no_old(self):
         """
         If old list does not have any servers then it just returns new list
         """
         new = [{'id': 'd', 'd': 3}, {'id': 'b', 'b': 4}]
         self.assertEqual(
-            self.freeze(updated_deleted_servers([], new)), self.freeze(new))
+            self.freeze(mark_deleted_servers([], new)), self.freeze(new))
 
     def test_updated_deleted_servers_no_new(self):
         """
@@ -384,7 +384,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         exp_old[0]["status"] = "DELETED"
         exp_old[1]["status"] = "DELETED"
         self.assertEqual(
-            self.freeze(updated_deleted_servers(old, [])),
+            self.freeze(mark_deleted_servers(old, [])),
             self.freeze(exp_old))
 
 
