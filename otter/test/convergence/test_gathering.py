@@ -1,8 +1,8 @@
 """Tests for convergence gathering."""
 
+from copy import deepcopy
 from datetime import datetime
 from functools import partial
-from urllib import urlencode
 
 from effect import (
     ComposedDispatcher,
@@ -16,6 +16,8 @@ from effect.async import perform_parallel_async
 from effect.testing import (
     EQDispatcher, EQFDispatcher, Stub)
 
+import mock
+
 from pyrsistent import freeze
 
 from toolz.curried import map
@@ -24,18 +26,20 @@ from toolz.functoolz import compose
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import NoSuchEndpoint
-from otter.cloud_client import service_request
+from otter.cloud_client import (
+    CLBNotFoundError,
+    service_request
+)
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
-    UnexpectedBehaviorError,
     extract_CLB_drained_at,
     get_all_convergence_data,
-    get_all_server_details,
     get_all_scaling_group_servers,
+    get_all_server_details,
     get_clb_contents,
     get_rcv3_contents,
     get_scaling_group_servers,
-    merge_servers)
+    mark_deleted_servers)
 from otter.convergence.model import (
     CLBDescription,
     CLBNode,
@@ -44,19 +48,21 @@ from otter.convergence.model import (
     RCv3Description,
     RCv3Node,
     ServerState)
+from otter.log.intents import Log
 from otter.test.utils import (
     EffectServersCache,
+    StubResponse,
     intent_func,
     nested_parallel,
+    nested_sequence,
     patch,
     perform_sequence,
-    resolve_effect,
-    resolve_retry_stubs,
     resolve_stubs,
     server
 )
+from otter.util.fp import assoc_obj
 from otter.util.retry import (
-    ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
+    Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import timestamp_to_epoch
 
 
@@ -70,15 +76,6 @@ def _request(requests):
     return request
 
 
-def resolve_svcreq(eff, result, service_type,
-                   method, url, headers=None, data=None):
-    expected_eff = service_request(
-        service_type, method, url, headers=headers, data=data)
-    assert eff.intent == expected_eff.intent, "%r != %r" % (
-        eff.intent, expected_eff.intent)
-    return resolve_effect(eff, result)
-
-
 def svc_request_args(**params):
     """
     Return service request args with formatted changes_since argument in it
@@ -86,134 +83,39 @@ def svc_request_args(**params):
     changes_since = params.pop('changes_since', None)
     if changes_since is not None:
         params['changes-since'] = changes_since.isoformat() + 'Z'
-    return (ServiceType.CLOUD_SERVERS, 'GET',
-            'servers/detail?{}'.format(urlencode(sorted(params.items()))))
+    return {
+        'service_type': ServiceType.CLOUD_SERVERS,
+        'method': 'GET',
+        'params': {k: [str(v)] for k, v in params.iteritems()},
+        'url': 'servers/detail'}
 
 
 class GetAllServerDetailsTests(SynchronousTestCase):
     """
-    Tests for :func:`get_all_server_details`
+    Tests for :func:`get_all_server_details`.  The service request is
+    constructed and handled by `cloud_client`.  :func:`get_all_server_details`
+    just handles constructing the parameters.
     """
-
-    def setUp(self):
-        """Save basic reused data."""
-        self.servers = [{'id': i} for i in range(9)]
-
-    def test_get_all_without_link_to_next_page(self):
+    def test_default_arguments(self):
         """
-        `get_all_server_details` will not fetch again if first does not have
-        a link to the next page (either pagination is not supported, or there
-        are no more pages)
+        :func:`get_all_server_details` called with arguments will use a default
+        batch size.
         """
-        fake_response = object()
-        body = {'servers': self.servers}
-        eff = get_all_server_details(batch_size=10)
-        svcreq = resolve_retry_stubs(eff)
-        result = resolve_svcreq(
-            svcreq, (fake_response, body), *svc_request_args(limit=10))
-        self.assertEqual(result, self.servers)
+        self.assertEqual(get_all_server_details().intent,
+                         service_request(**svc_request_args(limit=100)).intent)
 
-    def test_get_all_ignores_non_next_links(self):
+    def test_respects_batch_size_and_changes_since(self):
         """
-        `get_all_server_details` will ignore links that do not have
-        "rel" = "next".
+        :func:`get_all_server_details` will respect the changes since and
+        batch size arguments, and convert changes-since to an ISO8601 zulu
+        format.
         """
-        fake_response = object()
-        body = {'servers': self.servers,
-                'server_links': [{
-                    'href': 'https://ignoreme/path?bleh=1', 'rel': 'prev'}]}
-        eff = get_all_server_details(batch_size=10)
-        svcreq = resolve_retry_stubs(eff)
-        result = resolve_svcreq(
-            svcreq, (fake_response, body), *svc_request_args(limit=10))
-        self.assertEqual(result, self.servers)
-
-    def test_get_all_with_link_to_next_page(self):
-        """
-        `get_all_server_details` will fetch again and again until there is
-        no more next page.
-        """
-        servers = [{'id': i} for i in range(20)]
-        # first request
-        svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
-        fake_response = object()
-        body = {'servers': servers[:10],
-                'servers_links': [{
-                    'href': 'https://ignoreme/path?limit=10&marker=9',
-                    'rel': 'next'}]}
-        result = resolve_svcreq(
-            svcreq, (fake_response, body), *svc_request_args(limit=10))
-        self.assertIsInstance(result, Effect)
-
-        # next request, because previous had a next link
-        next_req = resolve_retry_stubs(result)
-        body = {'servers': servers[10:],
-                'servers_links': [{
-                    'href': 'https://ignoreme/path?limit=10&marker=19',
-                    'rel': 'next'}]}
-        result = resolve_svcreq(
-            next_req, (fake_response, body),
-            *svc_request_args(limit=10, marker=9))
-        self.assertIsInstance(result, Effect)
-
-        # third request, because previous had a next link
-        next_req = resolve_retry_stubs(result)
-        body = {'servers': []}
-        result = resolve_svcreq(next_req, (fake_response, body),
-                                *svc_request_args(limit=10, marker=19))
-
-        self.assertEqual(result, servers)
-
-    def test_get_all_blows_up_if_got_same_link_twice(self):
-        """
-        `get_all_server_details` will raise an exception if it attempts to get
-        the same next page link twice in a row (not related to retries - this
-        is if Nova returns the same link twice in a row)
-        """
-        servers = [{'id': i} for i in range(20)]
-        # first request
-        svcreq = resolve_retry_stubs(get_all_server_details(batch_size=10))
-        fake_response = object()
-        body = {'servers': servers[:10],
-                'servers_links': [{
-                    'href': 'https://ignoreme/path?anything=1',
-                    'rel': 'next'}]}
-        result = resolve_svcreq(svcreq, (fake_response, body),
-                                *svc_request_args(limit=10))
-        self.assertIsInstance(result, Effect)
-
-        # next request, because previous had a next link
-        next_req = resolve_retry_stubs(result)
-        body = {'servers': servers[10:],
-                'servers_links': [{
-                    'href': 'https://ignoreme/path?anything=1',
-                    'rel': 'next'}]}
-        self.assertRaises(UnexpectedBehaviorError,
-                          resolve_svcreq, next_req, (fake_response, body),
-                          *svc_request_args(anything=1))
-
-    def test_with_changes_since(self):
-        """
-        `get_all_server_details` will request for servers based on
-        changes_since time
-        """
-        fake_response = object()
-        body = {'servers': self.servers}
         since = datetime(2010, 10, 10, 10, 10, 0)
-        eff = get_all_server_details(changes_since=since, batch_size=10)
-        svcreq = resolve_retry_stubs(eff)
-        result = resolve_svcreq(
-            svcreq, (fake_response, body),
-            *svc_request_args(changes_since=since, limit=10))
-        self.assertEqual(result, self.servers)
-
-    def test_retry(self):
-        """The HTTP requests are retried with some appropriate policy."""
-        eff = get_all_server_details(batch_size=10)
         self.assertEqual(
-            eff.intent.should_retry,
-            ShouldDelayAndRetry(can_retry=retry_times(5),
-                                next_interval=exponential_backoff_interval(2)))
+            get_all_server_details(batch_size=10, changes_since=since).intent,
+            service_request(
+                **svc_request_args(limit=10, changes_since=since)).intent
+        )
 
 
 class GetAllScalingGroupServersTests(SynchronousTestCase):
@@ -224,20 +126,23 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
     def setUp(self):
         """Save basic reused data."""
         self.req = (ServiceType.CLOUD_SERVERS, 'GET',
-                    'servers/detail?limit=100')
+                    'servers/detail', None, None, {'limit': ['100']})
 
     def test_with_changes_since(self):
         """
         If given, servers are fetched based on changes_since
         """
         since = datetime(2010, 10, 10, 10, 10, 0)
-        eff = resolve_retry_stubs(
-            get_all_scaling_group_servers(changes_since=since))
-        fake_response = object()
+        eff = get_all_scaling_group_servers(changes_since=since)
         body = {'servers': []}
-        result = resolve_svcreq(
-            eff, (fake_response, body),
-            *svc_request_args(changes_since=since, limit=100))
+
+        sequence = [
+            (service_request(
+                **svc_request_args(changes_since=since, limit=100)).intent,
+             lambda i: (StubResponse(200, None), body)),
+            (Log(mock.ANY, mock.ANY), lambda i: None)
+        ]
+        result = perform_sequence(sequence, eff)
         self.assertEqual(result, {})
 
     def test_filters_no_metadata(self):
@@ -245,10 +150,14 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
         Servers without metadata are not included in the result.
         """
         servers = [{'id': i} for i in range(10)]
-        eff = resolve_retry_stubs(get_all_scaling_group_servers())
-        fake_response = object()
+        eff = get_all_scaling_group_servers()
         body = {'servers': servers}
-        result = resolve_svcreq(eff, (fake_response, body), *self.req)
+        sequence = [
+            (service_request(*self.req).intent,
+             lambda i: (StubResponse(200, None), body)),
+            (Log(mock.ANY, mock.ANY), lambda i: None)
+        ]
+        result = perform_sequence(sequence, eff)
         self.assertEqual(result, {})
 
     def test_filters_no_as_metadata(self):
@@ -257,10 +166,14 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
         in it
         """
         servers = [{'id': i, 'metadata': {}} for i in range(10)]
-        eff = resolve_retry_stubs(get_all_scaling_group_servers())
-        fake_response = object()
+        eff = get_all_scaling_group_servers()
         body = {'servers': servers}
-        result = resolve_svcreq(eff, (fake_response, body), *self.req)
+        sequence = [
+            (service_request(*self.req).intent,
+             lambda i: (StubResponse(200, None), body)),
+            (Log(mock.ANY, mock.ANY), lambda i: None)
+        ]
+        result = perform_sequence(sequence, eff)
         self.assertEqual(result, {})
 
     def test_returns_as_servers(self):
@@ -274,10 +187,14 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
              for i in range(5, 8)] +
             [{'metadata': {'rax:auto_scaling_group_id': 'a'}, 'id': 10}])
         servers = as_servers + [{'metadata': 'junk'}] * 3
-        eff = resolve_retry_stubs(get_all_scaling_group_servers())
-        fake_response = object()
+        eff = get_all_scaling_group_servers()
         body = {'servers': servers}
-        result = resolve_svcreq(eff, (fake_response, body), *self.req)
+        sequence = [
+            (service_request(*self.req).intent,
+             lambda i: (StubResponse(200, None), body)),
+            (Log(mock.ANY, mock.ANY), lambda i: None)
+        ]
+        result = perform_sequence(sequence, eff)
         self.assertEqual(
             result,
             {'a': as_servers[:5] + [as_servers[-1]], 'b': as_servers[5:8]})
@@ -292,12 +209,15 @@ class GetAllScalingGroupServersTests(SynchronousTestCase):
             [{'metadata': {'rax:auto_scaling_group_id': 'b'}, 'id': i}
              for i in range(5, 8)])
         servers = as_servers + [{'metadata': 'junk'}] * 3
-        eff = resolve_retry_stubs(
-            get_all_scaling_group_servers(
-                server_predicate=lambda s: s['id'] % 3 == 0))
-        fake_response = object()
+        eff = get_all_scaling_group_servers(
+            server_predicate=lambda s: s['id'] % 3 == 0)
         body = {'servers': servers}
-        result = resolve_svcreq(eff, (fake_response, body), *self.req)
+        sequence = [
+            (service_request(*self.req).intent,
+             lambda i: (StubResponse(200, None), body)),
+            (Log(mock.ANY, mock.ANY), lambda i: None)
+        ]
+        result = perform_sequence(sequence, eff)
         self.assertEqual(
             result,
             {'a': [as_servers[0], as_servers[3]], 'b': [as_servers[6]]})
@@ -310,14 +230,6 @@ class GetScalingGroupServersTests(SynchronousTestCase):
 
     def setUp(self):
         self.now = datetime(2010, 5, 31)
-        asmetakey = "rax:autoscale:group:id"
-        self.servers1 = [
-            {'id': 'a', 'metadata': {asmetakey: "gid"}},
-            {'id': 'b', 'metadata': {asmetakey: "gid"}},
-            {'id': 'd', 'metadata': {asmetakey: "gid"}}]
-        self.servers2 = [
-            {'id': 'a', 'b': 'c', 'metadata': {asmetakey: "gid"}},
-            {'id': 'd', 'metadata': {"changed": "yes"}}]
         self.freeze = compose(set, map(freeze))
 
     def _invoke(self):
@@ -341,51 +253,65 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         self._test_no_cache(False)
         self._test_no_cache(True)
 
-    def test_old_cache(self):
-        """
-        If cache is older than 30 days then servers returned are got by getting
-        current list and changes since last 30 days.
-        """
-        last_update = datetime(2010, 3, 1)
-        exp_last_update = datetime(2010, 5, 1)
-        changes = self.servers1
-        current = self.servers2
-        sequence = [
-            (("cachegstidgid", False), lambda i: (object(), last_update)),
-            nested_parallel([
-                (("alls", exp_last_update), lambda i: changes),
-                (("alls",), lambda i: current)
-            ])
-        ]
-        self.assertEqual(
-            self.freeze(perform_sequence(sequence, self._invoke())),
-            self.freeze([changes[1], current[0]]))
-
     def test_from_cache(self):
         """
-        If cache is < 30 days old then servers returned are merge of
-        changes since the cache time
+        If cache is there then servers returned are updated with servers
+        not found in current list marked as deleted
         """
-        cache = self.servers1
-        changes = self.servers2
+        asmetakey = "rax:autoscale:group:id"
+        cache = [
+            {'id': 'a', 'metadata': {asmetakey: "gid"}},  # gets updated
+            {'id': 'b', 'metadata': {asmetakey: "gid"}},  # deleted
+            {'id': 'd', 'metadata': {asmetakey: "gid"}},  # meta removed
+            {'id': 'c', 'metadata': {asmetakey: "gid"}}]  # same
+        current = [
+            {'id': 'a', 'b': 'c', 'metadata': {asmetakey: "gid"}},
+            {'id': 'z', 'z': 'w', 'metadata': {asmetakey: "gid"}},  # new
+            {'id': 'd', 'metadata': {"changed": "yes"}},
+            {'id': 'c', 'metadata': {asmetakey: "gid"}}]
         last_update = datetime(2010, 5, 20)
         sequence = [
             (("cachegstidgid", False), lambda i: (cache, last_update)),
-            (("alls", last_update), lambda i: changes)]
+            (("alls",), lambda i: current)]
+        del_cache_server = deepcopy(cache[1])
+        del_cache_server["status"] = "DELETED"
         self.assertEqual(
             self.freeze(perform_sequence(sequence, self._invoke())),
-            self.freeze([cache[1], changes[0]]))
+            self.freeze([del_cache_server, cache[-1]] + current[0:2]))
 
-    def test_merge_servers_precedence(self):
+    def test_mark_deleted_servers_precedence(self):
         """
-        In :func:`merge_servers`, if first list has common servers with second
-        list, the second one takes precedence
+        In :func:`mark_deleted_servers`, if old list has common servers with
+        new list, the new one takes precedence
         """
-        first = [{'id': 'a', 'a': 1}, {'id': 'b', 'b': 2}]
-        second = [{'id': 'd', 'd': 3}, {'id': 'b', 'b': 4}]
+        old = [{'id': 'a', 'a': 1}, {'id': 'b', 'b': 2}]
+        new = [{'id': 'd', 'd': 3}, {'id': 'b', 'b': 4}]
+        old_server = deepcopy(old[0])
+        old_server["status"] = "DELETED"
         self.assertEqual(
-            self.freeze(merge_servers(first, second)),
-            self.freeze([first[0]] + second))
+            self.freeze(mark_deleted_servers(old, new)),
+            self.freeze([old_server] + new))
+
+    def test_mark_deleted_servers_no_old(self):
+        """
+        If old list does not have any servers then it just returns new list
+        """
+        new = [{'id': 'd', 'd': 3}, {'id': 'b', 'b': 4}]
+        self.assertEqual(
+            self.freeze(mark_deleted_servers([], new)), self.freeze(new))
+
+    def test_updated_deleted_servers_no_new(self):
+        """
+        If new list does not have any servers then old list is updated as
+        DELETED and returned
+        """
+        old = [{'id': 'd', 'd': 3}, {'id': 'b', 'b': 4}]
+        exp_old = deepcopy(old)
+        exp_old[0]["status"] = "DELETED"
+        exp_old[1]["status"] = "DELETED"
+        self.assertEqual(
+            self.freeze(mark_deleted_servers(old, [])),
+            self.freeze(exp_old))
 
 
 class ExtractDrainedTests(SynchronousTestCase):
@@ -419,149 +345,180 @@ class ExtractDrainedTests(SynchronousTestCase):
         self.assertRaises(ValueError, extract_CLB_drained_at, feed)
 
 
+def lb_req(url, json_response, response):
+    """
+    Return a SequenceDispatcher two-tuple that matches a service request to a
+    particular load balancer endpoint (using GET), and returns the given
+    ``response`` as the content in an HTTP 200 ``StubResponse``.
+    """
+    if isinstance(response, Exception):
+        def handler(i): raise response
+    else:
+        def handler(i): return (StubResponse(200, {}), response)
+    return (
+        Retry(
+            effect=mock.ANY,
+            should_retry=ShouldDelayAndRetry(
+                can_retry=retry_times(5),
+                next_interval=exponential_backoff_interval(2))
+        ),
+        nested_sequence([
+            (service_request(
+                ServiceType.CLOUD_LOAD_BALANCERS,
+                'GET', url, json_response=json_response).intent,
+             handler)
+        ])
+    )
+
+
+def nodes_req(lb_id, nodes):
+    return lb_req('loadbalancers/{}/nodes'.format(lb_id),
+                  True, {'nodes': nodes})
+
+
+def node_feed_req(lb_id, node_id, response):
+    return lb_req(
+        'loadbalancers/{}/nodes/{}.atom'.format(lb_id, node_id),
+        False, response)
+
+
+def node(id, address, port=20, weight=2, condition='ENABLED',
+         type='PRIMARY'):
+    d = {'id': id, 'port': port, 'address': address, 'condition': condition,
+         'type': type}
+    if weight is not None:
+        d['weight'] = weight
+    return d
+
+
 class GetCLBContentsTests(SynchronousTestCase):
     """
     Tests for :func:`otter.convergence.get_clb_contents`
     """
 
     def setUp(self):
-        """
-        Stub request function and mock `extract_CLB_drained_at`
-        """
-        self.reqs = {
-            ('GET', 'loadbalancers', True): {'loadBalancers':
-                                             [{'id': 1}, {'id': 2}]},
-            ('GET', 'loadbalancers/1/nodes', True): {'nodes': [
-                {'id': '11', 'port': 20, 'address': 'a11',
-                 'weight': 2, 'condition': 'DRAINING', 'type': 'PRIMARY'},
-                {'id': '12', 'port': 20, 'address': 'a12',
-                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}]},
-            ('GET', 'loadbalancers/2/nodes', True): {'nodes': [
-                {'id': '21', 'port': 20, 'address': 'a21',
-                 'weight': 3, 'condition': 'ENABLED', 'type': 'PRIMARY'},
-                {'id': '22', 'port': 20, 'address': 'a22',
-                 'condition': 'DRAINING', 'type': 'PRIMARY'}]},
-            ('GET', 'loadbalancers/1/nodes/11.atom', False): '11feed',
-            ('GET', 'loadbalancers/2/nodes/22.atom', False): '22feed'
-        }
+        """mock `extract_CLB_drained_at`"""
         self.feeds = {'11feed': 1.0, '22feed': 2.0}
         self.mock_eda = patch(
             self, 'otter.convergence.gathering.extract_CLB_drained_at',
             side_effect=lambda f: self.feeds[f])
 
-    def _resolve_request(self, eff):
-        """
-        Resolve a :obj:`ServiceRequest` based on ``self.reqs`` and assert
-        that it's wrapped in a Retry with the expected policy.
-        """
-        self.assertEqual(
-            eff.intent.should_retry,
-            ShouldDelayAndRetry(can_retry=retry_times(5),
-                                next_interval=exponential_backoff_interval(2)))
-        req = eff.intent.effect.intent
-        body = self.reqs[(req.method, req.url, req.json_response)]
-        fake_response = object()
-        return resolve_effect(eff, (fake_response, body))
-
-    def _resolve_lb(self, eff):
-        """Resolve the tree of effects used to fetch LB information."""
-        # first resolve the request to list LBs
-        lb_nodes_fetch = self._resolve_request(eff)
-        if type(lb_nodes_fetch) is not Effect:
-            # If a parallel effect is *empty*, resolve_stubs will
-            # simply return an empty list immediately.
-            self.assertEqual(lb_nodes_fetch, [])  # sanity check
-            return lb_nodes_fetch
-        # which results in a parallel fetch of all nodes from all LBs
-        feed_fetches = resolve_effect(
-            lb_nodes_fetch,
-            map(self._resolve_request, lb_nodes_fetch.intent.effects))
-        # which results in a list parallel fetch of feeds for the nodes
-        lbnodes = resolve_effect(
-            feed_fetches,
-            map(self._resolve_request, feed_fetches.intent.effects))
-        # and we finally have the CLBNodes.
-        return lbnodes
-
     def test_success(self):
         """
         Gets LB contents with drained_at correctly
         """
+        node11 = node('11', 'a11', condition='DRAINING')
+        node12 = node('12', 'a12')
+        node21 = node('21', 'a21', weight=3)
+        node22 = node('22', 'a22', weight=None, condition='DRAINING')
+        seq = [
+            lb_req('loadbalancers', True,
+                   {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            nested_parallel([nodes_req(1, [node11, node12]),
+                             nodes_req(2, [node21, node22])]),
+            nested_parallel([node_feed_req(1, '11', '11feed'),
+                             node_feed_req(2, '22', '22feed')]),
+        ]
         eff = get_clb_contents()
-        draining, enabled = CLBNodeCondition.DRAINING, CLBNodeCondition.ENABLED
-        make_desc = partial(CLBDescription, port=20, type=CLBNodeType.PRIMARY)
         self.assertEqual(
-            self._resolve_lb(eff),
-            [CLBNode(node_id='11',
-                     address='a11',
-                     drained_at=1.0,
-                     description=make_desc(lb_id='1',
-                                           weight=2,
-                                           condition=draining)),
-             CLBNode(node_id='12',
-                     address='a12',
-                     description=make_desc(lb_id='1',
-                                           weight=2,
-                                           condition=enabled)),
-             CLBNode(node_id='21',
-                     address='a21',
-                     description=make_desc(lb_id='2',
-                                           weight=3,
-                                           condition=enabled)),
-             CLBNode(node_id='22',
-                     address='a22',
-                     drained_at=2.0,
-                     description=make_desc(lb_id='2',
-                                           weight=1,
-                                           condition=draining))])
+            perform_sequence(seq, eff),
+            [assoc_obj(CLBNode.from_node_json(1, node11), drained_at=1.0),
+             CLBNode.from_node_json(1, node12),
+             CLBNode.from_node_json(2, node21),
+             assoc_obj(CLBNode.from_node_json(2, node22), drained_at=2.0)])
 
     def test_no_lb(self):
         """
         Return empty list if there are no LB
         """
-        self.reqs = {('GET', 'loadbalancers', True): {'loadBalancers': []}}
+        seq = [
+            lb_req('loadbalancers', True, {'loadBalancers': []}),
+            nested_parallel([]),  # No LBs to fetch
+            nested_parallel([]),  # No nodes to fetch
+        ]
         eff = get_clb_contents()
-        self.assertEqual(self._resolve_lb(eff), [])
+        self.assertEqual(perform_sequence(seq, eff), [])
 
     def test_no_nodes(self):
         """
         Return empty if there are LBs but no nodes in them
         """
-        self.reqs = {
-            ('GET', 'loadbalancers', True): {'loadBalancers':
-                                             [{'id': 1}, {'id': 2}]},
-            ('GET', 'loadbalancers/1/nodes', True): {'nodes': []},
-            ('GET', 'loadbalancers/2/nodes', True): {'nodes': []},
-        }
-        eff = get_clb_contents()
-        self.assertEqual(self._resolve_lb(eff), [])
+        seq = [
+            lb_req('loadbalancers', True,
+                   {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            nested_parallel([nodes_req(1, []), nodes_req(2, [])]),
+            nested_parallel([]),  # No nodes to fetch
+        ]
+        self.assertEqual(perform_sequence(seq, get_clb_contents()), [])
 
     def test_no_draining(self):
         """
         Doesnt fetch feeds if all nodes are ENABLED
         """
-        self.reqs = {
-            ('GET', 'loadbalancers', True): {'loadBalancers':
-                                             [{'id': 1}, {'id': 2}]},
-            ('GET', 'loadbalancers/1/nodes', True): {'nodes': [
-                {'id': '11', 'port': 20, 'address': 'a11',
-                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
-            ]},
-            ('GET', 'loadbalancers/2/nodes', True): {'nodes': [
-                {'id': '21', 'port': 20, 'address': 'a21',
-                 'weight': 2, 'condition': 'ENABLED', 'type': 'PRIMARY'}
-            ]},
-        }
+        seq = [
+            lb_req('loadbalancers', True,
+                   {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            nested_parallel([nodes_req(1, [node('11', 'a11')]),
+                             nodes_req(2, [node('21', 'a21')])]),
+            nested_parallel([])  # No nodes to fetch
+        ]
         make_desc = partial(CLBDescription, port=20, weight=2,
                             condition=CLBNodeCondition.ENABLED,
                             type=CLBNodeType.PRIMARY)
         eff = get_clb_contents()
         self.assertEqual(
-            self._resolve_lb(eff),
+            perform_sequence(seq, eff),
             [CLBNode(node_id='11', address='a11',
                      description=make_desc(lb_id='1')),
              CLBNode(node_id='21', address='a21',
                      description=make_desc(lb_id='2'))])
+
+    def test_lb_disappeared_during_node_fetch(self):
+        """
+        If a load balancer gets deleted while fetching nodes, no nodes will be
+        returned for it.
+        """
+        seq = [
+            lb_req('loadbalancers', True,
+                   {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            nested_parallel([
+                nodes_req(1, [node('11', 'a11')]),
+                lb_req('loadbalancers/2/nodes', True,
+                       CLBNotFoundError(lb_id=u'2')),
+            ]),
+            nested_parallel([])  # No nodes to fetch
+        ]
+        make_desc = partial(CLBDescription, port=20, weight=2,
+                            condition=CLBNodeCondition.ENABLED,
+                            type=CLBNodeType.PRIMARY)
+        eff = get_clb_contents()
+        self.assertEqual(
+            perform_sequence(seq, eff),
+            [CLBNode(node_id='11', address='a11',
+                     description=make_desc(lb_id='1'))])
+
+    def test_lb_disappeared_during_feed_fetch(self):
+        """
+        If a load balancer gets deleted while fetching feeds, no nodes will be
+        returned for it.
+        """
+        node21 = node('21', 'a21', condition='DRAINING', weight=None)
+        seq = [
+            lb_req('loadbalancers', True,
+                   {'loadBalancers': [{'id': 1}, {'id': 2}]}),
+            nested_parallel([
+                nodes_req(1, [node('11', 'a11', condition='DRAINING'),
+                              node('12', 'a12')]),
+                nodes_req(2, [node21])
+            ]),
+            nested_parallel([
+                node_feed_req(1, '11', CLBNotFoundError(lb_id=u'1')),
+                node_feed_req(2, '21', '22feed')]),
+        ]
+        eff = get_clb_contents()
+        self.assertEqual(
+            perform_sequence(seq, eff),
+            [assoc_obj(CLBNode.from_node_json(2, node21), drained_at=2.0)])
 
 
 class GetRCv3ContentsTests(SynchronousTestCase):

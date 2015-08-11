@@ -5,12 +5,14 @@ Tests for otter.cloudfeeds
 import uuid
 from functools import partial
 
-from effect import Effect, TypeDispatcher
+from effect import Effect, Func, TypeDispatcher
 
 import mock
 
 from twisted.internet.defer import fail, succeed
+from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
+from twisted.web.client import ResponseFailed
 
 from txeffect import deferred_performer
 
@@ -28,11 +30,21 @@ from otter.log.cloudfeeds import (
 )
 from otter.log.formatters import LogLevel
 from otter.log.intents import Log, LogErr
-from otter.test.utils import CheckFailure, mock_log, patch, resolve_effect
+from otter.test.utils import (
+    CheckFailure,
+    mock_log,
+    nested_sequence,
+    patch,
+    perform_sequence,
+    raise_,
+    retry_sequence,
+    stub_pure_response
+)
+from otter.util.http import APIError
 from otter.util.retry import (
+    Retry,
     ShouldDelayAndRetry,
-    exponential_backoff_interval,
-    retry_times
+    exponential_backoff_interval
 )
 
 
@@ -45,31 +57,43 @@ class CFHelperTests(SynchronousTestCase):
         """
         `cf_msg` returns Effect with `Log` intent with cloud_feed=True
         """
-        self.assertEqual(
-            cf_msg('message', a=2, b=3),
-            Effect(Log('message', dict(cloud_feed=True, a=2, b=3)))
-        )
+        seq = [
+            (Func(uuid.uuid4), lambda _: 'uuid'),
+            (Log('message', dict(cloud_feed=True, cloud_feed_id='uuid',
+                                 a=2, b=3)),
+                lambda _: 'logged')
+        ]
+        self.assertEqual(perform_sequence(seq, cf_msg('message', a=2, b=3)),
+                         'logged')
 
     def test_cf_err(self):
         """
         `cf_err` returns Effect with `Log` intent with cloud_feed=True
         and isError=True
         """
-        self.assertEqual(
-            cf_err('message', a=2, b=3),
-            Effect(Log('message', dict(isError=True, cloud_feed=True,
-                                       a=2, b=3)))
-        )
+        seq = [
+            (Func(uuid.uuid4), lambda _: 'uuid'),
+            (Log('message', dict(isError=True, cloud_feed=True,
+                                 cloud_feed_id='uuid', a=2, b=3)),
+                lambda _: 'logged')
+        ]
+        self.assertEqual(perform_sequence(seq, cf_err('message', a=2, b=3)),
+                         'logged')
 
     def test_cf_fail(self):
         """
         `cf_err` returns Effect with `LogErr` intent with cloud_feed=True
         """
         f = object()
+        seq = [
+            (Func(uuid.uuid4), lambda _: 'uuid'),
+            (LogErr(f, 'message', dict(cloud_feed=True, cloud_feed_id='uuid',
+                                       a=2, b=3)),
+                lambda _: 'logged')
+        ]
         self.assertEqual(
-            cf_fail(f, 'message', a=2, b=3),
-            Effect(LogErr(f, 'message', dict(cloud_feed=True, a=2, b=3)))
-        )
+            perform_sequence(seq, cf_fail(f, 'message', a=2, b=3)),
+            'logged')
 
 
 def sample_event_pair():
@@ -87,7 +111,8 @@ def sample_event_pair():
         "message": ("human", ),
         "time": 0,
         "tenant_id": "tid",
-        "level": LogLevel.INFO
+        "level": LogLevel.INFO,
+        "cloud_feed_id": '00000000-0000-0000-0000-000000000000'
     }, {
         "scalingGroupId": "gid",
         "policyId": "pid",
@@ -114,11 +139,12 @@ class SanitizeEventTests(SynchronousTestCase):
         """
         Ensure it has only CF keys
         """
-        se, err, _time, tenant_id = sanitize_event(self.event)
+        se, err, _time, tenant_id, event_id = sanitize_event(self.event)
         self.assertLessEqual(set(se.keys()), set(self.exp_cf_event))
         self.assertEqual(err, exp_err)
         self.assertEqual(_time, '1970-01-01T00:00:00Z')
         self.assertEqual(tenant_id, 'tid')
+        self.assertEqual(event_id, '00000000-0000-0000-0000-000000000000')
         for key, value in self.exp_cf_event.items():
             if key in se:
                 self.assertEqual(se[key], value)
@@ -211,39 +237,72 @@ class EventTests(SynchronousTestCase):
         self.req['entry']['content']['event']['tenantId'] = tenant_id
         return self.req
 
-    def test_add_event(self):
+    def _perform_add_event(self, response_sequence):
         """
-        add_event pushes event by calling cloud feed with retries
+        Given a sequence of functions that take an intent and returns a
+        response (or raises an exception), perform :func:`add_event` and
+        return the result.
         """
         log = object()
         eff = add_event(self.event, 'tid', 'ord', log)
-
-        # effect is to generate UUID
-        self.assertIs(eff.intent.func, uuid.uuid4)
-        eff = resolve_effect(eff, uuid.UUID(int=0))
         uid = '00000000-0000-0000-0000-000000000000'
 
-        # effect scoped on on tenant id
-        self.assertIs(type(eff.intent), TenantScope)
-        self.assertEqual(eff.intent.tenant_id, 'tid')
+        svrq = service_request(
+            ServiceType.CLOUD_FEEDS, 'POST', 'autoscale/events',
+            headers={
+                'content-type': ['application/vnd.rackspace.atom+json']},
+            data=self._get_request('INFO', uid, 'tid'), log=log,
+            success_pred=has_code(201),
+            json_response=False)
 
-        # Wrapped effect is retry
-        eff = eff.intent.effect
-        self.assertEqual(
-            eff.intent.should_retry,
-            ShouldDelayAndRetry(can_retry=retry_times(5),
-                                next_interval=exponential_backoff_interval(2)))
+        seq = [
+            (TenantScope(mock.ANY, 'tid'), nested_sequence([
+                retry_sequence(
+                    Retry(effect=svrq, should_retry=ShouldDelayAndRetry(
+                        can_retry=mock.ANY,
+                        next_interval=exponential_backoff_interval(2))),
+                    response_sequence
+                )
+            ]))
+        ]
 
-        # effect wrapped in retry is ServiceRequest
-        eff = eff.intent.effect
-        self.assertEqual(
-            eff,
-            service_request(
-                ServiceType.CLOUD_FEEDS, 'POST', 'autoscale/events',
-                headers={
-                    'content-type': ['application/vnd.rackspace.atom+json']},
-                data=self._get_request('INFO', uid, 'tid'), log=log,
-                success_pred=has_code(201)))
+        return perform_sequence(seq, eff)
+
+    def test_add_event_succeeds_if_request_succeeds(self):
+        """
+        Adding an event succeeds without retrying if the service request
+        succeeds.  Testing what response code causes a service request to
+        succeeds is beyond the scope of this test.
+        """
+        body = "<some xml>"
+        resp = stub_pure_response(body, 201)
+        response = [lambda _: (resp, body)]
+        self.assertEqual(self._perform_add_event(response), (resp, body))
+
+    def test_add_event_only_retries_5_times_on_non_4xx_api_errors(self):
+        """
+        Attempting to add an event is only retried up to a maximum of 5 times,
+        and only if it's not an 4XX APIError.
+        """
+        responses = [
+            lambda _: raise_(Exception("oh noes!")),
+            lambda _: raise_(ResponseFailed(Failure(Exception(":(")))),
+            lambda _: raise_(APIError(code=100, body="<some xml>")),
+            lambda _: raise_(APIError(code=202, body="<some xml>")),
+            lambda _: raise_(APIError(code=301, body="<some xml>")),
+            lambda _: raise_(APIError(code=501, body="<some xml>")),
+        ]
+        with self.assertRaises(APIError) as cm:
+            self._perform_add_event(responses)
+
+        self.assertEqual(cm.exception.code, 501)
+
+    def test_add_event_bails_on_4xx_api_errors(self):
+        """
+        If CF returns a 4xx error, adding an event is not retried.
+        """
+        response = [lambda _: raise_(APIError(code=409, body="<some xml>"))]
+        self.assertRaises(APIError, self._perform_add_event, response)
 
     def test_prepare_request_error(self):
         """
@@ -348,7 +407,8 @@ class CloudFeedsObserverTests(SynchronousTestCase):
         """
         def wrapper(name, observer):
             def _observer(e):
-                observer(e + name)
+                e.update({name: 'done'})
+                observer(e)
             return _observer
 
         patch(self, 'otter.log.cloudfeeds.SpecificationObserverWrapper',
@@ -360,6 +420,7 @@ class CloudFeedsObserverTests(SynchronousTestCase):
 
         def cf_observer_called(text):
             self.cf_observer_text = text
+
         mock_cfo = patch(self, 'otter.log.cloudfeeds.CloudFeedsObserver')
         cfo_class = mock_cfo.return_value
         cfo_class.side_effect = cf_observer_called
@@ -370,5 +431,13 @@ class CloudFeedsObserverTests(SynchronousTestCase):
             reactor=0, authenticator=1, tenant_id=2, region=3,
             service_configs=4)
 
-        cfo('test')
-        self.assertEqual(self.cf_observer_text, 'testspecpeperror')
+        event_dict = {'init': 'test'}
+        cfo({'init': 'test'})
+        self.assertEqual(self.cf_observer_text,
+                         {'init': 'test',
+                          'spec': 'done',
+                          'pep': 'done',
+                          'error': 'done'})
+        self.assertEqual(event_dict, {'init': 'test'},
+                         "the original event dict shouldn't be mutated "
+                         "in case there is another observer chain.")

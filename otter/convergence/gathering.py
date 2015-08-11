@@ -1,41 +1,43 @@
 """Code related to gathering data to inform convergence."""
-from datetime import timedelta
 from functools import partial
-from urllib import urlencode
-from urlparse import parse_qs, urlparse
 
 from effect import catch, parallel
 from effect.do import do, do_return
 
 from toolz.curried import filter, groupby, keyfilter, map
-from toolz.dicttoolz import get_in, merge
-from toolz.functoolz import compose, identity
+from toolz.dicttoolz import assoc, get_in, merge
+from toolz.functoolz import compose, curry, identity
 from toolz.itertoolz import concat
 
 from otter.auth import NoSuchEndpoint
-from otter.cloud_client import service_request
+from otter.cloud_client import (
+    CLBNotFoundError,
+    get_clb_node_feed,
+    get_clb_nodes,
+    get_clbs,
+    list_servers_details_all,
+    service_request)
 from otter.constants import ServiceType
 from otter.convergence.model import (
-    CLBDescription,
     CLBNode,
     CLBNodeCondition,
-    CLBNodeType,
     NovaServer,
     RCv3Description,
     RCv3Node,
     group_id_from_metadata)
 from otter.indexer import atom
 from otter.models.cass import CassScalingGroupServersCache
+from otter.util.fp import assoc_obj
 from otter.util.http import append_segments
 from otter.util.retry import (
     exponential_backoff_interval, retry_effect, retry_times)
 from otter.util.timestamp import timestamp_to_epoch
 
 
-class UnexpectedBehaviorError(Exception):
-    """
-    Error to be raised when something happens that Autoscale does not expect.
-    """
+def _retry(eff):
+    """Retry an effect with a common policy."""
+    return retry_effect(
+        eff, retry_times(5), exponential_backoff_interval(2))
 
 
 def get_all_server_details(changes_since=None, batch_size=100):
@@ -48,49 +50,11 @@ def get_all_server_details(changes_since=None, batch_size=100):
 
     NOTE: This really screams to be a independent fxcloud-type API
     """
-    url = append_segments('servers', 'detail')
-    query = {'limit': batch_size}
+    query = {'limit': [str(batch_size)]}
     if changes_since is not None:
-        query['changes-since'] = '{0}Z'.format(changes_since.isoformat())
+        query['changes-since'] = ['{0}Z'.format(changes_since.isoformat())]
 
-    last_link = []
-
-    def get_server_details(query_params):
-        params = sorted(query_params.items())
-        eff = retry_effect(
-            service_request(ServiceType.CLOUD_SERVERS, 'GET',
-                            "{}?{}".format(url,
-                                           urlencode(params, True))),
-            retry_times(5), exponential_backoff_interval(2))
-        return eff.on(continue_)
-
-    def continue_(result):
-        _response, body = result
-        servers = body['servers']
-        # Only continue if pagination is supported and there is another page
-        continuation = [link['href'] for link in body.get('servers_links', [])
-                        if link['rel'] == 'next']
-        if continuation:
-            # blow up if we try to fetch the same link twice
-            if last_link and last_link[-1] == continuation[0]:
-                raise UnexpectedBehaviorError(
-                    "When gathering server details, got the same 'next' link "
-                    "twice from Nova: {0}".format(last_link[-1]))
-
-            last_link[:] = [continuation[0]]
-            parsed = urlparse(continuation[0])
-            more_eff = get_server_details(parse_qs(parsed.query))
-            return more_eff.on(lambda more_servers: servers + more_servers)
-        return servers
-
-    return get_server_details(query)
-
-
-def _discard_response((response, body)):
-    """
-    Takes a response, body tuple and discards the response.
-    """
-    return body
+    return list_servers_details_all(query)
 
 
 def get_all_scaling_group_servers(changes_since=None,
@@ -119,21 +83,28 @@ def get_all_scaling_group_servers(changes_since=None,
     return get_all_server_details(changes_since).on(servers_apply)
 
 
-def merge_servers(first, second):
+def mark_deleted_servers(old, new):
     """
-    Return servers got by merging the two sets of servers where second
-    takes precedence over first
+    Given dictionaries containing old and new servers, return a list of all
+    servers, with the deleted ones annotated with a status of DELETED.
 
-    :param list first: List of server dicts
-    :param list second: List of server dicts
-    :return: List of merged server dicts
+    :param list old: List of old servers
+    :param list new: List of latest servers
+    :return: List of updated servers
     """
+
     def sdict(servers):
         return {s['id']: s for s in servers}
 
-    return merge(sdict(first), sdict(second)).values()
+    old = sdict(old)
+    new = sdict(new)
+    deleted_ids = set(old.keys()) - set(new.keys())
+    for sid in deleted_ids:
+        old[sid] = assoc(old[sid], "status", "DELETED")
+    return merge(old, new).values()
 
 
+@curry
 def server_of_group(group_id, server):
     """
     Return True if server belongs to group_id. False otherwise
@@ -156,83 +127,57 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     :return: Servers as list of dicts
     :rtype: Effect
     """
-
     cache = cache_class(tenant_id, group_id)
     cached_servers, last_update = yield cache.get_servers(False)
     if last_update is None:
         servers = (yield all_as_servers()).get(group_id, [])
-    elif now - last_update >= timedelta(days=30):
-        last_update = now - timedelta(days=30)
-        changes, current = yield parallel([
-            all_servers(last_update), all_servers()])
-        servers = merge_servers(changes, current)
-        servers = list(filter(partial(server_of_group, group_id), servers))
     else:
-        changes = yield all_servers(last_update)
-        servers = merge_servers(cached_servers, changes)
-        servers = list(filter(partial(server_of_group, group_id), servers))
+        current = yield all_servers()
+        servers = mark_deleted_servers(cached_servers, current)
+        servers = list(filter(server_of_group(group_id), servers))
     yield do_return(servers)
 
 
+@do
 def get_clb_contents():
-    """
-    Get Rackspace Cloud Load Balancer contents as list of `CLBNode`.
-    """
+    """Get Rackspace Cloud Load Balancer contents as list of `CLBNode`."""
+    # If we get a CLBNotFoundError while fetching feeds, we should throw away
+    # all nodes related to that load balancer, because we don't want to act on
+    # data that we know is invalid/outdated (for example, if we can't fetch a
+    # feed because CLB was deleted, we don't want to say that we have a node in
+    # DRAINING with draining time of 0; we should just say that the node is
+    # gone).
 
-    def lb_req(method, url, json_response=True):
-        """Make a request to the LB service with retries."""
-        return retry_effect(
-            service_request(
-                ServiceType.CLOUD_LOAD_BALANCERS,
-                method, url, json_response=json_response),
-            retry_times(5), exponential_backoff_interval(2))
+    def gone(r):
+        return catch(CLBNotFoundError, lambda exc: r)
+    lb_ids = [lb['id'] for lb in (yield _retry(get_clbs()))]
+    node_reqs = [_retry(get_clb_nodes(lb_id).on(error=gone([])))
+                 for lb_id in lb_ids]
+    all_nodes = yield parallel(node_reqs)
+    lb_nodes = {lb_id: [CLBNode.from_node_json(lb_id, node) for node in nodes]
+                for lb_id, nodes in zip(lb_ids, all_nodes)}
+    draining = [n for n in concat(lb_nodes.values())
+                if n.description.condition == CLBNodeCondition.DRAINING]
+    feeds = yield parallel(
+        [_retry(get_clb_node_feed(n.description.lb_id, n.node_id).on(
+            error=gone(None)))
+         for n in draining]
+    )
+    nodes_to_feeds = dict(zip(draining, feeds))
+    deleted_lbs = set([
+        node.description.lb_id
+        for (node, feed) in nodes_to_feeds.items() if feed is None])
 
-    def _lb_path(lb_id):
-        """Return the URL path to lb with given id's nodes."""
-        return append_segments('loadbalancers', str(lb_id), 'nodes')
-
-    def fetch_nodes(result):
-        _response, body = result
-        lbs = body['loadBalancers']
-        lb_ids = [lb['id'] for lb in lbs]
-        lb_reqs = [
-            lb_req('GET', _lb_path(lb_id)).on(
-                lambda (response, body): body['nodes'])
-            for lb_id in lb_ids]
-        return parallel(lb_reqs).on(lambda all_nodes: (lb_ids, all_nodes))
-
-    def fetch_drained_feeds((ids, all_lb_nodes)):
-        nodes = [
-            CLBNode(
-                node_id=str(node['id']),
-                address=node['address'],
-                description=CLBDescription(
-                    lb_id=str(_id),
-                    port=node['port'],
-                    weight=node.get('weight', 1),
-                    condition=CLBNodeCondition.lookupByName(node['condition']),
-                    type=CLBNodeType.lookupByName(node['type'])))
-            for _id, nodes in zip(ids, all_lb_nodes) for node in nodes]
-        draining = [n for n in nodes
-                    if n.description.condition == CLBNodeCondition.DRAINING]
-        return parallel(
-            [lb_req(
-                'GET',
-                append_segments(
-                    'loadbalancers',
-                    str(n.description.lb_id),
-                    'nodes',
-                    '{}.atom'.format(n.node_id)),
-                json_response=False).on(_discard_response)
-             for n in draining]).on(lambda feeds: (nodes, draining, feeds))
-
-    def fill_drained_at((nodes, draining, feeds)):
-        for node, feed in zip(draining, feeds):
-            node.drained_at = extract_CLB_drained_at(feed)
-        return nodes
-
-    return lb_req('GET', 'loadbalancers').on(
-        fetch_nodes).on(fetch_drained_feeds).on(fill_drained_at)
+    def update_drained_at(node):
+        feed = nodes_to_feeds.get(node)
+        if node.description.lb_id in deleted_lbs:
+            return None
+        if feed is not None:
+            return assoc_obj(node, drained_at=extract_CLB_drained_at(feed))
+        else:
+            return node
+    nodes = map(update_drained_at, concat(lb_nodes.values()))
+    yield do_return(list(filter(bool, nodes)))
 
 
 def extract_CLB_drained_at(feed):

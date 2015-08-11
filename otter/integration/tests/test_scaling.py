@@ -18,6 +18,9 @@ from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.resources import TestResources
 
 
+skip = "This module needs maintenance before being run."
+
+
 username = os.environ['AS_USERNAME']
 password = os.environ['AS_PASSWORD']
 endpoint = os.environ['AS_IDENTITY']

@@ -52,19 +52,29 @@ from otter.cloud_client import (
     change_clb_node,
     concretize_service_request,
     create_server,
+    get_clb_node_feed,
+    get_clb_nodes,
+    get_clbs,
     get_cloud_client_dispatcher,
     get_server_details,
+    list_servers_details_all,
+    list_servers_details_page,
     perform_tenant_scope,
+    publish_to_cloudfeeds,
     remove_clb_nodes,
     service_request,
     set_nova_metadata_item)
 from otter.constants import ServiceType
+from otter.log.intents import Log
 from otter.test.utils import (
     StubResponse,
-    resolve_effect,
-    stub_pure_response,
     nested_sequence,
-    perform_sequence)
+    perform_sequence,
+    raise_,
+    resolve_effect,
+    stub_json_response,
+    stub_pure_response
+)
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.config import set_config_data
 from otter.util.http import APIError, headers
@@ -72,13 +82,21 @@ from otter.util.pure_http import Request, has_code
 
 
 def make_service_configs():
+    """
+    Generate service configs for performing service requests.
+    """
     return {
         ServiceType.CLOUD_SERVERS: {
             'name': 'cloudServersOpenStack',
             'region': 'DFW'},
         ServiceType.CLOUD_LOAD_BALANCERS: {
             'name': 'cloudLoadBalancers',
-            'region': 'DFW'}
+            'region': 'DFW'},
+        ServiceType.CLOUD_FEEDS: {
+            'name': 'cloud_feeds',
+            'region': 'DFW',
+            'url': 'special cloudfeeds url'
+        }
     }
 
 
@@ -539,7 +557,7 @@ class CLBClientTests(SynchronousTestCase):
     @property
     def lb_id(self):
         """What is my LB ID"""
-        return u"123456"
+        return "123456"
 
     def assert_parses_common_clb_errors(self, intent, eff):
         """
@@ -573,7 +591,8 @@ class CLBClientTests(SynchronousTestCase):
                 sync_perform(
                     EQFDispatcher([(intent, service_request_eqf(resp))]),
                     eff)
-            self.assertEqual(cm.exception, err(msg, lb_id=self.lb_id))
+            self.assertEqual(cm.exception,
+                             err(msg, lb_id=six.text_type(self.lb_id)))
 
         # OverLimit Retry is different because it's produced by repose
         over_limit = stub_pure_response(
@@ -592,7 +611,8 @@ class CLBClientTests(SynchronousTestCase):
                 eff)
         self.assertEqual(
             cm.exception,
-            CLBRateLimitError("OverLimit Retry...", lb_id=self.lb_id))
+            CLBRateLimitError("OverLimit Retry...",
+                              lb_id=six.text_type(self.lb_id)))
 
         # Ignored errors
         bad_resps = [
@@ -629,7 +649,8 @@ class CLBClientTests(SynchronousTestCase):
                     eff)
             self.assertEqual(
                 cm.exception,
-                APIError(headers={}, code=resp[0].code, body=resp[1]))
+                APIError(headers={}, code=resp[0].code, body=resp[1],
+                         method='method', url='original/request/URL'))
 
     def test_change_clb_node(self):
         """
@@ -638,7 +659,7 @@ class CLBClientTests(SynchronousTestCase):
 
         Parse the common CLB errors, and :class:`NoSuchCLBNodeError`.
         """
-        eff = change_clb_node(lb_id=self.lb_id, node_id=u'1234',
+        eff = change_clb_node(lb_id=self.lb_id, node_id='1234',
                               condition="DRAINING", weight=50)
         expected = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
@@ -667,7 +688,8 @@ class CLBClientTests(SynchronousTestCase):
             sync_perform(dispatcher, eff)
         self.assertEqual(
             cm.exception,
-            NoSuchCLBNodeError(msg, lb_id=self.lb_id, node_id=u'1234'))
+            NoSuchCLBNodeError(msg, lb_id=six.text_type(self.lb_id),
+                               node_id=u'1234'))
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)
@@ -710,7 +732,7 @@ class CLBClientTests(SynchronousTestCase):
             sync_perform(dispatcher, eff)
         self.assertEqual(
             cm.exception,
-            CLBDuplicateNodesError(msg, lb_id=self.lb_id))
+            CLBDuplicateNodesError(msg, lb_id=six.text_type(self.lb_id)))
 
         # CLBNodeLimitError failure
         msg = "Nodes must not exceed 25 per load balancer."
@@ -723,7 +745,7 @@ class CLBClientTests(SynchronousTestCase):
             sync_perform(dispatcher, eff)
         self.assertEqual(
             cm.exception,
-            CLBNodeLimitError(msg, lb_id=self.lb_id))
+            CLBNodeLimitError(msg, lb_id=six.text_type(self.lb_id)))
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)
@@ -805,18 +827,69 @@ class CLBClientTests(SynchronousTestCase):
         ]
         self.assertIs(perform_sequence(seq, eff), None)
 
+    def test_get_clbs(self):
+        """Returns all the load balancer details from the LBs endpoint."""
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS, 'GET', 'loadbalancers')
+        req = get_clbs()
+        seq = [
+            (expected.intent,
+             lambda i: stub_json_response({'loadBalancers': 'lbs!'}))]
+        self.assertEqual(perform_sequence(seq, req), 'lbs!')
 
-def _perform_one_request(intent, effect, response_code, response_body):
+    def test_get_clb_nodes(self):
+        """:func:`get_clb_nodes` returns all the nodes for a LB."""
+        req = get_clb_nodes(self.lb_id)
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'GET', 'loadbalancers/123456/nodes')
+        seq = [
+            (expected.intent,
+             lambda i: stub_json_response({'nodes': 'nodes!'}))]
+        self.assertEqual(perform_sequence(seq, req), 'nodes!')
+
+    def test_get_clb_nodes_error_handling(self):
+        """:func:`get_clb_nodes` parses the common CLB errors."""
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'GET', 'loadbalancers/123456/nodes')
+        self.assert_parses_common_clb_errors(
+            expected.intent, get_clb_nodes(self.lb_id))
+
+    def test_get_clb_node_feed(self):
+        """:func:`get_clb_node_feed` returns the Atom feed for a CLB node."""
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'GET', 'loadbalancers/123456/nodes/node1.atom',
+            json_response=False)
+        seq = [(expected.intent, lambda i: stub_pure_response('feed!'))]
+        req = get_clb_node_feed(self.lb_id, 'node1')
+        self.assertEqual(perform_sequence(seq, req), 'feed!')
+
+    def test_get_clb_node_feed_error_handling(self):
+        """:func:`get_clb_node_feed` parses the common CLB errors."""
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'GET', 'loadbalancers/123456/nodes/node1.atom',
+            json_response=False)
+        self.assert_parses_common_clb_errors(
+            expected.intent, get_clb_node_feed(self.lb_id, 'node1'))
+
+
+def _perform_one_request(intent, effect, response_code, response_body,
+                         log_intent=None):
     """
     Perform a request effect using EQFDispatcher, providing the given
     body and status code.
     """
-    dispatcher = EQFDispatcher([(
+    seq = [(
         intent,
         service_request_eqf(
             stub_pure_response(response_body, response_code))
-    )])
-    return sync_perform(dispatcher, effect)
+    )]
+    if log_intent is not None:
+        seq.append((log_intent, lambda _: None))
+    return perform_sequence(seq, effect)
 
 
 class NovaClientTests(SynchronousTestCase):
@@ -1014,12 +1087,21 @@ class NovaClientTests(SynchronousTestCase):
     def test_create_server_success(self):
         """
         Creating a server, when Nova responds with a 202, returns Nova's
-        response with the body as a JSON dictionary.
+        response with the body as a JSON dictionary.  It logs this response
+        minus the adminstrative password.
         """
+        server_body = {'server': {'id': 'server_id', 'adminPass': "12345"}}
+        log_intent = Log('request-create-server', {
+            'url': "original/request/URL",
+            'method': 'method',
+            'request_id': "original-request-id",
+            'response_body': '{"server": {"id": "server_id"}}'
+        })
         expected, real = self._setup_for_create_server()
-        resp, body = _perform_one_request(expected.intent, real, 202,
-                                          json.dumps({'server': 'args'}))
-        self.assertEqual(body, {'server': 'args'})
+        resp, body = _perform_one_request(
+            expected.intent, real, 202,
+            json.dumps(server_body), log_intent)
+        self.assertEqual(body, server_body)
 
     def test_create_server_standard_errors(self):
         """
@@ -1109,3 +1191,150 @@ class NovaClientTests(SynchronousTestCase):
         for code, body in unparseable:
             with self.assertRaises(APIError):
                 _perform_one_request(expected.intent, real, code, body)
+
+    def _list_server_details_intent(self, params):
+        """Return the expected intent for listing servers given parameters."""
+        return service_request(
+            ServiceType.CLOUD_SERVERS,
+            'GET', 'servers/detail',
+            params=params).intent
+
+    def _list_server_details_log_intent(self, body):
+        """
+        Return a :obj:`Log` intent for listing server details.
+        """
+        return Log(
+            'request-list-servers-details',
+            {'url': "original/request/URL",
+             'method': 'method',
+             'request_id': "original-request-id",
+             'response_body': json.dumps(body, sort_keys=True)}
+        )
+
+    def test_list_servers_details_page(self):
+        """
+        :func:`list_servers_details_page` returns the JSON response from
+        listing servers details.
+        """
+        params = {'limit': ['100'], 'marker': ['1']}
+        body = {'servers': [], 'servers_links': []}
+        eff = list_servers_details_page(params)
+        expected_intent = self._list_server_details_intent(params)
+        seq = [
+            (expected_intent,
+             service_request_eqf(stub_pure_response(json.dumps(body), 200))),
+            (self._list_server_details_log_intent(body), lambda _: None)
+        ]
+        resp, response_json = perform_sequence(seq, eff)
+        self.assertEqual(response_json, body)
+
+        self.assert_handles_nova_compute_fault(expected_intent, eff)
+        self.assert_handles_nova_rate_limiting(expected_intent, eff)
+
+    def test_list_servers_details_all_gets_until_no_next_link(self):
+        """
+        :func:`list_servers_details_all` follows the servers links until there
+        are no more links, and returns a list of servers as the result.  It
+        ignores any non-next links.
+        """
+        bodies = [
+            {'servers': ['1', '2'],
+             'servers_links': [{'href': 'doesnt_matter_url?marker=3',
+                                'rel': 'next'}]},
+            {'servers': ['3', '4'],
+             'servers_links': [{'href': 'doesnt_matter_url?marker=5',
+                                'rel': 'next'},
+                               {'href': 'doesnt_matter_url?marker=1',
+                                'rel': 'prev'}]},
+            {'servers': ['5', '6'],
+             'servers_links': [{'href': 'doesnt_matter_url?marker=3',
+                                'rel': 'prev'}]}
+        ]
+        resps = [json.dumps(d) for d in bodies]
+
+        eff = list_servers_details_all({'marker': ['1']})
+        seq = [
+            (self._list_server_details_intent({'marker': ['1']}),
+             service_request_eqf(stub_pure_response(resps[0], 200))),
+            (self._list_server_details_log_intent(bodies[0]), lambda _: None),
+            (self._list_server_details_intent({'marker': ['3']}),
+             service_request_eqf(stub_pure_response(resps[1], 200))),
+            (self._list_server_details_log_intent(bodies[1]), lambda _: None),
+            (self._list_server_details_intent({'marker': ['5']}),
+             service_request_eqf(stub_pure_response(resps[2], 200))),
+            (self._list_server_details_log_intent(bodies[2]), lambda _: None)
+        ]
+        result = perform_sequence(seq, eff)
+        self.assertEqual(result, ['1', '2', '3', '4', '5', '6'])
+
+    def test_list_servers_details_all_blows_up_if_got_same_link_twice(self):
+        """
+        :func:`list_servers_details_all` raises an exception if Nova returns
+        the same next link twice in a row.
+        """
+        bodies = [
+            {'servers': ['1', '2'],
+             'servers_links': [{'href': 'doesnt_matter_url?marker=3',
+                                'rel': 'next'}]},
+            {'servers': ['3', '4'],
+             'servers_links': [{'href': 'doesnt_matter_url?marker=3',
+                                'rel': 'next'},
+                               {'href': 'doesnt_matter_url?marker=1',
+                                'rel': 'prev'}]}
+        ]
+        resps = [json.dumps(d) for d in bodies]
+
+        eff = list_servers_details_all({'marker': ['1']})
+        seq = [
+            (self._list_server_details_intent({'marker': ['1']}),
+             service_request_eqf(stub_pure_response(resps[0], 200))),
+            (self._list_server_details_log_intent(bodies[0]), lambda _: None),
+            (self._list_server_details_intent({'marker': ['3']}),
+             service_request_eqf(stub_pure_response(resps[1], 200))),
+            (self._list_server_details_log_intent(bodies[1]), lambda _: None)
+        ]
+        self.assertRaises(NovaComputeFaultError, perform_sequence, seq, eff)
+
+    def test_list_servers_details_all_propagates_errors(self):
+        """
+        :func:`list_servers_details_all` propagates exceptions from making
+        the individual requests (from :func:`list_servers_details_page`).
+        """
+        eff = list_servers_details_all({'marker': ['1']})
+        seq = [
+            (self._list_server_details_intent({'marker': ['1']}),
+             lambda _: raise_(NovaComputeFaultError('error')))
+        ]
+        self.assertRaises(NovaComputeFaultError, perform_sequence, seq, eff)
+
+
+class CloudFeedsTests(SynchronousTestCase):
+    """
+    Tests for cloud feed functions.
+    """
+    def test_publish_to_cloudfeeds(self):
+        """
+        Publish an event to cloudfeeds.  Successfully handle non-JSON data.
+        """
+        _log = object()
+        eff = publish_to_cloudfeeds({'event': 'stuff'}, log=_log)
+        expected = service_request(
+            ServiceType.CLOUD_FEEDS, 'POST',
+            'autoscale/events',
+            headers={'content-type': ['application/vnd.rackspace.atom+json']},
+            data={'event': 'stuff'}, log=_log, success_pred=has_code(201),
+            json_response=False)
+
+        # success
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(stub_pure_response('<this is xml>', 201)))])
+        resp, body = sync_perform(dispatcher, eff)
+        self.assertEqual(body, '<this is xml>')
+
+        # Add regression test that 202 should be an API error because this
+        # is a bug in CF
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(stub_pure_response('<this is xml>', 202)))])
+        self.assertRaises(APIError, sync_perform, dispatcher, eff)

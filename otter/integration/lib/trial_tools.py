@@ -1,8 +1,9 @@
 """
 A set of helpers for writing trial tests
 """
-
+import json
 import os
+from datetime import datetime, timedelta
 
 from testtools.matchers import (
     AfterPreprocessing,
@@ -13,7 +14,10 @@ from testtools.matchers import (
 
 from twisted.internet import reactor
 
-from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
+from twisted.internet.defer import (
+    Deferred, gatherResults, inlineCallbacks, returnValue)
+
+from twisted.python.log import addObserver, removeObserver
 
 from twisted.web.client import HTTPConnectionPool
 
@@ -37,6 +41,18 @@ from otter.integration.lib.nova import (
     wait_for_servers
 )
 
+from otter.log import log
+
+from otter.log.formatters import (
+    ErrorFormattingWrapper,
+    LoggingEncoder,
+    PEP3101FormattingWrapper,
+    StreamObserverWrapper,
+    copying_wrapper
+)
+
+from otter.util.logging_treq import LoggingTreq
+
 
 username = os.environ['AS_USERNAME']
 password = os.environ['AS_PASSWORD']
@@ -44,6 +60,9 @@ endpoint = os.environ['AS_IDENTITY']
 flavor_ref = os.environ['AS_FLAVOR_REF']
 image_ref = os.environ['AS_IMAGE_REF']
 region = os.environ['AS_REGION']
+scheduler_interval = float(os.environ.get("AS_SCHEDULER_INTERVAL", "10"))
+otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
+convergence_interval = float(os.environ.get("AS_CONVERGENCE_INTERVAL", "10"))
 
 # Get vs dict lookup because it will return None if not found,
 # not throw an exception.  None is a valid value for convergence_tenant.
@@ -93,6 +112,72 @@ def get_resource_mapping():
     return res
 
 
+def filter_logs(observer):
+    """
+    Filter out logs like
+    "Starting factory <twisted.web.client_HTTP11ClientFactory".
+    """
+    def emit(eventdict):
+        if ('message' not in eventdict or
+                all([not m.startswith("Starting factory") and
+                     not m.startswith("Stopping factory")
+                     for m in eventdict['message']])):
+            observer(eventdict)
+    return emit
+
+
+def pretty_print_logs(observer):
+    """
+    A log observer formatter for test logs.  Prints log messages like::
+
+        MESSAGE
+        {
+            rest of JSON dict
+        }
+
+        --------
+
+        MESSAGE
+        {
+            rest of JSON dict
+        }
+
+        ...
+    """
+    def emit(eventdict):
+        if 'message' in eventdict:
+            message = ''.join(eventdict.pop('message'))
+        observer({'message': "\n".join(
+            ["", message, json.dumps(eventdict, cls=LoggingEncoder, indent=2),
+             "", "-" * 8]
+        )})
+    return emit
+
+
+def setup_test_log_observer(testcase):
+    """
+    Create a log observer that writes a particular test's logs to a temporary
+    file for the duration of the test.  Also cleans up the observer and the
+    temp file object after the test is over.
+    """
+    logfile = open("{0}.log".format(testcase.id()), 'ab')
+    observer = copying_wrapper(
+        PEP3101FormattingWrapper(
+            ErrorFormattingWrapper(
+                filter_logs(
+                    pretty_print_logs(
+                        StreamObserverWrapper(logfile))))))
+    addObserver(observer)
+    testcase.addCleanup(removeObserver, observer)
+    testcase.addCleanup(logfile.close)
+
+
+def get_utcstr_from_now(seconds):
+    """ Get UTC timestamp from now in ISO 8601 format """
+    return "{}Z".format(
+        (datetime.utcnow() + timedelta(seconds=seconds)).isoformat())
+
+
 class TestHelper(object):
     """
     A helper class that contains useful functions for actual test cases.  This
@@ -102,11 +187,13 @@ class TestHelper(object):
         """
         Set up the test case, HTTP pool, identity, and cleanup.
         """
+        setup_test_log_observer(test_case)
         self.test_case = test_case
         self.pool = HTTPConnectionPool(reactor, False)
+        self.treq = LoggingTreq(log=log, log_response=True)
         self.test_case.addCleanup(self.pool.closeCachedConnections)
 
-        self.clbs = [CloudLoadBalancer(pool=self.pool)
+        self.clbs = [CloudLoadBalancer(pool=self.pool, treq=self.treq)
                      for _ in range(num_clbs)]
 
     def create_group(self, **kwargs):
@@ -131,6 +218,7 @@ class TestHelper(object):
         return (
             ScalingGroup(
                 group_config=create_scaling_group_dict(**kwargs),
+                treq=self.treq,
                 pool=self.pool),
             server_name_prefix)
 
@@ -220,6 +308,15 @@ class TestHelper(object):
         returnValue(
             [server for server in servers if server['id'] in server_ids])
 
+    @inlineCallbacks
+    def assert_group_state(self, group, matcher):
+        """
+        Assert state of group conforms to the matcher
+        """
+        resp, state = yield group.get_scaling_group_state(self.test_case.rcs,
+                                                          [200])
+        self.test_case.assertIsNone(matcher.match(state["group"]))
+
 
 def tag(*tags):
     """
@@ -286,3 +383,12 @@ def random_string(byte_len=4):
     The string will be 2 * ``byte_len`` in length.
     """
     return os.urandom(byte_len).encode('hex')
+
+
+def sleep(reactor, seconds):
+    """
+    Sleep for given seconds
+    """
+    d = Deferred()
+    reactor.callLater(seconds, d.callback, None)
+    return d

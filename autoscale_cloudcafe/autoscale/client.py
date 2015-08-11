@@ -17,8 +17,7 @@ from autoscale.models.request.autoscale_requests import (
     Webhook_Request
 )
 from autoscale.models.response.autoscale_response import (
-    Audit, Config,
-    Group, Groups, Policies, Policy, RackConnectLBNodeDetail,
+    Config, Group, Groups, Policies, Policy, RackConnectLBNodeDetail,
     RackConnectLBNodes, RackConnectLBPool, RackConnectLBPools,
     RackConnectNetworkInfo, ScalingGroup, Webhook, Webhooks
 )
@@ -113,12 +112,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         '/{tenantId}/groups'
         """
         url = '%s/groups' % (self.url)
-        # Option "core" - Creates rack user only. See servermill build config
-        # option
-        if lc_metadata:
-            lc_metadata['build_config'] = 'core'
-        else:
-            lc_metadata = dict(build_config='core')
+        if not lc_metadata:
+            lc_metadata = {}
 
         # Setting network type for servers to be private by default so that
         # when testing against production, by default public IPs are not
@@ -738,21 +733,6 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         url = webhook_url
         return self.request('POST', url,
                             requestslib_kwargs=requestslib_kwargs)
-
-    def get_history(self, requestslib_kwargs=None):
-        """
-        :summary: Request the history audit log
-        :return: Response object containing response code 200 (on success) and a body
-                 containing the audit log details
-        :rtype: Response Object
-
-        GET
-        '/<string:tenantId>/history'
-        """
-        url = '{0}/history'.format(self.url)
-        return self.request('GET', url,
-                            requestslib_kwargs=requestslib_kwargs,
-                            response_entity_type=Audit)
 
     def delete_server(self, group_id, server_id, replace=None):
         """

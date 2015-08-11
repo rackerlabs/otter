@@ -4,6 +4,7 @@ Integration point for HTTP clients in otter.
 import json
 import re
 from functools import partial, wraps
+from urlparse import parse_qs, urlparse
 
 import attr
 
@@ -20,6 +21,7 @@ from effect import (
 import six
 
 from toolz.dicttoolz import get_in
+from toolz.functoolz import identity
 from toolz.itertoolz import concat
 
 from twisted.internet.defer import DeferredLock
@@ -29,6 +31,7 @@ from txeffect import deferred_performer, perform as twisted_perform
 
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType
+from otter.log.intents import msg as msg_effect
 from otter.util.config import config_value
 from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.http import headers as otter_headers
@@ -324,29 +327,68 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
     })
 
 
-# ----- CLB requests and error parsing -----
+# ----- Logging responses -----
 
-_CLB_IMMUTABLE_PATTERN = re.compile(
-    "^Load Balancer '\d+' has a status of '[^']+' and is considered "
-    "immutable\.$")
-_CLB_NOT_ACTIVE_PATTERN = re.compile("^LoadBalancer is not ACTIVE$")
-_CLB_DELETED_PATTERN = re.compile(
-    "^(Load Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
-    "The load balancer is deleted and) considered immutable\.$")
-_CLB_MARKED_DELETED_PATTERN = re.compile(
-    "^The loadbalancer is marked as deleted\.$")
-_CLB_NO_SUCH_NODE_PATTERN = re.compile(
-    "^Node with id #\d+ not found for loadbalancer #\d+$")
-_CLB_NO_SUCH_LB_PATTERN = re.compile(
-    "^Load balancer not found\.$")
-_CLB_DUPLICATE_NODES_PATTERN = re.compile(
-    "^Duplicate nodes detected. One or more nodes already configured "
-    "on load balancer\.$")
-_CLB_NODE_LIMIT_PATTERN = re.compile(
-    "^Nodes must not exceed \d+ per load balancer\.$")
-_CLB_NODE_REMOVED_PATTERN = re.compile(
-    "^Node ids ((?:\d+,)*(?:\d+)) are not a part of your loadbalancer\s*$")
-_CLB_OVER_LIMIT_PATTERN = re.compile("^OverLimit Retry\.{3}$")
+
+def log_success_response(msg_type, response_body_filter):
+    """
+    :param str msg_type: A string representing the message type of the log
+        message
+    :param callable response_body_filter: A callable that takes a the response
+        body and returns a version of the body that should be logged - this
+        should not mutate the original response body.
+    :return: a function that accepts success result from a `ServiceRequest` and
+        log the response body.  This assumes a JSON response, which is a
+        tuple of (response, response_content).  (non-JSON responses do not
+        currently include the original response)
+    """
+    def _log_it(result):
+        resp, json_body = result
+        # So we can link it to any non-cloud_client logs
+        request_id = resp.request.headers.getRawHeaders(
+            'x-otter-request-id', [None])[0]
+
+        eff = msg_effect(
+            msg_type,
+            method=resp.request.method,
+            url=resp.request.absoluteURI,
+            response_body=json.dumps(response_body_filter(json_body),
+                                     sort_keys=True),
+            request_id=request_id)
+        return eff.on(lambda _: result)
+
+    return _log_it
+
+
+# ----- CLB requests and error parsing -----
+def _regex(pattern):
+    """
+    Compile a case-insensitive pattern.
+    """
+    return re.compile(pattern, re.I)
+
+
+_CLB_IMMUTABLE_PATTERN = _regex(
+    "Load\s*Balancer '\d+' has a status of '[^']+' and is considered "
+    "immutable")
+_CLB_NOT_ACTIVE_PATTERN = _regex("Load\s*Balancer is not ACTIVE")
+_CLB_DELETED_PATTERN = _regex(
+    "(Load\s*Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
+    "The load balancer is deleted and) considered immutable")
+_CLB_MARKED_DELETED_PATTERN = _regex(
+    "The load\s*balancer is marked as deleted")
+_CLB_NO_SUCH_NODE_PATTERN = _regex(
+    "Node with id #\d+ not found for load\s*balancer #\d+$")
+_CLB_NO_SUCH_LB_PATTERN = _regex(
+    "Load\s*balancer not found")
+_CLB_DUPLICATE_NODES_PATTERN = _regex(
+    "Duplicate nodes detected. One or more nodes already configured "
+    "on load\s*balancer")
+_CLB_NODE_LIMIT_PATTERN = _regex(
+    "Nodes must not exceed \d+ per load\s*balancer")
+_CLB_NODE_REMOVED_PATTERN = _regex(
+    "Node ids ((?:\d+,)*(?:\d+)) are not a part of your load\s*balancer")
+_CLB_OVER_LIMIT_PATTERN = _regex("OverLimit Retry\.{3}")
 
 
 @attr.s(these={"message": attr.ib()}, init=False)
@@ -388,15 +430,18 @@ class CLBImmutableError(Exception):
 
 
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
-class CLBDeletedError(Exception):
+class CLBNotFoundError(Exception):
+    """A CLB doesn't exist. Superclass of other, more specific exceptions."""
+
+
+class CLBDeletedError(CLBNotFoundError):
     """
     Error to be raised when the CLB has been deleted or is being deleted.
     This is distinct from it not existing.
     """
 
 
-@attributes([Attribute('lb_id', instance_of=six.text_type)])
-class NoSuchCLBError(Exception):
+class NoSuchCLBError(CLBNotFoundError):
     """
     Error to be raised when the CLB never existed in the first place (or it
     has been deleted so long that there is no longer a record of it).
@@ -613,6 +658,44 @@ def remove_clb_nodes(lb_id, node_ids):
     ).on(success=lambda _: None)
 
 
+def get_clb_nodes(lb_id):
+    """
+    Fetch the nodes of the given load balancer. Returns list of node JSON.
+    """
+    return service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'GET',
+        append_segments('loadbalancers', str(lb_id), 'nodes'),
+    ).on(
+        error=_only_json_api_errors(
+            lambda c, b: _process_clb_api_error(c, b, lb_id))
+    ).on(
+        success=lambda (response, body): body['nodes'])
+
+
+def get_clbs():
+    """Fetch all LBs for a tenant. Returns list of loadbalancer JSON."""
+    return service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS, 'GET', 'loadbalancers',
+    ).on(
+        success=lambda (response, body): body['loadBalancers'])
+
+
+def get_clb_node_feed(lb_id, node_id):
+    """Get the atom feed associated with a CLB node. Returns feed as str."""
+    return service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'GET',
+        append_segments('loadbalancers', str(lb_id), 'nodes',
+                        '{}.atom'.format(node_id)),
+        json_response=False
+    ).on(
+        error=_only_json_api_errors(
+            lambda c, b: _process_clb_api_error(c, b, lb_id))
+    ).on(
+        success=lambda (response, body): body)
+
+
 def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
     """
     All CLB messages have only the keys ("message",), and the exception tpye
@@ -627,9 +710,9 @@ def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
 
     and maybe the partial will include the node ID too if it's provided.
     """
-    params = {"lb_id": lb_id}
+    params = {"lb_id": six.text_type(lb_id)}
     if node_id is not None:
-        params["node_id"] = node_id
+        params["node_id"] = six.text_type(node_id)
 
     return [(m[0], ("message",), m[1], partial(m[2], **params))
             for m in matches_tuples]
@@ -651,7 +734,7 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
         # overLimit is different than the other CLB messages because it's
         # produced by repose
         [(413, ("overLimit", "message"), _CLB_OVER_LIMIT_PATTERN,
-          partial(CLBRateLimitError, lb_id=lb_id))] +
+          partial(CLBRateLimitError, lb_id=six.text_type(lb_id)))] +
         _expand_clb_matches(
             [(422, _CLB_DELETED_PATTERN, CLBDeletedError),
              (410, _CLB_MARKED_DELETED_PATTERN, CLBDeletedError),
@@ -665,8 +748,8 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
 # ----- Nova requests and error parsing -----
 
 def _forbidden_plaintext(message):
-    return re.compile(
-        "^403 Forbidden\n\nAccess was denied to this resource\.\n\n ({0})$"
+    return _regex(
+        "403 Forbidden\s+Access was denied to this resource\.\s+({0})$"
         .format(message))
 
 _NOVA_403_NO_PUBLIC_NETWORK = _forbidden_plaintext(
@@ -676,9 +759,9 @@ _NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED = _forbidden_plaintext(
     "11111111-1111-1111-1111-111111111111\) required but missing")
 _NOVA_403_RACKCONNECT_NETWORK_REQUIRED = _forbidden_plaintext(
     "Exactly 1 isolated network\(s\) must be attached")
-_NOVA_403_QUOTA = re.compile(
-    "^Quota exceeded for (\S+): Requested \d+, but already used \d+ of \d+ "
-    "(\S+)$")
+_NOVA_403_QUOTA = _regex(
+    "Quota exceeded for (\S+): Requested \d+, but already used \d+ of \d+ "
+    "(\S+)")
 
 
 @attributes([Attribute('server_id', instance_of=six.text_type)])
@@ -725,7 +808,7 @@ class CreateServerOverQuoteError(ExceptionWithMessage):
     """
 
 
-_MAX_METADATA_PATTERN = re.compile('^Maximum number of metadata items .*$')
+_MAX_METADATA_PATTERN = _regex('Maximum number of metadata items')
 
 
 def set_nova_metadata_item(server_id, key, value):
@@ -738,6 +821,7 @@ def set_nova_metadata_item(server_id, key, value):
 
     Succeed on 200.
 
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
     :raise: :class:`NoSuchServer`, :class:`MetadataOverLimit`,
         :class:`NovaRateLimitError`, :class:`NovaComputeFaultError`,
         :class:`APIError`
@@ -754,9 +838,10 @@ def set_nova_metadata_item(server_id, key, value):
     def _parse_known_errors(code, json_body):
         other_errors = [
             (404, ('itemNotFound', 'message'), None,
-             partial(NoSuchServerError, server_id=server_id)),
+             partial(NoSuchServerError, server_id=six.text_type(server_id))),
             (403, ('forbidden', 'message'), _MAX_METADATA_PATTERN,
-             partial(ServerMetadataOverLimitError, server_id=server_id)),
+             partial(ServerMetadataOverLimitError,
+                     server_id=six.text_type(server_id))),
         ]
         _match_errors(_nova_standard_errors + other_errors, code, json_body)
 
@@ -771,6 +856,7 @@ def get_server_details(server_id):
 
     Succeed on 200.
 
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
     :raise: :class:`NoSuchServer`, :class:`NovaRateLimitError`,
         :class:`NovaComputeFaultError`, :class:`APIError`
     """
@@ -784,7 +870,7 @@ def get_server_details(server_id):
     def _parse_known_errors(code, json_body):
         other_errors = [
             (404, ('itemNotFound', 'message'), None,
-             partial(NoSuchServerError, server_id=server_id)),
+             partial(NoSuchServerError, server_id=six.text_type(server_id))),
         ]
         _match_errors(_nova_standard_errors + other_errors, code, json_body)
 
@@ -801,6 +887,7 @@ def create_server(server_args):
     Succeed on 202, and only reauthenticate on 401 because 403s may be terminal
     errors.
 
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
     :raise: :class:`CreateServerConfigurationError`,
         :class:`CreateServerOverQuoteError`, :class:`NovaRateLimitError`,
         :class:`NovaComputFaultError`, :class:`APIError`
@@ -835,12 +922,107 @@ def create_server(server_args):
 
         six.reraise(*api_error_exc_info)
 
+    def _remove_admin_pass_for_logging(response):
+        return {'server': {
+            k: v for k, v in response['server'].items() if k != "adminPass"
+        }}
+
     return (eff
             .on(error=catch(APIError, _parse_known_string_errors))
-            .on(error=_parse_known_json_errors))
+            .on(error=_parse_known_json_errors)
+            .on(log_success_response('request-create-server',
+                                     _remove_admin_pass_for_logging)))
+
+
+def list_servers_details_page(parameters=None):
+    """
+    List a single page of servers details given filtering and pagination
+    parameters.
+
+    :ivar dict parameters: A dictionary with pagination information,
+        changes-since filters, and name filters.
+
+    Succeed on 200.
+
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
+    :raise: :class:`NovaRateLimitError`, :class:`NovaComputeFaultError`,
+        :class:`APIError`
+    """
+    @_only_json_api_errors
+    def _parse_known_errors(code, json_body):
+        _match_errors(_nova_standard_errors, code, json_body)
+
+    return (
+        service_request(
+            ServiceType.CLOUD_SERVERS,
+            'GET', append_segments('servers', 'detail'),
+            params=parameters)
+        .on(error=_parse_known_errors)
+        .on(log_success_response('request-list-servers-details', identity))
+    )
+
+
+def list_servers_details_all(parameters=None):
+    """
+    List all pages of servers details, starting at the page specified by the
+    given filtering and pagination parameters.
+
+    :ivar dict parameters: A dictionary with pagination information,
+        changes-since filters, and name filters.
+
+    Succeed on 200.
+
+    :return: a `list` of server details `dict`s
+    :raise: :class:`NovaRateLimitError`, :class:`NovaComputeFaultError`,
+        :class:`APIError`
+    """
+    last_link = []
+
+    def continue_(result, servers_so_far=None):
+        if servers_so_far is None:
+            servers_so_far = []
+
+        _response, body = result
+        servers = servers_so_far + body['servers']
+
+        # Only continue if pagination is supported and there is another page
+        continuation = [link['href'] for link in body.get('servers_links', [])
+                        if link['rel'] == 'next']
+        if continuation:
+            # blow up if we try to fetch the same link twice
+            if last_link and last_link[-1] == continuation[0]:
+                raise NovaComputeFaultError(
+                    "When gathering server details, got the same 'next' link "
+                    "twice from Nova: {0}".format(last_link[-1]))
+
+            last_link[:] = [continuation[0]]
+            parsed_query = parse_qs(urlparse(continuation[0]).query)
+            return list_servers_details_page(parsed_query).on(
+                partial(continue_, servers_so_far=servers))
+
+        return servers
+
+    return list_servers_details_page(parameters).on(continue_)
 
 
 _nova_standard_errors = [
     (413, ('overLimit', 'message'), None, NovaRateLimitError),
     (500, ('computeFault', 'message'), None, NovaComputeFaultError)
 ]
+
+
+# ----- Cloud feeds requests -----
+def publish_to_cloudfeeds(event, log=None):
+    """
+    Publish an event dictionary to cloudfeeds.
+    """
+    return service_request(
+        ServiceType.CLOUD_FEEDS, 'POST',
+        append_segments('autoscale', 'events'),
+        # note: if we actually wanted a JSON response instead of XML,
+        # we'd have to pass the header:
+        # 'accept': ['application/vnd.rackspace.atom+json'],
+        headers={
+            'content-type': ['application/vnd.rackspace.atom+json']},
+        data=event, log=log, success_pred=has_code(201),
+        json_response=False)

@@ -422,8 +422,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         """
         makeService(test_config)
         self.Otter.assert_called_once_with(self.store, 'ord',
-                                           self.health_checker.health_check,
-                                           es_host=None)
+                                           self.health_checker.health_check)
 
     def test_max_groups(self):
         """
@@ -678,6 +677,9 @@ class APIMakeServiceTests(SynchronousTestCase):
             parent, kz_client, mock.ANY, 10, 3600)
 
         dispatcher = mock_setup_converger.call_args[0][2]
+
+        # Check dispatcher is set in otter object
+        self.assertIs(self.Otter.return_value.dispatcher, dispatcher)
 
         for intent in full_intents():
             self.assertIsNot(dispatcher(intent), None)

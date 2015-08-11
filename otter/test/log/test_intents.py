@@ -13,12 +13,15 @@ import mock
 
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.log import log as default_log
 from otter.log.intents import (
     err,
+    get_fields,
     get_log_dispatcher,
+    merge_effectful_fields,
     msg,
     with_log)
-from otter.test.utils import CheckFailureValue, mock_log
+from otter.test.utils import CheckFailureValue, IsBoundWith, matches, mock_log
 
 
 class LogDispatcherTests(SynchronousTestCase):
@@ -161,3 +164,42 @@ class LogDispatcherTests(SynchronousTestCase):
         self.assertEqual(sync_perform(self.disp, with_log(e, o='f')), "def")
         self.log.msg.assert_called_once_with(
             'foo', i='a', f1='v', m='d', o='f')
+
+    def test_get_fields(self):
+        """GetFields results in the fields bound in the effectful context."""
+        eff = with_log(get_fields(), ab=12, cd='foo')
+        fields = sync_perform(self.disp, eff)
+        self.assertEqual(fields, {'f1': 'v', 'ab': 12, 'cd': 'foo'})
+
+    def test_merge_effectful_fields_no_context(self):
+        """
+        The given log is returned unmodified when there's no effectful context.
+        """
+        log = mock_log()
+        result = merge_effectful_fields(base_dispatcher, log)
+        self.assertIs(result, log)
+
+    def test_merge_effectful_fields_no_log_no_context(self):
+        """
+        The default otter log is returned when no log is passed and there is no
+        effectful context.
+        """
+        result = merge_effectful_fields(base_dispatcher, None)
+        self.assertIs(result, default_log)
+
+    def test_merge_effectful_fields_no_log_with_context(self):
+        """
+        A log is returned with fields from the default otter log and the
+        context when no log is passed.
+        """
+        result = merge_effectful_fields(self.disp, None)
+        self.assertEqual(result, matches(IsBoundWith(f1='v', system='otter')))
+
+    def test_merge_effectful_fields_log_and_context(self):
+        """
+        A log is returned with fields from both the passed-in log and the
+        effectful context, with the latter taking precedence.
+        """
+        log = self.log.bind(f1='v2', passed_log=True)
+        result = merge_effectful_fields(self.disp, log)
+        self.assertEqual(result, matches(IsBoundWith(passed_log=True, f1='v')))

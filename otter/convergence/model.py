@@ -10,7 +10,9 @@ from attr.validators import instance_of
 
 from characteristic import Attribute, attributes
 
-from pyrsistent import PMap, PSet, freeze, pmap, pset, pvector
+from pyrsistent import PMap, PSet, freeze, pmap, pset, pvector, thaw
+
+from six import string_types
 
 from sumtypes import constructor, sumtype
 
@@ -193,16 +195,15 @@ def _lbs_from_metadata(metadata):
     return pset(desired_lbs)
 
 
-@attributes(['id', 'state', 'created', 'image_id', 'flavor_id',
-             # because type(pvector()) is pvectorc.PVector,
-             # which != pyrsistent.PVector
-             Attribute('links', default_factory=pvector,
-                       instance_of=type(pvector())),
-             Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
-             Attribute('servicenet_address',
-                       default_value='',
-                       instance_of=basestring),
-             Attribute('json', instance_of=PMap, default_factory=pmap)])
+def _validate_state(_1, _2, state):
+    """
+    Assert that a state is in ServerState
+    """
+    if state not in ServerState.iterconstants():
+        raise AssertionError("{0} is not a ServerState".format(state))
+
+
+@attr.s(repr=False)
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -222,10 +223,19 @@ class NovaServer(object):
     :var dict json: JSON dict received from Nova from which this server
         is created
     """
-
-    def __init__(self):
-        assert self.state in ServerState.iterconstants(), \
-            "%r is not a ServerState" % (self.state,)
+    id = attr.ib()
+    state = attr.ib(validator=_validate_state)
+    created = attr.ib()
+    image_id = attr.ib()
+    flavor_id = attr.ib()
+    # type(pvector()) is pvectorc.PVector, which != pyrsistent.PVector
+    links = attr.ib(default=attr.Factory(pvector),
+                    validator=instance_of(type(pvector())))
+    desired_lbs = attr.ib(default=attr.Factory(pset),
+                          validator=instance_of(PSet))
+    servicenet_address = attr.ib(default='',
+                                 validator=instance_of(string_types))
+    json = attr.ib(default=attr.Factory(pmap), validator=instance_of(PMap))
 
     @classmethod
     def from_server_details_json(cls, server_json):
@@ -259,6 +269,26 @@ class NovaServer(object):
             desired_lbs=_lbs_from_metadata(metadata),
             servicenet_address=_servicenet_address(server_json),
             json=freeze(server_json))
+
+    def __repr__(self):
+        """
+        Make the repr a little more friendly - and with less redundant/unused
+        information.
+        """
+        kvpairs = []
+        # this gives us an ordered list
+        for a in attr.fields(self.__class__):
+            value = thaw(getattr(self, a.name))
+            if a.name == "json":
+                value = {k: v for k, v in value.items() if k in
+                         ('status', 'metadata', 'updated', 'name',
+                          'OS-EXT-STS:task_state')}
+            kvpairs.append("{0}={1}".format(a.name, repr(value)))
+        return "<{0}({1})>".format(self.__class__.__name__, ", ".join(kvpairs))
+
+    def __str__(self):
+        """Return the repr"""
+        return repr(self)
 
 
 def group_id_from_metadata(metadata):
@@ -496,6 +526,22 @@ class CLBNode(object):
         See :func:`ILBNode.is_active`.
         """
         return self.description.condition != CLBNodeCondition.DISABLED
+
+    @classmethod
+    def from_node_json(cls, lb_id, json):
+        """
+        Create an instance of this class based on node JSON data from the CLB
+        API.
+        """
+        return cls(
+            node_id=str(json['id']),
+            address=json['address'],
+            description=CLBDescription(
+                lb_id=str(lb_id),
+                port=json['port'],
+                weight=json.get('weight', 1),
+                condition=CLBNodeCondition.lookupByName(json['condition']),
+                type=CLBNodeType.lookupByName(json['type'])))
 
 
 @implementer(ILBDescription)

@@ -8,7 +8,7 @@ from effect import (
 from effect.ref import ReadReference, Reference, reference_dispatcher
 from effect.testing import SequenceDispatcher
 
-from kazoo.exceptions import BadVersionError
+from kazoo.exceptions import BadVersionError, NoNodeError
 from kazoo.recipe.partitioner import PartitionState
 
 import mock
@@ -38,6 +38,7 @@ from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,
     UpdateGroupStatus,
+    UpdateGroupErrorReasons,
     UpdateServersCache)
 from otter.models.interface import (
     GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
@@ -113,10 +114,10 @@ class ConvergerTests(SynchronousTestCase):
         return self.fake_partitioner
 
     def _log_sequence(self, intents):
-        uid = uuid.uuid1()
+        uid = uuid.uuid4()
         exp_uid = str(uid)
         return SequenceDispatcher([
-            (Func(uuid.uuid1), lambda i: uid),
+            (Func(uuid.uuid4), lambda i: uid),
             (BoundFields(effect=mock.ANY,
                          fields={'otter_service': 'converger',
                                  'converger_run_id': exp_uid}),
@@ -319,6 +320,23 @@ class ConvergeOneGroupTests(SynchronousTestCase):
                         version=self.version),
              lambda i: raise_(BadVersionError())),
             (Log('mark-clean-skipped',
+                 dict(path='/groups/divergent/tenant-id_g1',
+                      dirty_version=self.version)), lambda i: None)
+        ])
+        self._verify_sequence(sequence)
+
+    def test_delete_node_not_found(self):
+        """
+        When DeleteNode raises a NoNodeError, a message is logged and nothing
+        else is cleaned up.
+        """
+        sequence = SequenceDispatcher([
+            (('ec', self.tenant_id, self.group_id, 3600),
+             lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
+            (DeleteNode(path='/groups/divergent/tenant-id_g1',
+                        version=self.version),
+             lambda i: raise_(NoNodeError())),
+            (Log('mark-clean-not-found',
                  dict(path='/groups/divergent/tenant-id_g1',
                       dirty_version=self.version)), lambda i: None)
         ])
@@ -807,7 +825,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 nested_parallel([
                     (Log('convergence-create-servers',
                          {'num_servers': 1, 'server_config': {'foo': 'bar'},
-                          'cloud_feed': True}), noop)
+                          'cloud_feed': True, 'cloud_feed_id': mock.ANY}),
+                     noop)
                 ])
             ]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
@@ -925,9 +944,45 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              noop),
             (Log('group-status-error',
                  dict(isError=True, cloud_feed=True,
-                      status='ERROR',
+                      cloud_feed_id=mock.ANY, status='ERROR',
                       reasons='Cloud Load Balancer does not exist: nolb1; '
                               'Cloud Load Balancer does not exist: nolb2')),
+             noop),
+            (UpdateGroupErrorReasons(
+                self.group,
+                ['Cloud Load Balancer does not exist: nolb1',
+                 'Cloud Load Balancer does not exist: nolb2']), noop)
+        ]
+        self.assertEqual(
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
+            (StepResult.FAILURE, ScalingGroupStatus.ERROR))
+
+    def test_failure_unknown_reasons(self):
+        """
+        The group is put into ERROR state if any step returns FAILURE, and
+        unknown error is defaulted to fixed reason
+        """
+        exc_info = raise_to_exc_info(ValueError('wat'))
+
+        def plan(*args, **kwargs):
+            return [TestStep(Effect("fail"))]
+
+        sequence = [
+            nested_parallel([]),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            nested_parallel([
+                ("fail", lambda i: (StepResult.FAILURE,
+                                    [ErrorReason.Exception(exc_info)]))
+            ]),
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            (UpdateGroupStatus(scaling_group=self.group,
+                               status=ScalingGroupStatus.ERROR),
+             noop),
+            (Log('group-status-error',
+                 dict(isError=True, cloud_feed=True, cloud_feed_id=mock.ANY,
+                      status='ERROR', reasons='Unknown error occurred')),
+             noop),
+            (UpdateGroupErrorReasons(self.group, ['Unknown error occurred']),
              noop)
         ]
         self.assertEqual(
@@ -955,7 +1010,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                status=ScalingGroupStatus.ACTIVE),
              noop),
             (Log('group-status-active',
-                 dict(cloud_feed=True, status='ACTIVE')), noop),
+                 dict(cloud_feed=True, cloud_feed_id=mock.ANY,
+                      status='ACTIVE')),
+             noop),
             (UpdateServersCache("tenant-id", "group-id", self.now,
                                 [{"id": "a", "_is_as_active": True},
                                  {"id": "b", "_is_as_active": True}]), noop)
@@ -980,7 +1037,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                status=ScalingGroupStatus.ACTIVE),
              noop),
             (Log('group-status-active',
-                 dict(cloud_feed=True, status='ACTIVE')), noop),
+                 dict(cloud_feed=True, cloud_feed_id=mock.ANY,
+                      status='ACTIVE')),
+             noop),
             (UpdateServersCache("tenant-id", "group-id", self.now,
                                 [{"id": "a", "_is_as_active": True},
                                  {"id": "b", "_is_as_active": True}]), noop)

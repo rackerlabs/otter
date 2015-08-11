@@ -4,7 +4,8 @@ from pyrsistent import pmap
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.util.fp import predicate_all, predicate_any, set_in
+from otter.util.fp import (
+    assoc_obj, predicate_all, predicate_any, set_in)
 
 
 class PredicateAllTests(SynchronousTestCase):
@@ -130,3 +131,23 @@ class SetInTests(SynchronousTestCase):
         """
         self.assertEquals(set_in({}, (1, 2, 3), 4),
                           pmap({1: pmap({2: pmap({3: 4})})}))
+
+
+class AssocObjTests(SynchronousTestCase):
+    """Tests for :func:`assoc_obj`."""
+
+    def test_assoc(self):
+        """
+        Creates a new object that's a copy of the old one, with the
+        specified attributes rebound. Existing attributes are identical.
+        """
+        class Foo(object):
+            def __init__(self):
+                self.l = [1, 2]
+                self.name = "foo"
+
+        o = Foo()
+        new = assoc_obj(o, name="bar")
+        self.assertEqual(o.name, "foo")
+        self.assertEqual(new.name, "bar")
+        self.assertIs(o.l, new.l)

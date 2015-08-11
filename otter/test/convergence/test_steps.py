@@ -15,8 +15,9 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.cloud_client import (
     CLBDeletedError,
     CLBDuplicateNodesError,
-    CLBNodeLimitError,
     CLBImmutableError,
+    CLBNodeLimitError,
+    CLBNotFoundError,
     CLBRateLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
@@ -55,6 +56,7 @@ from otter.convergence.steps import (
     _rcv3_check_bulk_delete,
     delete_and_verify,
 )
+from otter.log.intents import Log
 from otter.test.utils import (
     StubResponse,
     matches,
@@ -139,10 +141,20 @@ class CreateServerTests(SynchronousTestCase):
         """
         eff = CreateServer(
             server_config=freeze({'server': {'flavorRef': '1'}})).as_effect()
-        eff = resolve_effect(eff, 'random-name')
-
+        seq = [
+            (Func(generate_server_name), lambda _: 'random-name'),
+            (service_request(
+                ServiceType.CLOUD_SERVERS,
+                'POST',
+                'servers',
+                data={'server': {'name': 'random-name', 'flavorRef': '1'}},
+                success_pred=has_code(202),
+                reauth_codes=(401,)).intent,
+             lambda _: (StubResponse(202, {}), {"server": {}})),
+            (Log('request-create-server', ANY), lambda _: None)
+        ]
         self.assertEqual(
-            resolve_effect(eff, (StubResponse(202, {}), {"server": {}})),
+            perform_sequence(seq, eff),
             (StepResult.RETRY,
              [ErrorReason.String('waiting for server to become active')]))
 
@@ -218,7 +230,7 @@ class DeleteServerTests(SynchronousTestCase):
         self.assertIsInstance(eff.intent, Retry)
         self.assertEqual(
             eff.intent.should_retry,
-            ShouldDelayAndRetry(can_retry=retry_times(10),
+            ShouldDelayAndRetry(can_retry=retry_times(3),
                                 next_interval=exponential_backoff_interval(2)))
         self.assertEqual(eff.intent.effect.intent, 'abc123')
 
@@ -279,11 +291,12 @@ class DeleteServerTests(SynchronousTestCase):
         self.assertEqual(
             eff.intent,
             service_request(
-                ServiceType.CLOUD_SERVERS, 'GET', 'servers/sid/details',
+                ServiceType.CLOUD_SERVERS, 'GET', 'servers/sid',
                 success_pred=has_code(200, 404)).intent)
         r = resolve_effect(
-            eff, (StubResponse(200, {}),
-                  {'server': {"OS-EXT-STS:task_state": 'deleting'}}))
+            eff,
+            (StubResponse(200, {}),
+             {'server': {"OS-EXT-STS:task_state": 'deleting'}}))
         self.assertIsNone(r)
 
     def test_delete_and_verify_verify_404(self):
@@ -295,7 +308,7 @@ class DeleteServerTests(SynchronousTestCase):
         eff = resolve_effect(
             eff, service_request_error_response(APIError(204, {})),
             is_error=True)
-        r = resolve_effect(eff, (StubResponse(404, {}), {}))
+        r = resolve_effect(eff, (StubResponse(404, {}), {"itemNotFound": {}}))
         self.assertIsNone(r)
 
     def test_delete_and_verify_verify_unexpectedstatus(self):
@@ -469,9 +482,10 @@ class StepAsEffectTests(SynchronousTestCase):
         if there is any other 4xx error, then
         the error is propagated up and the result is a failure.
         """
-        terminals = (CLBDeletedError(lb_id=u"12345"),
-                     CLBNodeLimitError(lb_id=u"12345"),
+        terminals = (CLBNotFoundError(lb_id=u"12345"),
+                     CLBDeletedError(lb_id=u"12345"),
                      NoSuchCLBError(lb_id=u"12345"),
+                     CLBNodeLimitError(lb_id=u"12345"),
                      APIError(code=403, body="You're out of luck."),
                      APIError(code=422, body="Oh look another 422."))
         eff = self._add_one_node_to_clb()
@@ -609,8 +623,9 @@ class StepAsEffectTests(SynchronousTestCase):
         :obj:`AddNodesToCLB` succeeds if the CLB is not in existence (has been
         deleted or is not found).
         """
-        successes = (CLBDeletedError(lb_id=u"12345"),
-                     NoSuchCLBError(lb_id=u"12345"))
+        successes = [CLBNotFoundError(lb_id=u'12345'),
+                     CLBDeletedError(lb_id=u'12345'),
+                     NoSuchCLBError(lb_id=u'12345')]
         eff = RemoveNodesFromCLB(lb_id='12345',
                                  node_ids=pset(['1', '2'])).as_effect()
 

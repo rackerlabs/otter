@@ -17,6 +17,7 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 
 from txeffect import deferred_performer
 
+from otter.log.intents import merge_effectful_fields
 from otter.util import logging_treq
 from otter.util.http import APIError
 
@@ -48,11 +49,12 @@ def perform_request(dispatcher, intent):
 
     :return: A two-tuple of (HTTP Response, content as bytes)
     """
+    log = merge_effectful_fields(dispatcher, intent.log)
     response = yield intent.treq.request(intent.method.upper(), intent.url,
                                          headers=intent.headers,
                                          data=intent.data,
                                          params=intent.params,
-                                         log=intent.log)
+                                         log=log)
     content = yield intent.treq.content(response)
     returnValue((response, content))
 
@@ -96,7 +98,8 @@ def check_response(pred, result):
     if pred(response, content):
         return result
     else:
-        raise APIError(response.code, content, response.headers)
+        raise APIError(response.code, content, response.headers,
+                       response.request.method, response.request.absoluteURI)
 
 
 @memoize

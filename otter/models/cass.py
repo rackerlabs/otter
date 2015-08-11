@@ -147,8 +147,8 @@ _cql_create_group = (
 _cql_view_manifest = (
     'SELECT "tenantId", "groupId", group_config, '
     'launch_config, active, pending, "groupTouched", '
-    '"policyTouched", paused, desired, created_at, status, deleting '
-    'FROM {cf} '
+    '"policyTouched", paused, desired, created_at, status, error_reasons, '
+    'deleting FROM {cf} '
     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", data, version) '
@@ -211,8 +211,8 @@ _cql_delete_one_webhook = (
     '"webhookId" = :webhookId')
 _cql_list_states = (
     'SELECT "tenantId", "groupId", group_config, active, pending, '
-    '"groupTouched", "policyTouched", paused, desired, created_at, status '
-    'FROM {cf} WHERE "tenantId"=:tenantId AND deleting=false;')
+    '"groupTouched", "policyTouched", paused, desired, created_at, status, '
+    'error_reasons FROM {cf} WHERE "tenantId"=:tenantId AND deleting=false;')
 _cql_list_policy = (
     'SELECT "policyId", data FROM {cf} WHERE '
     '"tenantId" = :tenantId AND "groupId" = :groupId;')
@@ -497,6 +497,7 @@ def _unmarshal_state(state_dict):
         state_dict["paused"],
         status,
         desired=desired_capacity,
+        error_reasons=(state_dict["error_reasons"] or []),
     )
 
 
@@ -599,9 +600,9 @@ class WeakLocks(object):
 
 def get_client_ts(reactor):
     """
-    Return EPOCH with microseconds precision as a `Deferred`
+    Return EPOCH with microseconds precision synchronously
     """
-    return defer.succeed(int(reactor.seconds() * 1000000))
+    return int(reactor.seconds() * 1000000)
 
 
 def _check_deleting(group, get_deleting=False):
@@ -693,9 +694,7 @@ class CassScalingGroup(object):
         """
         @functools.wraps(func)
         def wrapper(*args):
-            d = get_client_ts(self.reactor)
-            d.addCallback(lambda ts: func(ts, *args))
-            return d
+            return func(get_client_ts(self.reactor), *args)
         return wrapper
 
     def view_manifest(self, with_policies=True, with_webhooks=False,
@@ -890,6 +889,26 @@ class CassScalingGroup(object):
             d.addCallback(set_deleting)
         else:
             d.addCallback(_do_update)
+        return d
+
+    def update_error_reasons(self, reasons):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.update_error_reasons`
+        """
+        self.log.msg("Updating error reasons {reasons}", reasons=reasons)
+
+        @self.with_timestamp
+        def _do_update(ts, lastRev):
+            query = _cql_update.format(
+                cf=self.group_table, column='error_reasons', name=":reasons")
+            return self.connection.execute(
+                query,
+                {"tenantId": self.tenant_id, "groupId": self.uuid,
+                 "reasons": reasons, "ts": ts},
+                DEFAULT_CONSISTENCY)
+
+        d = self.view_config()
+        d.addCallback(_do_update)
         return d
 
     def update_config(self, data):
@@ -1721,11 +1740,16 @@ class CassScalingGroupServersCache(object):
     Collection of cache of scaling group servers
     """
 
-    def __init__(self, tenant_id, group_id):
+    def __init__(self, tenant_id, group_id, clock=None):
         self.tenantId = tenant_id
         self.groupId = group_id
         self.table = "servers_cache"
         self.params = {"tenantId": self.tenantId, "groupId": self.groupId}
+        if clock is None:
+            from twisted.internet import reactor
+            self.clock = reactor
+        else:
+            self.clock = clock
 
     @do
     def get_servers(self, only_as_active):
@@ -1768,17 +1792,20 @@ class CassScalingGroupServersCache(object):
             queries.append(query.format(cf=self.table, i=i))
         if clear_others:
             return self.delete_servers().on(
-                lambda _: cql_eff(batch(queries), params))
+                lambda _: cql_eff(
+                    batch(queries, get_client_ts(self.clock)), params))
         else:
-            return cql_eff(batch(queries), params)
+            return cql_eff(batch(queries, get_client_ts(self.clock)), params)
 
     def delete_servers(self):
         """
         See :method:`IScalingGroupServersCache.delete_servers`
         """
+        query = ('DELETE FROM {cf} USING TIMESTAMP :ts '
+                 'WHERE "tenantId"=:tenantId AND "groupId"=:groupId')
         return cql_eff(
-            _cql_delete_all_in_group.format(cf=self.table, name=''),
-            self.params)
+            query.format(cf=self.table),
+            merge(self.params, {"ts": get_client_ts(self.clock)}))
 
 
 @implementer(IAdmin)

@@ -9,7 +9,7 @@ from inspect import getargspec
 from operator import attrgetter
 
 from effect import (
-    ComposedDispatcher, Effect, ParallelEffects, TypeDispatcher,
+    ComposedDispatcher, Constant, Effect, ParallelEffects, TypeDispatcher,
     base_dispatcher, sync_perform)
 from effect.async import perform_parallel_async
 from effect.fold import sequence
@@ -34,6 +34,7 @@ from twisted.application.service import Service
 from twisted.internet import defer
 from twisted.internet.defer import Deferred, maybeDeferred, succeed
 from twisted.python.failure import Failure
+from twisted.web.http_headers import Headers
 
 from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
@@ -44,7 +45,7 @@ from otter.models.interface import IScalingGroup, IScalingGroupServersCache
 from otter.supervisor import ISupervisor
 from otter.util.deferredutils import DeferredPool
 from otter.util.fp import set_in
-from otter.util.retry import Retry
+from otter.util.retry import Retry, ShouldDelayAndRetry, perform_retry
 
 
 class matches(object):
@@ -369,6 +370,15 @@ def mock_log(*args, **kwargs):
     return BoundLog(msg, err)
 
 
+class StubClientRequest(object):
+    """
+    A fake request object attached to a Twisted response object
+    """
+    method = "method"
+    absoluteURI = "original/request/URL"
+    headers = Headers({'x-otter-request-id': ['original-request-id']})
+
+
 class StubResponse(object):
     """
     A fake pre-built Twisted Web Response object.
@@ -376,6 +386,7 @@ class StubResponse(object):
     def __init__(self, code, headers, data=None):
         self.code = code
         self.headers = headers
+        self.request = StubClientRequest()
         # Data is not part of twisted response object
         self._data = data
 
@@ -398,6 +409,14 @@ def stub_pure_response(body, code=200, response_headers=None):
         body = json.dumps(body)
     if response_headers is None:
         response_headers = {}
+    return (StubResponse(code, response_headers), body)
+
+
+def stub_json_response(body, code=200, response_headers=None):
+    """
+    Return the type of two-tuple response that ServiceRequest returns when
+    json_response=True.
+    """
     return (StubResponse(code, response_headers), body)
 
 
@@ -695,6 +714,57 @@ def resolve_stubs(eff):
     dispatchers from Effect.
     """
     return eff_resolve_stubs(base_dispatcher, eff)
+
+
+def retry_sequence(expected_retry_intent, performers,
+                   fallback_dispatcher=None):
+    """
+    Return a two-tuple of ``(expected_retry_intent, Intent -> a)`` for use in
+    a :obj:`SequenceDispatcher`.  The Intent -> a function performs the
+    retried effect from the actual :obj:`Retry` intent over and over.
+
+    :param fallback_dispatcher: an optional dispatcher to compose onto the
+        sequence dispatcher.
+
+    Usage::
+
+        SequenceDispatcher([
+            retry_sequence(
+                Retry(
+                    effect=SomeEffect(),
+                    should_retry=ShouldDelayAndRetry(
+                        can_retry=retry_times(5),
+                        next_interval=repeating_interval(10))),
+                [fail_to_perform,
+                 fail_to_perform,
+                 perform_intent])
+        ])
+    """
+    def perform_retry_without_delay(actual_retry_intent):
+        should_retry = actual_retry_intent.should_retry
+        if isinstance(should_retry, ShouldDelayAndRetry):
+            def should_retry(exc_info):
+                exc_type, exc_value, exc_traceback = exc_info
+                failure = Failure(exc_value, exc_type, exc_traceback)
+                return Effect(Constant(
+                    actual_retry_intent.should_retry.can_retry(failure)))
+
+        new_retry_effect = Effect(Retry(
+            effect=actual_retry_intent.effect,
+            should_retry=should_retry))
+
+        _dispatchers = [TypeDispatcher({Retry: perform_retry}),
+                        base_dispatcher]
+        if fallback_dispatcher is not None:
+            _dispatchers.append(fallback_dispatcher)
+
+        seq = [(expected_retry_intent.effect.intent, performer)
+               for performer in performers]
+
+        return perform_sequence(seq, new_retry_effect,
+                                ComposedDispatcher(_dispatchers))
+
+    return (expected_retry_intent, perform_retry_without_delay)
 
 
 def perform_sequence(seq, eff, fallback_dispatcher=base_dispatcher):

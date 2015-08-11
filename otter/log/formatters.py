@@ -153,94 +153,6 @@ ERROR_FIELDS = {"isError", "failure", "why"}
 
 PRIMITIVE_FIELDS = {"time", "system", "id", "audit_log", "message"}
 
-AUDIT_LOG_FIELDS = {
-    "audit_log": bool,
-    "message": basestring,
-    "request_ip": basestring,
-    "user_id": basestring,
-    "tenant_id": basestring,
-    "scaling_group_id": basestring,
-    "policy_id": basestring,
-    "webhook_id": basestring,
-    "data": dict,
-    "transaction_id": basestring,
-    "event_type": basestring,
-    "is_error": bool,
-    "desired_capacity": int,
-    "pending_capacity": int,
-    "current_capacity": int,
-    "previous_desired_capacity": int,
-    "fault": dict,
-    "parent_id": basestring,
-    "as_user_id": basestring,
-    "convergence_delta": int,
-    "server_id": basestring,
-}
-
-
-def audit_log_formatter(eventDict, timestamp, hostname):
-    """
-    Format an eventDict into another dictionary that conforms to the audit log
-    format.
-
-    :param dict eventDict: an eventDict as would be passed into an observer
-    :param timestamp: a timestamp to use in the timestamp field
-
-    :returns: an audit-log formatted dictionary
-    """
-    audit_log_params = {
-        "@version": 1,
-        "@timestamp": timestamp,
-        "host": hostname,
-        "is_error": False
-    }
-
-    for key, value in eventDict.iteritems():
-        if key in AUDIT_LOG_FIELDS and isinstance(value, AUDIT_LOG_FIELDS[key]):
-                audit_log_params[key] = value
-
-    if "message" not in audit_log_params:
-        audit_log_params["message"] = " ".join([
-            str(m) for m in eventDict["message"]])
-
-    if eventDict.get("isError", False):
-        audit_log_params["is_error"] = True
-
-        # create the fault dictionary, if it doesn't exist, without clobbering
-        # any existing details
-        fault = {'details': {}}
-        fault.update(audit_log_params.get('fault', {}))
-        audit_log_params['fault'] = fault
-
-        if 'failure' in eventDict:
-            # Do not clobber any details already in there
-            fault['details'].update(getattr(eventDict['failure'].value,
-                                            'details', {}))
-
-            if 'message' not in fault:
-                fault['message'] = eventDict['failure'].value.message
-
-        audit_log_params["message"] = 'Failed: {0}.'.format(
-            audit_log_params["message"])
-
-        if 'why' in eventDict and eventDict['why']:
-            audit_log_params["message"] = '{0} {1}'.format(
-                audit_log_params["message"], eventDict['why'])
-
-        # strip out any repeated info in the details dict
-        delete = []
-        for key, value in fault['details'].iteritems():
-            if key in AUDIT_LOG_FIELDS:
-                if (key not in audit_log_params and
-                        isinstance(value, AUDIT_LOG_FIELDS[key])):
-                    audit_log_params[key] = value
-                delete.append(key)
-
-        for key in delete:
-            del fault['details'][key]
-
-    return audit_log_params
-
 
 @singledispatch
 def serialize_to_jsonable(obj):
@@ -332,12 +244,6 @@ def ObserverWrapper(observer, hostname, seconds=None):
             if key not in PRIMITIVE_FIELDS:
                 log_params[key] = value
 
-        # emit an audit log entry also, if it's an audit log
-        if 'audit_log' in eventDict:
-            log_params['audit_log_event_source'] = True
-            observer(audit_log_formatter(eventDict, log_params['@timestamp'],
-                                         hostname))
-
         observer(log_params)
 
     return Observer
@@ -363,7 +269,6 @@ def throttling_wrapper(observer):
         return True
 
     def emit(event):
-        event = event.copy()
         template = _get_matching_template(event)
         if template is not None:
             event_counts[template] += 1
@@ -375,4 +280,14 @@ def throttling_wrapper(observer):
         else:
             return observer(event)
 
+    return emit
+
+
+def copying_wrapper(observer):
+    """
+    An observer that copies the event-dict, so if there is more than one
+    observer chain that mutates events, we don't get any errors.
+    """
+    def emit(event_dict):
+        return observer(event_dict.copy())
     return emit

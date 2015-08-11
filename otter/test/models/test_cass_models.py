@@ -393,6 +393,7 @@ scaling_group_entry = {
     'created_at': 23,
     'deleting': False,
     'status': 'ACTIVE',
+    'error_reasons': []
 }
 
 
@@ -498,9 +499,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             self.b = b
             return 45
 
-        d = f(2, 3)
+        r = f(2, 3)
         # Wrapped function's return is same
-        self.assertEqual(self.successResultOf(d), 45)
+        self.assertEqual(r, 45)
         # Timestamp and arguments are passed correctly
         self.assertEqual(self.ts, 23566783)
         self.assertEqual(self.a, 2)
@@ -552,14 +553,15 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             merge(scaling_group_entry,
                   {'tenantId': self.tenant_id,
                    'groupId': self.group_id,
-                   'desired': 10})
+                   'desired': 10,
+                   'error_reasons': ['a', 'b']})
         ]]
         d = self.group.view_state()
         r = self.successResultOf(d)
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, launch_config, '
             'active, pending, "groupTouched", "policyTouched", paused, '
-            'desired, created_at, status, deleting '
+            'desired, created_at, status, error_reasons, deleting '
             'FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
@@ -575,7 +577,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                  policy_touched={'PT': 'R'},
                                  paused=False,
                                  status=ScalingGroupStatus.ACTIVE,
-                                 desired=10)
+                                 desired=10,
+                                 error_reasons=['a', 'b'])
         self.assertEqual(r, group_state)
 
     def test_view_state_no_desired_capacity(self):
@@ -703,7 +706,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         viewCql = (
             'SELECT "tenantId", "groupId", group_config, launch_config, '
             'active, pending, "groupTouched", "policyTouched", paused, '
-            'desired, created_at, status, deleting '
+            'desired, created_at, status, error_reasons, deleting '
             'FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         delCql = ('DELETE FROM scaling_group '
@@ -734,6 +737,28 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                        True,
                                        ScalingGroupStatus.ACTIVE,
                                        desired=0))
+
+    def test_view_state_no_error_reasons(self):
+        """
+        view_state with None error_reasons returns state with [] error_reasons
+        """
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'error_reasons': None})
+        ]]
+        d = self.group.view_state()
+        r = self.successResultOf(d)
+        self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
+                                       'a',
+                                       {'A': 'R'}, {'P': 'R'},
+                                       '2014-01-01T00:00:05Z.1234',
+                                       {'PT': 'R'},
+                                       False,
+                                       ScalingGroupStatus.ACTIVE,
+                                       desired=0,
+                                       error_reasons=[]))
 
     def test_modify_state_calls_modifier_with_group_and_state_and_others(self):
         """
@@ -1020,6 +1045,36 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                         "tenantId": '11111', 'ts': 10345000}
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.succeed({}))
+    def test_update_error_reasons_success(self, mock_vc):
+        """
+        Executes query that udpates group error reasons
+        """
+        self.clock.advance(10.345)
+        d = self.group.update_error_reasons(['r1', 'r2'])
+        self.assertIsNone(self.successResultOf(d))  # update returns None
+        expectedCql = (
+            'INSERT INTO scaling_group("tenantId", "groupId", error_reasons) '
+            'VALUES (:tenantId, :groupId, :reasons) USING TIMESTAMP :ts')
+        expectedData = {"reasons": ['r1', 'r2'],
+                        "groupId": '12345678g',
+                        "tenantId": '11111', 'ts': 10345000}
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.QUORUM)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.fail(NoSuchScalingGroupError('t', 'g')))
+    def test_update_error_reasons_no_group(self, mock_vc):
+        """
+        Raises NoSuchScalingGroupError if group is not found and does not
+        execute update query
+        """
+        self.clock.advance(10.345)
+        d = self.group.update_error_reasons(['r1', 'r2'])
+        self.failureResultOf(d, NoSuchScalingGroupError)
+        self.assertFalse(self.connection.execute.called)
 
     def test_view_config_no_such_group(self):
         """
@@ -2237,6 +2292,7 @@ class ViewManifestTests(CassScalingGroupTestCase):
             'created_at': 23,
             'deleting': False,
             'status': 'ACTIVE',
+            'error_reasons': None
         }
         self.manifest = {
             'groupConfiguration': self.config,
@@ -2270,7 +2326,7 @@ class ViewManifestTests(CassScalingGroupTestCase):
         view_cql = (
             'SELECT "tenantId", "groupId", group_config, launch_config, '
             'active, pending, "groupTouched", "policyTouched", paused, '
-            'desired, created_at, status, deleting '
+            'desired, created_at, status, error_reasons, deleting '
             'FROM scaling_group '
             'WHERE "tenantId" = :tenantId '
             'AND "groupId" = :groupId')
@@ -3067,6 +3123,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'created_at': 23,
             'deleting': False,
             'status': 'ACTIVE',
+            'error_reasons': None
         }
 
     @mock.patch('otter.models.cass.WeakLocks', return_value=2)
@@ -3313,7 +3370,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'status, error_reasons '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
@@ -3343,7 +3400,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'status, error_reasons '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
@@ -3373,7 +3430,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, '
-            'created_at, status FROM scaling_group '
+            'created_at, status, error_reasons FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
@@ -3390,7 +3447,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'status, error_reasons '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false '
             'LIMIT :limit;')
@@ -3408,7 +3465,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'status, error_reasons '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false AND '
             '"groupId" > :marker LIMIT :limit;')
@@ -3434,7 +3491,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status '
+            'status, error_reasons '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
@@ -3706,8 +3763,10 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         self.tenant_id = 'tid'
         self.group_id = 'gid'
         self.params = {"tenantId": self.tenant_id, "groupId": self.group_id}
+        self.clock = Clock()
+        self.clock.advance(2.5)
         self.cache = CassScalingGroupServersCache(
-            self.tenant_id, self.group_id)
+            self.tenant_id, self.group_id, self.clock)
         self.dt = datetime(2010, 10, 20, 10, 0, 0)
 
     def _test_get_servers(self, only_as_active, query_result, exp_result):
@@ -3785,9 +3844,9 @@ class CassGroupServersCacheTests(SynchronousTestCase):
               "server_as_active": True}],
             ([{"d": "e"}], self.dt))
 
-    def _test_insert_servers(self, eff):
+    def _test_insert_servers(self, eff, ts=2500000):
         query = (
-            'BEGIN BATCH '
+            'BEGIN BATCH USING TIMESTAMP {} '
             'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
             'server_id, server_blob, server_as_active) '
             'VALUES(:tenantId, :groupId, :last_update, :server_id0, '
@@ -3795,7 +3854,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
             'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
             'server_id, server_blob, server_as_active) '
             'VALUES(:tenantId, :groupId, :last_update, :server_id1, '
-            ':server_blob1, :server_as_active1); APPLY BATCH;')
+            ':server_blob1, :server_as_active1); APPLY BATCH;').format(ts)
         self.params.update(
             {"server_id0": "a", "server_blob0": '{"id": "a"}',
              "server_as_active0": True,
@@ -3822,8 +3881,9 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         eff = self.cache.insert_servers(
             self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}], True)
         self.assertEqual(eff.intent, "delete")
+        self.clock.advance(1)
         eff = resolve_effect(eff, None)
-        self._test_insert_servers(eff)
+        self._test_insert_servers(eff, 3500000)
 
     def test_insert_empty(self):
         """
@@ -3839,9 +3899,9 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         """
         self.assertEqual(
             self.cache.delete_servers(),
-            cql_eff(('DELETE FROM servers_cache WHERE '
-                     '"tenantId" = :tenantId AND "groupId" = :groupId'),
-                    self.params))
+            cql_eff(('DELETE FROM servers_cache USING TIMESTAMP :ts WHERE '
+                     '"tenantId"=:tenantId AND "groupId"=:groupId'),
+                    merge(self.params, {"ts": 2500000})))
 
 
 class CassAdminTestCase(SynchronousTestCase):

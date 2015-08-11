@@ -50,7 +50,8 @@ def extract_active_ids(group_status):
 
 def create_scaling_group_dict(
     image_ref=None, flavor_ref=None, min_entities=0, name=None,
-    max_entities=25, use_lbs=None, server_name_prefix=None
+    max_entities=25, use_lbs=None, server_name_prefix=None,
+    key_name=None
 ):
     """This function returns a dictionary containing a scaling group's JSON
     payload.  Note: this function does NOT create a scaling group.
@@ -73,6 +74,9 @@ def create_scaling_group_dict(
         invoking the o.l.CLB.scaling_group_spec() method on such objects.  If
         not given, no load balancers will be used.
     :param str server_name_prefix: Specifies a server name in the server
+        args that get passed to autoscale - autoscale will use this as the
+        prefix of all server names created by the group.
+    :param str key_name: Specifies an ssh key name in the server
         args that get passed to autoscale - autoscale will use this as the
         prefix of all server names created by the group.
 
@@ -119,6 +123,9 @@ def create_scaling_group_dict(
     if server_name_prefix is not None:
         launch_config_args["server"]["name"] = server_name_prefix
 
+    if key_name is not None:
+        launch_config_args["server"]["key_name"] = key_name
+
     return obj
 
 
@@ -136,7 +143,7 @@ class ScalingGroup(object):
 
     :ivar group_config: The complete JSON dictionary the group was
         created with - a dictionary including 'groupConfiguration',
-        'launhConfiguration', and maybe 'scalingPolicies'
+        'launchConfiguration', and maybe 'scalingPolicies'
 
     :ivar pool: a :class:`twisted.web.client.HTTPConnectionPool` to pass to
         all treq requests
@@ -259,14 +266,14 @@ class ScalingGroup(object):
 
         return self.replace_group_config(rcs, new_config)
 
-    def trigger_convergence(self, rcs):
+    def trigger_convergence(self, rcs, success_codes=None):
         """
         Trigger convergence on a group
         """
         d = self.treq.post(
             "{}/converge".format(self._endpoint(rcs)),
             headers=headers(str(rcs.token)), pool=self.pool)
-        return d.addCallback(check_success, [204])
+        return d.addCallback(check_success, success_codes or [204])
 
     def stop(self, rcs):
         """Clean up a scaling group.  Although safe to call yourself, you
@@ -284,7 +291,7 @@ class ScalingGroup(object):
 
         return self.delete_scaling_group(rcs)
 
-    def delete_scaling_group(self, rcs):
+    def delete_scaling_group(self, rcs, force="true", success_codes=None):
         """Unconditionally delete the scaling group.  You may call this only
         once.
 
@@ -297,12 +304,10 @@ class ScalingGroup(object):
         """
 
         return (self.treq.delete(
-            "%s/groups/%s?force=true" % (
-                str(rcs.endpoints["otter"]), self.group_id
-            ),
+            "{}?force={}".format(self._endpoint(rcs), force),
             headers=headers(str(rcs.token)),
             pool=self.pool
-        ).addCallback(check_success, [204, 404]))
+        ).addCallback(check_success, success_codes or [204, 404]))
 
     def get_scaling_group_state(self, rcs, success_codes=None):
         """Retrieve the state of the scaling group.
@@ -428,6 +433,24 @@ class ScalingGroup(object):
         ids = extract_active_ids(body)
         returnValue(random.sample(ids, n))
 
+    def pause(self, rcs):
+        """
+        Pause group
+        """
+        d = self.treq.post(
+            "{}/pause".format(self._endpoint(rcs)),
+            headers=headers(str(rcs.token)), pool=self.pool)
+        return d.addCallback(check_success, [204])
+
+    def resume(self, rcs):
+        """
+        Resume group
+        """
+        d = self.treq.post(
+            "{}/resume".format(self._endpoint(rcs)),
+            headers=headers(str(rcs.token)), pool=self.pool)
+        return d.addCallback(check_success, [204])
+
     def wait_for_state(self, rcs, matcher, timeout=600, period=10, clock=None):
         """
         Wait for the state on the scaling group to match the provided matchers,
@@ -513,6 +536,7 @@ the scaling group.
     Attribute('scaling_group', instance_of=ScalingGroup),
     Attribute('set_to', default_value=None),
     Attribute('scale_percent', default_value=None),
+    Attribute('schedule', default_value=None),
     Attribute('name', instance_of=str, default_value='integration-test-policy')
 ])
 class ScalingPolicy(object):
@@ -528,6 +552,8 @@ class ScalingPolicy(object):
     :param int set_to: The number of servers to set as the desired capacity
     :param float scale_percent: The percentage by which to scale the group up
         (positive) or down (negative)
+    :param dict schedule: "args" argument of policy if this is scheduled
+        policy
     :param str name: A string to use as the name of the scaling policy. A
         timestamp will be appended automatically for differentiation.
     """
@@ -551,9 +577,13 @@ class ScalingPolicy(object):
         self.policy = [{
             "name": name_time,
             "cooldown": 0,
-            "type": "webhook",
             change_type: change_factor
         }]
+        if self.schedule is not None:
+            self.policy[0]["type"] = "schedule"
+            self.policy[0]["args"] = self.schedule
+        else:
+            self.policy[0]["type"] = "webhook"
 
     def stop(self, rcs):
         """Disposes of the policy.
@@ -655,3 +685,32 @@ class ScalingPolicy(object):
             # So, we forcefully return our resources here.
             .addCallback(lambda _, x: x, rcs)
         )
+
+    def create_webhook(self, rcs):
+        """
+        Create webhook and return `Webhook` object as Deferred
+        """
+        d = treq.post(
+            "{}/webhooks".format(self.link.rstrip("/")),
+            headers=headers(str(rcs.token)),
+            data=json.dumps([{"name": "integration-test-webhook"}]),
+            pool=self.scaling_group.pool)
+        d.addCallback(check_success, [201])
+        d.addCallback(treq.json_content)
+        return d.addCallback(lambda r: Webhook.from_json(r["webhooks"][0]))
+
+
+@attributes(["id", "name", "link", "capurl"])
+class Webhook(object):
+    """
+    Scaling group's policy's webhook
+    """
+
+    @classmethod
+    def from_json(cls, blob):
+        return Webhook(
+            id=blob["id"], name=blob["name"],
+            link=next(str(link["href"]) for link in blob["links"]
+                      if link["rel"] == "self"),
+            capurl=next(str(link["href"]) for link in blob["links"]
+                        if link["rel"] == "capability"))

@@ -5,17 +5,96 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 :obj:`Converger`.
 """
 
+# # Note [Convergence cycles]
+#
+# A very abstract version of our convergence cycle:
+# - CYCLE (every N seconds)
+# - find all divergent flags for this node's groups
+# - for each group (that's not in `currently_converging`)
+#   - add to currently_converging
+#   - run a single convergence iteration
+#   - remove from currently_converging
+# - IF group is fully converged, delete divergent flag
+# - ELSE goto CYCLE
+#
+# Importantly for the cycle logic, divergent flags are not deleted when the
+# group has not yet fully converged. This is the mechanism by which the
+# "cycling" actually happens -- we repeatedly run a convergence iteration until
+# we determine it's fully converged, and then we finally delete the flag. See
+# [Divergent flags] for more details about the divergent flag.
+#
+# So: currently_converging lasts for a single *iteration*,
+#     divergent flags last for a whole *cycle*.
+#
+# `currently_converging` is a set of group IDs that are being converged *within
+# a node*. We keep track of this since we receive notifications that groups are
+# divergent asynchronously with the actual convergence process. If a group is
+# in that set when we notice a divergent flag, we ignore it, *without* deleting
+# the divergent flag, so we will still check that group on the next cycle.
+
+
+# # Note [Divergent flags]
+#
+# We run the convergence service on multiple servers. We want to divvy up this
+# work stably between the different nodes such that a group is always converged
+# by the same node -- this is to avoid accidentally running convergence
+# iterations concurrently for the same group, which could lead to unnecessary
+# creation/deletion of resources as the concurrent processes race against each
+# other. In order to do this, we use a ZooKeeper set partitioner (see
+# otter.util.zkpartitioner). All groups are stably mapped to a partitioned
+# "bucket" via a simple hash/mod algorithm.
+#
+# In order to actually register that a group needs convergence, we create a
+# ZooKeeper node with the name of the tenant and group, and convergence nodes
+# watch the ZK directory and filter for groups that map to their allocated
+# buckets.
+#
+# Marking a group divergent (or "dirty") is tricky enough that just using a
+# boolean flag for "is group dirty or not" won't work, because that will allow
+# a race condition that can lead to stalled convergence. Here's the scenario,
+# with Otter nodes 'A' and 'B', assuming only a boolean `dirty` flag:
+#
+# - A: policy executed: groupN.dirty = True
+# - B: converge group N (repeat until done)
+# - A: policy executed: groupN.dirty = True
+# - B: groupN.dirty = False
+#
+# Here, a policy was executed on group N twice, and A tried to mark it dirty
+# twice. The problem is that when the converger node finished converging, it
+# then marked it clean *after* node A tried to mark it dirty a second time.
+# It's a small window of time, but if it happens at just the right moment,
+# after the final iteration of convergence and before the group is marked
+# clean, then the changes desired by the second policy execution will not
+# happen.
+#
+# So instead of just a boolean flag, we'll take advantage of ZK node
+# versioning. When we mark a group as dirty, we'll create a node for it if it
+# doesn't exist, and if it does exist, we'll write to it with `set`. The
+# content doesn't matter - the only thing that does matter is the version,
+# which will be incremented on every `set` operation. On the converger side,
+# when it searches for dirty groups to converge, it will remember the version
+# of the node. When convergence completes, it will delete the node ONLY if the
+# version hasn't changed, with a `delete(path, version)` call.
+#
+# The effect of this is that if any process updates the dirty flag after it's
+# already been created, the node won't be deleted, so convergence will pick up
+# that group again. We don't need to keep track of exactly how many times a
+# group has been marked dirty (i.e. how many times a policy has been executed
+# or config has changed), only if there are _any_ outstanding requests for
+# convergence, since convergence always uses the most recent data.
+
+
 import operator
 import uuid
 from datetime import datetime
 from functools import partial
 from hashlib import sha1
 
-from effect import Effect, FirstError, Func, catch, parallel
+from effect import Effect, FirstError, Func, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
 
-from kazoo.exceptions import BadVersionError
+from kazoo.exceptions import BadVersionError, NoNodeError
 from kazoo.recipe.partitioner import PartitionState
 
 from pyrsistent import pset
@@ -41,7 +120,8 @@ from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, with_log
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, UpdateGroupStatus, UpdateServersCache)
+    DeleteGroup, GetScalingGroupInfo, UpdateGroupErrorReasons,
+    UpdateGroupStatus, UpdateServersCache)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.timestamp import datetime_to_epoch
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
@@ -240,9 +320,13 @@ def convergence_failed(scaling_group, reasons):
     """
     yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                    status=ScalingGroupStatus.ERROR))
+    presented_reasons = sorted(present_reasons(reasons))
+    if len(presented_reasons) == 0:
+        presented_reasons = [u"Unknown error occurred"]
     yield cf_err(
         'group-status-error', status=ScalingGroupStatus.ERROR.name,
-        reasons='; '.join(sorted(present_reasons(reasons))))
+        reasons='; '.join(presented_reasons))
+    yield Effect(UpdateGroupErrorReasons(scaling_group, presented_reasons))
     yield do_return(ScalingGroupStatus.ERROR)
 
 
@@ -269,68 +353,37 @@ def mark_divergent(tenant_id, group_id):
     :return: an Effect which succeeds when the information has been
         recorded.
     """
-    # This is tricky enough that just using a boolean flag for "is group
-    # dirty or not" won't work, because that will allow a race condition
-    # that can lead to stalled convergence. Here's the scenario, with Otter
-    # nodes 'A' and 'B', assuming only a boolean `dirty` flag:
-
-    # - A: policy executed: groupN.dirty = True
-    # -               B: converge group N (repeat until done)
-    # - A: policy executed: groupN.dirty = True
-    # -               B: groupN.dirty = False
-
-    # Here, a policy was executed on group N twice, and A tried to mark it
-    # dirty twice. The problem is that when the converger node finished
-    # converging, it then marked it clean *after* node A tried to mark it dirty
-    # a second time. It's a small window of time, but if it happens at just the
-    # right moment, after the final iteration of convergence and before the
-    # group is marked clean, then the changes desired by the second policy
-    # execution will not happen.
-
-    # So instead of just a boolean flag, we'll take advantage of ZK node
-    # versioning. When we mark a group as dirty, we'll create a node for it
-    # if it doesn't exist, and if it does exist, we'll write to it with
-    # `set`. The content doesn't matter - the only thing that does matter
-    # is the version, which will be incremented on every `set`
-    # operation. On the converger side, when it searches for dirty groups
-    # to converge, it will remember the version of the node. When
-    # convergence completes, it will delete the node ONLY if the version
-    # hasn't changed, with a `delete(path, version)` call.
-
-    # The effect of this is that if any process updates the dirty flag
-    # after it's already been created, the node won't be deleted, so
-    # convergence will pick up that group again. We don't need to keep
-    # track of exactly how many times a group has been marked dirty
-    # (i.e. how many times a policy has been executed or config has
-    # changed), only if there are _any_ outstanding requests for
-    # convergence, since convergence always uses the most recent data.
-
+    # See note [Divergent flags]
     flag = format_dirty_flag(tenant_id, group_id)
     path = CONVERGENCE_DIRTY_DIR + '/' + flag
     eff = Effect(CreateOrSet(path=path, content='dirty'))
     return eff
 
 
+@do
 def delete_divergent_flag(tenant_id, group_id, version):
     """
-    Delete the dirty flag, if its version hasn't changed. See comment in
-    :func:`mark_divergent` for more info.
+    Delete the dirty flag, if its version hasn't changed. See note [Divergent
+    flags] for more info.
 
     :return: Effect of None.
     """
     flag = format_dirty_flag(tenant_id, group_id)
     path = CONVERGENCE_DIRTY_DIR + '/' + flag
-    return Effect(DeleteNode(path=path, version=version)).on(
-        success=lambda r: msg('mark-clean-success'),
+    fields = dict(path=path, dirty_version=version)
+    try:
+        yield Effect(DeleteNode(path=path, version=version))
+    except BadVersionError:
         # BadVersionError shouldn't be logged as an error because it's an
         # expected occurrence any time convergence is requested multiple times
         # rapidly.
-        error=catch(
-            BadVersionError, lambda e: msg('mark-clean-skipped',
-                                           path=path, dirty_version=version))
-    ).on(
-        error=lambda e: err(exc_info_to_failure(e), 'mark-clean-failure',
-                            path=path, dirty_version=version))
+        yield msg('mark-clean-skipped', **fields)
+    except NoNodeError:
+        yield msg('mark-clean-not-found', **fields)
+    except Exception:
+        yield err(None, 'mark-clean-failure', **fields)
+    else:
+        yield msg('mark-clean-success')
 
 
 class ConvergenceStarter(object):
@@ -482,24 +535,22 @@ def converge_all_groups(currently_converging, my_buckets, all_buckets,
     yield msg('converge-all-groups', group_infos=group_infos,
               currently_converging=list(cc))
 
+    @do
     def converge(tenant_id, group_id, dirty_flag):
-        def got_stat(stat):
-            # If the node disappeared, ignore it. `stat` will be None here if
-            # the divergent flag was discovered only after the group is removed
-            # from currently_converging, but before the divergent flag is
-            # deleted, and then the deletion happens, and then our GetStat
-            # happens. This basically means it happens when one convergence is
-            # starting as another one for the same group is ending.
-            if stat is None:
-                return msg('converge-divergent-flag-disappeared',
-                           znode=dirty_flag)
-            else:
-                return Effect(TenantScope(
-                    converge_one_group(currently_converging,
-                                       tenant_id, group_id, stat.version,
-                                       build_timeout),
-                    tenant_id))
-        return Effect(GetStat(dirty_flag)).on(got_stat)
+        stat = yield Effect(GetStat(dirty_flag))
+        # If the node disappeared, ignore it. `stat` will be None here if the
+        # divergent flag was discovered only after the group is removed from
+        # currently_converging, but before the divergent flag is deleted, and
+        # then the deletion happens, and then our GetStat happens. This
+        # basically means it happens when one convergence is starting as
+        # another one for the same group is ending.
+        if stat is None:
+            yield msg('converge-divergent-flag-disappeared', znode=dirty_flag)
+        else:
+            eff = converge_one_group(currently_converging, tenant_id, group_id,
+                                     stat.version, build_timeout)
+            result = yield Effect(TenantScope(eff, tenant_id))
+            yield do_return(result)
 
     effs = []
     for info in group_infos:
@@ -586,7 +637,7 @@ class Converger(MultiService):
         """
         Return Effect wrapped with converger_run_id log field
         """
-        return Effect(Func(uuid.uuid1)).on(str).on(
+        return Effect(Func(uuid.uuid4)).on(str).on(
             lambda uid: with_log(eff, otter_service='converger',
                                  converger_run_id=uid))
 

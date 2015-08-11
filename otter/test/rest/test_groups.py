@@ -56,7 +56,21 @@ class FormatterHelpers(SynchronousTestCase):
         """
         Patch url root
         """
-        patch(self, 'otter.util.http.get_url_root', return_value="")
+        set_config_data({'url_root': 'root'})
+        self.addCleanup(set_config_data, None)
+
+    def links(self, server_id):
+        return [
+            {'href': 'https://root/servers/{}'.format(server_id),
+             'rel': 'self'},
+            {'href': 'https://root/servers/{}'.format(server_id),
+             'rel': 'bookmark'}
+        ]
+
+    def format(self, state, active=None):
+        formatted = format_state_dict(state, active)
+        validate(formatted, rest_schemas.group_state['properties']['group'])
+        return formatted
 
     def test_format_state_dict_has_active_and_pending(self):
         """
@@ -69,14 +83,14 @@ class FormatterHelpers(SynchronousTestCase):
         active server links and ids.
         """
         active = {
-            '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
-            '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
-            '3': {'name': 'n3', 'links': ['links3'], 'created': 't'}}
+            '1': {'name': 'n1', 'links': self.links('1'), 'created': 't'},
+            '2': {'name': 'n2', 'links': self.links('2'), 'created': 't'},
+            '3': {'name': 'n3', 'links': self.links('3'), 'created': 't'}}
         pending = {
             'j1': {'created': 't'},
             'j2': {'created': 't'},
             'j3': {'created': 't'}}
-        translated = format_state_dict(
+        translated = self.format(
             GroupState(
                 '11111',
                 'one',
@@ -94,16 +108,16 @@ class FormatterHelpers(SynchronousTestCase):
 
         self.assertEqual(translated, {
             'active': [
-                {'id': '1', 'links': ['links1']},
-                {'id': '2', 'links': ['links2']},
-                {'id': '3', 'links': ['links3']}
+                {'id': '1', 'links': self.links('1')},
+                {'id': '2', 'links': self.links('2')},
+                {'id': '3', 'links': self.links('3')}
             ],
             'name': 'test',
             'activeCapacity': 3,
             'pendingCapacity': 3,
             'desiredCapacity': 6,
             'paused': True,
-            'status': 'ACTIVE',
+            'status': 'ACTIVE'
         })
 
     def test_format_state_dict_with_active(self):
@@ -113,9 +127,9 @@ class FormatterHelpers(SynchronousTestCase):
         capacity is got from the desired and active list provided
         """
         active = {
-            '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
-            '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
-            '3': {'name': 'n3', 'links': ['links3'], 'created': 't'}}
+            '1': {'name': 'n1', 'links': self.links('1'), 'created': 't'},
+            '2': {'name': 'n2', 'links': self.links('2'), 'created': 't'},
+            '3': {'name': 'n3', 'links': self.links('3'), 'created': 't'}}
         state = GroupState(
             '11111',
             'one',
@@ -127,20 +141,20 @@ class FormatterHelpers(SynchronousTestCase):
             True,
             ScalingGroupStatus.ACTIVE,
             desired=10)
-        result = format_state_dict(state, active)
+        result = self.format(state, active)
         self.assertEqual(result['desiredCapacity'], 10)
         self.assertEqual(result['pendingCapacity'], 7)
+        self.assertNotIn('errors', result)
 
-    @mock.patch('otter.rest.groups.config_value')
-    def test_format_state_different_status(self, config_value):
+    def test_format_state_different_status(self):
         """
         When a group's status is something other than ACTIVE, it's reflected in
-        the output.
+        the output. "errors" is formatted as list of {"message": ..} dicts
         """
         active = {
-            '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
-            '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
-            '3': {'name': 'n3', 'links': ['links3'], 'created': 't'}}
+            '1': {'name': 'n1', 'links': self.links('1'), 'created': 't'},
+            '2': {'name': 'n2', 'links': self.links('2'), 'created': 't'},
+            '3': {'name': 'n3', 'links': self.links('3'), 'created': 't'}}
         state = GroupState(
             '11111',
             'one',
@@ -151,9 +165,12 @@ class FormatterHelpers(SynchronousTestCase):
             {},
             True,
             ScalingGroupStatus.ERROR,
-            desired=10)
-        result = format_state_dict(state, active)
+            desired=10,
+            error_reasons=['wat', 'noo'])
+        result = self.format(state, active)
         self.assertEqual(result['status'], 'ERROR')
+        self.assertEqual(
+            result['errors'], [{'message': 'wat'}, {'message': 'noo'}])
 
 
 class ExtractBoolArgTests(SynchronousTestCase):
@@ -368,7 +385,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
                     'pendingCapacity': 1,
                     'desiredCapacity': 1,
                     'paused': False,
-                    'status': 'ACTIVE',
+                    'status': 'ACTIVE'
                 }
             }],
             "groups_links": []
@@ -1137,9 +1154,25 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.addCleanup(set_config_data, {})
         cs = mock_gcs.return_value
         cs.start_convergence.return_value = defer.succeed(None)
+        self.mock_state = GroupState(
+            '11111', 'one', '', {}, {}, None, {}, False,
+            ScalingGroupStatus.ACTIVE)
         self.assert_status_code(
             204, endpoint='{}converge'.format(self.endpoint), method='POST')
         cs.start_convergence.assert_called_once_with(mock.ANY, '11111', 'one')
+
+    def test_group_paused_converge(self):
+        """
+        Calling `../converge` on paused group will return 403 GroupPausedError
+        for convergence tenant
+        """
+        set_config_data({'convergence-tenants': ['11111']})
+        self.addCleanup(set_config_data, {})
+        self.mock_state = GroupState(
+            '11111', 'one', '', {}, {}, None, {}, True,  # group paused
+            ScalingGroupStatus.ACTIVE)
+        self.assert_status_code(
+            403, endpoint='{}converge'.format(self.endpoint), method='POST')
 
     def test_group_converge_worker_tenant(self):
         """
@@ -1246,6 +1279,7 @@ class GroupPauseTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         Pausing should call the controller's ``pause_scaling_group`` function
         """
+        self.otter.dispatcher = "disp"
         mock_pause = patch(
             self, 'otter.rest.groups.controller.pause_scaling_group',
             return_value=defer.succeed(None))
@@ -1253,13 +1287,7 @@ class GroupPauseTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(response_body, "")
 
         mock_pause.assert_called_once_with(mock.ANY, 'transaction-id',
-                                           self.mock_group)
-
-    def test_pause_not_implemented(self):
-        """
-        Resume currently raises 501 not implemented
-        """
-        self.assert_status_code(501, method="POST")
+                                           self.mock_group, "disp")
 
 
 class GroupResumeTestCase(RestAPITestMixin, SynchronousTestCase):
@@ -1273,6 +1301,7 @@ class GroupResumeTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         Resume should call the controller's ``resume_scaling_group`` function
         """
+        self.otter.dispatcher = "disp"
         mock_resume = patch(
             self, 'otter.rest.groups.controller.resume_scaling_group',
             return_value=defer.succeed(None))
@@ -1280,13 +1309,7 @@ class GroupResumeTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(response_body, "")
 
         mock_resume.assert_called_once_with(mock.ANY, 'transaction-id',
-                                            self.mock_group)
-
-    def test_resume_not_implemented(self):
-        """
-        Resume currently raises 501 not implemented
-        """
-        self.assert_status_code(501, method="POST")
+                                            self.mock_group, "disp")
 
 
 class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
