@@ -9,6 +9,7 @@ import operator
 import sys
 import time
 from collections import namedtuple
+from datetime import timedelta
 from functools import partial
 
 from effect import Effect
@@ -34,7 +35,7 @@ from otter.constants import ServiceType, get_service_configs
 from otter.convergence.gathering import get_all_scaling_group_servers
 from otter.effect_dispatcher import get_legacy_dispatcher
 from otter.log import log as otter_log
-from otter.util.fp import predicate_all
+from otter.util.fp import partition_bool, predicate_all
 
 
 QUERY_GROUPS_OF_TENANTS = (
@@ -253,31 +254,36 @@ def connect_cass_servers(reactor, config):
         seed_endpoints, config['keyspace'], disconnect_on_cancel=True)
 
 
-def log_divergent_groups(divergent_groups, log, group_metrics, timeout):
+def log_divergent_groups(clock, divergent_groups, log, group_metrics, timeout):
     """
     Log groups that have not changed and been divergent for long time
     """
     dg = divergent_groups
     converged, diverged = partition_bool(
         lambda gm: gm.actual + gm.pending == gm.desired, group_metrics)
+    # stop tracking all converged groups
     for gm in converged:
-        dg.pop((gm.tenant_id, gm.group_id))
-    now = datetime.now()
+        dg.pop((gm.tenant_id, gm.group_id), None)
+    # Start tracking divergent groups depending on whether they've changed
+    now = clock.seconds()
     for gm in diverged:
         pair = (gm.tenant_id, gm.group_id)
         if pair in dg:
             last_time, values = dg[pair]
             if values != hash((gm.desired, gm.actual, gm.pending)):
-                del gd[pair]
+                del dg[pair]
                 continue
             time_diff = now - last_time
-            if time_diff.total_seconds() > timeout:
-                log.err("Group {group_id} of {tenant_id} remains diverged "
-                        "for {divergent_time}", tenant_id=tenant_id,
-                        group_id=group_id, desired=gm.desired,
-                        actual=gm.actual, pending=gm.actual,
-                        divergent_time=str(time_diff))
-            dg[pair] = now, values
+            if time_diff > timeout and time_diff % timeout <= 60:
+                # log on intervals of timeout. For example, if timeout is 1 hr
+                # then log every hour it remains diverged
+                log.err(None,
+                        ("Group {group_id} of {tenant_id} remains diverged "
+                         "and unchanged for {divergent_time}"),
+                        tenant_id=gm.tenant_id, group_id=gm.group_id,
+                        desired=gm.desired, actual=gm.actual,
+                        pending=gm.pending,
+                        divergent_time=str(timedelta(seconds=time_diff)))
         else:
             dg[pair] = now, hash((gm.desired, gm.actual, gm.pending))
 

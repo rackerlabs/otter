@@ -32,6 +32,7 @@ from otter.metrics import (
     QUERY_GROUPS_OF_TENANTS,
     add_to_cloud_metrics,
     collect_metrics,
+    log_divergent_groups,
     get_all_metrics,
     get_all_metrics_effects,
     get_scaling_groups,
@@ -378,6 +379,75 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         self.assertEqual(req.url, 'ingest')
         self.assertEqual(req.data, req_data)
         self.assertEqual(req.log, log)
+
+
+class LogDivergentGroupsTests(SynchronousTestCase):
+    """
+    Tests for :func:`log_divergent_groups`
+    """
+
+    def setUp(self):
+        self.clock = Clock()
+        self.log = mock_log()
+        self.dg = {}
+
+    def invoke(self, metrics):
+        return log_divergent_groups(self.clock, self.dg, self.log, metrics,
+                                    3600)
+
+    def test_no_groups(self):
+        """
+        There are no group metrics collected
+        """
+        self.invoke([])
+        self.assertEqual(self.dg, {})
+        self.assertFalse(self.log.msg.called)
+        self.assertFalse(self.log.err.called)
+
+    def test_converged(self):
+        """
+        All converged groups are popped out from divergent_groups
+        """
+        self.dg = {('t1', 'g1'): (2, 23),
+                   ('t1', 'g2'): (3, 67)}
+        metrics = [GroupMetrics("t1", "g1", 1, 1, 0),
+                   GroupMetrics("t1", "g2", 2, 0, 2)]
+        self.invoke(metrics)
+        self.assertFalse(self.log.err.called)
+        self.assertEqual(self.dg, {})
+
+        # Works if self.dg is already empty
+        self.invoke(metrics)
+        self.assertFalse(self.log.err.called)
+
+    def test_diverged(self):
+        """
+        - Changed groups are removed from tracking
+        - Start tracking new groups
+        - Timeout groups are logged
+        """
+        metrics = [GroupMetrics("t1", "cg", 1, 1, 1),
+                   GroupMetrics("t2", "tg", 2, 1, 2),
+                   GroupMetrics("t1", "fine", 2, 0, 2),
+                   GroupMetrics("t1", "ng", 3, 1, 1)]  # new group
+        self.dg = {
+            ("t1", "cg"): (0, 23),  # changed group: any value diff from hash
+            ("t2", "tg"): (0, hash((2, 1, 2)))  # timeout group
+        }
+        self.clock.advance(3603)
+        self.invoke(metrics)
+        # changed group "cg" removed and converged group "fine" not added
+        self.assertEqual(
+            self.dg,
+            {("t2", "tg"): (0, hash((2, 1, 2))),  # timeout group remains
+             ("t1", "ng"): (3603, hash((3, 1, 1)))})  # new group added
+        # timeout group logged
+        self.log.err.assert_called_once_with(
+            None,
+            ("Group {group_id} of {tenant_id} remains diverged and unchanged "
+             "for {divergent_time}"),
+            tenant_id="t2", group_id="tg", desired=2, actual=1, pending=2,
+            divergent_time="1:00:03")
 
 
 class CollectMetricsTests(SynchronousTestCase):
