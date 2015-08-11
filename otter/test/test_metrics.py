@@ -392,8 +392,8 @@ class LogDivergentGroupsTests(SynchronousTestCase):
         self.dg = {}
 
     def invoke(self, metrics):
-        return log_divergent_groups(self.clock, self.dg, self.log, metrics,
-                                    3600)
+        return log_divergent_groups(self.clock, self.dg, self.log, 3600,
+                                    metrics)
 
     def test_no_groups(self):
         """
@@ -423,31 +423,47 @@ class LogDivergentGroupsTests(SynchronousTestCase):
     def test_diverged(self):
         """
         - Changed groups are removed from tracking
-        - Start tracking new groups
-        - Timeout groups are logged
+        - tracks new groups
+        - Timeout groups are logged including long timeouts
+        - Existing diverged groups not yet timed out are not logged
         """
         metrics = [GroupMetrics("t1", "cg", 1, 1, 1),
-                   GroupMetrics("t2", "tg", 2, 1, 2),
+                   GroupMetrics("t2", "tg", 2, 1, 2),  # timeout
+                   GroupMetrics("t2", "tg2", 5, 2, 1),  # high timeout
                    GroupMetrics("t1", "fine", 2, 0, 2),
-                   GroupMetrics("t1", "ng", 3, 1, 1)]  # new group
+                   GroupMetrics("t1", "ng", 3, 1, 1),  # new group
+                   GroupMetrics("t1", "dg", 6, 0, 3)]
         self.dg = {
             ("t1", "cg"): (0, 23),  # changed group: any value diff from hash
-            ("t2", "tg"): (0, hash((2, 1, 2)))  # timeout group
+            ("t2", "tg"): (3600, hash((2, 1, 2))),  # timeout group
+            ("t2", "tg2"): (0, hash((5, 2, 1))),  # high timeout group
+            ("t1", "dg"): (7100, hash((6, 0, 3)))  # diverged but not timeout
         }
-        self.clock.advance(3603)
+        self.clock.advance(7203)
         self.invoke(metrics)
         # changed group "cg" removed and converged group "fine" not added
         self.assertEqual(
             self.dg,
-            {("t2", "tg"): (0, hash((2, 1, 2))),  # timeout group remains
-             ("t1", "ng"): (3603, hash((3, 1, 1)))})  # new group added
-        # timeout group logged
-        self.log.err.assert_called_once_with(
-            None,
-            ("Group {group_id} of {tenant_id} remains diverged and unchanged "
-             "for {divergent_time}"),
-            tenant_id="t2", group_id="tg", desired=2, actual=1, pending=2,
-            divergent_time="1:00:03")
+            {("t2", "tg"): (3600, hash((2, 1, 2))),  # timeout group remains
+             ("t2", "tg2"): (0, hash((5, 2, 1))),  # high timeout group remains
+             ("t1", "ng"): (7203, hash((3, 1, 1))),  # new group added
+             ("t1", "dg"): (7100, hash((6, 0, 3)))})  # diverged group remains
+        # timeout groups logged. Notice that already diverged but not timedout
+        # groups ("t1, "dg") are not logged
+        self.log.err.assert_has_calls([
+            mock.call(
+                mock.ANY,
+                ("Group {group_id} of {tenant_id} remains diverged and "
+                 "unchanged for {divergent_time}"),
+                tenant_id="t2", group_id="tg", desired=2, actual=1, pending=2,
+                divergent_time="1:00:03"),
+            mock.call(
+                mock.ANY,
+                ("Group {group_id} of {tenant_id} remains diverged and "
+                 "unchanged for {divergent_time}"),
+                tenant_id="t2", group_id="tg2", desired=5, actual=2, pending=1,
+                divergent_time="2:00:03")
+        ])
 
 
 class CollectMetricsTests(SynchronousTestCase):

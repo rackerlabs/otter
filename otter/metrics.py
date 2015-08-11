@@ -19,7 +19,7 @@ from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in, groupby
 from toolz.dicttoolz import merge
-from toolz.functoolz import identity
+from toolz.functoolz import curry, identity
 
 from twisted.application.internet import TimerService
 from twisted.application.service import Service
@@ -254,7 +254,8 @@ def connect_cass_servers(reactor, config):
         seed_endpoints, config['keyspace'], disconnect_on_cancel=True)
 
 
-def log_divergent_groups(clock, divergent_groups, log, group_metrics, timeout):
+@curry
+def log_divergent_groups(clock, divergent_groups, log, timeout, group_metrics):
     """
     Log groups that have not changed and been divergent for long time
     """
@@ -277,7 +278,7 @@ def log_divergent_groups(clock, divergent_groups, log, group_metrics, timeout):
             if time_diff > timeout and time_diff % timeout <= 60:
                 # log on intervals of timeout. For example, if timeout is 1 hr
                 # then log every hour it remains diverged
-                log.err(None,
+                log.err(ValueError(""),  # Need to give an exception to log err
                         ("Group {group_id} of {tenant_id} remains diverged "
                          "and unchanged for {divergent_time}"),
                         tenant_id=gm.tenant_id, group_id=gm.group_id,
