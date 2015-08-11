@@ -1,5 +1,6 @@
 """Tests for convergence gathering."""
 
+from copy import deepcopy
 from datetime import datetime
 from functools import partial
 
@@ -38,7 +39,7 @@ from otter.convergence.gathering import (
     get_clb_contents,
     get_rcv3_contents,
     get_scaling_group_servers,
-    merge_servers)
+    mark_deleted_servers)
 from otter.convergence.model import (
     CLBDescription,
     CLBNode,
@@ -229,14 +230,6 @@ class GetScalingGroupServersTests(SynchronousTestCase):
 
     def setUp(self):
         self.now = datetime(2010, 5, 31)
-        asmetakey = "rax:autoscale:group:id"
-        self.servers1 = [
-            {'id': 'a', 'metadata': {asmetakey: "gid"}},
-            {'id': 'b', 'metadata': {asmetakey: "gid"}},
-            {'id': 'd', 'metadata': {asmetakey: "gid"}}]
-        self.servers2 = [
-            {'id': 'a', 'b': 'c', 'metadata': {asmetakey: "gid"}},
-            {'id': 'd', 'metadata': {"changed": "yes"}}]
         self.freeze = compose(set, map(freeze))
 
     def _invoke(self):
@@ -260,51 +253,65 @@ class GetScalingGroupServersTests(SynchronousTestCase):
         self._test_no_cache(False)
         self._test_no_cache(True)
 
-    def test_old_cache(self):
-        """
-        If cache is older than 30 days then servers returned are got by getting
-        current list and changes since last 30 days.
-        """
-        last_update = datetime(2010, 3, 1)
-        exp_last_update = datetime(2010, 5, 1)
-        changes = self.servers1
-        current = self.servers2
-        sequence = [
-            (("cachegstidgid", False), lambda i: (object(), last_update)),
-            nested_parallel([
-                (("alls", exp_last_update), lambda i: changes),
-                (("alls",), lambda i: current)
-            ])
-        ]
-        self.assertEqual(
-            self.freeze(perform_sequence(sequence, self._invoke())),
-            self.freeze([changes[1], current[0]]))
-
     def test_from_cache(self):
         """
-        If cache is < 30 days old then servers returned are merge of
-        changes since the cache time
+        If cache is there then servers returned are updated with servers
+        not found in current list marked as deleted
         """
-        cache = self.servers1
-        changes = self.servers2
+        asmetakey = "rax:autoscale:group:id"
+        cache = [
+            {'id': 'a', 'metadata': {asmetakey: "gid"}},  # gets updated
+            {'id': 'b', 'metadata': {asmetakey: "gid"}},  # deleted
+            {'id': 'd', 'metadata': {asmetakey: "gid"}},  # meta removed
+            {'id': 'c', 'metadata': {asmetakey: "gid"}}]  # same
+        current = [
+            {'id': 'a', 'b': 'c', 'metadata': {asmetakey: "gid"}},
+            {'id': 'z', 'z': 'w', 'metadata': {asmetakey: "gid"}},  # new
+            {'id': 'd', 'metadata': {"changed": "yes"}},
+            {'id': 'c', 'metadata': {asmetakey: "gid"}}]
         last_update = datetime(2010, 5, 20)
         sequence = [
             (("cachegstidgid", False), lambda i: (cache, last_update)),
-            (("alls", last_update), lambda i: changes)]
+            (("alls",), lambda i: current)]
+        del_cache_server = deepcopy(cache[1])
+        del_cache_server["status"] = "DELETED"
         self.assertEqual(
             self.freeze(perform_sequence(sequence, self._invoke())),
-            self.freeze([cache[1], changes[0]]))
+            self.freeze([del_cache_server, cache[-1]] + current[0:2]))
 
-    def test_merge_servers_precedence(self):
+    def test_mark_deleted_servers_precedence(self):
         """
-        In :func:`merge_servers`, if first list has common servers with second
-        list, the second one takes precedence
+        In :func:`mark_deleted_servers`, if old list has common servers with
+        new list, the new one takes precedence
         """
-        first = [{'id': 'a', 'a': 1}, {'id': 'b', 'b': 2}]
-        second = [{'id': 'd', 'd': 3}, {'id': 'b', 'b': 4}]
+        old = [{'id': 'a', 'a': 1}, {'id': 'b', 'b': 2}]
+        new = [{'id': 'd', 'd': 3}, {'id': 'b', 'b': 4}]
+        old_server = deepcopy(old[0])
+        old_server["status"] = "DELETED"
         self.assertEqual(
-            self.freeze(merge_servers(first, second)),
-            self.freeze([first[0]] + second))
+            self.freeze(mark_deleted_servers(old, new)),
+            self.freeze([old_server] + new))
+
+    def test_mark_deleted_servers_no_old(self):
+        """
+        If old list does not have any servers then it just returns new list
+        """
+        new = [{'id': 'd', 'd': 3}, {'id': 'b', 'b': 4}]
+        self.assertEqual(
+            self.freeze(mark_deleted_servers([], new)), self.freeze(new))
+
+    def test_updated_deleted_servers_no_new(self):
+        """
+        If new list does not have any servers then old list is updated as
+        DELETED and returned
+        """
+        old = [{'id': 'd', 'd': 3}, {'id': 'b', 'b': 4}]
+        exp_old = deepcopy(old)
+        exp_old[0]["status"] = "DELETED"
+        exp_old[1]["status"] = "DELETED"
+        self.assertEqual(
+            self.freeze(mark_deleted_servers(old, [])),
+            self.freeze(exp_old))
 
 
 class ExtractDrainedTests(SynchronousTestCase):
