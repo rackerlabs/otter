@@ -9,6 +9,7 @@ from toolz.functoolz import identity
 from otter.cloud_client import (
     CLBDeletedError,
     CreateServerConfigurationError,
+    CreateServerOverQuoteError,
     NoSuchCLBError
 )
 from otter.convergence.model import ErrorReason
@@ -51,6 +52,11 @@ def _present_clb_deleted_error(exception):
 def _present_server_configuration_error(exception):
     return "Server launch configuration is invalid: {0}".format(
         exception.message)
+
+
+@_present_exception.register(CreateServerOverQuoteError)
+def _present_server_over_limit_error(exception):
+    return "Servers cannot be created: {0}".format(exception.message)
 
 
 @match(ErrorReason)
