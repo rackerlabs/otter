@@ -527,7 +527,7 @@ class CollectMetricsTests(SynchronousTestCase):
         d = collect_metrics(_reactor, self.config, self.log,
                             perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
-        self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.successResultOf(d), self.metrics)
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
         self.get_scaling_groups.assert_called_once_with(
@@ -540,15 +540,16 @@ class CollectMetricsTests(SynchronousTestCase):
 
     def test_metrics_collected_convergence_tenants(self):
         """
-        Metrics is collected after getting groups from cass and servers
-        from nova and it is added to blueflood
+        Metrics is collected after getting groups of convergence tenants only
+        from cass and servers of those tenants from nova and it is added to
+        blueflood
         """
         self.config['convergence-tenants'] = ['foo', 'bar']
         _reactor = mock.Mock()
         d = collect_metrics(_reactor, self.config, self.log,
                             perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
-        self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.successResultOf(d), self.metrics)
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
         self.get_specific_scaling_groups.assert_called_once_with(
@@ -568,7 +569,7 @@ class CollectMetricsTests(SynchronousTestCase):
         d = collect_metrics(mock.Mock(), self.config, self.log, client=client,
                             perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
-        self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.successResultOf(d), self.metrics)
         self.assertFalse(self.connect_cass_servers.called)
         self.assertFalse(client.disconnect.called)
 
@@ -580,7 +581,7 @@ class CollectMetricsTests(SynchronousTestCase):
         d = collect_metrics(_reactor, self.config, self.log,
                             authenticator=auth, perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
-        self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.successResultOf(d), self.metrics)
         self.get_all_metrics.assert_called_once_with(
             self.dispatcher, self.groups, self.log, _print=False)
 
