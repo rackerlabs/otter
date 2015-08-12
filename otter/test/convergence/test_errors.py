@@ -5,6 +5,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.cloud_client import (
     CLBDeletedError,
     CreateServerConfigurationError,
+    CreateServerOverQuoteError,
     NoSuchCLBError
 )
 from otter.convergence.errors import present_reasons, structure_reason
@@ -32,7 +33,9 @@ class PresentReasonsTests(SynchronousTestCase):
             CLBDeletedError(lb_id=u'lbid2'):
                 'Cloud Load Balancer is currently being deleted: lbid2',
             CreateServerConfigurationError("Your server is wrong"):
-                'Server launch configuration is invalid: Your server is wrong'
+                'Server launch configuration is invalid: Your server is wrong',
+            CreateServerOverQuoteError("You are over quota"):
+                'Servers cannot be created: You are over quota'
         }
         excs = excs.items()
         self.assertEqual(
