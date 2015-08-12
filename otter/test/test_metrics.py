@@ -620,6 +620,9 @@ class ServiceTests(SynchronousTestCase):
                        'metrics': {'interval': 20}}
         self.mock_cm = patch(
             self, 'otter.metrics.collect_metrics', return_value=succeed(None))
+        self.mock_ldg = patch(
+            self, 'otter.metrics.log_divergent_groups',
+            return_value=succeed(None))
         self.log = mock_log()
         self.clock = Clock()
 
@@ -643,6 +646,19 @@ class ServiceTests(SynchronousTestCase):
         from otter.metrics import metrics_log
         mock_ms.assert_called_once_with(
             matches(IsInstance(ReactorBase)), c, metrics_log)
+
+    def test_log_div_groups_called(self):
+        """
+        Metrics collected from `collect_metrics` is logged by calling
+        `log_divergent_groups`
+        """
+        self.mock_cm.return_value = succeed("metrics")
+        s = self._service()
+        s.divergent_groups = "dg"
+        s.startService()
+        self._cm_called(1)
+        self.mock_ldg.assert_called_once_with(
+            "r", "dg", self.log, 3600, "metrics")
 
     def test_collect_metrics_called_again(self):
         """

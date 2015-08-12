@@ -19,7 +19,7 @@ from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in, groupby
 from toolz.dicttoolz import merge
-from toolz.functoolz import curry, identity
+from toolz.functoolz import identity
 
 from twisted.application.internet import TimerService
 from twisted.application.service import Service
@@ -254,7 +254,6 @@ def connect_cass_servers(reactor, config):
         seed_endpoints, config['keyspace'], disconnect_on_cancel=True)
 
 
-@curry
 def log_divergent_groups(clock, divergent_groups, log, timeout, group_metrics):
     """
     Log groups that have not changed and been divergent for long time
@@ -291,7 +290,6 @@ def log_divergent_groups(clock, divergent_groups, log, timeout, group_metrics):
 
 @defer.inlineCallbacks
 def collect_metrics(reactor, config, log, client=None, authenticator=None,
-                    divergent_groups=None,
                     _print=False, perform=perform,
                     get_legacy_dispatcher=get_legacy_dispatcher):
     """
@@ -329,8 +327,6 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     group_metrics = yield get_all_metrics(
         dispatcher, cass_groups, log, _print=_print)
 
-    log_divergent_groups(group_metrics)
-
     # Calculate total desired, actual and pending
     total_desired, total_actual, total_pending = 0, 0, 0
     for group_metric in group_metrics:
@@ -360,6 +356,8 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     # Disconnect only if we created the client
     if not client:
         yield _client.disconnect()
+
+    defer.returnValue(group_metrics)
 
 
 class Options(usage.Options):
@@ -394,16 +392,20 @@ class MetricsService(Service, object):
         :param IReactorTime clock: Optional reactor for timer purpose
         """
         self._client = connect_cass_servers(reactor, config['cassandra'])
-        divergent_groups = {}
+        self.divergent_groups = {}
 
         def collect(*a, **k):
-            return collect_metrics(*a, **k).addErrback(log.err)
+            d = collect_metrics(*a, **k)
+            d.addCallback(
+                partial(
+                    log_divergent_groups, reactor, self.divergent_groups, log,
+                    get_in(['metrics', 'divergent_timeout'], config, 3600)))
+            return d.addErrback(log.err)
 
         self._service = TimerService(
             get_in(['metrics', 'interval'], config, default=60), collect,
             reactor, config, log, client=self._client,
-            authenticator=generate_authenticator(reactor, config['identity']),
-            divergent_groups=divergent_groups)
+            authenticator=generate_authenticator(reactor, config['identity']))
         self._service.clock = clock or reactor
 
     def startService(self):
