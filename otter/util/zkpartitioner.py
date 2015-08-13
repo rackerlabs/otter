@@ -67,9 +67,10 @@ class Partitioner(MultiService):
 
     def stopService(self):
         """Release the buckets."""
-        MultiService.stopService(self)
+        d = MultiService.stopService(self)
         if self.partitioner.acquired:
-            return self.partitioner.finish()
+            d.addCallback(lambda _: self.partitioner.finish())
+        return d
 
     def reset_path(self, path):
         """Re-initialize the partitioner to use a new path."""
@@ -114,7 +115,7 @@ class Partitioner(MultiService):
                          old_buckets=self._old_buckets,
                          otter_msg_type='partition-acquired')
             self._old_buckets = buckets
-        self.got_buckets(buckets)
+        return self.got_buckets(buckets)
 
     def health_check(self):
         """
