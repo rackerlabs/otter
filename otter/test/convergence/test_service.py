@@ -153,7 +153,7 @@ class ConvergerTests(SynchronousTestCase):
         converger = self._converger(converge_all_groups, dispatcher=sequence)
 
         with sequence.consume():
-            result = self.fake_partitioner.got_buckets(my_buckets)
+            result, = self.fake_partitioner.got_buckets(my_buckets)
         self.assertEqual(self.successResultOf(result), 'foo')
 
     def test_buckets_acquired_errors(self):
@@ -179,7 +179,7 @@ class ConvergerTests(SynchronousTestCase):
         self._converger(converge_all_groups, dispatcher=sequence)
 
         with sequence.consume():
-            result = self.fake_partitioner.got_buckets([0])
+            result, = self.fake_partitioner.got_buckets([0])
         self.assertEqual(self.successResultOf(result), None)
 
     def test_divergent_changed_not_acquired(self):

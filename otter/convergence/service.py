@@ -607,7 +607,7 @@ class Converger(MultiService):
         """
         ceff = Effect(GetChildren(CONVERGENCE_DIRTY_DIR)).on(
             partial(self._converge_all, my_buckets))
-        return perform(self._dispatcher, self._with_conv_runid(ceff))
+        return (perform(self._dispatcher, self._with_conv_runid(ceff)), )
 
     def divergent_changed(self, children):
         """
