@@ -200,7 +200,7 @@ class PartitionerTests(SynchronousTestCase):
         self.partitioner.startService()
         d = self.partitioner.stopService()
         self.assertFalse(self.kz_partitioner.finish.called)
-        self.assertIsNone(d)
+        self.successResultOf(d)
 
     def test_stop_service_acquired(self):
         """
@@ -209,7 +209,8 @@ class PartitionerTests(SynchronousTestCase):
         self.kz_partitioner.acquired = True
         self.partitioner.startService()
         d = self.partitioner.stopService()
-        self.assertIs(self.kz_partitioner.finish.return_value, d)
+        self.assertIs(self.successResultOf(d),
+                      self.kz_partitioner.finish.return_value)
 
     def test_stop_service_stops_polling(self):
         """
