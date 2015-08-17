@@ -64,7 +64,7 @@ class GetValidatedEventTests(SynchronousTestCase):
         Nothing is changed if Error-based event is not found in msg_types
         """
         e = {'isError': True, 'why': 'unknown', 'a': 'b'}
-        self.assertEqual(get_validated_event(e), e)
+        self.assertEqual(get_validated_event(e), [e])
 
     def test_error_why_is_changed(self):
         """
@@ -74,16 +74,16 @@ class GetValidatedEventTests(SynchronousTestCase):
         e = {'isError': True, 'why': 'delete-server', 'a': 'b'}
         self.assertEqual(
             get_validated_event(e),
-            {'why': 'Deleting {server_id} server',
-             'isError': True, 'a': 'b',
-             'otter_msg_type': 'delete-server'})
+            [{'why': 'Deleting {server_id} server',
+              'isError': True, 'a': 'b',
+              'otter_msg_type': 'delete-server'}])
 
     def test_error_no_why_in_event(self):
         """
         If error-based event's does not have "why", then it is not changed
         """
         e = {'isError': True, 'a': 'b'}
-        self.assertEqual(get_validated_event(e), e)
+        self.assertEqual(get_validated_event(e), [e])
 
     def test_error_no_why_but_message(self):
         """
@@ -92,16 +92,16 @@ class GetValidatedEventTests(SynchronousTestCase):
         e = {'isError': True, 'a': 'b', "message": ('delete-server',)}
         self.assertEqual(
             get_validated_event(e),
-            {'message': ('Deleting {server_id} server',), 'isError': True,
-             'why': 'Deleting {server_id} server',
-             'a': 'b', 'otter_msg_type': 'delete-server'})
+            [{'message': ('Deleting {server_id} server',), 'isError': True,
+              'why': 'Deleting {server_id} server',
+              'a': 'b', 'otter_msg_type': 'delete-server'}])
 
     def test_msg_not_found(self):
         """
         Event is not changed if msg_type is not found
         """
         e = {'message': ('unknown',), 'a': 'b'}
-        self.assertEqual(get_validated_event(e), e)
+        self.assertEqual(get_validated_event(e), [e])
 
     def test_message_is_changed(self):
         """
@@ -111,8 +111,8 @@ class GetValidatedEventTests(SynchronousTestCase):
         e = {'message': ('delete-server',), 'a': 'b'}
         self.assertEqual(
             get_validated_event(e),
-            {'message': ('Deleting {server_id} server',),
-             'a': 'b', 'otter_msg_type': 'delete-server'})
+            [{'message': ('Deleting {server_id} server',),
+              'a': 'b', 'otter_msg_type': 'delete-server'}])
 
     def test_callable_spec(self):
         """
@@ -121,10 +121,11 @@ class GetValidatedEventTests(SynchronousTestCase):
         """
         e = {"message": ('foo-bar',), 'ab': 'cd'}
         self.assertEqual(
-            get_validated_event(e, specs={'foo-bar': lambda e: e['ab']}),
-            {'message': ('cd',),
-             'otter_msg_type': 'foo-bar',
-             'ab': 'cd'})
+            get_validated_event(e,
+                                specs={'foo-bar': lambda e: [(e, e['ab'])]}),
+            [{'message': ('cd',),
+              'otter_msg_type': 'foo-bar',
+              'ab': 'cd'}])
 
     def test_callable_spec_error(self):
         """
@@ -133,8 +134,9 @@ class GetValidatedEventTests(SynchronousTestCase):
         """
         e = {'isError': True, 'why': 'foo-bar', 'ab': 'cd'}
         self.assertEqual(
-            get_validated_event(e, specs={'foo-bar': lambda e: e['ab']}),
-            {'why': 'cd',
-             'isError': True,
-             'otter_msg_type': 'foo-bar',
-             'ab': 'cd'})
+            get_validated_event(e,
+                                specs={'foo-bar': lambda e: [(e, e['ab'])]}),
+            [{'why': 'cd',
+              'isError': True,
+              'otter_msg_type': 'foo-bar',
+              'ab': 'cd'}])
