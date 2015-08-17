@@ -18,7 +18,7 @@ from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in, groupby
-from toolz.dicttoolz import merge
+from toolz.dicttoolz import keyfilter, merge
 from toolz.functoolz import identity
 
 from twisted.application.internet import TimerService
@@ -254,40 +254,6 @@ def connect_cass_servers(reactor, config):
         seed_endpoints, config['keyspace'], disconnect_on_cancel=True)
 
 
-def log_divergent_groups(clock, divergent_groups, log, timeout, group_metrics):
-    """
-    Log groups that have not changed and been divergent for long time
-    """
-    dg = divergent_groups
-    converged, diverged = partition_bool(
-        lambda gm: gm.actual + gm.pending == gm.desired, group_metrics)
-    # stop tracking all converged groups
-    for gm in converged:
-        dg.pop((gm.tenant_id, gm.group_id), None)
-    # Start tracking divergent groups depending on whether they've changed
-    now = clock.seconds()
-    for gm in diverged:
-        pair = (gm.tenant_id, gm.group_id)
-        if pair in dg:
-            last_time, values = dg[pair]
-            if values != hash((gm.desired, gm.actual, gm.pending)):
-                del dg[pair]
-                continue
-            time_diff = now - last_time
-            if time_diff > timeout and time_diff % timeout <= 60:
-                # log on intervals of timeout. For example, if timeout is 1 hr
-                # then log every hour it remains diverged
-                log.err(ValueError(""),  # Need to give an exception to log err
-                        ("Group {group_id} of {tenant_id} remains diverged "
-                         "and unchanged for {divergent_time}"),
-                        tenant_id=gm.tenant_id, group_id=gm.group_id,
-                        desired=gm.desired, actual=gm.actual,
-                        pending=gm.pending,
-                        divergent_time=str(timedelta(seconds=time_diff)))
-        else:
-            dg[pair] = now, hash((gm.desired, gm.actual, gm.pending))
-
-
 @defer.inlineCallbacks
 def collect_metrics(reactor, config, log, client=None, authenticator=None,
                     _print=False, perform=perform,
@@ -376,12 +342,49 @@ class Options(usage.Options):
         self.update(json.load(self.open(self['config'])))
 
 
+def unchanged_divergent_groups(clock, current, timeout, group_metrics):
+    """
+    Return list of GroupMetrics that have been divergent and unchanged for
+    timeout seconds
+
+    :param IReactorTime clock: Twisted time used to track
+    :param dict current: Currently tracked divergent groups
+    :param float timeout: Timeout in seconds
+    :param list group_metrics: List of group metrics
+
+    :return: (updated current, List of (group, divergent_time) tuples)
+    """
+    converged, diverged = partition_bool(
+        lambda gm: gm.actual + gm.pending == gm.desired, group_metrics)
+    # stop tracking all converged groups
+    converged = set((g.tenant_id, g.group_id) for g in converged)
+    updated = keyfilter(lambda k: k not in converged, current)
+    # Start tracking divergent groups depending on whether they've changed
+    now = clock.seconds()
+    to_log, new = [], {}
+    for gm in diverged:
+        pair = (gm.tenant_id, gm.group_id)
+        if pair in updated:
+            last_time, values = updated[pair]
+            if values != hash((gm.desired, gm.actual, gm.pending)):
+                del updated[pair]
+                continue
+            time_diff = now - last_time
+            if time_diff > timeout and time_diff % timeout <= 60:
+                # log on intervals of timeout. For example, if timeout is 1 hr
+                # then log every hour it remains diverged
+                to_log.append((gm, time_diff))
+        else:
+            new[pair] = now, hash((gm.desired, gm.actual, gm.pending))
+    return merge(updated, new), to_log
+
+
 class MetricsService(Service, object):
     """
     Service collects metrics on continuous basis
     """
 
-    def __init__(self, reactor, config, log, clock=None):
+    def __init__(self, reactor, config, log, clock=None, collect=None):
         """
         Initialize the service by connecting to Cassandra and setting up
         authenticator
@@ -392,21 +395,39 @@ class MetricsService(Service, object):
         :param IReactorTime clock: Optional reactor for timer purpose
         """
         self._client = connect_cass_servers(reactor, config['cassandra'])
-        self.divergent_groups = {}
-
-        def collect(*a, **k):
-            d = collect_metrics(*a, **k)
-            d.addCallback(
-                partial(
-                    log_divergent_groups, reactor, self.divergent_groups, log,
-                    get_in(['metrics', 'divergent_timeout'], config, 3600)))
-            return d.addErrback(log.err)
-
+        self.log = log
+        self.reactor = reactor
+        self._divergent_groups = {}
+        self.divergent_timeout = get_in(
+            ['metrics', 'divergent_timeout'], config, 3600)
         self._service = TimerService(
-            get_in(['metrics', 'interval'], config, default=60), collect,
-            reactor, config, log, client=self._client,
+            get_in(['metrics', 'interval'], config, default=60),
+            collect or self.collect,
+            reactor,
+            config,
+            self.log,
+            client=self._client,
             authenticator=generate_authenticator(reactor, config['identity']))
         self._service.clock = clock or reactor
+
+    @defer.inlineCallbacks
+    def collect(self, *a, **k):
+        try:
+            metrics = yield collect_metrics(*a, **k)
+            self._divergent_groups, to_log = unchanged_divergent_groups(
+                self.reactor, self._divergent_groups, self.divergent_timeout,
+                metrics)
+            for group, duration in to_log:
+                self.log.err(
+                    ValueError(""),  # Need to give an exception to log err
+                    ("Group {group_id} of {tenant_id} remains diverged "
+                     "and unchanged for {divergent_time}"),
+                    tenant_id=group.tenant_id, group_id=group.group_id,
+                    desired=group.desired, actual=group.actual,
+                    pending=group.pending,
+                    divergent_time=str(timedelta(seconds=duration)))
+        except Exception:
+            self.log.err(None, "Error collecting metrics")
 
     def startService(self):
         """

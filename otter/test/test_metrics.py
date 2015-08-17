@@ -32,7 +32,7 @@ from otter.metrics import (
     QUERY_GROUPS_OF_TENANTS,
     add_to_cloud_metrics,
     collect_metrics,
-    log_divergent_groups,
+    unchanged_divergent_groups,
     get_all_metrics,
     get_all_metrics_effects,
     get_scaling_groups,
@@ -42,7 +42,6 @@ from otter.metrics import (
 )
 from otter.test.test_auth import identity_config
 from otter.test.utils import (
-    CheckFailure,
     CheckFailureValue,
     IsCallable,
     Provides,
@@ -381,44 +380,35 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         self.assertEqual(req.log, log)
 
 
-class LogDivergentGroupsTests(SynchronousTestCase):
+class UnchangedDivergentGroupsTests(SynchronousTestCase):
     """
-    Tests for :func:`log_divergent_groups`
+    Tests for :func:`unchanged_divergent_groups`
     """
 
     def setUp(self):
         self.clock = Clock()
-        self.log = mock_log()
-        self.dg = {}
 
-    def invoke(self, metrics):
-        return log_divergent_groups(self.clock, self.dg, self.log, 3600,
-                                    metrics)
+    def invoke(self, current={}, metrics=[]):
+        return unchanged_divergent_groups(self.clock, current, 3600, metrics)
 
     def test_no_groups(self):
         """
         There are no group metrics collected
         """
-        self.invoke([])
-        self.assertEqual(self.dg, {})
-        self.assertFalse(self.log.msg.called)
-        self.assertFalse(self.log.err.called)
+        groups, logs = self.invoke()
+        self.assertEqual(groups, {})
+        self.assertEqual(logs, [])
 
     def test_converged(self):
         """
         All converged groups are popped out from divergent_groups
         """
-        self.dg = {('t1', 'g1'): (2, 23),
-                   ('t1', 'g2'): (3, 67)}
+        dg = {('t1', 'g1'): (2, 23), ('t1', 'g2'): (3, 67)}
         metrics = [GroupMetrics("t1", "g1", 1, 1, 0),
                    GroupMetrics("t1", "g2", 2, 0, 2)]
-        self.invoke(metrics)
-        self.assertFalse(self.log.err.called)
-        self.assertEqual(self.dg, {})
-
-        # Works if self.dg is already empty
-        self.invoke(metrics)
-        self.assertFalse(self.log.err.called)
+        groups, logs = self.invoke(dg, metrics)
+        self.assertEqual(groups, {})
+        self.assertEqual(logs, [])
 
     def test_diverged(self):
         """
@@ -433,37 +423,26 @@ class LogDivergentGroupsTests(SynchronousTestCase):
                    GroupMetrics("t1", "fine", 2, 0, 2),
                    GroupMetrics("t1", "ng", 3, 1, 1),  # new group
                    GroupMetrics("t1", "dg", 6, 0, 3)]
-        self.dg = {
+        dg = {
             ("t1", "cg"): (0, 23),  # changed group: any value diff from hash
             ("t2", "tg"): (3600, hash((2, 1, 2))),  # timeout group
             ("t2", "tg2"): (0, hash((5, 2, 1))),  # high timeout group
             ("t1", "dg"): (7100, hash((6, 0, 3)))  # diverged but not timeout
         }
         self.clock.advance(7203)
-        self.invoke(metrics)
+        groups, logs = self.invoke(dg, metrics)
         # changed group "cg" removed and converged group "fine" not added
         self.assertEqual(
-            self.dg,
+            groups,
             {("t2", "tg"): (3600, hash((2, 1, 2))),  # timeout group remains
              ("t2", "tg2"): (0, hash((5, 2, 1))),  # high timeout group remains
              ("t1", "ng"): (7203, hash((3, 1, 1))),  # new group added
              ("t1", "dg"): (7100, hash((6, 0, 3)))})  # diverged group remains
-        # timeout groups logged. Notice that already diverged but not timedout
-        # groups ("t1, "dg") are not logged
-        self.log.err.assert_has_calls([
-            mock.call(
-                mock.ANY,
-                ("Group {group_id} of {tenant_id} remains diverged and "
-                 "unchanged for {divergent_time}"),
-                tenant_id="t2", group_id="tg", desired=2, actual=1, pending=2,
-                divergent_time="1:00:03"),
-            mock.call(
-                mock.ANY,
-                ("Group {group_id} of {tenant_id} remains diverged and "
-                 "unchanged for {divergent_time}"),
-                tenant_id="t2", group_id="tg2", desired=5, actual=2, pending=1,
-                divergent_time="2:00:03")
-        ])
+        # timeout groups to be logged. Notice that already diverged but not
+        # timedout groups ("t1, "dg") are not to be logged
+        self.assertEqual(
+            logs,
+            [(metrics[1], 3603), (metrics[2], 7203)])
 
 
 class CollectMetricsTests(SynchronousTestCase):
@@ -617,24 +596,17 @@ class ServiceTests(SynchronousTestCase):
         self.mock_ccs = patch(
             self, 'otter.metrics.connect_cass_servers',
             return_value=self.client)
-        self.config = {'cassandra': 'c', 'identity': identity_config,
-                       'metrics': {'interval': 20}}
         self.mock_cm = patch(
             self, 'otter.metrics.collect_metrics', return_value=succeed(None))
-        self.mock_ldg = patch(
-            self, 'otter.metrics.log_divergent_groups',
-            return_value=succeed(None))
+        self.config = {'cassandra': 'c', 'identity': identity_config,
+                       'metrics': {'interval': 20}}
         self.log = mock_log()
         self.clock = Clock()
 
     def _service(self):
-        return MetricsService('r', self.config, self.log, self.clock)
-
-    def _cm_called(self, calls):
-        self.assertEqual(len(self.mock_cm.mock_calls), calls)
-        self.mock_cm.assert_called_with(
-            'r', self.config, self.log, client=self.client,
-            authenticator=matches(Provides(IAuthenticator)))
+        self.collect = mock.Mock()
+        return MetricsService('r', self.config, self.log, self.clock,
+                              collect=self.collect)
 
     @mock.patch('otter.metrics.MetricsService')
     def test_make_service(self, mock_ms):
@@ -648,45 +620,63 @@ class ServiceTests(SynchronousTestCase):
         mock_ms.assert_called_once_with(
             matches(IsInstance(ReactorBase)), c, metrics_log)
 
-    def test_log_div_groups_called(self):
+    def test_collect_called_again(self):
         """
-        Metrics collected from `collect_metrics` is logged by calling
-        `log_divergent_groups`
+        `self.collect` is called again based on interval given in config
+        """
+        s = self._service()
+        s.startService()
+        self.assertTrue(s.running)
+        self.collect.assert_called_once_with(
+            'r', self.config, self.log, client=self.client,
+            authenticator=matches(Provides(IAuthenticator)))
+        self.clock.advance(20)
+        self.assertEqual(len(self.collect.mock_calls), 2)
+        self.collect.assert_called_with(
+            'r', self.config, self.log, client=self.client,
+            authenticator=matches(Provides(IAuthenticator)))
+
+    @mock.patch("otter.metrics.unchanged_divergent_groups")
+    def test_collect(self, mock_udg):
+        """
+        `self.collect` gets metrics from collect_metrics and logs unchanged
+        diverged groups got from `unchanged_divergent_groups`
         """
         self.mock_cm.return_value = succeed("metrics")
         s = self._service()
-        s.divergent_groups = "dg"
-        s.startService()
-        self._cm_called(1)
-        self.mock_ldg.assert_called_once_with(
-            "r", "dg", self.log, 3600, "metrics")
+        s._divergent_groups = "dg"
+        mock_udg.return_value = (
+            "ndg",
+            [(GroupMetrics("t", "g1", 2, 0, 1), 3600),
+             (GroupMetrics("t", "g2", 3, 1, 0), 7200)])
+        d = s.collect('r', self.config, client="client")
+        self.assertIsNone(self.successResultOf(d))
+        self.mock_cm.assert_called_once_with('r', self.config, client="client")
+        mock_udg.assert_called_once_with("r", "dg", 3600, "metrics")
+        self.log.err.assert_has_calls([
+            mock.call(mock.ANY,
+                      ("Group {group_id} of {tenant_id} remains diverged "
+                       "and unchanged for {divergent_time}"),
+                      tenant_id="t", group_id="g1", desired=2, actual=0,
+                      pending=1, divergent_time="1:00:00"),
+            mock.call(mock.ANY,
+                      ("Group {group_id} of {tenant_id} remains diverged "
+                       "and unchanged for {divergent_time}"),
+                      tenant_id="t", group_id="g2", desired=3, actual=1,
+                      pending=0, divergent_time="2:00:00")
+        ])
+        self.assertEqual(s._divergent_groups, "ndg")
 
-    def test_collect_metrics_called_again(self):
+    def test_collect_error(self):
         """
-        `collect_metrics` is called again based on interval given in config
-        """
-        s = self._service()
-        s.startService()
-        self.assertTrue(s.running)
-        self._cm_called(1)
-        self.clock.advance(20)
-        self._cm_called(2)
-
-    def test_collect_metrics_called_again_on_error(self):
-        """
-        `collect_metrics` is called again even if one of the
-        previous call fails
+        `self.collect` logs error and returns success if `collect_metrics`
+        errors
         """
         s = self._service()
         self.mock_cm.return_value = fail(ValueError('a'))
-        s.startService()
-        self._cm_called(1)
-        self.log.err.assert_called_once_with(CheckFailure(ValueError))
-        # Service is still running
-        self.assertTrue(s.running)
-        # And collect_metrics is called again after interval is passed
-        self.clock.advance(20)
-        self._cm_called(2)
+        d = s.collect('r', self.config, client="client")
+        self.assertIsNone(self.successResultOf(d))
+        self.log.err.assert_called_once_with(None, "Error collecting metrics")
 
     def test_stop_service(self):
         """
@@ -695,10 +685,10 @@ class ServiceTests(SynchronousTestCase):
         s = self._service()
         s.startService()
         self.assertTrue(s.running)
-        self._cm_called(1)
+        self.assertEqual(len(self.collect.mock_calls), 1)
         d = s.stopService()
         self.assertEqual(self.successResultOf(d), 'disconnected')
         self.assertFalse(s.running)
-        # collect_metrics is not called again
+        # self.collect is not called again
         self.clock.advance(20)
-        self._cm_called(1)
+        self.assertEqual(len(self.collect.mock_calls), 1)
