@@ -17,10 +17,10 @@ class SpecificationObserverWrapperTests(SynchronousTestCase):
         """
         Sample delegating observer
         """
-        self.e = None
+        self.e = []
 
         def observer(event):
-            self.e = event
+            self.e.append(event)
 
         self.observer = observer
 
@@ -33,9 +33,9 @@ class SpecificationObserverWrapperTests(SynchronousTestCase):
             {'message': ("launch-servers",), "num_servers": 2})
         self.assertEqual(
             self.e,
-            {'message': ('Launching {num_servers} servers', ),
-             'num_servers': 2,
-             'otter_msg_type': 'launch-servers'})
+            [{'message': ('Launching {num_servers} servers', ),
+              'num_servers': 2,
+              'otter_msg_type': 'launch-servers'}])
 
     def test_error_validating_observer(self):
         """
@@ -47,11 +47,22 @@ class SpecificationObserverWrapperTests(SynchronousTestCase):
         wrapper({'message': ("something-bad",), 'a': 'b'})
         self.assertEqual(
             self.e,
-            {'original_event': {'message': ("something-bad",), 'a': 'b'},
-             'isError': True,
-             'failure': CheckFailureValue(ValueError('hm')),
-             'why': 'Error validating event',
-             'message': ()})
+            [{'original_event': {'message': ("something-bad",), 'a': 'b'},
+              'isError': True,
+              'failure': CheckFailureValue(ValueError('hm')),
+              'why': 'Error validating event',
+              'message': ()}])
+
+    def test_event_gets_split(self):
+        """
+        The observer might emit multiple events if the original event gets
+        split.
+        """
+        message = {'message': ("launch-servers",), "num_servers": 2}
+        wrapper = SpecificationObserverWrapper(
+            self.observer, lambda e: [e, e.copy()])
+        wrapper(message)
+        self.assertEqual(self.e, [message, message])
 
 
 class GetValidatedEventTests(SynchronousTestCase):
