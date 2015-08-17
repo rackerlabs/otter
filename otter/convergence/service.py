@@ -649,7 +649,11 @@ class Converger(MultiService):
         """
         ceff = Effect(GetChildren(CONVERGENCE_DIRTY_DIR)).on(
             partial(self._converge_all, my_buckets))
-        return perform(self._dispatcher, self._with_conv_runid(ceff))
+        # Return deferred as 1-element tuple for testing only.
+        # Returning deferred would block otter from shutting down until
+        # it is fired which we don't need to do since convergence is itempotent
+        # and will be triggered in next start of otter
+        return (perform(self._dispatcher, self._with_conv_runid(ceff)), )
 
     def divergent_changed(self, children):
         """
