@@ -154,7 +154,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         if dummy_asserter.err:
             print("SetUpClass failed: background LB nodes")
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='pass')
+    @tags(speed='slow', type='rcv3', rcv3_mimic='pass', convergence='yes')
     def test_create_scaling_group_with_pool_on_cloud_network(self):
         """
         Test that it is possible to create a scaling group with 0 entities
@@ -167,7 +167,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             network_list=[self.rackconnect_network])
         self._common_scaling_group_assertions(pool_group_resp)
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='pass')
+    @tags(speed='slow', type='rcv3', rcv3_mimic='pass', convergence='yes')
     @unittest.skip(
         'Skip pending implementation of network validation by Otter')
     def test_create_scaling_group_with_pool_on_private(self):
@@ -183,13 +183,13 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                                                       self.servicenet_network])
         self._common_scaling_group_assertions(pool_group_resp)
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='pass')
+    @tags(speed='slow', type='rcv3', rcv3_mimic='pass', convergence='yes')
     @unittest.skip(
         'Skip pending implementation of network validation by Otter')
     def test_create_scaling_group_with_pool_on_public(self):
         """
         Test that it is possible to create a scaling group with 0 entities
-        connected to an RCV3 LB pool with only private network specified
+        connected to an RCV3 LB pool with only public network specified
         """
         # Create a scaling group with zero servers
         lb_pools = [{'loadBalancerId': self.pool.id, 'type': 'RackConnectV3'}]
@@ -199,7 +199,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                                                       self.public_network])
         self._common_scaling_group_assertions(pool_group_resp)
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='pass')
+    @tags(speed='slow', type='rcv3', rcv3_mimic='pass', convergence='yes')
     def test_create_nonzero_scaling_group_with_pool_on_cloud_network(self):
         """
         Test that it is possible to create a scaling group with min_servers
@@ -216,7 +216,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             asserter=self)
         self.verify_group_state(pool_group_resp.entity.id, self.min_servers)
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='fail')
+    @tags(speed='slow', type='rcv3', rcv3_mimic='fail', convergence='error')
     @unittest.skipIf(autoscale_config.mimic,
                      "This test fails on mimic because it does not implement "
                      "cloud networks yet.")
@@ -248,7 +248,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                  pool_group_resp.entity.id, self.min_servers, timeout=600,
                  asserter=self))
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='fail')
+    @tags(speed='slow', type='rcv3', rcv3_mimic='fail', convergence='error')
     @unittest.skipIf(autoscale_config.mimic,
                      "This test fails on mimic because it does not implement "
                      "cloud networks yet.")
@@ -280,7 +280,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                  pool_group_resp.entity.id, self.min_servers, timeout=600,
                  asserter=self))
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='pass')
+    @tags(speed='slow', type='rcv3', rcv3_mimic='pass', convergence='yes')
     def test_create_scaling_group_with_pool_counts(self):
         """
         Test that it is possible to create a scaling group with min_servers
@@ -326,7 +326,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                      new_counts['cloud_servers'], init_cloud_servers,
                      self.min_servers))
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='fail')
+    @tags(speed='slow', type='rcv3', rcv3_mimic='fail', convergence='yes')
     @unittest.skipIf(autoscale_config.mimic,
                      "This test fails on mimic because it does not implement "
                      "cloud networks yet.")
@@ -380,7 +380,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             .format(status)
         )
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='pass')
+    @tags(speed='slow', type='rcv3', rcv3_mimic='pass', convergence='yes')
     def test_scale_up_down_on_rcv3_pool(self):
         """
         Attempt to scale up and down on a correctly configured RCv3 pool.
@@ -509,7 +509,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                             msg='Initial node {0} was not in '
                             'the final list'.format(nid))
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='pass')
+    @tags(speed='slow', type='rcv3', rcv3_mimic='pass', convergence='yes')
     def test_scale_up_down_on_rcv3_and_clb(self):
         """
         As test_scale_up_down_on_rcv3, but includes a cloud load balancer as
@@ -665,7 +665,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                           'count of {1}'.format(num_clb_nodes_after_scale,
                                                 self.min_servers))
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='pass')
+    @tags(speed='slow', type='rcv3', rcv3_mimic='pass', convergence='yes')
     def test_scale_down_after_manual_remove_node(self):
         """
         Verify that the RCV3 group can successfully scale down after a server
