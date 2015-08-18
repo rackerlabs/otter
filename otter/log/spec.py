@@ -4,11 +4,13 @@ Format logs based on specification
 import json
 import math
 
-from operator import itemgetter
-
-from toolz.functoolz import curry
+from toolz.dicttoolz import assoc, keyfilter
+from toolz.functoolz import compose, curry
 
 from twisted.python.failure import Failure
+
+
+_json_len = compose(len, json.dumps)
 
 
 def split_execute_convergence(event, max_length=50000):
@@ -22,36 +24,26 @@ def split_execute_convergence(event, max_length=50000):
     characters - we're going to limit it to 50k.
     """
     message = "Executing convergence"
-    chars = len(json.dumps(event))
-    if chars <= max_length:
+    if _json_len(event) <= max_length:
         return [(event, message)]
 
-    large_things = [(k, len(json.dumps(event[k])))
-                    for k in ('servers', 'lb_nodes')]
-    large_things = sorted(large_things, key=itemgetter(1), reverse=True)
-
     events = [(event, message)]
+    large_things = sorted(('servers', 'lb_nodes'),
+                          key=compose(_json_len, event.get),
+                          reverse=True)
 
     # simplified event which serves as a base for the split out events
-    base_event = {k: event[k] for k in event if k not in
-                  ('desired', 'servers', 'lb_nodes', 'steps')}
+    base_event = keyfilter(
+        lambda k: k not in ('desired', 'servers', 'lb_nodes', 'steps'),
+        event)
 
-    def splitted_event(key, value):
-        e = base_event.copy()
-        e[key] = value
-        return e
-
-    @curry
-    def as_json(key, value):
-        return json.dumps(splitted_event(key, value))
-
-    for thing, _ in large_things:
-        events.extend(
-            [(splitted_event(thing, value), message)
-             for value in split(as_json(thing), event[thing], max_length)]
-        )
+    for thing in large_things:
+        split_up_events = split(
+            curry(assoc, base_event, thing), event[thing], max_length,
+            _json_len)
+        events.extend([(e, message) for e in split_up_events])
         del event[thing]
-        if len(json.dumps(event)) <= max_length:
+        if _json_len(event) <= max_length:
             break
 
     return events
@@ -129,7 +121,7 @@ def halve(l):
     return (l[:half_index], l[half_index:])
 
 
-def split(render, elements, max_len):
+def split(render, elements, max_len, calculate_len=len):
     """
     Render some elements of a list, where each rendered message is no longer
     than max.
@@ -147,11 +139,12 @@ def split(render, elements, max_len):
         the provided callable, should probably be less than ``max_len``.
     """
     m = render(elements)
-    if len(elements) > 1 and len(m) > max_len:
+    if len(elements) > 1 and calculate_len(m) > max_len:
         left, right = halve(elements)
-        return split(render, left, max_len) + split(render, right, max_len)
+        return (split(render, left, max_len, calculate_len) +
+                split(render, right, max_len, calculate_len))
     else:
-        return [elements]
+        return [m]
 
 
 def error_event(event, failure, why):
