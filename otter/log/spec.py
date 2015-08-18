@@ -22,6 +22,14 @@ def split_execute_convergence(event, max_length=50000):
 
     Experimentally determined that probably logs cut off at around 75k,
     characters - we're going to limit it to 50k.
+
+    :param dict event: The 'execute-convergence' type event dictionary to split
+    :param int max_length: The maximum length of the entire JSON-formatted
+        dictionary.
+
+    :return: `list` of `dict` representing the spit up event dicts.  If
+        the event does not need to be split, this list will only have one
+        element.
     """
     message = "Executing convergence"
     if _json_len(event) <= max_length:
