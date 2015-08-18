@@ -300,6 +300,29 @@ def empty_group(log, trans_id, group):
     return d
 
 
+@defer.inlineCallbacks
+def modify_and_trigger(group, log, modifier, *args, **kwargs):
+    """
+    Modify group state and trigger convergence after that
+
+    :param IScalingGroup group: Scaling group whose state is getting modified
+    :param log: Bound logger
+    :param modifier: Callable as described in IScalingGroup.modify_state
+
+    :return: Deferred with None
+    """
+    cannot_exec_pol_err = None
+    try:
+        yield group.modify_state(modifier, *args, **kwargs)
+    except CannotExecutePolicyError as ce:
+        cannot_exec_pol_err = ce
+    if tenant_is_enabled(group.tenant_id, config_value):
+        cs = get_convergence_starter()
+        yield cs.start_convergence(log, group.tenant_id, group.uuid)
+    if cannot_exec_pol_err is not None:
+        raise cannot_exec_pol_err
+
+
 def converge(log, transaction_id, config, scaling_group, state, launch_config,
              policy, config_value=config_value):
     """
