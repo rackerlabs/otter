@@ -123,20 +123,24 @@ def halve(l):
 
 def split(render, elements, max_len, calculate_len=len):
     """
-    Render some elements of a list, where each rendered message is no longer
-    than max.
+    Render some elements of a list, where the length (as determined by
+    ``calculate_len``) of each rendered object is no longer than ``max_len``.
 
     Messages longer than the max that are rendered from individual elements
     will still be returned, so ``max_len`` mustn't be assumed to be a hard
     constraint.
 
     :param callable render: A callable which takes a list of elements, and
-        produces a string the list should be rendered to.
+        produces an object string the list of elements be rendered to.
     :param list elements: A list of elements that should be potentially split.
-    :param int max_len: Maximum length of the rendered list
+    :param int max_len: Maximum length of the rendered object, as calculated
+        by ``calculate_len``.
+    :param callable calculate_len: A callable that takes the rendered object
+        and calculates the length.
 
-    :return: a `list` of `list`s of elements, each of which, when rendered with
-        the provided callable, should probably be less than ``max_len``.
+    :return: a `list` of `list`s of elements, each of which, when rendered
+        and measured with the provided callables, should probably be less than
+        ``max_len``.
     """
     m = render(elements)
     if len(elements) > 1 and calculate_len(m) > max_len:
