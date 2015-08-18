@@ -1,8 +1,60 @@
 """
 Format logs based on specification
 """
+import json
+import math
+
+from operator import itemgetter
+
+from toolz.functoolz import curry
 
 from twisted.python.failure import Failure
+
+
+def split_execute_convergence(event, max_length=50000):
+    """
+    Try to split execute-convergence event out into multiple events if there
+    are too many CLB nodes, too many servers, or too many steps.
+
+    The problem is mainly the servers, since they take up the most space.
+
+    Experimentally determined that probably logs cut off at around 75k,
+    characters - we're going to limit it to 50k.
+    """
+    message = "Executing convergence"
+    chars = len(json.dumps(event))
+    if chars <= max_length:
+        return [(event, message)]
+
+    large_things = [(k, len(json.dumps(event[k])))
+                    for k in ('servers', 'lb_nodes')]
+    large_things = sorted(large_things, key=itemgetter(1), reverse=True)
+
+    events = [(event, message)]
+
+    # simplified event which serves as a base for the split out events
+    base_event = {k: event[k] for k in event if k not in
+                  ('desired', 'servers', 'lb_nodes', 'steps')}
+
+    def splitted_event(key, value):
+        e = base_event.copy()
+        e[key] = value
+        return e
+
+    @curry
+    def as_json(key, value):
+        return json.dumps(splitted_event(key, value))
+
+    for thing, _ in large_things:
+        events.extend(
+            [(splitted_event(thing, value), message)
+             for value in split(as_json(thing), event[thing], max_length)]
+        )
+        del event[thing]
+        if len(json.dumps(event)) <= max_length:
+            break
+
+    return events
 
 
 # mapping from msg type -> message
@@ -22,7 +74,7 @@ msg_types = {
     "converge-non-fatal-error": (
         "Non-fatal error while converging group {scaling_group_id}"),
     "delete-server": "Deleting {server_id} server",
-    "execute-convergence": "Executing convergence",
+    "execute-convergence": split_execute_convergence,
     "execute-convergence-results": (
         "Got result of {worst_status} after executing convergence"),
     "launch-servers": "Launching {num_servers} servers",
@@ -64,6 +116,42 @@ msg_types = {
     "group-status-error":
         "Group's status is changed to ERROR. Reasons: {reasons}",
 }
+
+
+def halve(l):
+    """
+    Split a sequence in half, biased to the left.
+
+    :param list l: The sequence to split
+    :return: a `tuple` containing both halves of the sequence.
+    """
+    half_index = int(math.ceil(len(l) / 2.0))
+    return (l[:half_index], l[half_index:])
+
+
+def split(render, elements, max_len):
+    """
+    Render some elements of a list, where each rendered message is no longer
+    than max.
+
+    Messages longer than the max that are rendered from individual elements
+    will still be returned, so ``max_len`` mustn't be assumed to be a hard
+    constraint.
+
+    :param callable render: A callable which takes a list of elements, and
+        produces a string the list should be rendered to.
+    :param list elements: A list of elements that should be potentially split.
+    :param int max_len: Maximum length of the rendered list
+
+    :return: a `list` of `list`s of elements, each of which, when rendered with
+        the provided callable, should probably be less than ``max_len``.
+    """
+    m = render(elements)
+    if len(elements) > 1 and len(m) > max_len:
+        left, right = halve(elements)
+        return split(render, left, max_len) + split(render, right, max_len)
+    else:
+        return [elements]
 
 
 def error_event(event, failure, why):
