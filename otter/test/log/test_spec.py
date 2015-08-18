@@ -17,10 +17,10 @@ class SpecificationObserverWrapperTests(SynchronousTestCase):
         """
         Sample delegating observer
         """
-        self.e = None
+        self.e = []
 
         def observer(event):
-            self.e = event
+            self.e.append(event)
 
         self.observer = observer
 
@@ -33,9 +33,9 @@ class SpecificationObserverWrapperTests(SynchronousTestCase):
             {'message': ("launch-servers",), "num_servers": 2})
         self.assertEqual(
             self.e,
-            {'message': ('Launching {num_servers} servers', ),
-             'num_servers': 2,
-             'otter_msg_type': 'launch-servers'})
+            [{'message': ('Launching {num_servers} servers', ),
+              'num_servers': 2,
+              'otter_msg_type': 'launch-servers'}])
 
     def test_error_validating_observer(self):
         """
@@ -47,11 +47,22 @@ class SpecificationObserverWrapperTests(SynchronousTestCase):
         wrapper({'message': ("something-bad",), 'a': 'b'})
         self.assertEqual(
             self.e,
-            {'original_event': {'message': ("something-bad",), 'a': 'b'},
-             'isError': True,
-             'failure': CheckFailureValue(ValueError('hm')),
-             'why': 'Error validating event',
-             'message': ()})
+            [{'original_event': {'message': ("something-bad",), 'a': 'b'},
+              'isError': True,
+              'failure': CheckFailureValue(ValueError('hm')),
+              'why': 'Error validating event',
+              'message': ()}])
+
+    def test_event_gets_split(self):
+        """
+        The observer might emit multiple events if the original event gets
+        split.
+        """
+        message = {'message': ("launch-servers",), "num_servers": 2}
+        wrapper = SpecificationObserverWrapper(
+            self.observer, lambda e: [e, e.copy()])
+        wrapper(message)
+        self.assertEqual(self.e, [message, message])
 
 
 class GetValidatedEventTests(SynchronousTestCase):
@@ -64,7 +75,7 @@ class GetValidatedEventTests(SynchronousTestCase):
         Nothing is changed if Error-based event is not found in msg_types
         """
         e = {'isError': True, 'why': 'unknown', 'a': 'b'}
-        self.assertEqual(get_validated_event(e), e)
+        self.assertEqual(get_validated_event(e), [e])
 
     def test_error_why_is_changed(self):
         """
@@ -74,16 +85,16 @@ class GetValidatedEventTests(SynchronousTestCase):
         e = {'isError': True, 'why': 'delete-server', 'a': 'b'}
         self.assertEqual(
             get_validated_event(e),
-            {'why': 'Deleting {server_id} server',
-             'isError': True, 'a': 'b',
-             'otter_msg_type': 'delete-server'})
+            [{'why': 'Deleting {server_id} server',
+              'isError': True, 'a': 'b',
+              'otter_msg_type': 'delete-server'}])
 
     def test_error_no_why_in_event(self):
         """
         If error-based event's does not have "why", then it is not changed
         """
         e = {'isError': True, 'a': 'b'}
-        self.assertEqual(get_validated_event(e), e)
+        self.assertEqual(get_validated_event(e), [e])
 
     def test_error_no_why_but_message(self):
         """
@@ -92,16 +103,16 @@ class GetValidatedEventTests(SynchronousTestCase):
         e = {'isError': True, 'a': 'b', "message": ('delete-server',)}
         self.assertEqual(
             get_validated_event(e),
-            {'message': ('Deleting {server_id} server',), 'isError': True,
-             'why': 'Deleting {server_id} server',
-             'a': 'b', 'otter_msg_type': 'delete-server'})
+            [{'message': ('Deleting {server_id} server',), 'isError': True,
+              'why': 'Deleting {server_id} server',
+              'a': 'b', 'otter_msg_type': 'delete-server'}])
 
     def test_msg_not_found(self):
         """
         Event is not changed if msg_type is not found
         """
         e = {'message': ('unknown',), 'a': 'b'}
-        self.assertEqual(get_validated_event(e), e)
+        self.assertEqual(get_validated_event(e), [e])
 
     def test_message_is_changed(self):
         """
@@ -111,5 +122,52 @@ class GetValidatedEventTests(SynchronousTestCase):
         e = {'message': ('delete-server',), 'a': 'b'}
         self.assertEqual(
             get_validated_event(e),
-            {'message': ('Deleting {server_id} server',),
-             'a': 'b', 'otter_msg_type': 'delete-server'})
+            [{'message': ('Deleting {server_id} server',),
+              'a': 'b', 'otter_msg_type': 'delete-server'}])
+
+    def test_callable_spec(self):
+        """
+        Spec values can be callable, in which case they will be called with the
+        event dict, and their return value will be used as the new `message`.
+        """
+        e = {"message": ('foo-bar',), 'ab': 'cd'}
+        self.assertEqual(
+            get_validated_event(e,
+                                specs={'foo-bar': lambda e: [(e, e['ab'])]}),
+            [{'message': ('cd',),
+              'otter_msg_type': 'foo-bar',
+              'ab': 'cd'}])
+
+    def test_callable_spec_error(self):
+        """
+        Spec values will be called for errors as well, and their return will be
+        used as the new value for `why`.
+        """
+        e = {'isError': True, 'why': 'foo-bar', 'ab': 'cd'}
+        self.assertEqual(
+            get_validated_event(e,
+                                specs={'foo-bar': lambda e: [(e, e['ab'])]}),
+            [{'why': 'cd',
+              'isError': True,
+              'otter_msg_type': 'foo-bar',
+              'ab': 'cd'}])
+
+    def test_callable_spec_split_events(self):
+        """
+        Event dictionaries returned will have a field tracking how many events
+        the original event was split into.
+        """
+        e = {'isError': True, 'why': 'foo-bar', 'ab': 'cd'}
+        specs = {'foo-bar': lambda e: [(e, e['ab']), (e.copy(), 'another')]}
+        self.assertEqual(
+            get_validated_event(e, specs),
+            [{'why': 'cd',
+              'isError': True,
+              'otter_msg_type': 'foo-bar',
+              'ab': 'cd',
+              'split_message': '1 of 2'},
+             {'why': 'another',
+              'isError': True,
+              'otter_msg_type': 'foo-bar',
+              'ab': 'cd',
+              'split_message': '2 of 2'}])

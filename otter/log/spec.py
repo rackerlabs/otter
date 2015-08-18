@@ -8,6 +8,8 @@ from twisted.python.failure import Failure
 # mapping from msg type -> message
 msg_types = {
     # Keep these in alphabetical order so merges can be deterministic
+    # These can be callables as well with the following type:
+    # event -> [(event, format_str)]
     "add-server-clb": ("Adding {server_id} with IP address {ip_address} "
                        "to CLB {clb_id}"),
     "converge-all-groups": "Attempting to converge all dirty groups",
@@ -78,44 +80,58 @@ class MsgTypeNotFound(Exception):
     """
 
 
-def try_msg_types(*tries):
+def try_msg_types(event, specs, tries):
     """
     Try series of msg_types
     """
     for msg_type in tries:
-        if msg_type in msg_types:
-            return msg_types[msg_type], msg_type
-    raise MsgTypeNotFound
+        if msg_type in specs:
+            formatter = specs[msg_type]
+            if callable(formatter):
+                events = formatter(event)
+            else:
+                events = [(event, formatter)]
+
+            return events, msg_type
+    raise MsgTypeNotFound(msg_type)
 
 
-def get_validated_event(event):
+def get_validated_event(event, specs=msg_types):
     """
     Validate event's message as per msg_types and error details as
     per error_fields
 
-    :return: Validated event
+    :return: A list of validated events.
     :raises: `ValueError` or `TypeError` if `event_dict` is not valid
     """
     try:
         # message is tuple of strings
         message = ''.join(event.get("message", []))
-
+        error = event.get('isError', False)
         # Is this message speced?
-        if event.get('isError', False):
-            expanded, msg_type = try_msg_types(event.get("why", None), message)
+        if error:
             validate_error(event)
-            event['why'] = expanded
-            if message:
-                event['message'] = (expanded,)
-        else:
-            expanded, msg_type = try_msg_types(message)
-            event["message"] = (expanded, )
+
+        events_and_messages, msg_type = try_msg_types(
+            event, specs,
+            [event.get("why", None), message] if error else [message])
 
         # TODO: Validate non-primitive fields
-        event["otter_msg_type"] = msg_type
-        return event
+        for i, (e, m) in enumerate(events_and_messages):
+            e["otter_msg_type"] = msg_type
+            if error:
+                e['why'] = m
+
+            if not error or message:
+                e['message'] = (m,)
+
+            if len(events_and_messages) > 1:
+                e['split_message'] = "{0} of {1}".format(
+                    i + 1, len(events_and_messages))
+
+        return [e for e, _ in events_and_messages]
     except MsgTypeNotFound:
-        return event
+        return [event]
 
 
 def SpecificationObserverWrapper(observer,
@@ -136,11 +152,12 @@ def SpecificationObserverWrapper(observer,
     """
     def validating_observer(event_dict):
         try:
-            speced_event = get_validated_event(event_dict)
+            speced_events = get_validated_event(event_dict)
         except (ValueError, TypeError):
-            speced_event = error_event(
-                event_dict, Failure(), "Error validating event")
-        observer(speced_event)
+            speced_events = [error_event(
+                event_dict, Failure(), "Error validating event")]
+        for event in speced_events:
+            observer(event)
 
     return validating_observer
 
