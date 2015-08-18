@@ -151,3 +151,23 @@ class GetValidatedEventTests(SynchronousTestCase):
               'isError': True,
               'otter_msg_type': 'foo-bar',
               'ab': 'cd'}])
+
+    def test_callable_spec_split_events(self):
+        """
+        Event dictionaries returned will have a field tracking how many events
+        the original event was split into.
+        """
+        e = {'isError': True, 'why': 'foo-bar', 'ab': 'cd'}
+        specs = {'foo-bar': lambda e: [(e, e['ab']), (e.copy(), 'another')]}
+        self.assertEqual(
+            get_validated_event(e, specs),
+            [{'why': 'cd',
+              'isError': True,
+              'otter_msg_type': 'foo-bar',
+              'ab': 'cd',
+              'split_message': '1 of 2'},
+             {'why': 'another',
+              'isError': True,
+              'otter_msg_type': 'foo-bar',
+              'ab': 'cd',
+              'split_message': '2 of 2'}])
