@@ -18,7 +18,7 @@ from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in, groupby
-from toolz.dicttoolz import keyfilter, merge
+from toolz.dicttoolz import merge
 from toolz.functoolz import identity
 
 from twisted.application.internet import TimerService
@@ -342,6 +342,10 @@ class Options(usage.Options):
         self.update(json.load(self.open(self['config'])))
 
 
+def metrics_set(metrics):
+    return set((g.tenant_id, g.group_id) for g in metrics)
+
+
 def unchanged_divergent_groups(clock, current, timeout, group_metrics):
     """
     Return list of GroupMetrics that have been divergent and unchanged for
@@ -356,9 +360,11 @@ def unchanged_divergent_groups(clock, current, timeout, group_metrics):
     """
     converged, diverged = partition_bool(
         lambda gm: gm.actual + gm.pending == gm.desired, group_metrics)
-    # stop tracking all converged groups
-    converged = set((g.tenant_id, g.group_id) for g in converged)
-    updated = keyfilter(lambda k: k not in converged, current)
+    # stop tracking all converged and deleted groups
+    deleted = set(current.keys()) - metrics_set(group_metrics)
+    updated = current.copy()
+    for g in metrics_set(converged) | deleted:
+        updated.pop(g, None)
     # Start tracking divergent groups depending on whether they've changed
     now = clock.seconds()
     to_log, new = [], {}

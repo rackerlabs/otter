@@ -427,11 +427,13 @@ class UnchangedDivergentGroupsTests(SynchronousTestCase):
             ("t1", "cg"): (0, 23),  # changed group: any value diff from hash
             ("t2", "tg"): (3600, hash((2, 1, 2))),  # timeout group
             ("t2", "tg2"): (0, hash((5, 2, 1))),  # high timeout group
-            ("t1", "dg"): (7100, hash((6, 0, 3)))  # diverged but not timeout
+            ("t1", "dg"): (7100, hash((6, 0, 3))),  # diverged but not timeout
+            ("t2", "delg"): (4000, hash((4, 1, 2)))  # deleted group
         }
         self.clock.advance(7203)
         groups, logs = self.invoke(dg, metrics)
         # changed group "cg" removed and converged group "fine" not added
+        # Deleted group "delg" removed
         self.assertEqual(
             groups,
             {("t2", "tg"): (3600, hash((2, 1, 2))),  # timeout group remains
