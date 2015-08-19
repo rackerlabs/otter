@@ -18,22 +18,6 @@ from test_repo.autoscale.fixtures import (
 from test_repo.autoscale.system.integration import common
 
 
-class DummyAsserter(object):
-    def __init__(self):
-        self.err = None
-
-    def assertEquals(self, a, b, msg):  # nopep8 - ignore N802
-        if a != b:
-            self.fail(msg)
-
-    def assertNotEquals(self, a, b, msg):  # nopep8 - ignore N802
-        if a == b:
-            self.fail(msg)
-
-    def fail(self, msg):
-        self.err = msg
-
-
 @unittest.skipUnless(rcv3_client, "RCv3 is not supported by this account.")
 class AutoscaleRackConnectFixture(AutoscaleFixture):
     """
@@ -129,30 +113,18 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                           cls.lbaas_client.delete_load_balancer)
 
         # OK, back to waiting for autoscale servers to spin up.
-        dummy_asserter = DummyAsserter()
         cls.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             background_group_resp.entity.id,
             2,
             timeout=600,
-            api="Autoscale",
-            asserter=dummy_asserter)
-
-        # If there was an error waiting for servers to build, abort the
-        # testing.
-        if dummy_asserter.err:
-            print("SetUpClass failed: background servers")
+            api="Autoscale")
 
         # Wait for initial nodes to be added to the load balancer
         cls.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             cls.pool.id,
             count_pre_nodes + 2,
             timeout=300,
-            api="RackConnect",
-            asserter=dummy_asserter)
-        # If there was an error waiting for servers to build, abort the
-        # testing.
-        if dummy_asserter.err:
-            print("SetUpClass failed: background LB nodes")
+            api="RackConnect")
 
     @tags(speed='slow', type='rcv3', rcv3_mimic='pass', convergence='yes')
     def test_create_scaling_group_with_pool_on_cloud_network(self):
