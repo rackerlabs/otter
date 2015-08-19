@@ -57,6 +57,33 @@ def split_execute_convergence(event, max_length=50000):
     return events
 
 
+@curry
+def split_cf_messages(format_message, var_length_key, event, max_length=255):
+    """
+    Try to split cloud feed log events out into multiple events if the message
+    is too long (the variable-length variable would cause the message to be
+    too long.)
+
+    :param str format_message: The format string to use to format the event
+    :param str var_length_key: The key in the event dictionary that contains
+        the variable-length part of the formatted message.
+    :param dict event: The event dictionary
+    :param int max_length: The maximum length of the formatted message.
+
+    :return: `list` of event dictionaries with the formatted message and
+        the split event field.
+    """
+    def length_calc(e):
+        return len(format_message.format(**e))
+
+    if length_calc(event) <= max_length:
+        return [(event, format_message)]
+
+    events = split(curry(assoc, event, var_length_key), event[var_length_key],
+                   max_length, length_calc)
+    return [(e, format_message) for e in events]
+
+
 # mapping from msg type -> message
 msg_types = {
     # Keep these in alphabetical order so merges can be deterministic
@@ -93,25 +120,28 @@ msg_types = {
         "Request to create a server succeeded with response: {response_body}"),
     "request-list-servers-details": ("Request to list servers succeeded"),
 
-    # CF-published log messages
+    # CF-publishing failures
     "cf-add-failure": "Failed to add event to cloud feeds",
     "cf-unsuitable-message": (
         "Tried to add unsuitable message in cloud feeds: "
         "{unsuitable_message}"),
+
+    # CF-published log messages
     "convergence-create-servers":
-        "Creating {num_servers} with config {server_config}",
-    "convergence-delete-servers": "Deleting {servers}",
-    "convergence-add-clb-nodes":
-        "Adding IPs to CLB {lb_id}: {addresses}",
-    "convergence-remove-clb-nodes":
-        "Removing nodes from CLB {lb_id}: {nodes}",
-    "convergence-change-clb-nodes":
+        "Creating {num_servers} servers.",
+    "convergence-delete-servers": split_cf_messages(
+        "Deleting {servers}", 'servers'),
+    "convergence-add-clb-nodes": split_cf_messages(
+        "Adding IPs to CLB {lb_id}: {addresses}", 'addresses'),
+    "convergence-remove-clb-nodes": split_cf_messages(
+        "Removing nodes from CLB {lb_id}: {nodes}", 'nodes'),
+    "convergence-change-clb-nodes": split_cf_messages(
         "Changing nodes on CLB {lb_id}: nodes={nodes}, type={type}, "
-        "condition={condition}, weight={weight}",
-    "convergence-add-rcv3-nodes":
-        "Adding servers to RCv3 LB {lb_id}: {servers}",
-    "convergence-remove-rcv3-nodes":
-        "Removing servers from RCv3 LB {lb_id}: {servers}",
+        "condition={condition}, weight={weight}", "nodes"),
+    "convergence-add-rcv3-nodes": split_cf_messages(
+        "Adding servers to RCv3 LB {lb_id}: {servers}", "servers"),
+    "convergence-remove-rcv3-nodes": split_cf_messages(
+        "Removing servers from RCv3 LB {lb_id}: {servers}", "servers"),
     "group-status-active": "Group's status is changed to ACTIVE",
     "group-status-error":
         "Group's status is changed to ERROR. Reasons: {reasons}",

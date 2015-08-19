@@ -3,11 +3,14 @@ Tests for log_spec.py
 """
 import json
 
+from toolz.dicttoolz import assoc
+
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.log.spec import (
     SpecificationObserverWrapper,
     get_validated_event,
+    split_cf_messages,
     split_execute_convergence
 )
 from otter.test.utils import CheckFailureValue, raise_
@@ -277,3 +280,42 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
         ]
 
         self.assertEqual(result, expected)
+
+
+class CFMessageSplitTests(SynchronousTestCase):
+    """
+    Tests for splitting cf message type events
+    (e.g. :func:`split_cf_messages`)
+    """
+    def test_no_need_to_split_if_below_length(self):
+        """
+        Do not split the event if the message is sufficiently short.
+        """
+        message = 'Hello {there} human being {punctuation}'
+        event = {'there': [1, 2, 3, 4], 'punctuation': '!', 'extra': 'unused'}
+        result = split_cf_messages(message, 'there')(event)
+        self.assertEqual(result, [(event, message)])
+
+    def test_no_split_on_empty_field(self):
+        """
+        Do not split the event the field is an empty list, even if it is too
+        long.
+        """
+        message = 'Hello {there} human being {punctuation}'
+        event = {'there': [], 'punctuation': '!', 'extra': 'unused'}
+        result = split_cf_messages(message, 'there', max_length=5)(event)
+        self.assertEqual(result, [(event, message)])
+
+    def test_split_only_var_key(self):
+        """
+        Only the values for the specified key will be split, no matter how long
+        the other keys are.
+        """
+        message = 'x: {x}, y: {y}'
+        event = {'x': '123', 'y': '12345'}
+        result = split_cf_messages(message, 'x', max_length=14)(event)
+        self.assertEqual(
+            result,
+            [(assoc(event, 'x', '1'), message),
+             (assoc(event, 'x', '2'), message),
+             (assoc(event, 'x', '3'), message)])
