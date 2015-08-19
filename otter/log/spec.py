@@ -150,8 +150,9 @@ msg_types = {
     "convergence-remove-rcv3-nodes": split_cf_messages(
         "Removing servers from RCv3 LB {lb_id}: {servers}", "servers"),
     "group-status-active": "Group's status is changed to ACTIVE",
-    "group-status-error":
-        "Group's status is changed to ERROR. Reasons: {reasons}",
+    "group-status-error": split_cf_messages(
+        "Group's status is changed to ERROR. Reasons: {reasons}", "reasons",
+        separator='; ')
 }
 
 
