@@ -371,7 +371,9 @@ class OtterPolicy(object):
         """
         group = self.store.get_scaling_group(self.log, self.tenant_id,
                                              self.scaling_group_id)
-        d = group.modify_state(
+        d = controller.modify_and_trigger(
+            group,
+            self.log,
             partial(controller.maybe_execute_scaling_policy,
                     self.log, transaction_id(request),
                     policy_id=self.policy_id),

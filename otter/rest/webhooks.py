@@ -370,7 +370,9 @@ class OtterExecute(object):
             logl[0] = bound_log
             group = self.store.get_scaling_group(bound_log, tenant_id,
                                                  group_id)
-            return group.modify_state(
+            return modify_and_trigger(
+                group,
+                bound_log,
                 partial(controller.maybe_execute_scaling_policy,
                         bound_log, transaction_id(request),
                         policy_id=policy_id),

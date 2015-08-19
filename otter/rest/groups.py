@@ -411,9 +411,12 @@ class OtterGroups(object):
             launch = result['launchConfiguration']
             group = self.store.get_scaling_group(
                 self.log, self.tenant_id, group_id)
-            d = group.modify_state(partial(
-                controller.obey_config_change, self.log,
-                transaction_id(request), config, launch_config=launch),
+            d = controller.modify_and_trigger(
+                group,
+                self.log,
+                partial(
+                    controller.obey_config_change, self.log,
+                    transaction_id(request), config, launch_config=launch),
                 modify_state_reason='create_new_scaling_group')
             return d.addCallback(lambda _: result)
 
@@ -672,11 +675,7 @@ class OtterGroup(object):
         if tenant_is_enabled(self.tenant_id, config_value):
             group = self.store.get_scaling_group(
                 self.log, self.tenant_id, self.group_id)
-            cs = get_convergence_starter()
-            d = group.modify_state(is_group_paused)
-            return d.addCallback(
-                lambda _: cs.start_convergence(self.log, self.tenant_id,
-                                               self.group_id))
+            return modify_and_trigger(group, self.log, is_group_paused)
         else:
             request.setResponseCode(404)
 
@@ -788,7 +787,9 @@ class OtterServers(object):
         """
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.scaling_group_id)
-        d = group.modify_state(
+        d = controller.modify_and_trigger(
+            group,
+            self.log,
             partial(controller.remove_server_from_group,
                     self.log.bind(server_id=server_id),
                     transaction_id(request), server_id,

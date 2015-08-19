@@ -703,13 +703,6 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge,
 
     # convergence case - requires that the convergence dispatcher handles
     # EvictServerFromScalingGroup
-    cs = get_convergence_starter()
-    d = perform_convergence_remove_from_group(
+    return perform_convergence_remove_from_group(
         log, trans_id, server_id, replace, purge, group, state,
         cs.dispatcher)
-
-    def kick_off_convergence(new_state):
-        cs.start_convergence(log, group.tenant_id, group.uuid)
-        return new_state
-
-    return d.addCallback(kick_off_convergence)
