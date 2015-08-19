@@ -58,7 +58,8 @@ def split_execute_convergence(event, max_length=50000):
 
 
 @curry
-def split_cf_messages(format_message, var_length_key, event, max_length=255):
+def split_cf_messages(format_message, var_length_key, event, separator=', ',
+                      max_length=255):
     """
     Try to split cloud feed log events out into multiple events if the message
     is too long (the variable-length variable would cause the message to be
@@ -68,6 +69,10 @@ def split_cf_messages(format_message, var_length_key, event, max_length=255):
     :param str var_length_key: The key in the event dictionary that contains
         the variable-length part of the formatted message.
     :param dict event: The event dictionary
+    :param str separator: The separator to use to join the various elements
+        that should be varied.  (e.g. if the elements in "var_length_key" are
+        ["1", "2", "3"] and the separator is "; ", "var_length_key" will be
+        represented as "1; 2; 3")
     :param int max_length: The maximum length of the formatted message.
 
     :return: `list` of event dictionaries with the formatted message and
@@ -76,11 +81,13 @@ def split_cf_messages(format_message, var_length_key, event, max_length=255):
     def length_calc(e):
         return len(format_message.format(**e))
 
-    if length_calc(event) <= max_length:
-        return [(event, format_message)]
+    render = compose(curry(assoc, event, var_length_key), separator.join,
+                     curry(map, str))
 
-    events = split(curry(assoc, event, var_length_key), event[var_length_key],
-                   max_length, length_calc)
+    if length_calc(event) <= max_length:
+        return [(render(event[var_length_key]), format_message)]
+
+    events = split(render, event[var_length_key], max_length, length_calc)
     return [(e, format_message) for e in events]
 
 

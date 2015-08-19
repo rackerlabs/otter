@@ -289,12 +289,14 @@ class CFMessageSplitTests(SynchronousTestCase):
     """
     def test_no_need_to_split_if_below_length(self):
         """
-        Do not split the event if the message is sufficiently short.
+        Do not split the event if the message is sufficiently short.  However,
+        do format it so that the list becomes a comma-separated string.
         """
         message = 'Hello {there} human being {punctuation}'
         event = {'there': [1, 2, 3, 4], 'punctuation': '!', 'extra': 'unused'}
         result = split_cf_messages(message, 'there')(event)
-        self.assertEqual(result, [(event, message)])
+        self.assertEqual(result,
+                         [(assoc(event, 'there', '1, 2, 3, 4'), message)])
 
     def test_no_split_on_empty_field(self):
         """
@@ -304,7 +306,7 @@ class CFMessageSplitTests(SynchronousTestCase):
         message = 'Hello {there} human being {punctuation}'
         event = {'there': [], 'punctuation': '!', 'extra': 'unused'}
         result = split_cf_messages(message, 'there', max_length=5)(event)
-        self.assertEqual(result, [(event, message)])
+        self.assertEqual(result, [(assoc(event, 'there', ''), message)])
 
     def test_split_only_var_key(self):
         """
