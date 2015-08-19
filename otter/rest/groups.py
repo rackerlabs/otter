@@ -615,7 +615,7 @@ class OtterGroup(object):
                                              self.group_id)
         force = extract_bool_arg(request, 'force', False)
         return controller.delete_group(
-            log, transaction_id(request), group, force)
+            self.dispatcher, log, transaction_id(request), group, force)
 
     @app.route('/state/', methods=['GET'])
     @with_transaction_id()
@@ -672,11 +672,10 @@ class OtterGroup(object):
         if tenant_is_enabled(self.tenant_id, config_value):
             group = self.store.get_scaling_group(
                 self.log, self.tenant_id, self.group_id)
-            cs = get_convergence_starter()
             d = group.modify_state(is_group_paused)
-            return d.addCallback(
-                lambda _: cs.start_convergence(self.log, self.tenant_id,
-                                               self.group_id))
+            eff = trigger_convergence(self.tenant_id, self.group_id)
+            return d.addCallback(lambda _: perform(self.dispatcher, eff))
+
         else:
             request.setResponseCode(404)
 

@@ -386,6 +386,13 @@ def delete_divergent_flag(tenant_id, group_id, version):
         yield msg('mark-clean-success')
 
 
+def trigger_convergence(tenant_id, group_id):
+    eff = with_log(mark_divergent(tenant_id, group_id),
+                   tenant_id=tenant_id, scaling_group_id=group_id)
+    return eff.on(success=lambda _: msg("mark-dirty-success"),
+                  error=lambda e: err("mark-dirty-failure"))
+
+
 class ConvergenceStarter(object):
     """
     A service that allows indicating that a group has diverged and needs

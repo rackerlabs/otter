@@ -205,7 +205,7 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
     return d
 
 
-def delete_group(log, trans_id, group, force):
+def delete_group(dispatcher, log, trans_id, group, force):
     """
     Delete group based on the kind of tenant
 
@@ -221,7 +221,7 @@ def delete_group(log, trans_id, group, force):
 
     def check_and_delete(_group, state):
         if state.desired == 0:
-            d = trigger_convergence_deletion(log, group)
+            d = trigger_convergence_deletion(dispatcher, group)
             return d.addCallback(lambda _: state)
         else:
             raise GroupNotEmptyError(group.tenant_id, group.uuid)
@@ -230,7 +230,7 @@ def delete_group(log, trans_id, group, force):
         if force:
             # We don't care about servers in the group. So trigger deletion
             # since it will take precedence over other status
-            d = trigger_convergence_deletion(log, group)
+            d = trigger_convergence_deletion(dispatcher, group)
         else:
             # Delete only if desired is 0 which must be done with a lock to
             # ensure desired is not getting modified by another thread/node
@@ -247,7 +247,7 @@ def delete_group(log, trans_id, group, force):
     return d
 
 
-def trigger_convergence_deletion(log, group):
+def trigger_convergence_deletion(dispatcher, group):
     """
     Trigger deletion of group that belongs to convergence tenant
 
@@ -258,9 +258,8 @@ def trigger_convergence_deletion(log, group):
     # Update group status and trigger convergence
     # DELETING status will take precedence over other status
     d = group.update_status(ScalingGroupStatus.DELETING)
-    cs = get_convergence_starter()
-    d.addCallback(
-        lambda _: cs.start_convergence(log, group.tenant_id, group.uuid))
+    eff = trigger_convergence(group.tenant_id, group.uuid)
+    d.addCallback(lambda _: perform(dispatcher, eff))
     return d
 
 
