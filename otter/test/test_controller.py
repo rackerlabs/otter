@@ -1456,8 +1456,8 @@ class ConvergeTestCase(SynchronousTestCase):
 
     def test_real_convergence_nonzero_delta(self):
         """
-        When a tenant is configured for convergence, convergence is triggered
-        and state is returned after convergence triggering is successful
+        When a tenant is configured for convergence, the state.desired is
+        updated with new desired and state is returned
         """
         log = mock_log()
         state = GroupState('tenant', 'group', "test", [], [], None, {},
@@ -1466,23 +1466,19 @@ class ConvergeTestCase(SynchronousTestCase):
         policy = {'change': 5}
         config_data = {'convergence-tenants': ['tenant']}
 
-        start_convergence = self.cvg_starter_mock.start_convergence
-        start_convergence.return_value = defer.succeed("ignored")
-
         result = controller.converge(log, 'txn-id', group_config, self.group,
                                      state, 'launch', policy,
                                      config_value=config_data.get)
         self.assertEqual(self.successResultOf(result), state)
-        start_convergence.assert_called_once_with(log, 'tenant', 'group')
+        self.assertEqual(state.desired, 5)
 
         # And execute_launch_config is _not_ called
         self.assertFalse(self.mocks['execute_launch_config'].called)
 
     def test_real_convergence_zero_delta(self):
         """
-        When a tenant is configured for convergence, if the delta is zero, the
-        ConvergenceStarter service's ``start_convergence`` method is still
-        invoked. However, None is returned synchronously
+        When a tenant is configured for convergence, if the delta is zero,
+        state.desired is not udpated and None is returned synchronously
         """
         log = mock_log()
         state = GroupState('tenant', 'group-id', "test", [], [], None, {},
@@ -1491,14 +1487,11 @@ class ConvergeTestCase(SynchronousTestCase):
         policy = {'change': 0}
         config_data = {'convergence-tenants': ['tenant']}
 
-        start_convergence = self.cvg_starter_mock.start_convergence
-        start_convergence.return_value = defer.succeed("ignored")
-
         result = controller.converge(log, 'txn-id', group_config, self.group,
                                      state, 'launch', policy,
                                      config_value=config_data.get)
         self.assertIsNone(result)
-        start_convergence.assert_called_once_with(log, 'tenant', 'group')
+        self.assertEqual(state.desired, 0)
 
         # And execute_launch_config is _not_ called
         self.assertFalse(self.mocks['execute_launch_config'].called)
