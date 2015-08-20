@@ -82,49 +82,57 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         count_pre_nodes = cls.rcv3_client.get_pool_info(cls.pool.id)\
                              .entity.node_counts['cloud_servers']
 
-        # Many tests require us to have some servers sitting in an account
-        # ahead of time.  We don't actually use these servers for anything,
-        # except to verify that Autoscale doesn't affect them in any way.  We
-        # create a group and some servers in that group here.
-        init_group_name = rand_name('as_rcv3_test-back')
-        background_group_resp = (
-            cls.autoscale_behaviors.create_scaling_group_given(
-                gc_name=init_group_name,
-                gc_cooldown=1,
-                gc_min_entities=2,
-                lc_load_balancers=lb_pools,
-                lc_networks=[cls.servicenet_network, cls.rackconnect_network])
-        )
-        cls.resources.add(background_group_resp.entity.id,
-                          cls.autoscale_client.delete_scaling_group_with_force)
+        try:
+            # Many tests require us to have some servers sitting in an account
+            # ahead of time.  We don't actually use these servers for anything,
+            # except to verify that Autoscale doesn't affect them in any way.
+            # We create a group and some servers in that group here.
+            init_group_name = rand_name('as_rcv3_test-back')
+            background_group_resp = (
+                cls.autoscale_behaviors.create_scaling_group_given(
+                    gc_name=init_group_name,
+                    gc_cooldown=1,
+                    gc_min_entities=2,
+                    lc_load_balancers=lb_pools,
+                    lc_networks=[cls.servicenet_network,
+                                 cls.rackconnect_network])
+            )
+            cls.resources.add(
+                background_group_resp.entity.id,
+                cls.autoscale_client.delete_scaling_group_with_force)
 
-        # Create the cloud load balancers needed for testing before the
-        # blocking wait for servers to build.
-        #
-        # We create these before waiting for the group to complete because it
-        # lets us overlap load-balancer creation and server spin-up.  This lets
-        # us use a single polling loop to effectively wait for both resources
-        # to be up.  RISK: it depends on load balancers provisioning faster
-        # than servers.
-        cls.load_balancer_1_response = cls.lbaas_client.create_load_balancer(
-            'otter_test_1', [], 'HTTP', 80, "PUBLIC")
-        cls.load_balancer_1 = cls.load_balancer_1_response.entity.id
-        cls.resources.add(cls.load_balancer_1,
-                          cls.lbaas_client.delete_load_balancer)
+            # Create the cloud load balancers needed for testing before the
+            # blocking wait for servers to build.
+            #
+            # We create these before waiting for the group to complete because
+            # it lets us overlap load-balancer creation and server spin-up.
+            # This lets us use a single polling loop to effectively wait for
+            # both resources to be up.  RISK: it depends on load balancers
+            # provisioning faster than servers.
+            lb_1_response = cls.lbaas_client.create_load_balancer(
+                'otter_test_1', [], 'HTTP', 80, "PUBLIC")
+            cls.load_balancer_1 = lb_1_response.entity.id
+            cls.resources.add(cls.load_balancer_1,
+                              cls.lbaas_client.delete_load_balancer)
 
-        # OK, back to waiting for autoscale servers to spin up.
-        cls.autoscale_behaviors.wait_for_expected_number_of_active_servers(
-            background_group_resp.entity.id,
-            2,
-            timeout=600,
-            api="Autoscale")
+            # OK, back to waiting for autoscale servers to spin up.
+            cls.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+                background_group_resp.entity.id,
+                2,
+                timeout=600,
+                api="Autoscale")
 
-        # Wait for initial nodes to be added to the load balancer
-        cls.autoscale_behaviors.wait_for_expected_number_of_active_servers(
-            cls.pool.id,
-            count_pre_nodes + 2,
-            timeout=300,
-            api="RackConnect")
+            # Wait for initial nodes to be added to the load balancer
+            cls.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+                cls.pool.id,
+                count_pre_nodes + 2,
+                timeout=300,
+                api="RackConnect")
+        except Exception:
+            # clean up even if setUpClass fails, since if an exception occurs
+            # in setUpClass, tearDownClass is not called
+            cls.resources.release()
+            raise
 
     @tags(speed='slow', type='rcv3', rcv3_mimic='pass', convergence='yes')
     def test_create_scaling_group_with_pool_on_cloud_network(self):
