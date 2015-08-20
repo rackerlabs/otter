@@ -13,7 +13,7 @@ from txeffect import perform
 from otter import controller
 from otter.controller import GroupPausedError
 from otter.convergence.composition import tenant_is_enabled
-from otter.convergence.service import get_convergence_starter
+from otter.convergence.service import trigger_convergence
 from otter.effect_dispatcher import get_working_cql_dispatcher
 from otter.json_schema.group_schemas import (
     MAX_ENTITIES,
@@ -714,7 +714,8 @@ class OtterGroup(object):
         """
         servers/ route handling
         """
-        servers = OtterServers(self.store, self.tenant_id, self.group_id)
+        servers = OtterServers(self.store, self.tenant_id, self.group_id,
+                               self.dispatcher)
         return servers.app.resource()
 
     @app.route('/config/')
@@ -748,13 +749,14 @@ class OtterServers(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, scaling_group_id):
+    def __init__(self, store, tenant_id, scaling_group_id, dispatcher):
         self.log = log.bind(system='otter.rest.group.servers',
                             tenant_id=tenant_id,
                             scaling_group_id=scaling_group_id)
         self.store = store
         self.tenant_id = tenant_id
         self.scaling_group_id = scaling_group_id
+        self.dispatcher = dispatcher
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -789,6 +791,7 @@ class OtterServers(object):
             self.log, self.tenant_id, self.scaling_group_id)
         d = group.modify_state(
             partial(controller.remove_server_from_group,
+                    self.dispatcher,
                     self.log.bind(server_id=server_id),
                     transaction_id(request), server_id,
                     extract_bool_arg(request, 'replace', True),

@@ -8,6 +8,8 @@ from copy import deepcopy
 
 from datetime import datetime
 
+from effect.testing import SequenceDispatcher
+
 from jsonschema import ValidationError
 
 import mock
@@ -43,7 +45,7 @@ from otter.supervisor import (
     set_supervisor,
 )
 from otter.test.rest.request import DummyException, RestAPITestMixin
-from otter.test.utils import IsBoundWith, matches, patch
+from otter.test.utils import IsBoundWith, intent_func, matches, noop, patch
 from otter.util.config import set_config_data
 from otter.worker.validate_config import InvalidLaunchConfiguration
 
@@ -876,6 +878,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         Set the uuid of the group to "one"
         """
         super(OneGroupTestCase, self).setUp()
+        self.otter.dispatcher = "disp"
         self.mock_group.uuid = "one"
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
 
@@ -1096,7 +1099,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
         self.mock_controller.delete_group.assert_called_once_with(
-            mock.ANY, 'transaction-id', self.mock_group, False)
+            "disp", mock.ANY, 'transaction-id', self.mock_group, False)
 
     def test_group_delete_force(self):
         """
@@ -1108,7 +1111,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             204, endpoint="{0}?force=true".format(self.endpoint),
             method="DELETE")
         self.mock_controller.delete_group.assert_called_once_with(
-            mock.ANY, "transaction-id", self.mock_group, True)
+            "disp", mock.ANY, "transaction-id", self.mock_group, True)
 
     def test_group_delete_404(self):
         """
@@ -1121,7 +1124,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
         self.mock_controller.delete_group.assert_called_once_with(
-            mock.ANY, "transaction-id", self.mock_group, False)
+            "disp", mock.ANY, "transaction-id", self.mock_group, False)
 
         resp = json.loads(response_body)
         self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
@@ -1138,28 +1141,31 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
         self.mock_controller.delete_group.assert_called_once_with(
-            mock.ANY, "transaction-id", self.mock_group, False)
+            "disp", mock.ANY, "transaction-id", self.mock_group, False)
 
         resp = json.loads(response_body)
         self.assertEqual(resp['error']['type'], 'GroupNotEmptyError')
         self.flushLoggedErrors(GroupNotEmptyError)
 
-    @mock.patch('otter.rest.groups.get_convergence_starter')
-    def test_group_converge_enabled_tenant(self, mock_gcs):
+    @mock.patch('otter.rest.groups.trigger_convergence',
+                side_effect=intent_func("tg"))
+    def test_group_converge_enabled_tenant(self, mock_tg):
         """
         Calling `../converge` on convergence enabled tenant triggers
         convergence and returns Deferred with None after enabling it
         """
         set_config_data({'convergence-tenants': ['11111']})
         self.addCleanup(set_config_data, {})
-        cs = mock_gcs.return_value
-        cs.start_convergence.return_value = defer.succeed(None)
+        self.otter.dispatcher = SequenceDispatcher([
+            (("tg", "11111", "one"), noop)
+        ])
         self.mock_state = GroupState(
             '11111', 'one', '', {}, {}, None, {}, False,
             ScalingGroupStatus.ACTIVE)
-        self.assert_status_code(
-            204, endpoint='{}converge'.format(self.endpoint), method='POST')
-        cs.start_convergence.assert_called_once_with(mock.ANY, '11111', 'one')
+        with self.otter.dispatcher.consume():
+            self.assert_status_code(
+                204, endpoint='{}converge'.format(self.endpoint),
+                method='POST')
 
     def test_group_paused_converge(self):
         """
@@ -1324,6 +1330,7 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         Mock remove_server_from_group
         """
         super(GroupServersTests, self).setUp()
+        self.otter.dispatcher = "disp"
         self.mock_rsfg = patch(
             self, 'otter.rest.groups.controller.remove_server_from_group',
             return_value=None)
@@ -1350,6 +1357,7 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         Asserts that the call to :func:`remove_server_from_group` is correct.
         """
         self.mock_rsfg.assert_called_once_with(
+            "disp",
             matches(IsBoundWith(system='otter.rest.groups.delete_server',
                                 tenant_id='11111',
                                 scaling_group_id='one',
