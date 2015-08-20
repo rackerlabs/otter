@@ -24,7 +24,7 @@ from otter.cloud_client import (
     set_nova_metadata_item)
 from otter.convergence.model import DRAINING_METADATA
 from otter.convergence.service import (
-    ConvergenceStarter, get_convergence_starter, set_convergence_starter)
+    get_convergence_starter, set_convergence_starter)
 from otter.log.intents import BoundFields, Log
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
 from otter.models.interface import (
@@ -1842,10 +1842,10 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         new_state = assoc_obj(self.state, desired=self.state.desired - 1)
         disp = SequenceDispatcher([
             (BoundFields(mock.ANY, dict(server_id="server_id",
-                                       transaction_id=self.trans_id)),
+                                        transaction_id=self.trans_id)),
              nested_sequence([
                 (("crsfg", self.log, self.trans_id, "server_id", False, False,
-                self.group, self.state), lambda i: new_state),
+                  self.group, self.state), lambda i: new_state),
                 (("tg", "tenant_id", "group_id"), lambda i: "triggered")
              ]))
         ])
