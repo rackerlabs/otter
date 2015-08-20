@@ -343,8 +343,12 @@ class StepAsEffectTests(SynchronousTestCase):
         meta = SetMetadataItemOnServer(server_id=server_id, key='metadata_key',
                                        value='teapot')
         eff = meta.as_effect()
+        seq = [
+            (eff.intent, lambda i: (StubResponse(202, {}), {})),
+            (Log(ANY, ANY), lambda _: None)
+        ]
         self.assertEqual(
-            resolve_effect(eff, (None, {})),
+            perform_sequence(seq, eff),
             (StepResult.SUCCESS, []))
 
         exceptions = (NoSuchServerError("msg", server_id=server_id),
@@ -354,9 +358,9 @@ class StepAsEffectTests(SynchronousTestCase):
         for exception in exceptions:
             self.assertRaises(
                 type(exception),
-                resolve_effect,
-                eff, (type(exception), exception, None),
-                is_error=True)
+                perform_sequence,
+                [(eff.intent, lambda i: raise_(exception))],
+                eff)
 
     def test_change_load_balancer_node(self):
         """
@@ -445,7 +449,8 @@ class StepAsEffectTests(SynchronousTestCase):
         """
         eff = self._add_one_node_to_clb()
         seq = SequenceDispatcher([
-            (eff.intent, lambda i: (StubResponse(202, {}), ''))
+            (eff.intent, lambda i: (StubResponse(202, {}), '')),
+            (Log(ANY, ANY), lambda _: None)
         ])
         expected = (
             StepResult.RETRY,
