@@ -50,7 +50,8 @@ from otter.cloud_client import (
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.model import DRAINING_METADATA, group_id_from_metadata
 from otter.convergence.service import (
-    delete_divergent_flag, get_convergence_starter, mark_divergent)
+    delete_divergent_flag, get_convergence_starter, mark_divergent,
+    trigger_convergence)
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
 from otter.log.intents import msg, with_log
@@ -655,8 +656,8 @@ def perform_convergence_remove_from_group(
     return perform(dispatcher, eff)
 
 
-def remove_server_from_group(log, trans_id, server_id, replace, purge,
-                             group, state, config_value=config_value):
+def remove_server_from_group(dispatcher, log, trans_id, server_id, replace,
+                             purge, group, state, config_value=config_value):
     """
     Remove a specific server from the group, optionally replacing it
     with a new one, and optionally deleting the old one from Nova.
@@ -685,13 +686,11 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge,
 
     # convergence case - requires that the convergence dispatcher handles
     # EvictServerFromScalingGroup
-    cs = get_convergence_starter()
     d = perform_convergence_remove_from_group(
-        log, trans_id, server_id, replace, purge, group, state,
-        cs.dispatcher)
+        log, trans_id, server_id, replace, purge, group, state, dispatcher)
 
     def kick_off_convergence(new_state):
-        cs.start_convergence(log, group.tenant_id, group.uuid)
+        perform(dispatcher, trigger_convergence(group.tenant_id, group.uuid))
         return new_state
 
     return d.addCallback(kick_off_convergence)
