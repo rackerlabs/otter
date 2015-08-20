@@ -21,6 +21,7 @@ from otter.convergence.model import (
     ILBDescription,
     ILBNode,
     NovaServer,
+    RCv3Description,
     ServerState,
     _private_ipv4_addresses,
     _servicenet_address,
@@ -360,15 +361,19 @@ class AutoscaleMetadataTests(SynchronousTestCase):
         """
         lbs = [
             CLBDescription(port=80, lb_id='123'),
+            RCv3Description(lb_id='123'),
             CLBDescription(port=8080, lb_id='123'),
-            CLBDescription(port=80, lb_id='234')
+            CLBDescription(port=80, lb_id='234'),
+            RCv3Description(lb_id='3232'),
         ]
         expected = {
             'rax:autoscale:group:id': 'group_id',
             'rax:auto_scaling_group_id': 'group_id',
             'rax:autoscale:lb:CloudLoadBalancer:123': (
                 '[{"port": 80}, {"port": 8080}]'),
-            'rax:autoscale:lb:CloudLoadBalancer:234': '[{"port": 80}]'
+            'rax:autoscale:lb:CloudLoadBalancer:234': '[{"port": 80}]',
+            'rax:autoscale:lb:RackConnectV3:123': '',
+            'rax:autoscale:lb:RackConnectV3:3232': '',
         }
 
         self.assertEqual(generate_metadata('group_id', lbs),
@@ -501,7 +506,9 @@ class NovaServerTests(SynchronousTestCase):
             # a dictionary instead of a list
             'rax:autoscale:lb:CloudLoadBalancer:4': '{"port": 80}',
             # not even valid json
-            'rax:autoscale:lb:CloudLoadBalancer:5': 'invalid json string'
+            'rax:autoscale:lb:CloudLoadBalancer:5': 'invalid json string',
+            # RCv3 with same LB id as CLB
+            'rax:autoscale:lb:RackConnectV3:1': ''
         }
         self.assertEqual(
             NovaServer.from_server_details_json(self.servers[0]),
@@ -512,7 +519,8 @@ class NovaServerTests(SynchronousTestCase):
                        created=self.createds[0][1],
                        desired_lbs=pset([
                            CLBDescription(lb_id='1', port=80),
-                           CLBDescription(lb_id='1', port=90)]),
+                           CLBDescription(lb_id='1', port=90),
+                           RCv3Description(lb_id='1')]),
                        servicenet_address='',
                        links=freeze(self.links[0]),
                        json=freeze(self.servers[0])))
@@ -522,6 +530,7 @@ class NovaServerTests(SynchronousTestCase):
         Creating from server json ignores unsupported LB types
         """
         self.servers[0]['metadata'] = {
+            "rax:autoscale:lb:1": '[{"port":80},{"port":90}]',
             "rax:autoscale:lb:RackConnect:{0}".format(uuid4()): None,
             "rax:autoscale:lb:Neutron:456": None
         }
