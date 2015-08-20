@@ -27,9 +27,10 @@ def split_execute_convergence(event, max_length=50000):
     :param int max_length: The maximum length of the entire JSON-formatted
         dictionary.
 
-    :return: `list` of `dict` representing the spit up event dicts.  If
-        the event does not need to be split, this list will only have one
-        element.
+    :return: `list` of `tuple` of (`dict`, `str`).  The `dict`s in the tuple
+        represents the spit up event dicts, and the `str` the format string
+        for each.  If the event does not need to be split, the list will only
+        have one tuple.
     """
     message = "Executing convergence"
     if _json_len(event) <= max_length:
