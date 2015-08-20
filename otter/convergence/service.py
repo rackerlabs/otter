@@ -83,8 +83,8 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 # or config has changed), only if there are _any_ outstanding requests for
 # convergence, since convergence always uses the most recent data.
 
-
 import operator
+import time
 import uuid
 from datetime import datetime
 from functools import partial
@@ -97,7 +97,7 @@ from effect.ref import Reference
 from kazoo.exceptions import BadVersionError, NoNodeError
 from kazoo.recipe.partitioner import PartitionState
 
-from pyrsistent import pset
+from pyrsistent import pmap, pset
 from pyrsistent import thaw
 
 import six
@@ -507,7 +507,8 @@ def converge_one_group(currently_converging, tenant_id, group_id, version,
 
 
 @do
-def converge_all_groups(currently_converging, my_buckets, all_buckets,
+def converge_all_groups(currently_converging, recently_converged,
+                        my_buckets, all_buckets,
                         divergent_flags, build_timeout,
                         converge_one_group=converge_one_group):
     """
@@ -515,6 +516,8 @@ def converge_all_groups(currently_converging, my_buckets, all_buckets,
     buckets we've been allocated.
 
     :param Reference currently_converging: pset of currently converging groups
+    :param Reference recently_converged: pmap of group ID to time last
+        convergence finished
     :param my_buckets: The buckets that should be checked for group IDs to
         converge on.
     :param all_buckets: The set of all buckets that can be checked for group
@@ -550,11 +553,21 @@ def converge_all_groups(currently_converging, my_buckets, all_buckets,
             eff = converge_one_group(currently_converging, tenant_id, group_id,
                                      stat.version, build_timeout)
             result = yield Effect(TenantScope(eff, tenant_id))
+            time_done = yield Effect(Func(time.time))
+            yield recently_converged.modify(
+                lambda rcg: rcg.set(group_id, time_done))
             yield do_return(result)
 
+    recently_converged_map = yield recently_converged.read()
+    start_time = yield Effect(Func(time.time))
     effs = []
     for info in group_infos:
         tenant_id, group_id = info['tenant_id'], info['group_id']
+        if start_time - recently_converged_map.get(group_id, 0) < 10:
+            # Don't converge a group if it has recently been converged.
+            # TODO: clean up the pmap so it doesn't accumulate an entry for all
+            # groups over time!
+            continue
         eff = converge(tenant_id, group_id, info['dirty-flag'])
         effs.append(
             with_log(eff, tenant_id=tenant_id, scaling_group_id=group_id))
@@ -621,14 +634,15 @@ class Converger(MultiService):
             got_buckets=self.buckets_acquired)
         self.partitioner.setServiceParent(self)
         self.currently_converging = Reference(pset())
+        self.recently_converged = Reference(pmap())
         self.build_timeout = build_timeout
         self._converge_all_groups = converge_all_groups
 
     def _converge_all(self, my_buckets, divergent_flags):
         """Run :func:`converge_all_groups` and log errors."""
-        eff = self._converge_all_groups(self.currently_converging,
-                                        my_buckets, self._buckets,
-                                        divergent_flags, self.build_timeout)
+        eff = self._converge_all_groups(
+            self.currently_converging, self.recently_converged,
+            my_buckets, self._buckets, divergent_flags, self.build_timeout)
         return eff.on(
             error=lambda e: err(
                 exc_info_to_failure(e), 'converge-all-groups-error'))

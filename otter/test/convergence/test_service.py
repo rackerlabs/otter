@@ -1,11 +1,13 @@
 import sys
+import time
 import traceback
 import uuid
 from datetime import datetime
 
 from effect import (
     ComposedDispatcher, Effect, Error, Func, base_dispatcher, sync_perform)
-from effect.ref import ReadReference, Reference, reference_dispatcher
+from effect.ref import (ModifyReference, ReadReference, Reference,
+                        reference_dispatcher)
 from effect.testing import SequenceDispatcher
 
 from kazoo.exceptions import BadVersionError, NoNodeError
@@ -129,7 +131,7 @@ class ConvergerTests(SynchronousTestCase):
         When buckets are allocated, the result of converge_all_groups is
         performed.
         """
-        def converge_all_groups(currently_converging, _my_buckets,
+        def converge_all_groups(currently_converging, recent, _my_buckets,
                                 all_buckets, divergent_flags, build_timeout):
             return Effect(
                 ('converge-all', currently_converging, _my_buckets,
@@ -161,7 +163,7 @@ class ConvergerTests(SynchronousTestCase):
         Errors raised from performing the converge_all_groups effect are
         logged, and None is the ultimate result.
         """
-        def converge_all_groups(currently_converging, _my_buckets,
+        def converge_all_groups(currently_converging, recent, _my_buckets,
                                 all_buckets, divergent_flags, build_timeout):
             return Effect('converge-all')
 
@@ -212,7 +214,7 @@ class ConvergerTests(SynchronousTestCase):
         and the list of child nodes is passed on to
         :func:`converge_all_groups`.
         """
-        def converge_all_groups(currently_converging, _my_buckets,
+        def converge_all_groups(currently_converging, recent, _my_buckets,
                                 all_buckets, divergent_flags, build_timeout):
             return Effect(('converge-all-groups', divergent_flags))
 
@@ -403,6 +405,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
     def setUp(self):
         self.currently_converging = Reference(pset())
+        self.recently_converged = Reference(pset())
         self.my_buckets = [1, 6]
         self.all_buckets = range(10)
         self.group_infos = [
@@ -414,8 +417,8 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
     def _converge_all_groups(self, flags):
         return converge_all_groups(
-            self.currently_converging, self.my_buckets,
-            self.all_buckets,
+            self.currently_converging, self.recently_converged,
+            self.my_buckets, self.all_buckets,
             flags,
             3600,
             converge_one_group=self._converge_one_group)
@@ -424,6 +427,11 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                             group_id, version, build_timeout):
         return Effect(
             ('converge', tenant_id, group_id, version, build_timeout))
+
+    def _add_recent_group(self, group_id, expected_time):
+        modifier_cmp = transform_eq(
+            lambda f: f(pmap()), pmap({group_id: expected_time}))
+        return ModifyReference(self.recently_converged, modifier_cmp)
 
     def test_converge_all_groups(self):
         """
@@ -440,6 +448,8 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                  nested_sequence([
                      (('converge', tid, gid, 1, 3600),
                       lambda i: 'converged {}!'.format(tid))])),
+                (Func(time.time), lambda i: 145),
+                (self._add_recent_group(gid, 145), lambda i: None),
             ]
 
         sequence = [
@@ -448,6 +458,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             (Log('converge-all-groups',
                  dict(group_infos=self.group_infos, currently_converging=[])),
              lambda i: None),
+            (ReadReference(ref=self.recently_converged), lambda i: pmap()),
             nested_parallel([
                 (BoundFields(mock.ANY, fields={'tenant_id': '00',
                                                'scaling_group_id': 'g1'}),
@@ -473,7 +484,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                  dict(group_infos=[self.group_infos[1]],
                       currently_converging=['g1'])),
              lambda i: None),
-
+            (ReadReference(ref=self.recently_converged), lambda i: pmap()),
             nested_parallel([
                 (BoundFields(mock.ANY, dict(tenant_id='01',
                                             scaling_group_id='g2')),
@@ -485,6 +496,9 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                         (('converge', '01', 'g2', 5, 3600),
                          lambda i: 'converged two!'),
                      ])),
+                    (Func(time.time), lambda i: 0),
+                    (ModifyReference(self.recently_converged, mock.ANY),
+                     lambda i: None),
                  ])),
              ])
         ]
@@ -497,7 +511,8 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             1 / 0
 
         result = converge_all_groups(
-            self.currently_converging, self.my_buckets, self.all_buckets, [],
+            self.currently_converging, self.recently_converged,
+            self.my_buckets, self.all_buckets, [],
             3600, converge_one_group=converge_one_group)
         self.assertEqual(sync_perform(_get_dispatcher(), result), None)
 
@@ -522,12 +537,12 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                  noop)]
 
         sequence = [
-            (ReadReference(ref=self.currently_converging),
-             lambda i: pset()),
+            (ReadReference(ref=self.currently_converging), lambda i: pset()),
             (Log('converge-all-groups',
                  dict(group_infos=[self.group_infos[0]],
                       currently_converging=[])),
              lambda i: None),
+            (ReadReference(ref=self.recently_converged), lambda i: pmap()),
             nested_parallel([
                 (BoundFields(mock.ANY, fields={'tenant_id': '00',
                                                'scaling_group_id': 'g1'}),
