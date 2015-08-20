@@ -31,14 +31,15 @@ from otter.convergence.service import (
     converge_one_group,
     execute_convergence, get_my_divergent_groups,
     is_autoscale_active,
-    non_concurrently)
+    non_concurrently,
+    trigger_convergence)
 from otter.convergence.steps import CreateServer
 from otter.log.intents import BoundFields, Log, LogErr
 from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,
-    UpdateGroupStatus,
     UpdateGroupErrorReasons,
+    UpdateGroupStatus,
     UpdateServersCache)
 from otter.models.interface import (
     GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
@@ -58,6 +59,47 @@ from otter.test.utils import (
     test_dispatcher,
     transform_eq)
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
+
+
+class TriggerConvergenceTests(SynchronousTestCase):
+    """
+    Tests for :func:`trigger_convergence`
+    """
+
+    def test_success(self):
+        """
+        Divergent flag is set with bound log and msg is logged
+        """
+        seq = [
+            (BoundFields(mock.ANY, dict(tenant_id="t", scaling_group_id="g")),
+             nested_sequence([
+                 (CreateOrSet(path="/groups/divergent/t_g", content="dirty"),
+                  noop)
+             ])),
+            (Log("mark-dirty-success", {}), noop)
+        ]
+        self.assertEqual(
+            perform_sequence(seq, trigger_convergence("t", "g")),
+            None)
+
+    def test_failure(self):
+        """
+        If setting divergent flag errors, then error is logged and
+        None returned
+        """
+        seq = [
+            (BoundFields(mock.ANY, dict(tenant_id="t", scaling_group_id="g")),
+             nested_sequence([
+                 (CreateOrSet(path="/groups/divergent/t_g", content="dirty"),
+                  lambda i: raise_(ValueError("oops")))
+             ])),
+            (LogErr(CheckFailureValue(ValueError("oops")),
+                    "mark-dirty-failure", {}),
+             noop)
+        ]
+        self.assertEqual(
+            perform_sequence(seq, trigger_convergence("t", "g")),
+            None)
 
 
 class ConvergenceStarterTests(SynchronousTestCase):

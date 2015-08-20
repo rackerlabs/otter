@@ -387,10 +387,14 @@ def delete_divergent_flag(tenant_id, group_id, version):
 
 
 def trigger_convergence(tenant_id, group_id):
+    """
+    Trigger convergence on a scaling group
+    """
     eff = with_log(mark_divergent(tenant_id, group_id),
                    tenant_id=tenant_id, scaling_group_id=group_id)
     return eff.on(success=lambda _: msg("mark-dirty-success"),
-                  error=lambda e: err("mark-dirty-failure"))
+                  error=lambda e: err(exc_info_to_failure(e),
+                                      "mark-dirty-failure"))
 
 
 class ConvergenceStarter(object):
