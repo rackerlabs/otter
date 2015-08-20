@@ -1803,38 +1803,6 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         self.assertRaises(ValueError, self._remove, True, False,
                           seq_dispatcher)
 
-    def test_perform_convergence_remove_from_group(self):
-        """
-        Perform :func:`convergence_remove_server_from_group` with the given
-        dispatcher.
-        """
-        self.state.desired = 2
-
-        seq_dispatcher = SequenceDispatcher([
-            self._tenant_retry(
-                get_server_details('server_id').intent,
-                lambda _: (StubResponse(200, {}), self.server_details)),
-            (GetScalingGroupInfo(tenant_id='tenant_id',
-                                 group_id='group_id'),
-                lambda _: (self.group, self.group_manifest_info)),
-            self._tenant_retry(
-                EvictServerFromScalingGroup(log=self.log,
-                                            transaction_id=self.trans_id,
-                                            scaling_group=self.group,
-                                            server_id='server_id'),
-                lambda _: (StubResponse(200, {}), None))
-        ])
-        dispatcher = ComposedDispatcher([test_dispatcher(), seq_dispatcher])
-
-        with seq_dispatcher.consume():
-            result = self.successResultOf(
-                controller.perform_convergence_remove_from_group(
-                    self.log, self.trans_id, 'server_id', False, False,
-                    self.group, self.state, dispatcher))
-
-        self.assert_states_equivalent_except_desired(result, self.state)
-        self.assertEqual(result.desired, self.state.desired - 1)
-
     def test_non_convergence_uses_supervisor_remove(self):
         """
         If the tenant is not convergence-enabled, the controller's
@@ -1856,12 +1824,11 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             self.log, self.trans_id, 'server_id', False, False,
             self.group, self.state)
 
-    @mock.patch('otter.controller.perform_convergence_remove_from_group',
-                autospec=True)
+    @mock.patch('otter.controller.convergence_remove_server_from_group',
+                autospec=True, side_effect=intent_func("crsfg"))
     @mock.patch('otter.controller.trigger_convergence',
                 side_effect=intent_func("tg"))
-    def test_convergence_uses_convergence_remove(self, mock_tg,
-                                                 mock_performer):
+    def test_convergence_uses_convergence_remove(self, mock_tg, mock_crsfg):
         """
         If the tenant is convergence-enabled, the controller's
         :func:`remove_server_from_group` calls
@@ -1873,20 +1840,20 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         the return value.
         """
         new_state = assoc_obj(self.state, desired=self.state.desired - 1)
-        mock_performer.return_value = defer.succeed(new_state)
         disp = SequenceDispatcher([
-            (("tg", "tenant_id", "group_id"),
-             lambda i: defer.succeed("triggered"))
+            (BoundFields(mock.ANY, dict(server_id="server_id",
+                                       transaction_id=self.trans_id)),
+             nested_sequence([
+                (("crsfg", self.log, self.trans_id, "server_id", False, False,
+                self.group, self.state), lambda i: new_state),
+                (("tg", "tenant_id", "group_id"), lambda i: "triggered")
+             ]))
         ])
 
         d = controller.remove_server_from_group(
             disp, self.log, self.trans_id, 'server_id', False, False,
             self.group, self.state,
             config_value={'convergence-tenants': [self.group.tenant_id]}.get)
-
-        mock_performer.assert_called_once_with(
-            self.log, self.trans_id, 'server_id', False, False, self.group,
-            self.state, disp)
 
         with disp.consume():
             result = self.successResultOf(d)

@@ -592,7 +592,7 @@ def convergence_remove_server_from_group(
     :type state: :class:`~otter.models.interface.GroupState`
 
     :return: The updated state.
-    :rtype: deferred :class:`~otter.models.interface.GroupState`
+    :rtype: Effect of :class:`~otter.models.interface.GroupState`
 
     :raise: :class:`CannotDeleteServerBelowMinError` if the server cannot
         be deleted without replacement, and :class:`ServerNotFoundError` if
@@ -629,33 +629,6 @@ def convergence_remove_server_from_group(
         yield do_return(state)
 
 
-def perform_convergence_remove_from_group(
-        log, trans_id, server_id, replace, purge, group, state, dispatcher):
-    """
-    Create the effect to remove a server from a group and performs it with
-    the given dispatcher.
-
-    :param log: A bound logger
-    :param bytes trans_id: The transaction id for this operation.
-    :param bytes server_id: The id of the server to be removed.
-    :param bool replace: Should the server be replaced?
-    :param bool purge: Should the server be deleted from Nova?
-    :param group: The scaling group to remove a server from.
-    :type group: :class:`~otter.models.interface.IScalingGroup`
-    :param state: The current state of the group.
-    :type state: :class:`~otter.models.interface.GroupState`
-    :param dispatcher: A dispatcher that can perform all the effects used by
-        :func:`convergence_remove_server_from_group`.
-
-    :return: The end result of :func:`convergence_remove_server_from_group`
-        (the new state).
-    :rtype: deferred :class:`~otter.models.interface.GroupState`
-    """
-    eff = convergence_remove_server_from_group(
-        log, trans_id, server_id, replace, purge, group, state)
-    return perform(dispatcher, eff)
-
-
 def remove_server_from_group(dispatcher, log, trans_id, server_id, replace,
                              purge, group, state, config_value=config_value):
     """
@@ -686,11 +659,15 @@ def remove_server_from_group(dispatcher, log, trans_id, server_id, replace,
 
     # convergence case - requires that the convergence dispatcher handles
     # EvictServerFromScalingGroup
-    d = perform_convergence_remove_from_group(
-        log, trans_id, server_id, replace, purge, group, state, dispatcher)
+    eff = convergence_remove_server_from_group(
+        log, trans_id, server_id, replace, purge, group, state)
 
     def kick_off_convergence(new_state):
-        perform(dispatcher, trigger_convergence(group.tenant_id, group.uuid))
-        return new_state
+        ceff = trigger_convergence(group.tenant_id, group.uuid)
+        return ceff.on(lambda _: new_state)
 
-    return d.addCallback(kick_off_convergence)
+    return perform(
+        dispatcher,
+        with_log(eff.on(kick_off_convergence),
+                 server_id=server_id,
+                 transaction_id=trans_id))
