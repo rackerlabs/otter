@@ -4,10 +4,12 @@ Code for composing all of the convergence functionality together.
 from pyrsistent import freeze, pset
 
 from toolz.dicttoolz import get_in, merge
+from toolz.itertoolz import groupby
 
 from otter.convergence.model import (
     CLBDescription,
     DesiredGroupState,
+    RCv3Description,
     generate_metadata)
 from otter.util.fp import set_in
 
@@ -32,13 +34,14 @@ def json_to_LBConfigs(lbs_json):
 
     :param lbs_json: Sequence of load balancer configs
     :return: Sequence of :class:`ILBDescription` providers
-
-    NOTE: Currently ignores RackConnectV3 configs. Will add them when it gets
-    implemented in convergence
     """
-    return pset([
-        CLBDescription(lb_id=str(lb['loadBalancerId']), port=lb['port'])
-        for lb in lbs_json if lb.get('type') != 'RackConnectV3'])
+    by_type = groupby(lambda lb: lb.get('type', 'CloudLoadBalancer'), lbs_json)
+    return pset(
+        [CLBDescription(lb_id=str(lb['loadBalancerId']), port=lb['port'])
+         for lb in by_type.get('CloudLoadBalancer', [])] +
+        [RCv3Description(lb_id=str(lb['loadBalancerId']))
+         for lb in by_type.get('RackConnectV3', [])]
+    )
 
 
 def get_desired_group_state(group_id, launch_config, desired):
