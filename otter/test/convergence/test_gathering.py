@@ -353,8 +353,10 @@ def lb_req(url, json_response, response):
     """
     if isinstance(response, Exception):
         def handler(i): raise response
+        log_seq = []
     else:
         def handler(i): return (StubResponse(200, {}), response)
+        log_seq = [(Log(mock.ANY, mock.ANY), lambda i: None)]
     return (
         Retry(
             effect=mock.ANY,
@@ -367,7 +369,7 @@ def lb_req(url, json_response, response):
                 ServiceType.CLOUD_LOAD_BALANCERS,
                 'GET', url, json_response=json_response).intent,
              handler)
-        ])
+        ] + log_seq)
     )
 
 

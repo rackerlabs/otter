@@ -22,3 +22,7 @@ script:
 
 after_script:
     - coveralls
+
+branches:
+  only:
+    - master

@@ -8,6 +8,7 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.integration.lib import nova
+from otter.test.utils import StubClientRequest
 from otter.util.deferredutils import TimedOutError
 from otter.util.http import headers
 
@@ -18,6 +19,7 @@ class Response(object):
         self.code = code
         self.headers = headers
         self.strbody = strbody
+        self.request = StubClientRequest()
 
 
 def get_fake_treq(test_case, method, url, expected_args_and_kwargs, response):

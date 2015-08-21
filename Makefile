@@ -5,7 +5,7 @@ SCRIPTSDIR=scripts
 PYDIRS=${CODEDIR} ${SCRIPTSDIR} autoscale_cloudcafe autoscale_cloudroast
 CQLSH ?= $(shell which cqlsh)
 DOCDIR=doc
-UNITTESTS ?= ${CODEDIR}.test
+UNITTESTS ?= ${CODEDIR}.test ${CODEDIR}.integration.lib
 CASSANDRA_HOST ?= localhost
 export CASSANDRA_HOST
 CASSANDRA_PORT ?= 9160

@@ -11,6 +11,8 @@ from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 from twisted.python.log import msg
 
+from otter.integration.lib.utils import diagnose
+
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import APIError, check_success, headers
 from otter.util.retry import (
@@ -32,6 +34,7 @@ class NovaServer(object):
     :ivar treq: defaults to the `treq` module if not provided - used mainly
         for test injection
     """
+    @diagnose("nova", "Deleting server")
     def delete(self, rcs):
         """
         Delete the server.
@@ -56,6 +59,7 @@ class NovaServer(object):
             deferred_description=(
                 "Waiting for server {} to get deleted".format(self.id)))
 
+    @diagnose("nova", "Getting server's metadata")
     def list_metadata(self, rcs):
         """
         Use Nova to get the server's metadata.
@@ -69,6 +73,7 @@ class NovaServer(object):
             pool=self.pool,
         ).addCallback(check_success, [200]).addCallback(self.treq.json_content)
 
+    @diagnose("nova", "Updating server's metadata")
     def update_metadata(self, metadata, rcs):
         """
         Use Nova to alter a server's metadata.
@@ -83,6 +88,7 @@ class NovaServer(object):
             pool=self.pool,
         ).addCallback(check_success, [200]).addCallback(self.treq.json_content)
 
+    @diagnose("nova", "Getting server's addresses")
     def get_addresses(self, rcs):
         """
         Get the network addresses for a server.
@@ -97,6 +103,7 @@ class NovaServer(object):
         ).addCallback(check_success, [200]).addCallback(self.treq.json_content)
 
 
+@diagnose("nova", "Deleting one or more servers")
 def delete_servers(server_ids, rcs, pool, _treq=treq):
     """
     Use Nova to delete multiple servers.
@@ -107,6 +114,7 @@ def delete_servers(server_ids, rcs, pool, _treq=treq):
                           for _id in server_ids])
 
 
+@diagnose("nova", "Listing all servers")
 def list_servers(rcs, pool, _treq=treq):
     """
     Get a list of all servers, with an optional name regex provided.  This
@@ -122,6 +130,7 @@ def list_servers(rcs, pool, _treq=treq):
     ).addCallback(check_success, [200]).addCallback(_treq.json_content)
 
 
+@diagnose("nova", "Creating server")
 def create_server(rcs, pool, server_args, _treq=treq):
     """
     Create a server using Nova.
@@ -143,6 +152,7 @@ def create_server(rcs, pool, server_args, _treq=treq):
     return d.addCallback(itemgetter('server')).addCallback(itemgetter('id'))
 
 
+@diagnose("nova", "Waiting for all servers to reach a particular state")
 def wait_for_servers(rcs, pool, matcher, group=None, timeout=600, period=10,
                      clock=None, _treq=treq):
     """
