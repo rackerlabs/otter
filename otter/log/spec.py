@@ -4,8 +4,9 @@ Format logs based on specification
 import json
 import math
 
-from toolz.dicttoolz import assoc, keyfilter
-from toolz.functoolz import compose, curry
+from toolz.curried import assoc
+from toolz.dicttoolz import keyfilter
+from toolz.functoolz import compose
 
 from twisted.python.failure import Failure
 
@@ -48,7 +49,7 @@ def split_execute_convergence(event, max_length=50000):
 
     for thing in large_things:
         split_up_events = split(
-            curry(assoc, base_event, thing), event[thing], max_length,
+            assoc(base_event, thing), event[thing], max_length,
             _json_len)
         events.extend([(e, message) for e in split_up_events])
         del event[thing]
