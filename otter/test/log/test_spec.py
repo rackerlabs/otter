@@ -225,9 +225,8 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
 
         result = split_execute_convergence(event.copy(), max_length=length)
         expected = [
-            ({k: event[k] for k in event if k != 'lb_nodes'}, message),
-            ({k: event[k] for k in event
-              if k not in ('desired', 'steps', 'servers')}, message)
+            (dissoc(event, 'lb_nodes'), message),
+            (dissoc(event, 'desired', 'steps', 'servers'), message)
         ]
 
         self.assertEqual(result, expected)
@@ -249,10 +248,8 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
 
         expected = [
             (short_event, message),
-            ({k: event[k] for k in event
-              if k not in ('desired', 'steps', 'servers')}, message),
-            ({k: event[k] for k in event
-              if k not in ('desired', 'steps', 'lb_nodes')}, message)
+            (dissoc(event, 'desired', 'steps', 'servers'), message),
+            (dissoc(event, 'desired', 'steps', 'lb_nodes'), message)
         ]
 
         self.assertEqual(result, expected)
