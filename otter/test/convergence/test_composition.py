@@ -31,12 +31,17 @@ class JsonToLBConfigTests(SynchronousTestCase):
                  {'loadBalancerId': 20, 'port': 800},
                  {'loadBalancerId': 20, 'type': 'RackConnectV3'},
                  {'loadBalancerId': 200, 'type': 'RackConnectV3'},
-                 {'loadBalancerId': 21, 'port': 81}]),
-            pset([CLBDescription(lb_id='20', port=80),
-                  CLBDescription(lb_id='20', port=800),
-                  CLBDescription(lb_id='21', port=81),
-                  RCv3Description(lb_id='20'),
-                  RCv3Description(lb_id='200')]))
+                 {'loadBalancerId': 21, 'port': 81},
+                 {'loadBalancerId': 'cebdc220-172f-4b10-9f29-9c7e980ba41d',
+                  'type': 'RackConnectV3'}]),
+            pset([
+                CLBDescription(lb_id='20', port=80),
+                CLBDescription(lb_id='20', port=800),
+                CLBDescription(lb_id='21', port=81),
+                RCv3Description(lb_id='20'),
+                RCv3Description(lb_id='200'),
+                RCv3Description(lb_id='cebdc220-172f-4b10-9f29-9c7e980ba41d')
+            ]))
 
 
 class GetDesiredGroupStateTests(SynchronousTestCase):
