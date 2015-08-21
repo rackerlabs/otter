@@ -19,6 +19,8 @@ from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 from twisted.python.log import msg
 
 from otter.integration.lib.nova import NovaServer
+from otter.integration.lib.utils import diagnose
+
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import check_success, headers
 from otter.util.retry import (
@@ -160,6 +162,7 @@ class ScalingGroup(object):
         return "{}/groups/{}".format(
             str(rcs.endpoints["otter"]), self.group_id)
 
+    @diagnose("AS", "Changing launch config")
     def set_launch_config(self, rcs, launch_config):
         """Changes the launch configuration used by the scaling group.
 
@@ -205,6 +208,7 @@ class ScalingGroup(object):
             pp.pprint(config[0])
         return config[0]
 
+    @diagnose("AS", "Changing group config")
     def replace_group_config(self, rcs, replacement_config):
         """
         Replace the current group configuration with the provided config
@@ -266,6 +270,7 @@ class ScalingGroup(object):
 
         return self.replace_group_config(rcs, new_config)
 
+    @diagnose("AS", "Triggering convergence")
     def trigger_convergence(self, rcs, success_codes=None):
         """
         Trigger convergence on a group
@@ -275,6 +280,7 @@ class ScalingGroup(object):
             headers=headers(str(rcs.token)), pool=self.pool)
         return d.addCallback(check_success, success_codes or [204])
 
+    @diagnose("AS", "Cleaning up the scaling group")
     def stop(self, rcs):
         """Clean up a scaling group.  Although safe to call yourself, you
         should think twice about it.  Let :method:`start` handle registering
@@ -288,9 +294,10 @@ class ScalingGroup(object):
             This provides useful information to complete the request, like
             which endpoint to use to make the API request.
         """
+        if getattr(self, 'group_id', None):
+            return self.delete_scaling_group(rcs)
 
-        return self.delete_scaling_group(rcs)
-
+    @diagnose("AS", "Deleting scaling group")
     def delete_scaling_group(self, rcs, force="true", success_codes=None):
         """Unconditionally delete the scaling group.  You may call this only
         once.
@@ -309,6 +316,7 @@ class ScalingGroup(object):
             pool=self.pool
         ).addCallback(check_success, success_codes or [204, 404]))
 
+    @diagnose("AS", "Getting scaling group state")
     def get_scaling_group_state(self, rcs, success_codes=None):
         """Retrieve the state of the scaling group.
 
@@ -349,6 +357,7 @@ class ScalingGroup(object):
             .addCallback(debug_print)
         )
 
+    @diagnose("AS", "Creating scaling group")
     def start(self, rcs, test):
         """Create a scaling group.
 
@@ -380,6 +389,7 @@ class ScalingGroup(object):
             .addCallback(record_results)
         )
 
+    @diagnose("AS+Nova", "Getting the servicenet IPs of the active servers")
     def get_servicenet_ips(self, rcs, server_ids=None):
         """
         Get the servicenet IPs for the following server IDs - if no IDs are
@@ -422,6 +432,7 @@ class ScalingGroup(object):
             .addCallback(extract_active_ids)
             .addCallback(_get_the_ips))
 
+    @diagnose("AS", "Picking random active servers")
     @inlineCallbacks
     def choose_random_servers(self, rcs, n):
         """
@@ -433,6 +444,7 @@ class ScalingGroup(object):
         ids = extract_active_ids(body)
         returnValue(random.sample(ids, n))
 
+    @diagnose("AS", "Pausing scaling group")
     def pause(self, rcs):
         """
         Pause group
@@ -442,6 +454,7 @@ class ScalingGroup(object):
             headers=headers(str(rcs.token)), pool=self.pool)
         return d.addCallback(check_success, [204])
 
+    @diagnose("AS", "Resume scaling group")
     def resume(self, rcs):
         """
         Resume group
@@ -451,6 +464,7 @@ class ScalingGroup(object):
             headers=headers(str(rcs.token)), pool=self.pool)
         return d.addCallback(check_success, [204])
 
+    @diagnose("AS", "Wait for scaling group state to reach a particular point")
     def wait_for_state(self, rcs, matcher, timeout=600, period=10, clock=None):
         """
         Wait for the state on the scaling group to match the provided matchers,
@@ -585,6 +599,7 @@ class ScalingPolicy(object):
         else:
             self.policy[0]["type"] = "webhook"
 
+    @diagnose("AS", "Cleaning up policy")
     def stop(self, rcs):
         """Disposes of the policy.
 
@@ -596,8 +611,10 @@ class ScalingPolicy(object):
             policy.  It returns the test resources supplied, easing continuity
             of integration test code.
         """
-        return self.delete(rcs)
+        if getattr(self, 'policy_id', None):
+            return self.delete(rcs)
 
+    @diagnose("AS", "Creating policy")
     def start(self, rcs, test):
         """Creates and registers, but does not execute, the policy.
 
@@ -639,6 +656,7 @@ class ScalingPolicy(object):
             .addCallback(record_results)
         )
 
+    @diagnose("AS", "Deleting policy")
     def delete(self, rcs):
         """Removes the scaling policy.
 
@@ -659,6 +677,7 @@ class ScalingPolicy(object):
             .addCallback(check_success, [204, 404])
         ).addCallback(lambda _: rcs)
 
+    @diagnose("AS", "Executing policy")
     def execute(self, rcs, success_codes=None):
         """Executes the scaling policy.
 
@@ -686,6 +705,7 @@ class ScalingPolicy(object):
             .addCallback(lambda _, x: x, rcs)
         )
 
+    @diagnose("AS", "Creating webhook")
     def create_webhook(self, rcs):
         """
         Create webhook and return `Webhook` object as Deferred

@@ -37,9 +37,19 @@ msg_types = {
     "mark-dirty-failure": "Failed to mark group {scaling_group_id} dirty",
     "remove-server-clb": ("Removing server {server_id} with IP address "
                           "{ip_address} from CLB {clb_id}"),
+
+    # request response body logging
     "request-create-server": (
         "Request to create a server succeeded with response: {response_body}"),
-    "request-list-servers-details": ("Request to list servers succeeded"),
+    "request-list-servers-details": "Request to list servers succeeded",
+    "request-one-server-details": "Request for a server's details succeeded",
+    "request-set-metadata-item": (
+        "Request to set a metadata item for a server succeeded"),
+    "request-get-clb-node-feed": (
+        "Request to get the activity feed for a CLB node succeeded"),
+    "request-list-clbs": "Request to list CLBs succeeded",
+    "request-list-clb-nodes": "Request to list a CLB's nodes succeeded",
+    "request-add-clb-nodes": "Request to add nodes to a CLB succeeded.",
 
     # CF-published log messages
     "cf-add-failure": "Failed to add event to cloud feeds",
