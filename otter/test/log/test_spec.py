@@ -1,10 +1,17 @@
 """
 Tests for log_spec.py
 """
+import json
+
+from toolz.dicttoolz import dissoc
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.log.spec import SpecificationObserverWrapper, get_validated_event
+from otter.log.spec import (
+    SpecificationObserverWrapper,
+    get_validated_event,
+    split_execute_convergence
+)
 from otter.test.utils import CheckFailureValue, raise_
 
 
@@ -171,3 +178,100 @@ class GetValidatedEventTests(SynchronousTestCase):
               'otter_msg_type': 'foo-bar',
               'ab': 'cd',
               'split_message': '2 of 2'}])
+
+
+class ExecuteConvergenceSplitTests(SynchronousTestCase):
+    """
+    Tests for splitting "execute-convergence" type events
+    (e.g. :func:`split_execute_convergence`)
+    """
+    def test_split_out_servers_if_servers_longer(self):
+        """
+        If the 'servers' parameter is longer than the 'lb_nodes' parameter,
+        and the event is otherwise sufficiently small, 'servers' is the
+        param that gets split into another message.
+        """
+        event = {'hi': 'there', 'desired': 'desired', 'steps': ['steps'],
+                 'lb_nodes': ['1', '2', '3'], 'servers': ['1', '2', '3', '4']}
+        message = "Executing convergence"
+
+        # assume that removing 'lb_nodes' would make it the perfect length, but
+        # since 'servers' is bigger, it's the thing that gets removed.
+        length = len(
+            json.dumps({k: event[k] for k in event if k != 'lb_nodes'}))
+
+        result = split_execute_convergence(event.copy(), max_length=length)
+        expected = [
+            (dissoc(event, 'servers'), message),
+            (dissoc(event, 'desired', 'steps', 'lb_nodes'), message)
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_split_out_lb_nodes_if_lb_nodes_longer(self):
+        """
+        If the 'lb_nodes' parameter is longer than the 'servers' parameter,
+        and the event is otherwise sufficiently small, 'lb_nodes' is the
+        param that gets split into another message.
+        """
+        event = {'hi': 'there', 'desired': 'desired', 'steps': ['steps'],
+                 'lb_nodes': ['1', '2', '3', '4'], 'servers': ['1', '2', '3']}
+        message = "Executing convergence"
+
+        # assume that removing 'servers' would make it the perfect length, but
+        # since 'lb_nodes' is bigger, it's the thing that gets removed.
+        length = len(
+            json.dumps({k: event[k] for k in event if k != 'servers'}))
+
+        result = split_execute_convergence(event.copy(), max_length=length)
+        expected = [
+            (dissoc(event, 'lb_nodes'), message),
+            (dissoc(event, 'desired', 'steps', 'servers'), message)
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_split_out_both_servers_and_lb_nodes_if_too_long(self):
+        """
+        Both 'lb_nodes' and 'servers' are split out if the event is too long
+        to accomodate both.  The longest one is removed first.
+        """
+        event = {'hi': 'there', 'desired': 'desired', 'steps': ['steps'],
+                 'lb_nodes': ['1', '2', '3', '4'], 'servers': ['1', '2', '3']}
+        message = "Executing convergence"
+
+        short_event = {k: event[k] for k in event
+                       if k not in ('servers', 'lb_nodes')}
+        result = split_execute_convergence(
+            event.copy(),
+            max_length=len(json.dumps(short_event)) + 5)
+
+        expected = [
+            (short_event, message),
+            (dissoc(event, 'desired', 'steps', 'servers'), message),
+            (dissoc(event, 'desired', 'steps', 'lb_nodes'), message)
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_split_servers_into_multiple_if_servers_too_long(self):
+        """
+        Both 'servers' is too long to even fit in one event, split the servers
+        list, so there are more than 2 events returned.
+        """
+        def event(servers):
+            return {'hi': 'there', "servers": servers}
+
+        message = "Executing convergence"
+        result = split_execute_convergence(
+            dict(lb_nodes=[], **event([str(i) for i in range(5)])),
+            max_length=len(json.dumps(event(['0', '1']))))
+
+        expected = [
+            ({'hi': 'there', 'lb_nodes': []}, message),
+            (event(['0', '1']), message),
+            (event(['2']), message),
+            (event(['3', '4']), message),
+        ]
+
+        self.assertEqual(result, expected)
