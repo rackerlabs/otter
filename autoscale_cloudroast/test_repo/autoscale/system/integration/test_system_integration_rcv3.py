@@ -196,7 +196,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             asserter=self)
         self.verify_group_state(pool_group_resp.entity.id, self.min_servers)
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='fail', convergence='error')
+    # This tests that the desired capacity drops as a result of configuration
+    # errors, which happens on the worker, but not in convergence.
+    @tags(speed='slow', type='rcv3', rcv3_mimic='fail', convergence='never')
     @unittest.skipIf(autoscale_config.mimic,
                      "This test fails on mimic because it does not implement "
                      "cloud networks yet.")
@@ -228,7 +230,9 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
                  pool_group_resp.entity.id, self.min_servers, timeout=600,
                  asserter=self))
 
-    @tags(speed='slow', type='rcv3', rcv3_mimic='fail', convergence='error')
+    # This tests that the desired capacity drops as a result of configuration
+    # errors, which happens on the worker, but not in convergence.
+    @tags(speed='slow', type='rcv3', rcv3_mimic='fail', convergence='never')
     @unittest.skipIf(autoscale_config.mimic,
                      "This test fails on mimic because it does not implement "
                      "cloud networks yet.")
