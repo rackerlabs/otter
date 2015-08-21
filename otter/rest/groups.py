@@ -21,6 +21,7 @@ from otter.json_schema.group_schemas import (
 )
 from otter.json_schema.rest_schemas import create_group_request
 from otter.log import log
+from otter.log.intents import with_log
 from otter.models.cass import CassScalingGroupServersCache
 from otter.models.interface import ScalingGroupStatus
 from otter.rest.bobby import get_bobby
@@ -673,7 +674,10 @@ class OtterGroup(object):
             group = self.store.get_scaling_group(
                 self.log, self.tenant_id, self.group_id)
             d = group.modify_state(is_group_paused)
-            eff = trigger_convergence(self.tenant_id, self.group_id)
+            eff = with_log(trigger_convergence(self.tenant_id, self.group_id),
+                           tenant_id=self.tenant_id,
+                           scaling_group_id=self.group_id,
+                           transaction_id=transaction_id(request))
             return d.addCallback(lambda _: perform(self.dispatcher, eff))
 
         else:

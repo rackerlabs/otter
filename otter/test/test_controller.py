@@ -879,10 +879,15 @@ class TriggerConvergenceDeletionTests(SynchronousTestCase):
         upd = defer.Deferred()
         group.update_status.return_value = upd
         disp = SequenceDispatcher([
-            (("tg", "tid", "gid"), lambda i: "triggerred")
+            (BoundFields(mock.ANY,
+                         dict(tenant_id="tid", scaling_group_id="gid",
+                              transaction_id="transid")),
+             nested_sequence([
+                (("tg", "tid", "gid"), lambda i: "triggerred")
+             ]))
         ])
 
-        d = controller.trigger_convergence_deletion(disp, group)
+        d = controller.trigger_convergence_deletion(disp, group, "transid")
 
         # First DELETING status is set
         self.assertNoResult(d)
@@ -964,7 +969,7 @@ class DeleteGroupTests(SynchronousTestCase):
         d = controller.delete_group(
             "disp", self.log, 'transid', self.group, True)
         self.assertEqual(self.successResultOf(d), 'tcd')
-        self.mock_tcd.assert_called_once_with("disp", self.group)
+        self.mock_tcd.assert_called_once_with("disp", self.group, 'transid')
         # delete_group() or modify_state() not called
         self.assertFalse(self.group.delete_group.called)
         self.assertFalse(self.group.modify_state.called)
@@ -985,7 +990,7 @@ class DeleteGroupTests(SynchronousTestCase):
         # modify_state is paused
         self.assertNoResult(d)
         self.assertTrue(self.group.modify_state.called)
-        self.mock_tcd.assert_called_once_with("disp", self.group)
+        self.mock_tcd.assert_called_once_with("disp", self.group, 'transid')
         self.assertEqual(self.group.modify_state_values, [self.state])
 
         # unpause modify_state and result is available
@@ -1841,7 +1846,9 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         """
         new_state = assoc_obj(self.state, desired=self.state.desired - 1)
         disp = SequenceDispatcher([
-            (BoundFields(mock.ANY, dict(server_id="server_id",
+            (BoundFields(mock.ANY, dict(tenant_id="tenant_id",
+                                        scaling_group_id="group_id",
+                                        server_id="server_id",
                                         transaction_id=self.trans_id)),
              nested_sequence([
                 (("crsfg", self.log, self.trans_id, "server_id", False, False,

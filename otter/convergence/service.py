@@ -103,6 +103,7 @@ from pyrsistent import thaw
 import six
 
 from toolz.dicttoolz import merge
+from toolz.functoolz import curry
 
 from twisted.application.service import MultiService
 
@@ -386,15 +387,22 @@ def delete_divergent_flag(tenant_id, group_id, version):
         yield msg('mark-clean-success')
 
 
+@curry
+def log_and_raise(msg, exc_info):
+    """
+    Log error and raise it
+    """
+    eff = err(exc_info_to_failure(exc_info), msg)
+    return eff.on(lambda _: six.reraise(*exc_info))
+
+
 def trigger_convergence(tenant_id, group_id):
     """
     Trigger convergence on a scaling group
     """
-    eff = with_log(mark_divergent(tenant_id, group_id),
-                   tenant_id=tenant_id, scaling_group_id=group_id)
+    eff = mark_divergent(tenant_id, group_id)
     return eff.on(success=lambda _: msg("mark-dirty-success"),
-                  error=lambda e: err(exc_info_to_failure(e),
-                                      "mark-dirty-failure"))
+                  error=log_and_raise("mark-dirty-failure"))
 
 
 class ConvergenceStarter(object):

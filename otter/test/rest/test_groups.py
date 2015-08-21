@@ -29,6 +29,7 @@ from otter.json_schema.group_examples import (
     policy as policy_examples,
 )
 from otter.json_schema.group_schemas import MAX_ENTITIES
+from otter.log.intents import BoundFields
 from otter.models.interface import (
     GroupNotEmptyError,
     GroupState,
@@ -45,7 +46,8 @@ from otter.supervisor import (
     set_supervisor,
 )
 from otter.test.rest.request import DummyException, RestAPITestMixin
-from otter.test.utils import IsBoundWith, intent_func, matches, noop, patch
+from otter.test.utils import (
+    IsBoundWith, intent_func, matches, nested_sequence, noop, patch)
 from otter.util.config import set_config_data
 from otter.worker.validate_config import InvalidLaunchConfiguration
 
@@ -1157,7 +1159,12 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         set_config_data({'convergence-tenants': ['11111']})
         self.addCleanup(set_config_data, {})
         self.otter.dispatcher = SequenceDispatcher([
-            (("tg", "11111", "one"), noop)
+            (BoundFields(mock.ANY,
+                         dict(tenant_id='11111', scaling_group_id="one",
+                              transaction_id="transaction-id")),
+             nested_sequence([
+                (("tg", "11111", "one"), noop)
+             ]))
         ])
         self.mock_state = GroupState(
             '11111', 'one', '', {}, {}, None, {}, False,

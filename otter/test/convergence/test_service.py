@@ -71,11 +71,7 @@ class TriggerConvergenceTests(SynchronousTestCase):
         Divergent flag is set with bound log and msg is logged
         """
         seq = [
-            (BoundFields(mock.ANY, dict(tenant_id="t", scaling_group_id="g")),
-             nested_sequence([
-                 (CreateOrSet(path="/groups/divergent/t_g", content="dirty"),
-                  noop)
-             ])),
+            (CreateOrSet(path="/groups/divergent/t_g", content="dirty"), noop),
             (Log("mark-dirty-success", {}), noop)
         ]
         self.assertEqual(
@@ -84,22 +80,17 @@ class TriggerConvergenceTests(SynchronousTestCase):
 
     def test_failure(self):
         """
-        If setting divergent flag errors, then error is logged and
-        None returned
+        If setting divergent flag errors, then error is logged and raised
         """
         seq = [
-            (BoundFields(mock.ANY, dict(tenant_id="t", scaling_group_id="g")),
-             nested_sequence([
-                 (CreateOrSet(path="/groups/divergent/t_g", content="dirty"),
-                  lambda i: raise_(ValueError("oops")))
-             ])),
+            (CreateOrSet(path="/groups/divergent/t_g", content="dirty"),
+             lambda i: raise_(ValueError("oops"))),
             (LogErr(CheckFailureValue(ValueError("oops")),
                     "mark-dirty-failure", {}),
              noop)
         ]
-        self.assertEqual(
-            perform_sequence(seq, trigger_convergence("t", "g")),
-            None)
+        self.assertRaises(
+            ValueError, perform_sequence, seq, trigger_convergence("t", "g"))
 
 
 class ConvergenceStarterTests(SynchronousTestCase):

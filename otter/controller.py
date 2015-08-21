@@ -222,7 +222,7 @@ def delete_group(dispatcher, log, trans_id, group, force):
 
     def check_and_delete(_group, state):
         if state.desired == 0:
-            d = trigger_convergence_deletion(dispatcher, group)
+            d = trigger_convergence_deletion(dispatcher, group, trans_id)
             return d.addCallback(lambda _: state)
         else:
             raise GroupNotEmptyError(group.tenant_id, group.uuid)
@@ -231,7 +231,7 @@ def delete_group(dispatcher, log, trans_id, group, force):
         if force:
             # We don't care about servers in the group. So trigger deletion
             # since it will take precedence over other status
-            d = trigger_convergence_deletion(dispatcher, group)
+            d = trigger_convergence_deletion(dispatcher, group, trans_id)
         else:
             # Delete only if desired is 0 which must be done with a lock to
             # ensure desired is not getting modified by another thread/node
@@ -248,7 +248,7 @@ def delete_group(dispatcher, log, trans_id, group, force):
     return d
 
 
-def trigger_convergence_deletion(dispatcher, group):
+def trigger_convergence_deletion(dispatcher, group, trans_id):
     """
     Trigger deletion of group that belongs to convergence tenant
 
@@ -259,7 +259,10 @@ def trigger_convergence_deletion(dispatcher, group):
     # Update group status and trigger convergence
     # DELETING status will take precedence over other status
     d = group.update_status(ScalingGroupStatus.DELETING)
-    eff = trigger_convergence(group.tenant_id, group.uuid)
+    eff = with_log(trigger_convergence(group.tenant_id, group.uuid),
+                   tenant_id=group.tenant_id,
+                   scaling_group_id=group.uuid,
+                   transaction_id=trans_id)
     d.addCallback(lambda _: perform(dispatcher, eff))
     return d
 
@@ -669,5 +672,7 @@ def remove_server_from_group(dispatcher, log, trans_id, server_id, replace,
     return perform(
         dispatcher,
         with_log(eff.on(kick_off_convergence),
+                 tenant_id=group.tenant_id,
+                 scaling_group_id=group.uuid,
                  server_id=server_id,
                  transaction_id=trans_id))
