@@ -429,9 +429,35 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             ('converge', tenant_id, group_id, version, build_timeout))
 
     def _add_recent_group(self, group_id, expected_time):
-        modifier_cmp = transform_eq(
-            lambda f: f(pmap()), pmap({group_id: expected_time}))
-        return ModifyReference(self.recently_converged, modifier_cmp)
+        """
+        Return a ModifyReference intent that compares equal to one that adds
+        the given group and time to the `recently_converged` map.
+        """
+        modifier = transform_eq(lambda f: f(pmap()),
+                                pmap({group_id: expected_time}))
+        return ModifyReference(self.recently_converged, modifier)
+
+    def _expect_group_converged(self, tenant_id, group_id):
+        """
+        Return a SequenceDispatcher two-tuple that matches the usual sequence
+        of intents for converging a single group.
+        """
+        return (
+            BoundFields(mock.ANY,
+                        dict(tenant_id=tenant_id, scaling_group_id=group_id)),
+            nested_sequence([
+                (GetStat(
+                    path='/groups/divergent/{tenant_id}_{group_id}'.format(
+                        tenant_id=tenant_id, group_id=group_id)),
+                 lambda i: ZNodeStatStub(version=5)),
+                (TenantScope(mock.ANY, tenant_id),
+                 nested_sequence([
+                     (('converge', tenant_id, group_id, 5, 3600),
+                      lambda i: 'converged {}!'.format(group_id)),
+                 ])),
+            (Func(time.time), lambda i: 200),
+            (self._add_recent_group(group_id, 200), lambda i: None),
+         ]))
 
     def test_converge_all_groups(self):
         """
@@ -439,19 +465,6 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         needing convergence.
         """
         eff = self._converge_all_groups(['00_g1', '01_g2'])
-
-        def get_bound_sequence(tid, gid):
-            return [
-                (GetStat(path='/groups/divergent/{}_{}'.format(tid, gid)),
-                 lambda i: ZNodeStatStub(version=1)),
-                (TenantScope(mock.ANY, tid),
-                 nested_sequence([
-                     (('converge', tid, gid, 1, 3600),
-                      lambda i: 'converged {}!'.format(tid))])),
-                (Func(time.time), lambda i: 145),
-                (self._add_recent_group(gid, 145), lambda i: None),
-            ]
-
         sequence = [
             (ReadReference(ref=self.currently_converging),
              lambda i: pset()),
@@ -459,22 +472,17 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                  dict(group_infos=self.group_infos, currently_converging=[])),
              lambda i: None),
             (ReadReference(ref=self.recently_converged), lambda i: pmap()),
-            nested_parallel([
-                (BoundFields(mock.ANY, fields={'tenant_id': '00',
-                                               'scaling_group_id': 'g1'}),
-                 nested_sequence(get_bound_sequence('00', 'g1'))),
-                (BoundFields(mock.ANY, fields={'tenant_id': '01',
-                                               'scaling_group_id': 'g2'}),
-                 nested_sequence(get_bound_sequence('01', 'g2'))),
-             ])
+            (Func(time.time), lambda i: 100),
+            nested_parallel([self._expect_group_converged('00', 'g1'),
+                             self._expect_group_converged('01', 'g2')])
         ]
         self.assertEqual(perform_sequence(sequence, eff),
-                         ['converged 00!', 'converged 01!'])
+                         ['converged g1!', 'converged g2!'])
 
     def test_filter_out_currently_converging(self):
         """
         If a group is already being converged, its dirty flag is not statted
-        convergence is not run for it.
+        and convergence is not run for it.
         """
         eff = self._converge_all_groups(['00_g1', '01_g2'])
         sequence = [
@@ -485,24 +493,47 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                       currently_converging=['g1'])),
              lambda i: None),
             (ReadReference(ref=self.recently_converged), lambda i: pmap()),
-            nested_parallel([
-                (BoundFields(mock.ANY, dict(tenant_id='01',
-                                            scaling_group_id='g2')),
-                 nested_sequence([
-                    (GetStat(path='/groups/divergent/01_g2'),
-                     lambda i: ZNodeStatStub(version=5)),
-                    (TenantScope(mock.ANY, '01'),
-                     nested_sequence([
-                        (('converge', '01', 'g2', 5, 3600),
-                         lambda i: 'converged two!'),
-                     ])),
-                    (Func(time.time), lambda i: 0),
-                    (ModifyReference(self.recently_converged, mock.ANY),
-                     lambda i: None),
-                 ])),
-             ])
+            (Func(time.time), lambda i: 100),
+            nested_parallel([self._expect_group_converged('01', 'g2')])
         ]
-        self.assertEqual(perform_sequence(sequence, eff), ['converged two!'])
+        self.assertEqual(perform_sequence(sequence, eff), ['converged g2!'])
+
+    def test_filter_out_recently_converged(self):
+        """
+        If a group was recently converged, it will not be converged again.
+        """
+        eff = self._converge_all_groups(['00_g1'])
+        sequence = [
+            (ReadReference(ref=self.currently_converging), lambda i: pset([])),
+            (Log('converge-all-groups',
+                 dict(group_infos=[self.group_infos[0]],
+                      currently_converging=[])),
+             lambda i: None),
+            (ReadReference(ref=self.recently_converged),
+             lambda i: pmap({'g1': 5})),
+            (Func(time.time), lambda i: 14),
+            nested_parallel([]) # No groups to converge
+        ]
+        self.assertEqual(perform_sequence(sequence, eff), [])
+
+    def test_dont_filter_out_non_recently_converged(self):
+        """
+        If a group was converged in the past but not recently, it can be
+        converged.
+        """
+        eff = self._converge_all_groups(['00_g1'])
+        sequence = [
+            (ReadReference(ref=self.currently_converging), lambda i: pset([])),
+            (Log('converge-all-groups',
+                 dict(group_infos=[self.group_infos[0]],
+                      currently_converging=[])),
+             lambda i: None),
+            (ReadReference(ref=self.recently_converged),
+             lambda i: pmap({'g1': 5})),
+            (Func(time.time), lambda i: 16),
+            nested_parallel([self._expect_group_converged('00', 'g1')])
+        ]
+        self.assertEqual(perform_sequence(sequence, eff), ['converged g1!'])
 
     def test_no_log_on_no_groups(self):
         """When there's no work, no log message is emitted."""
@@ -543,6 +574,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                       currently_converging=[])),
              lambda i: None),
             (ReadReference(ref=self.recently_converged), lambda i: pmap()),
+            (Func(time.time), lambda i: 100),
             nested_parallel([
                 (BoundFields(mock.ANY, fields={'tenant_id': '00',
                                                'scaling_group_id': 'g1'}),
