@@ -122,7 +122,8 @@ msg_types = {
 
 def halve(l):
     """
-    Split a sequence in half, biased to the left.
+    Split a sequence in half, biased to the left (if the number of elements
+    is odd, the left sub-list has one more element than the right sub-list.)
 
     :param list l: The sequence to split
     :return: a `tuple` containing both halves of the sequence.
@@ -133,24 +134,33 @@ def halve(l):
 
 def split(render, elements, max_len, calculate_len=len):
     """
-    Render some elements of a list, where the length (as determined by
-    ``calculate_len``) of each rendered object is no longer than ``max_len``.
+    Split given elements into sub-lists, ensuring that length (as calculated by
+    ``calculate_len``) of each rendered sub-list is less than ``max_len``, and
+    transform each sublist using the ``render`` callable.
 
     Messages longer than the max that are rendered from individual elements
     will still be returned, so ``max_len`` mustn't be assumed to be a hard
     constraint.
 
-    :param callable render: A callable which takes a list of elements, and
-        produces an object string the list of elements be rendered to.
+    :param callable render: A callable that takes list of elements and returns
+        an object whose length is calculated by ``calculate_len``.  These
+        objects are what get returned, as opposed to the elements themselves.
     :param list elements: A list of elements that should be potentially split.
-    :param int max_len: Maximum length of the rendered object, as calculated
+        They should be renderable by ``render``.
+    :param int max_len: Maximum length of the rendered object (an object
+        produced by calling ``render(elements)``), as calculated
         by ``calculate_len``.
     :param callable calculate_len: A callable that takes the rendered object
-        and calculates the length.
+        (produced by calling ``render(elements)``) and calculates the length.
 
-    :return: a `list` of `list`s of elements, each of which, when rendered
-        and measured with the provided callables, should probably be less than
-        ``max_len``.
+    :return: a `list` of rendered elements such that::
+
+            all([calculate_len(rendered) <= max_len
+                 for rendered in return_value]) == True
+
+        To the best of this function's ability, anyway.  Each rendered object
+        in the return value will be the result of calling ``render`` on a
+        subset of ``elements``.
     """
     m = render(elements)
     if len(elements) > 1 and calculate_len(m) > max_len:
