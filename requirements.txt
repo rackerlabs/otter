@@ -15,7 +15,7 @@ effect==0.9
 txeffect==0.9
 characteristic==14.3.0
 attrs==15.0.0
-toolz==0.7.1
+toolz==0.7.4
 pyrsistent==0.10.3
 singledispatch==3.4.0.3
 six==1.9.0

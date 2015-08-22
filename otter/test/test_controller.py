@@ -1559,18 +1559,22 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             self.assertEqual(getattr(state1, attribute),
                              getattr(state2, attribute))
 
-    def _tenant_retry(self, intent, performer):
+    def _tenant_retry(self, intent, performer, logged_response=True):
         """
         Return a :class:`SequenceDispatcher` tuple such that a TenantScope
         is wrapped over a Retry which is wrapped over the given intent.
         """
+        seq = [(intent, performer)]
+        if logged_response:
+            seq.append((Log(mock.ANY, mock.ANY), lambda i: None))
+
         return (
             TenantScope(mock.ANY, self.group.tenant_id),
             nested_sequence([
                 (Retry(effect=mock.ANY, should_retry=_should_retry_params),
-                 nested_sequence([(intent, performer)]))
-             ])
-         )
+                 nested_sequence(seq))
+            ])
+        )
 
     def _remove(self, replace, purge, seq_dispatcher):
         eff = controller.convergence_remove_server_from_group(
@@ -1745,7 +1749,8 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                                             transaction_id=self.trans_id,
                                             scaling_group=self.group,
                                             server_id='server_id'),
-                lambda _: (StubResponse(200, {}), None))
+                lambda _: (StubResponse(200, {}), None),
+                logged_response=False)
         ])
         result = self._remove(True, False, seq_dispatcher)
         self.assertEqual(result, self.state)
@@ -1769,7 +1774,8 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                                             transaction_id=self.trans_id,
                                             scaling_group=self.group,
                                             server_id='server_id'),
-                lambda _: (StubResponse(200, {}), None))
+                lambda _: (StubResponse(200, {}), None),
+                logged_response=False)
         ])
         result = self._remove(False, False, seq_dispatcher)
         self.assert_states_equivalent_except_desired(result, self.state)
@@ -1814,7 +1820,8 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                                             transaction_id=self.trans_id,
                                             scaling_group=self.group,
                                             server_id='server_id'),
-                lambda _: (StubResponse(200, {}), None))
+                lambda _: (StubResponse(200, {}), None),
+                logged_response=False)
         ])
         dispatcher = ComposedDispatcher([test_dispatcher(), seq_dispatcher])
 

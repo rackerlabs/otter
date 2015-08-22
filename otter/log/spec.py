@@ -4,7 +4,8 @@ Format logs based on specification
 import json
 import math
 
-from toolz.dicttoolz import assoc, keyfilter
+from toolz.curried import assoc
+from toolz.dicttoolz import keyfilter
 from toolz.functoolz import compose, curry
 
 from twisted.python.failure import Failure
@@ -27,9 +28,10 @@ def split_execute_convergence(event, max_length=50000):
     :param int max_length: The maximum length of the entire JSON-formatted
         dictionary.
 
-    :return: `list` of `dict` representing the spit up event dicts.  If
-        the event does not need to be split, this list will only have one
-        element.
+    :return: `list` of `tuple` of (`dict`, `str`).  The `dict`s in the tuple
+        represents the spit up event dicts, and the `str` the format string
+        for each.  If the event does not need to be split, the list will only
+        have one tuple.
     """
     message = "Executing convergence"
     if _json_len(event) <= max_length:
@@ -47,7 +49,7 @@ def split_execute_convergence(event, max_length=50000):
 
     for thing in large_things:
         split_up_events = split(
-            curry(assoc, base_event, thing), event[thing], max_length,
+            assoc(base_event, thing), event[thing], max_length,
             _json_len)
         events.extend([(e, message) for e in split_up_events])
         del event[thing]
@@ -81,7 +83,7 @@ def split_cf_messages(format_message, var_length_key, event, separator=', ',
     def length_calc(e):
         return len(format_message.format(**e))
 
-    render = compose(curry(assoc, event, var_length_key), separator.join,
+    render = compose(assoc(event, var_length_key), separator.join,
                      curry(map, str))
 
     if length_calc(event) <= max_length:
@@ -123,9 +125,19 @@ msg_types = {
     "mark-dirty-failure": "Failed to mark group {scaling_group_id} dirty",
     "remove-server-clb": ("Removing server {server_id} with IP address "
                           "{ip_address} from CLB {clb_id}"),
+
+    # request response body logging
     "request-create-server": (
         "Request to create a server succeeded with response: {response_body}"),
-    "request-list-servers-details": ("Request to list servers succeeded"),
+    "request-list-servers-details": "Request to list servers succeeded",
+    "request-one-server-details": "Request for a server's details succeeded",
+    "request-set-metadata-item": (
+        "Request to set a metadata item for a server succeeded"),
+    "request-get-clb-node-feed": (
+        "Request to get the activity feed for a CLB node succeeded"),
+    "request-list-clbs": "Request to list CLBs succeeded",
+    "request-list-clb-nodes": "Request to list a CLB's nodes succeeded",
+    "request-add-clb-nodes": "Request to add nodes to a CLB succeeded.",
 
     # CF-publishing failures
     "cf-add-failure": "Failed to add event to cloud feeds",
@@ -158,7 +170,8 @@ msg_types = {
 
 def halve(l):
     """
-    Split a sequence in half, biased to the left.
+    Split a sequence in half, biased to the left (if the number of elements
+    is odd, the left sub-list has one more element than the right sub-list.)
 
     :param list l: The sequence to split
     :return: a `tuple` containing both halves of the sequence.
@@ -169,24 +182,33 @@ def halve(l):
 
 def split(render, elements, max_len, calculate_len=len):
     """
-    Render some elements of a list, where the length (as determined by
-    ``calculate_len``) of each rendered object is no longer than ``max_len``.
+    Split given elements into sub-lists, ensuring that length (as calculated by
+    ``calculate_len``) of each rendered sub-list is less than ``max_len``, and
+    transform each sublist using the ``render`` callable.
 
     Messages longer than the max that are rendered from individual elements
     will still be returned, so ``max_len`` mustn't be assumed to be a hard
     constraint.
 
-    :param callable render: A callable which takes a list of elements, and
-        produces an object string the list of elements be rendered to.
+    :param callable render: A callable that takes list of elements and returns
+        an object whose length is calculated by ``calculate_len``.  These
+        objects are what get returned, as opposed to the elements themselves.
     :param list elements: A list of elements that should be potentially split.
-    :param int max_len: Maximum length of the rendered object, as calculated
+        They should be renderable by ``render``.
+    :param int max_len: Maximum length of the rendered object (an object
+        produced by calling ``render(elements)``), as calculated
         by ``calculate_len``.
     :param callable calculate_len: A callable that takes the rendered object
-        and calculates the length.
+        (produced by calling ``render(elements)``) and calculates the length.
 
-    :return: a `list` of `list`s of elements, each of which, when rendered
-        and measured with the provided callables, should probably be less than
-        ``max_len``.
+    :return: a `list` of rendered elements such that::
+
+            all([calculate_len(rendered) <= max_len
+                 for rendered in return_value]) == True
+
+        To the best of this function's ability, anyway.  Each rendered object
+        in the return value will be the result of calling ``render`` on a
+        subset of ``elements``.
     """
     m = render(elements)
     if len(elements) > 1 and calculate_len(m) > max_len:

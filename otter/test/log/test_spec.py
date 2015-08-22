@@ -3,7 +3,7 @@ Tests for log_spec.py
 """
 import json
 
-from toolz.dicttoolz import assoc
+from toolz.dicttoolz import assoc, dissoc
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -203,9 +203,8 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
 
         result = split_execute_convergence(event.copy(), max_length=length)
         expected = [
-            ({k: event[k] for k in event if k != 'servers'}, message),
-            ({k: event[k] for k in event
-              if k not in ('desired', 'steps', 'lb_nodes')}, message)
+            (dissoc(event, 'servers'), message),
+            (dissoc(event, 'desired', 'steps', 'lb_nodes'), message)
         ]
 
         self.assertEqual(result, expected)
@@ -227,9 +226,8 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
 
         result = split_execute_convergence(event.copy(), max_length=length)
         expected = [
-            ({k: event[k] for k in event if k != 'lb_nodes'}, message),
-            ({k: event[k] for k in event
-              if k not in ('desired', 'steps', 'servers')}, message)
+            (dissoc(event, 'lb_nodes'), message),
+            (dissoc(event, 'desired', 'steps', 'servers'), message)
         ]
 
         self.assertEqual(result, expected)
@@ -251,10 +249,8 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
 
         expected = [
             (short_event, message),
-            ({k: event[k] for k in event
-              if k not in ('desired', 'steps', 'servers')}, message),
-            ({k: event[k] for k in event
-              if k not in ('desired', 'steps', 'lb_nodes')}, message)
+            (dissoc(event, 'desired', 'steps', 'servers'), message),
+            (dissoc(event, 'desired', 'steps', 'lb_nodes'), message)
         ]
 
         self.assertEqual(result, expected)

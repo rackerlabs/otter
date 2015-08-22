@@ -10,6 +10,8 @@ import treq
 
 from twisted.internet.defer import inlineCallbacks, returnValue
 
+from otter.integration.lib.utils import diagnose
+
 from otter.util.http import check_success
 
 
@@ -55,6 +57,7 @@ def _sequenced_behaviors(test_case, pool, endpoint, criteria, behaviors,
     returnValue(behavior_id)
 
 
+@diagnose("mimic", "Deleting behavior")
 def _delete_behavior(pool, endpoint, behavior_id, _treq):
     """
     Given a behavior ID, delete it from mimic.
@@ -92,6 +95,7 @@ class MimicNova(object):
         the default library :mod:`treq` will be used.  Mainly to be used for
         injecting stubs during tests.
     """
+    @diagnose("mimic", "Changing a server's status")
     def change_server_statuses(self, rcs, ids_to_status):
         """
         Change the statuses of the given server IDs.  Changing the statuses of
@@ -114,6 +118,7 @@ class MimicNova(object):
             pool=self.pool
         ).addCallback(check_success, [201]).addCallback(self.treq.content)
 
+    @diagnose("mimic", "Injecting create server behavior")
     def sequenced_behaviors(self, rcs, criteria, behaviors,
                             event_description="creation"):
         """
@@ -141,6 +146,7 @@ class MimicNova(object):
                                        event_description),
             criteria, behaviors, self.treq)
 
+    @diagnose("mimic", "Deleting create server behavior")
     def delete_behavior(self, rcs, behavior_id, event_description="creation"):
         """
         Given a behavior ID, delete it from mimic.
@@ -176,6 +182,7 @@ class MimicIdentity(object):
         the default library :mod:`treq` will be used.  Mainly to be used for
         injecting stubs during tests.
     """
+    @diagnose("mimic", "Injecting auth behavior")
     def sequenced_behaviors(self, identity_endpoint, criteria, behaviors,
                             event_description="auth"):
         """
@@ -226,6 +233,7 @@ class MimicCLB(object):
         the default library :mod:`treq` will be used.  Mainly to be used for
         injecting stubs during tests.
     """
+    @diagnose("mimic", "Setting CLB status")
     def set_clb_attributes(self, rcs, clb_id, kvpairs):
         """
         Update the attributes of a clould load balancer based on the provided
