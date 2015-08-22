@@ -10,36 +10,38 @@ from otter.convergence.composition import (
     get_desired_group_state,
     json_to_LBConfigs,
     tenant_is_enabled)
-from otter.convergence.model import CLBDescription, DesiredGroupState
+from otter.convergence.model import (
+    CLBDescription,
+    DesiredGroupState,
+    RCv3Description
+)
 
 
 class JsonToLBConfigTests(SynchronousTestCase):
     """
     Tests for :func:`json_to_LBConfigs`
     """
-    def test_without_rackconnect(self):
+    def test_with_clb_and_rackconnect(self):
         """
-        LB config without rackconnect
-        """
-        self.assertEqual(
-            json_to_LBConfigs([{'loadBalancerId': 20, 'port': 80},
-                               {'loadBalancerId': 20, 'port': 800},
-                               {'loadBalancerId': 21, 'port': 81}]),
-            pset([CLBDescription(lb_id='20', port=80),
-                  CLBDescription(lb_id='20', port=800),
-                  CLBDescription(lb_id='21', port=81)]))
-
-    def test_with_rackconnect(self):
-        """
-        LB config with rackconnect
+        LB config with both CLBs and rackconnect.
         """
         self.assertEqual(
             json_to_LBConfigs(
                 [{'loadBalancerId': 20, 'port': 80},
+                 {'loadBalancerId': 20, 'port': 800},
+                 {'loadBalancerId': 20, 'type': 'RackConnectV3'},
                  {'loadBalancerId': 200, 'type': 'RackConnectV3'},
-                 {'loadBalancerId': 21, 'port': 81}]),
-            pset([CLBDescription(lb_id='20', port=80),
-                  CLBDescription(lb_id='21', port=81)]))
+                 {'loadBalancerId': 21, 'port': 81},
+                 {'loadBalancerId': 'cebdc220-172f-4b10-9f29-9c7e980ba41d',
+                  'type': 'RackConnectV3'}]),
+            pset([
+                CLBDescription(lb_id='20', port=80),
+                CLBDescription(lb_id='20', port=800),
+                CLBDescription(lb_id='21', port=81),
+                RCv3Description(lb_id='20'),
+                RCv3Description(lb_id='200'),
+                RCv3Description(lb_id='cebdc220-172f-4b10-9f29-9c7e980ba41d')
+            ]))
 
 
 class GetDesiredGroupStateTests(SynchronousTestCase):
@@ -77,7 +79,9 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                     'rax:autoscale:group:id': 'uuid',
                     'rax:autoscale:lb:CloudLoadBalancer:23': json.dumps(
                         [{"port": 80},
-                         {"port": 90}])
+                         {"port": 90}]),
+                    'rax:autoscale:lb:RackConnectV3:23': '',
+                    'rax:autoscale:lb:RackConnectV3:12': ''
                 }
             }
         }
@@ -89,7 +93,9 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                 capacity=2,
                 desired_lbs=pset([
                     CLBDescription(lb_id='23', port=80),
-                    CLBDescription(lb_id='23', port=90)])))
+                    CLBDescription(lb_id='23', port=90),
+                    RCv3Description(lb_id='23'),
+                    RCv3Description(lb_id='12')])))
         self.assert_server_config_hashable(state)
 
     def test_no_lbs(self):

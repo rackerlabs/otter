@@ -32,6 +32,7 @@ from otter.metrics import (
     QUERY_GROUPS_OF_TENANTS,
     add_to_cloud_metrics,
     collect_metrics,
+    unchanged_divergent_groups,
     get_all_metrics,
     get_all_metrics_effects,
     get_scaling_groups,
@@ -41,7 +42,6 @@ from otter.metrics import (
 )
 from otter.test.test_auth import identity_config
 from otter.test.utils import (
-    CheckFailure,
     CheckFailureValue,
     IsCallable,
     Provides,
@@ -380,6 +380,73 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         self.assertEqual(req.log, log)
 
 
+class UnchangedDivergentGroupsTests(SynchronousTestCase):
+    """
+    Tests for :func:`unchanged_divergent_groups`
+    """
+
+    def setUp(self):
+        self.clock = Clock()
+
+    def invoke(self, current={}, metrics=[]):
+        return unchanged_divergent_groups(self.clock, current, 3600, metrics)
+
+    def test_no_groups(self):
+        """
+        There are no group metrics collected
+        """
+        groups, logs = self.invoke()
+        self.assertEqual(groups, {})
+        self.assertEqual(logs, [])
+
+    def test_converged(self):
+        """
+        All converged groups are popped out from divergent_groups
+        """
+        dg = {('t1', 'g1'): (2, 23), ('t1', 'g2'): (3, 67)}
+        metrics = [GroupMetrics("t1", "g1", 1, 1, 0),
+                   GroupMetrics("t1", "g2", 2, 0, 2)]
+        groups, logs = self.invoke(dg, metrics)
+        self.assertEqual(groups, {})
+        self.assertEqual(logs, [])
+
+    def test_diverged(self):
+        """
+        - Changed groups are removed from tracking
+        - tracks new groups
+        - Timeout groups are logged including long timeouts
+        - Existing diverged groups not yet timed out are not logged
+        """
+        metrics = [GroupMetrics("t1", "cg", 1, 1, 1),
+                   GroupMetrics("t2", "tg", 2, 1, 2),  # timeout
+                   GroupMetrics("t2", "tg2", 5, 2, 1),  # high timeout
+                   GroupMetrics("t1", "fine", 2, 0, 2),
+                   GroupMetrics("t1", "ng", 3, 1, 1),  # new group
+                   GroupMetrics("t1", "dg", 6, 0, 3)]
+        dg = {
+            ("t1", "cg"): (0, 23),  # changed group: any value diff from hash
+            ("t2", "tg"): (3600, hash((2, 1, 2))),  # timeout group
+            ("t2", "tg2"): (0, hash((5, 2, 1))),  # high timeout group
+            ("t1", "dg"): (7100, hash((6, 0, 3))),  # diverged but not timeout
+            ("t2", "delg"): (4000, hash((4, 1, 2)))  # deleted group
+        }
+        self.clock.advance(7203)
+        groups, logs = self.invoke(dg, metrics)
+        # changed group "cg" removed and converged group "fine" not added
+        # Deleted group "delg" removed
+        self.assertEqual(
+            groups,
+            {("t2", "tg"): (3600, hash((2, 1, 2))),  # timeout group remains
+             ("t2", "tg2"): (0, hash((5, 2, 1))),  # high timeout group remains
+             ("t1", "ng"): (7203, hash((3, 1, 1))),  # new group added
+             ("t1", "dg"): (7100, hash((6, 0, 3)))})  # diverged group remains
+        # timeout groups to be logged. Notice that already diverged but not
+        # timedout groups ("t1, "dg") are not to be logged
+        self.assertEqual(
+            logs,
+            [(metrics[1], 3603), (metrics[2], 7203)])
+
+
 class CollectMetricsTests(SynchronousTestCase):
     """
     Tests for :func:`collect_metrics`
@@ -441,7 +508,7 @@ class CollectMetricsTests(SynchronousTestCase):
         d = collect_metrics(_reactor, self.config, self.log,
                             perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
-        self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.successResultOf(d), self.metrics)
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
         self.get_scaling_groups.assert_called_once_with(
@@ -454,15 +521,16 @@ class CollectMetricsTests(SynchronousTestCase):
 
     def test_metrics_collected_convergence_tenants(self):
         """
-        Metrics is collected after getting groups from cass and servers
-        from nova and it is added to blueflood
+        Metrics is collected after getting groups of convergence tenants only
+        from cass and servers of those tenants from nova and it is added to
+        blueflood
         """
         self.config['convergence-tenants'] = ['foo', 'bar']
         _reactor = mock.Mock()
         d = collect_metrics(_reactor, self.config, self.log,
                             perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
-        self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.successResultOf(d), self.metrics)
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
         self.get_specific_scaling_groups.assert_called_once_with(
@@ -482,7 +550,7 @@ class CollectMetricsTests(SynchronousTestCase):
         d = collect_metrics(mock.Mock(), self.config, self.log, client=client,
                             perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
-        self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.successResultOf(d), self.metrics)
         self.assertFalse(self.connect_cass_servers.called)
         self.assertFalse(client.disconnect.called)
 
@@ -494,7 +562,7 @@ class CollectMetricsTests(SynchronousTestCase):
         d = collect_metrics(_reactor, self.config, self.log,
                             authenticator=auth, perform=self._fake_perform,
                             get_legacy_dispatcher=self.get_legacy_dispatcher)
-        self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.successResultOf(d), self.metrics)
         self.get_all_metrics.assert_called_once_with(
             self.dispatcher, self.groups, self.log, _print=False)
 
@@ -530,21 +598,17 @@ class ServiceTests(SynchronousTestCase):
         self.mock_ccs = patch(
             self, 'otter.metrics.connect_cass_servers',
             return_value=self.client)
-        self.config = {'cassandra': 'c', 'identity': identity_config,
-                       'metrics': {'interval': 20}}
         self.mock_cm = patch(
             self, 'otter.metrics.collect_metrics', return_value=succeed(None))
+        self.config = {'cassandra': 'c', 'identity': identity_config,
+                       'metrics': {'interval': 20}}
         self.log = mock_log()
         self.clock = Clock()
 
     def _service(self):
-        return MetricsService('r', self.config, self.log, self.clock)
-
-    def _cm_called(self, calls):
-        self.assertEqual(len(self.mock_cm.mock_calls), calls)
-        self.mock_cm.assert_called_with(
-            'r', self.config, self.log, client=self.client,
-            authenticator=matches(Provides(IAuthenticator)))
+        self.collect = mock.Mock()
+        return MetricsService('r', self.config, self.log, self.clock,
+                              collect=self.collect)
 
     @mock.patch('otter.metrics.MetricsService')
     def test_make_service(self, mock_ms):
@@ -558,32 +622,63 @@ class ServiceTests(SynchronousTestCase):
         mock_ms.assert_called_once_with(
             matches(IsInstance(ReactorBase)), c, metrics_log)
 
-    def test_collect_metrics_called_again(self):
+    def test_collect_called_again(self):
         """
-        `collect_metrics` is called again based on interval given in config
+        `self.collect` is called again based on interval given in config
         """
         s = self._service()
         s.startService()
         self.assertTrue(s.running)
-        self._cm_called(1)
+        self.collect.assert_called_once_with(
+            'r', self.config, self.log, client=self.client,
+            authenticator=matches(Provides(IAuthenticator)))
         self.clock.advance(20)
-        self._cm_called(2)
+        self.assertEqual(len(self.collect.mock_calls), 2)
+        self.collect.assert_called_with(
+            'r', self.config, self.log, client=self.client,
+            authenticator=matches(Provides(IAuthenticator)))
 
-    def test_collect_metrics_called_again_on_error(self):
+    @mock.patch("otter.metrics.unchanged_divergent_groups")
+    def test_collect(self, mock_udg):
         """
-        `collect_metrics` is called again even if one of the
-        previous call fails
+        `self.collect` gets metrics from collect_metrics and logs unchanged
+        diverged groups got from `unchanged_divergent_groups`
+        """
+        self.mock_cm.return_value = succeed("metrics")
+        s = self._service()
+        s._divergent_groups = "dg"
+        mock_udg.return_value = (
+            "ndg",
+            [(GroupMetrics("t", "g1", 2, 0, 1), 3600),
+             (GroupMetrics("t", "g2", 3, 1, 0), 7200)])
+        d = s.collect('r', self.config, client="client")
+        self.assertIsNone(self.successResultOf(d))
+        self.mock_cm.assert_called_once_with('r', self.config, client="client")
+        mock_udg.assert_called_once_with("r", "dg", 3600, "metrics")
+        self.log.err.assert_has_calls([
+            mock.call(mock.ANY,
+                      ("Group {group_id} of {tenant_id} remains diverged "
+                       "and unchanged for {divergent_time}"),
+                      tenant_id="t", group_id="g1", desired=2, actual=0,
+                      pending=1, divergent_time="1:00:00"),
+            mock.call(mock.ANY,
+                      ("Group {group_id} of {tenant_id} remains diverged "
+                       "and unchanged for {divergent_time}"),
+                      tenant_id="t", group_id="g2", desired=3, actual=1,
+                      pending=0, divergent_time="2:00:00")
+        ])
+        self.assertEqual(s._divergent_groups, "ndg")
+
+    def test_collect_error(self):
+        """
+        `self.collect` logs error and returns success if `collect_metrics`
+        errors
         """
         s = self._service()
         self.mock_cm.return_value = fail(ValueError('a'))
-        s.startService()
-        self._cm_called(1)
-        self.log.err.assert_called_once_with(CheckFailure(ValueError))
-        # Service is still running
-        self.assertTrue(s.running)
-        # And collect_metrics is called again after interval is passed
-        self.clock.advance(20)
-        self._cm_called(2)
+        d = s.collect('r', self.config, client="client")
+        self.assertIsNone(self.successResultOf(d))
+        self.log.err.assert_called_once_with(None, "Error collecting metrics")
 
     def test_stop_service(self):
         """
@@ -592,10 +687,10 @@ class ServiceTests(SynchronousTestCase):
         s = self._service()
         s.startService()
         self.assertTrue(s.running)
-        self._cm_called(1)
+        self.assertEqual(len(self.collect.mock_calls), 1)
         d = s.stopService()
         self.assertEqual(self.successResultOf(d), 'disconnected')
         self.assertFalse(s.running)
-        # collect_metrics is not called again
+        # self.collect is not called again
         self.clock.advance(20)
-        self._cm_called(1)
+        self.assertEqual(len(self.collect.mock_calls), 1)
