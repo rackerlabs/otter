@@ -241,16 +241,31 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         self.group_id = 'g1'
         self.version = 5
 
+    # def _add_recent_group(self, group_id, expected_time):
+    #     """
+    #     Return a ModifyReference intent that compares equal to one that adds
+    #     the given group and time to the `recently_converged` map.
+    #     """
+    #     modifier = transform_eq(lambda f: f(pmap()),
+    #                             pmap({group_id: expected_time}))
+    #     return ModifyReference(self.recently_converged, modifier)
+    #
+
+# sequence:
+                # (Func(time.time), lambda i: 200),
+                # (self._add_recent_group(group_id, 200), lambda i: None),
+
     def _execute_convergence(self, tenant_id, group_id, build_timeout):
         return Effect(('ec', tenant_id, group_id, build_timeout))
 
-    def _verify_sequence(self, sequence, converging=Reference(pset())):
+    def _verify_sequence(self, sequence, converging=Reference(pset()),
+                         recent=Reference(pmap())):
         """
         Verify that sequence is executed
         """
         dispatcher = ComposedDispatcher([sequence, _get_dispatcher()])
         eff = converge_one_group(
-            converging, self.tenant_id, self.group_id, self.version,
+            converging, recent, self.tenant_id, self.group_id, self.version,
             3600, execute_convergence=self._execute_convergence)
         with sequence.consume():
             self.assertIsNone(sync_perform(dispatcher, eff))
@@ -423,19 +438,10 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             3600,
             converge_one_group=self._converge_one_group)
 
-    def _converge_one_group(self, currently_converging, tenant_id,
-                            group_id, version, build_timeout):
+    def _converge_one_group(self, currently_converging, recently_converged,
+                            tenant_id, group_id, version, build_timeout):
         return Effect(
             ('converge', tenant_id, group_id, version, build_timeout))
-
-    def _add_recent_group(self, group_id, expected_time):
-        """
-        Return a ModifyReference intent that compares equal to one that adds
-        the given group and time to the `recently_converged` map.
-        """
-        modifier = transform_eq(lambda f: f(pmap()),
-                                pmap({group_id: expected_time}))
-        return ModifyReference(self.recently_converged, modifier)
 
     def _expect_group_converged(self, tenant_id, group_id):
         """
@@ -455,9 +461,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                      (('converge', tenant_id, group_id, 5, 3600),
                       lambda i: 'converged {}!'.format(group_id)),
                  ])),
-            (Func(time.time), lambda i: 200),
-            (self._add_recent_group(group_id, 200), lambda i: None),
-         ]))
+            ]))
 
     def test_converge_all_groups(self):
         """
@@ -512,7 +516,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             (ReadReference(ref=self.recently_converged),
              lambda i: pmap({'g1': 5})),
             (Func(time.time), lambda i: 14),
-            nested_parallel([]) # No groups to converge
+            nested_parallel([])  # No groups to converge
         ]
         self.assertEqual(perform_sequence(sequence, eff), [])
 
@@ -537,9 +541,8 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
     def test_no_log_on_no_groups(self):
         """When there's no work, no log message is emitted."""
-        def converge_one_group(log, currently_converging, tenant_id, group_id,
-                               version, build_timeout):
-            1 / 0
+        def converge_one_group(*args, **kwargs):
+            1 / 0  # This should not be run
 
         result = converge_all_groups(
             self.currently_converging, self.recently_converged,

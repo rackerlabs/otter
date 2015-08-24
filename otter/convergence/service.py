@@ -465,13 +465,15 @@ def get_my_divergent_groups(my_buckets, all_buckets, divergent_flags):
 
 
 @do
-def converge_one_group(currently_converging, tenant_id, group_id, version,
+def converge_one_group(currently_converging, recently_converged,
+                       tenant_id, group_id, version,
                        build_timeout, execute_convergence=execute_convergence):
     """
     Converge one group, non-concurrently, and clean up the dirty flag when
     done.
 
     :param Reference currently_converging: pset of currently converging groups
+    :param Reference recently_converged: pmap of recently converged groups
     :param str tenant_id: the tenant ID of the group that is converging
     :param str group_id: the ID of the group that is converging
     :param version: version number of ZNode of the group's dirty flag
@@ -480,9 +482,16 @@ def converge_one_group(currently_converging, tenant_id, group_id, version,
     :param callable execute_convergence: like :func`execute_convergence`, to
         be used for test injection only
     """
-    eff = execute_convergence(tenant_id, group_id, build_timeout)
+    @do
+    def cvg():
+        result = yield execute_convergence(tenant_id, group_id, build_timeout)
+        time_done = yield Effect(Func(time.time))
+        yield recently_converged.modify(
+            lambda rcg: rcg.set(group_id, time_done))
+        yield do_return(result)
+
     try:
-        result = yield non_concurrently(currently_converging, group_id, eff)
+        result = yield non_concurrently(currently_converging, group_id, cvg())
     except ConcurrentError:
         # We don't need to spam the logs about this, it's to be expected
         return
@@ -550,10 +559,10 @@ def converge_all_groups(currently_converging, recently_converged,
         if stat is None:
             yield msg('converge-divergent-flag-disappeared', znode=dirty_flag)
         else:
-            eff = converge_one_group(currently_converging, tenant_id, group_id,
+            eff = converge_one_group(currently_converging, recently_converged,
+                                     tenant_id, group_id,
                                      stat.version, build_timeout)
             result = yield Effect(TenantScope(eff, tenant_id))
-            time_done = yield Effect(Func(time.time))
             # UGH. TODO: This is too late. This should really be removed
             # synchronously with deleting the group from currently_converging,
             # since there are other asynchronous things that happen after that
@@ -561,8 +570,6 @@ def converge_all_groups(currently_converging, recently_converged,
             # convergence can sneak in between a previous one and the time we
             # update the recently_converged dict here, which would defeat the
             # mechanism.
-            yield recently_converged.modify(
-                lambda rcg: rcg.set(group_id, time_done))
             yield do_return(result)
 
     recently_converged_map = yield recently_converged.read()
