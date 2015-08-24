@@ -263,24 +263,22 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         """
         Verify that sequence is executed
         """
-        dispatcher = ComposedDispatcher([sequence, _get_dispatcher()])
         eff = converge_one_group(
             converging, recent, self.tenant_id, self.group_id, self.version,
             3600, execute_convergence=self._execute_convergence)
-        with sequence.consume():
-            self.assertIsNone(sync_perform(dispatcher, eff))
+        perform_sequence(sequence, eff, fallback_dispatcher=_get_dispatcher())
 
     def test_success(self):
         """
         runs execute_convergence and returns None, then deletes the dirty flag.
         """
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version), lambda i: None),
             (Log('mark-clean-success', {}), lambda i: None)
-        ])
+        ]
         self._verify_sequence(sequence)
 
     def test_non_concurrent(self):
@@ -288,8 +286,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         Won't run execute_convergence if it's already running for the same
         group ID.
         """
-        self._verify_sequence(
-            SequenceDispatcher([]), Reference(pset([self.group_id])))
+        self._verify_sequence([], Reference(pset([self.group_id])))
 
     def test_no_scaling_group(self):
         """
@@ -297,7 +294,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         dirty flag is cleaned up.
         """
         expected_error = NoSuchScalingGroupError(self.tenant_id, self.group_id)
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: raise_(expected_error)),
             (LogErr(CheckFailureValue(expected_error),
@@ -306,7 +303,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version), lambda i: None),
             (Log('mark-clean-success', {}), lambda i: None)
-        ])
+        ]
         self._verify_sequence(sequence)
 
     def test_unexpected_errors(self):
@@ -315,13 +312,13 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         dirty flag.
         """
         expected_error = RuntimeError('oh no!')
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: raise_(expected_error)),
             (LogErr(CheckFailureValue(expected_error),
                     'converge-non-fatal-error', {}),
              lambda i: None)
-        ])
+        ]
         self._verify_sequence(sequence)
 
     def test_delete_node_version_mismatch(self):
@@ -330,7 +327,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         converge_one_group, and DeleteNode raises a BadVersionError, the error
         is logged and nothing else is cleaned up.
         """
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
@@ -339,7 +336,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             (Log('mark-clean-skipped',
                  dict(path='/groups/divergent/tenant-id_g1',
                       dirty_version=self.version)), lambda i: None)
-        ])
+        ]
         self._verify_sequence(sequence)
 
     def test_delete_node_not_found(self):
@@ -347,7 +344,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         When DeleteNode raises a NoNodeError, a message is logged and nothing
         else is cleaned up.
         """
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
@@ -356,12 +353,12 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             (Log('mark-clean-not-found',
                  dict(path='/groups/divergent/tenant-id_g1',
                       dirty_version=self.version)), lambda i: None)
-        ])
+        ]
         self._verify_sequence(sequence)
 
     def test_delete_node_other_error(self):
         """When marking clean raises arbitrary errors, an error is logged."""
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
@@ -371,7 +368,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
                     'mark-clean-failure',
                     dict(path='/groups/divergent/tenant-id_g1',
                          dirty_version=self.version)), lambda i: None)
-        ])
+        ]
         self._verify_sequence(sequence)
 
     def test_retry(self):
@@ -379,10 +376,10 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         When execute_convergence returns RETRY, the divergent flag is not
         deleted.
         """
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.RETRY, ScalingGroupStatus.ACTIVE))
-        ])
+        ]
         self._verify_sequence(sequence)
 
     def test_failure(self):
@@ -390,13 +387,13 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         When execute_convergence returns FAILURE, the divergent flag is
         deleted.
         """
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.FAILURE, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version), lambda i: None),
             (Log('mark-clean-success', {}), lambda i: None)
-        ])
+        ]
         self._verify_sequence(sequence)
 
     def test_delete_flag_unconditionally_when_group_deleted(self):
@@ -405,13 +402,13 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         deleted, the divergent flag is unconditionally deleted (ignoring
         mismatched versions), because a re-converge would be fruitless.
         """
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.SUCCESS, None)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1', version=-1),
              noop),
             (Log('mark-clean-success', {}), noop),
-        ])
+        ]
         self._verify_sequence(sequence)
 
 
