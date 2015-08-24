@@ -30,6 +30,49 @@ THROTTLE_COUNT = 50
 NON_PEP3101_SYSTEMS = ('kazoo',)
 
 
+_fanout = None
+
+
+def get_fanout():
+    """
+    :return: the global instance of :class:`FanoutObserver`
+    """
+    return _fanout
+
+
+def set_fanout(fanout):
+    """
+    Set the global instance of :class:`FanoutObserver`.
+    """
+    global _fanout
+    _fanout = fanout
+
+
+class FanoutObserver(object):
+    """
+    A fanout observer that emits events that it receives to all its sub
+    observers.
+    """
+    def __init__(self, observer):
+        """
+        Initialize the subobservers with the first observer.
+        """
+        self.subobservers = [copying_wrapper(observer)]
+
+    def add_observer(self, observer):
+        """
+        Add another observer to the subobservers.
+        """
+        self.subobservers.append(copying_wrapper(observer))
+
+    def emit(self, event_dict):
+        """
+        Emit a copy of the event dict to every subobserver.
+        """
+        for ob in self.subobservers:
+            ob(event_dict)
+
+
 class LoggingEncoder(json.JSONEncoder):
     """
     A JSONEncoder that will decide how to serialize objects that the base
