@@ -26,6 +26,7 @@ from otter.log.formatters import (
     PEP3101FormattingWrapper,
     StreamObserverWrapper,
     SystemFilterWrapper,
+    add_to_fanout,
     get_fanout,
     serialize_to_jsonable,
     set_fanout,
@@ -644,10 +645,11 @@ class FanoutObserverTests(SynchronousTestCase):
 
     def test_global_fanout(self):
         """
-        Setting and getting the global fanout observer.
+        Setting and getting and adding to the global fanout observer.
         """
+        obs = []
         self.assertEqual(get_fanout(), None)
-        self.addCleanup(set_fanout, None)
-        fanout = FanoutObserver([].append)
-        set_fanout(fanout)
-        self.assertIs(get_fanout(), fanout)
+        add_to_fanout(obs.append)
+        self.assertEqual(get_fanout().subobservers, [obs.append])
+        set_fanout(None)
+        self.assertEqual(get_fanout(), None)

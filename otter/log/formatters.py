@@ -33,6 +33,18 @@ NON_PEP3101_SYSTEMS = ('kazoo',)
 _fanout = None
 
 
+def add_to_fanout(observer):
+    """
+    :return: the global instance of :class:`FanoutObserver`
+    """
+    global _fanout
+    if _fanout is None:
+        _fanout = FanoutObserver(observer)
+    else:
+        _fanout.add_observer(observer)
+    return _fanout
+
+
 def get_fanout():
     """
     :return: the global instance of :class:`FanoutObserver`
