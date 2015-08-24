@@ -7,6 +7,8 @@ from toolz.dicttoolz import assoc, dissoc
 
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.convergence.model import DesiredGroupState
+
 from otter.log.spec import (
     SpecificationObserverWrapper,
     get_validated_event,
@@ -186,20 +188,28 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
     Tests for splitting "execute-convergence" type events
     (e.g. :func:`split_execute_convergence`)
     """
+    def setUp(self):
+        """
+        Set up a desired group state to use for desired, so that serializing
+        objects can be tested.
+        """
+        self.state = DesiredGroupState(server_config='config', capacity=1)
+
     def test_split_out_servers_if_servers_longer(self):
         """
         If the 'servers' parameter is longer than the 'lb_nodes' parameter,
         and the event is otherwise sufficiently small, 'servers' is the
         param that gets split into another message.
         """
-        event = {'hi': 'there', 'desired': 'desired', 'steps': ['steps'],
+        event = {'hi': 'there', 'desired': self.state, 'steps': ['steps'],
                  'lb_nodes': ['1', '2', '3'], 'servers': ['1', '2', '3', '4']}
         message = "Executing convergence"
 
         # assume that removing 'lb_nodes' would make it the perfect length, but
         # since 'servers' is bigger, it's the thing that gets removed.
         length = len(
-            json.dumps({k: event[k] for k in event if k != 'lb_nodes'}))
+            json.dumps({k: event[k] for k in event if k != 'lb_nodes'},
+                       default=repr))
 
         result = split_execute_convergence(event.copy(), max_length=length)
         expected = [
@@ -215,14 +225,15 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
         and the event is otherwise sufficiently small, 'lb_nodes' is the
         param that gets split into another message.
         """
-        event = {'hi': 'there', 'desired': 'desired', 'steps': ['steps'],
+        event = {'hi': 'there', 'desired': self.state, 'steps': ['steps'],
                  'lb_nodes': ['1', '2', '3', '4'], 'servers': ['1', '2', '3']}
         message = "Executing convergence"
 
         # assume that removing 'servers' would make it the perfect length, but
         # since 'lb_nodes' is bigger, it's the thing that gets removed.
         length = len(
-            json.dumps({k: event[k] for k in event if k != 'servers'}))
+            json.dumps({k: event[k] for k in event if k != 'servers'},
+                       default=repr),)
 
         result = split_execute_convergence(event.copy(), max_length=length)
         expected = [
@@ -237,7 +248,7 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
         Both 'lb_nodes' and 'servers' are split out if the event is too long
         to accomodate both.  The longest one is removed first.
         """
-        event = {'hi': 'there', 'desired': 'desired', 'steps': ['steps'],
+        event = {'hi': 'there', 'desired': self.state, 'steps': ['steps'],
                  'lb_nodes': ['1', '2', '3', '4'], 'servers': ['1', '2', '3']}
         message = "Executing convergence"
 
@@ -245,7 +256,7 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
                        if k not in ('servers', 'lb_nodes')}
         result = split_execute_convergence(
             event.copy(),
-            max_length=len(json.dumps(short_event)) + 5)
+            max_length=len(json.dumps(short_event, default=repr)) + 5)
 
         expected = [
             (short_event, message),

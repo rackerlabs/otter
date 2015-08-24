@@ -10,10 +10,8 @@ from toolz.functoolz import compose, curry
 
 from twisted.python.failure import Failure
 
-from otter.log.formatters import LoggingEncoder
 
-
-_json_len = compose(len, curry(json.dumps, cls=LoggingEncoder))
+_json_len = compose(len, curry(json.dumps, default=repr))
 
 
 def split_execute_convergence(event, max_length=50000):
