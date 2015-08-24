@@ -18,6 +18,8 @@ from otter.auth import CachingAuthenticator, SingleTenantAuthenticator
 from otter.constants import (
     CONVERGENCE_DIRTY_DIR, ServiceType, get_service_configs)
 from otter.convergence.service import Converger
+from otter.log.cloudfeeds import CloudFeedsObserver
+from otter.log.formatters import FanoutObserver, set_fanout
 from otter.models.cass import CassScalingGroupCollection as OriginalStore
 from otter.supervisor import SupervisorService, get_supervisor, set_supervisor
 from otter.tap.api import (
@@ -474,12 +476,15 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.assertEqual(get_supervisor(), supervisor_service)
 
-    @mock.patch('otter.tap.api.addObserver')
-    @mock.patch('otter.tap.api.get_cf_observer')
-    def test_cloudfeeds_setup(self, mock_getobserver, mock_addobserver):
+    def test_cloudfeeds_setup(self):
         """
         Cloud feeds observer is setup if it is there in config
         """
+        fanout = FanoutObserver([].append)
+        set_fanout(fanout)
+        self.addCleanup(set_fanout, None)
+        self.assertEqual(len(fanout.subobservers), 1)
+
         conf = deepcopy(test_config)
         conf['cloudfeeds'] = {'service': 'cloudFeeds', 'tenant_id': 'tid',
                               'url': 'url'}
@@ -487,24 +492,36 @@ class APIMakeServiceTests(SynchronousTestCase):
         serv_confs = get_service_configs(conf)
         serv_confs[ServiceType.CLOUD_FEEDS] = {
             'name': 'cloudFeeds', 'region': 'ord', 'url': 'url'}
-        mock_getobserver.assert_called_once_with(
-            self.reactor, matches(IsInstance(CachingAuthenticator)), 'tid',
-            'ord', serv_confs)
-        mock_addobserver.assert_called_once_with(mock_getobserver.return_value)
+
+        self.assertEqual(len(fanout.subobservers), 2)
+        cf_observer = fanout.subobservers[-1]
+        self.assertEqual(
+            cf_observer,
+            CloudFeedsObserver(
+                reactor=self.reactor,
+                authenticator=matches(IsInstance(CachingAuthenticator)),
+                tenant_id='tid',
+                region='ord',
+                service_configs=serv_confs))
 
         # single tenant authenticator is created
-        real_auth = mock_getobserver.call_args[0][1]
+        authenticator = cf_observer.authenticator
         self.assertIsInstance(
-            real_auth._authenticator._authenticator._authenticator,
+            authenticator._authenticator._authenticator._authenticator,
             SingleTenantAuthenticator)
 
-    @mock.patch('otter.tap.api.get_cf_observer')
-    def test_cloudfeeds_no_setup(self, mock_getobserver):
+    def test_cloudfeeds_no_setup(self):
         """
         Cloud feeds observer is not setup if it is not there in config
         """
+        fanout = FanoutObserver([].append)
+        set_fanout(fanout)
+        self.addCleanup(set_fanout, None)
+        self.assertEqual(len(fanout.subobservers), 1)
+
         makeService(test_config)
-        self.assertFalse(mock_getobserver.called)
+
+        self.assertEqual(len(fanout.subobservers), 1)
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
