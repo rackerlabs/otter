@@ -607,7 +607,7 @@ class FanoutObserverTests(SynchronousTestCase):
         obs = []
         fanout = FanoutObserver(obs.append)
         for mess in messages:
-            fanout.emit(mess.copy())
+            fanout(mess.copy())
         self.assertEqual(obs, messages)
 
     def test_fanout_multiple_observers(self):
@@ -618,10 +618,10 @@ class FanoutObserverTests(SynchronousTestCase):
         messages = [{str(i): 'message'} for i in range(3)]
         obs1, obs2 = [], []
         fanout = FanoutObserver(obs1.append)
-        fanout.emit(messages[0].copy())
+        fanout(messages[0].copy())
         fanout.add_observer(obs2.append)
-        fanout.emit(messages[1].copy())
-        fanout.emit(messages[2].copy())
+        fanout(messages[1].copy())
+        fanout(messages[2].copy())
         self.assertEqual(obs1, messages)
         self.assertEqual(obs2, messages[1:])
 
@@ -638,7 +638,7 @@ class FanoutObserverTests(SynchronousTestCase):
 
         fanout = FanoutObserver(obs.append)
         fanout.add_observer(mutate)
-        fanout.emit({'only': 'message', 'delete_me': 'go'})
+        fanout({'only': 'message', 'delete_me': 'go'})
 
         self.assertEqual(obs, [{'only': 'message', 'delete_me': 'go'}])
         self.assertEqual(obs_mutated, [{'only': 'message', 'added': 'added'}])

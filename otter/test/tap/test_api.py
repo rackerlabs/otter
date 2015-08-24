@@ -19,7 +19,7 @@ from otter.constants import (
     CONVERGENCE_DIRTY_DIR, ServiceType, get_service_configs)
 from otter.convergence.service import Converger
 from otter.log.cloudfeeds import CloudFeedsObserver
-from otter.log.formatters import FanoutObserver, set_fanout
+from otter.log.formatters import get_fanout, set_fanout
 from otter.models.cass import CassScalingGroupCollection as OriginalStore
 from otter.supervisor import SupervisorService, get_supervisor, set_supervisor
 from otter.tap.api import (
@@ -480,10 +480,8 @@ class APIMakeServiceTests(SynchronousTestCase):
         """
         Cloud feeds observer is setup if it is there in config
         """
-        fanout = FanoutObserver([].append)
-        set_fanout(fanout)
         self.addCleanup(set_fanout, None)
-        self.assertEqual(len(fanout.subobservers), 1)
+        self.assertEqual(get_fanout(), None)
 
         conf = deepcopy(test_config)
         conf['cloudfeeds'] = {'service': 'cloudFeeds', 'tenant_id': 'tid',
@@ -493,8 +491,8 @@ class APIMakeServiceTests(SynchronousTestCase):
         serv_confs[ServiceType.CLOUD_FEEDS] = {
             'name': 'cloudFeeds', 'region': 'ord', 'url': 'url'}
 
-        self.assertEqual(len(fanout.subobservers), 2)
-        cf_observer = fanout.subobservers[-1]
+        self.assertEqual(len(get_fanout().subobservers), 1)
+        cf_observer = get_fanout().subobservers[0]
         self.assertEqual(
             cf_observer,
             CloudFeedsObserver(
@@ -514,14 +512,12 @@ class APIMakeServiceTests(SynchronousTestCase):
         """
         Cloud feeds observer is not setup if it is not there in config
         """
-        fanout = FanoutObserver([].append)
-        set_fanout(fanout)
         self.addCleanup(set_fanout, None)
-        self.assertEqual(len(fanout.subobservers), 1)
+        self.assertEqual(get_fanout(), None)
 
         makeService(test_config)
 
-        self.assertEqual(len(fanout.subobservers), 1)
+        self.assertEqual(get_fanout(), None)
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')

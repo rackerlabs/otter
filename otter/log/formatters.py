@@ -77,7 +77,7 @@ class FanoutObserver(object):
         """
         self.subobservers.append(observer)
 
-    def emit(self, event_dict):
+    def __call__(self, event_dict):
         """
         Emit a copy of the event dict to every subobserver.
         """

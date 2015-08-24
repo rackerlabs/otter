@@ -38,7 +38,7 @@ from otter.convergence.service import (
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log
 from otter.log.cloudfeeds import CloudFeedsObserver
-from otter.log.formatters import get_fanout
+from otter.log.formatters import add_to_fanout
 from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.rest.admin import OtterAdmin
 from otter.rest.application import Otter
@@ -251,10 +251,7 @@ def makeService(config):
     if cf_conf is not None:
         id_conf = deepcopy(config['identity'])
         id_conf['strategy'] = 'single_tenant'
-        fanout = get_fanout()
-        assert fanout is not None, "No twistd logger set up yet"
-
-        fanout.add_observer(CloudFeedsObserver(
+        add_to_fanout(CloudFeedsObserver(
             reactor=reactor,
             authenticator=generate_authenticator(reactor, id_conf),
             tenant_id=cf_conf['tenant_id'],
