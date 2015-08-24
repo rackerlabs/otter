@@ -647,9 +647,20 @@ class FanoutObserverTests(SynchronousTestCase):
         """
         Setting and getting and adding to the global fanout observer.
         """
-        obs = []
+        obs1, obs2 = [], []
         self.assertEqual(get_fanout(), None)
-        add_to_fanout(obs.append)
-        self.assertEqual(get_fanout().subobservers, [obs.append])
+
+        # add_to_fanout when there is no fanout
+        fanout1 = add_to_fanout(obs1.append)
+        self.assertIs(fanout1, get_fanout())
+        self.assertEqual(fanout1.subobservers, [obs1.append])
+
+        # add_to_fanout when there is already a fanout
+        fanout2 = add_to_fanout(obs2.append)
+        self.assertIs(fanout2, fanout1)
+        self.assertIs(fanout1, get_fanout())
+        self.assertEqual(fanout2.subobservers, [obs1.append, obs2.append])
+
+        # set_fanout
         set_fanout(None)
         self.assertEqual(get_fanout(), None)
