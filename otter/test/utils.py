@@ -40,7 +40,7 @@ from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
 
 from otter.convergence.model import NovaServer
-from otter.log.bound import BoundLog
+from otter.log.bound import BoundLog, bound_log_kwargs
 from otter.models.interface import IScalingGroup, IScalingGroupServersCache
 from otter.supervisor import ISupervisor
 from otter.util.deferredutils import DeferredPool
@@ -110,24 +110,13 @@ class IsBoundWith(object):
         """
         if not isinstance(log, BoundLog):
             return Mismatch('log is not a BoundLog')
-        # Collect kwargs
-        f = log.msg
-        kwargs_list = []
-        while True:
-            try:
-                kwargs_list.append(f.keywords)
-            except AttributeError:
-                break
-            else:
-                f = f.func
-        # combine them in order they were bound
-        kwargs = {}
-        [kwargs.update(kwa) for kwa in reversed(kwargs_list)]
-        # Compare and return accordingly
+        kwargs = bound_log_kwargs(log)
         if self.kwargs == kwargs:
             return None
         else:
-            return Mismatch('Expected kwargs {} but got {} instead'.format(self.kwargs, kwargs))
+            return Mismatch(
+                'Expected kwargs {} but got {} instead'.format(self.kwargs,
+                                                               kwargs))
 
 
 class Provides(object):
