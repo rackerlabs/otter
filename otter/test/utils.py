@@ -775,11 +775,26 @@ def perform_sequence(seq, eff, fallback_dispatcher=base_dispatcher):
     :param fallback_dispatcher: an optional dispatcher to compose onto the
         sequence dispatcher.
     """
+    def fmt_log():
+        return '{{{\n%s\n}}}' % (
+            '\n'.join(['{}: {}'.format(*x) for x in log]),)
+
+    def dispatcher(intent):
+        p = sequence(intent)
+        if p is not None:
+            log.append(("sequence", intent))
+            return p
+        p = fallback_dispatcher(intent)
+        if p is not None:
+            log.append(("fallback", intent))
+            return p
+        else:
+            log.append(("NOT FOUND", intent))
+            raise AssertionError(
+                "Performer not found: {}!\n{}".format(intent, fmt_log()))
+
     sequence = SequenceDispatcher(seq)
-    if fallback_dispatcher is not None:
-        dispatcher = ComposedDispatcher([sequence, fallback_dispatcher])
-    else:
-        dispatcher = sequence
+    log = []
     with sequence.consume():
         return sync_perform(dispatcher, eff)
 
@@ -908,6 +923,14 @@ def transform_eq(transformer, rhs):
                 self.comparisons, rhs)
 
     return TransformedEq()
+
+
+def match_func(arg, result):
+    """
+    Return an object that compares equal to a function that, when given
+    ``arg``, returns ``result``.
+    """
+    return transform_eq(lambda f: f(arg), result)
 
 
 def raise_(e):
