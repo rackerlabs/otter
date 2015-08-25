@@ -11,7 +11,7 @@ from effect import (
     TypeDispatcher,
     base_dispatcher,
     sync_perform)
-from effect.testing import EQFDispatcher, SequenceDispatcher
+from effect.testing import EQFDispatcher, SequenceDispatcher, perform_sequence
 
 import mock
 
@@ -69,7 +69,6 @@ from otter.log.intents import Log
 from otter.test.utils import (
     StubResponse,
     nested_sequence,
-    perform_sequence,
     raise_,
     resolve_effect,
     stub_json_response,

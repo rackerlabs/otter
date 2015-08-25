@@ -2,7 +2,7 @@
 import json
 
 from effect import Effect, Func, base_dispatcher, sync_perform
-from effect.testing import SequenceDispatcher
+from effect.testing import SequenceDispatcher, perform_sequence
 
 from mock import ANY, patch
 
@@ -60,7 +60,6 @@ from otter.log.intents import Log
 from otter.test.utils import (
     StubResponse,
     matches,
-    perform_sequence,
     raise_,
     resolve_effect,
     stub_pure_response,

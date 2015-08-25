@@ -7,7 +7,8 @@ from effect import (
     ComposedDispatcher,
     Effect,
     sync_perform)
-from effect.testing import SequenceDispatcher
+from effect.testing import (
+    SequenceDispatcher, parallel_sequence, perform_sequence)
 
 import mock
 
@@ -40,11 +41,9 @@ from otter.test.utils import (
     matches,
     mock_group as util_mock_group,
     mock_log,
-    nested_parallel,
     nested_sequence,
     noop,
     patch,
-    perform_sequence,
     raise_,
     test_dispatcher)
 from otter.util.config import set_config_data
@@ -76,11 +75,12 @@ class PauseGroupTests(SynchronousTestCase):
                                         tenant_id="tid",
                                         scaling_group_id="gid")),
              nested_sequence([
-                 nested_parallel([
-                     (ModifyGroupStatePaused(self.group, True), noop),
-                     (DeleteNode(path="/groups/divergent/tid_gid", version=-1),
-                      noop),
-                     (Log("mark-clean-success", {}), noop)
+                 parallel_sequence([
+                     [(ModifyGroupStatePaused(self.group, True), noop)],
+                     [(DeleteNode(path="/groups/divergent/tid_gid",
+                                  version=-1),
+                       noop),
+                      (Log("mark-clean-success", {}), noop)],
                  ])
              ]))
         ]
@@ -119,12 +119,12 @@ class PauseGroupTests(SynchronousTestCase):
                                         tenant_id="tid",
                                         scaling_group_id="gid")),
              nested_sequence([
-                 nested_parallel([
-                     (ModifyGroupStatePaused(self.group, False), noop),
-                     (CreateOrSet(path="/groups/divergent/tid_gid",
-                                  content="dirty"),
-                      noop),
-                     (Log("mark-dirty-success", {}), noop)
+                 parallel_sequence([
+                     [(ModifyGroupStatePaused(self.group, False), noop)],
+                     [(CreateOrSet(path="/groups/divergent/tid_gid",
+                                   content="dirty"),
+                       noop),
+                      (Log("mark-dirty-success", {}), noop)]
                  ])
              ]))
         ]

@@ -6,6 +6,7 @@ import uuid
 from functools import partial
 
 from effect import Effect, Func, TypeDispatcher
+from effect.testing import perform_sequence
 
 import mock
 
@@ -33,7 +34,6 @@ from otter.test.utils import (
     CheckFailure,
     mock_log,
     nested_sequence,
-    perform_sequence,
     raise_,
     retry_sequence,
     stub_pure_response
