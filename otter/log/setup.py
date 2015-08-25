@@ -13,6 +13,7 @@ from otter.log.formatters import (
     SystemFilterWrapper,
     add_to_fanout,
     get_fanout,
+    cf_id_wrapper,
     throttling_wrapper,
 )
 from otter.log.spec import SpecificationObserverWrapper
@@ -35,7 +36,8 @@ def make_observer_chain(ultimate_observer, indent):
             PEP3101FormattingWrapper(
                 SystemFilterWrapper(
                     ErrorFormattingWrapper(
-                        get_fanout())))))
+                        cf_id_wrapper(
+                            get_fanout()))))))
 
 
 def observer_factory():
