@@ -1,10 +1,7 @@
 """
 Tests for :obj:`otter.test.utils`.
 """
-from effect import (
-    ComposedDispatcher, Effect, NoPerformerFoundError,
-    base_dispatcher, parallel, sync_performer)
-from effect.fold import FoldError, sequence
+from effect import ComposedDispatcher, Effect, base_dispatcher, sync_performer
 from effect.testing import perform_sequence
 
 from mock import ANY

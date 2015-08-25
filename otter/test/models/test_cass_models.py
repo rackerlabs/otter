@@ -10,7 +10,7 @@ from functools import partial
 
 from effect import (
     Constant, Effect, ParallelEffects, TypeDispatcher, sync_perform)
-from effect.testing import resolve_effect, perform_sequence
+from effect.testing import perform_sequence, resolve_effect
 
 from jsonschema import ValidationError
 

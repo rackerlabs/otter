@@ -77,7 +77,8 @@ class PauseGroupTests(SynchronousTestCase):
              nested_sequence([
                  parallel_sequence([
                      [(ModifyGroupStatePaused(self.group, True), noop)],
-                     [(DeleteNode(path="/groups/divergent/tid_gid", version=-1),
+                     [(DeleteNode(path="/groups/divergent/tid_gid",
+                                  version=-1),
                        noop),
                       (Log("mark-clean-success", {}), noop)],
                  ])

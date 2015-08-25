@@ -7,7 +7,7 @@ from effect import (
     ComposedDispatcher, Effect, Error, Func, base_dispatcher, sync_perform)
 from effect.ref import ReadReference, Reference, reference_dispatcher
 from effect.testing import (
-    SequenceDispatcher, perform_sequence, parallel_sequence)
+    SequenceDispatcher, parallel_sequence, perform_sequence)
 
 from kazoo.exceptions import BadVersionError, NoNodeError
 from kazoo.recipe.partitioner import PartitionState
@@ -562,7 +562,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
              lambda i: None),
             parallel_sequence([
                 [(BoundFields(mock.ANY, fields={'tenant_id': '00',
-                                               'scaling_group_id': 'g1'}),
+                                                'scaling_group_id': 'g1'}),
                   nested_sequence(get_bound_sequence('00', 'g1')))],
              ]),
         ]

@@ -10,14 +10,12 @@ from operator import attrgetter
 
 from effect import (
     ComposedDispatcher, Constant, Effect, ParallelEffects, TypeDispatcher,
-    base_dispatcher, sync_perform)
+    base_dispatcher)
 from effect.async import perform_parallel_async
-from effect.fold import sequence
 from effect.testing import (
-    SequenceDispatcher,
+    perform_sequence,
     resolve_effect as eff_resolve_effect,
-    resolve_stubs as eff_resolve_stubs,
-    perform_sequence as PS)
+    resolve_stubs as eff_resolve_stubs)
 
 from kazoo.recipe.partitioner import PartitionState
 
@@ -762,7 +760,8 @@ def retry_sequence(expected_retry_intent, performers,
         seq = [(expected_retry_intent.effect.intent, performer)
                for performer in performers]
 
-        return PS(seq, new_retry_effect, ComposedDispatcher(_dispatchers))
+        return perform_sequence(seq, new_retry_effect,
+                                ComposedDispatcher(_dispatchers))
 
     return (expected_retry_intent, perform_retry_without_delay)
 
@@ -797,7 +796,7 @@ def nested_sequence(seq, get_effect=attrgetter('effect'),
         sequence dispatcher.
     """
     return compose(
-        partial(PS, seq,
+        partial(perform_sequence, seq,
                 fallback_dispatcher=fallback_dispatcher),
         get_effect)
 
