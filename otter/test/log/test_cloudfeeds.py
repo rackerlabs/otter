@@ -1,11 +1,9 @@
 """
 Tests for otter.cloudfeeds
 """
-
-import uuid
 from functools import partial
 
-from effect import Effect, Func, TypeDispatcher
+from effect import Effect, TypeDispatcher
 from effect.testing import perform_sequence
 
 import mock
@@ -24,6 +22,7 @@ from otter.log.cloudfeeds import (
     UnsuitableMessage,
     add_event,
     cf_err, cf_fail, cf_msg,
+    cfid_wrapper,
     prepare_request,
     request_format,
     sanitize_event
@@ -304,6 +303,25 @@ class EventTests(SynchronousTestCase):
             request_format, self.cf_event, True, "1970-01-01T00:00:00Z",
             'ord', 'tid', 'uuid')
         self.assertEqual(req, self._get_request('ERROR', 'uuid', 'tid'))
+
+
+class CFIDWrapperTests(SynchronousTestCase):
+    """
+    Tests for generating a CF ID as an observer/wrapper (:func:`cfid_wrapper`)
+    """
+    def test_add_cf_id_to_cloud_feeds_events(self):
+        """
+        CF event dictionaries have an ID added to them, non-CF events do not.
+        """
+        obs = []
+        id_observer = cfid_wrapper(obs.append)
+        id_observer({'cloud_feed': True, 'this': 'is a cf event'})
+        id_observer({'this': 'is not a cf event'})
+        self.assertEqual(
+            obs,
+            [{'cloud_feed': True, 'this': 'is a cf event',
+              'cloud_feed_id': mock.ANY},
+             {'this': 'is not a cf event'}])
 
 
 class CloudFeedsObserverTests(SynchronousTestCase):

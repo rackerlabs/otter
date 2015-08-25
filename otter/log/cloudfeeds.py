@@ -1,13 +1,12 @@
 """
 Publishing events to Cloud feeds
 """
-
-import uuid
 from copy import deepcopy
+from uuid import uuid4
 
 from characteristic import attributes
 
-from effect import Effect, Func
+from effect import Effect
 
 from toolz.dicttoolz import keyfilter
 
@@ -169,6 +168,17 @@ def add_event(event, admin_tenant_id, region, log):
             retry_times(5)),
         exponential_backoff_interval(2))
     return Effect(TenantScope(tenant_id=admin_tenant_id, effect=eff))
+
+
+def cfid_wrapper(observer):
+    """
+    Wrapper that adds a cloud feeds ID to each cloud feeds event dictionary.
+    """
+    def emit(event_dict):
+        if event_dict.get('cloud_feed', False):
+            event_dict['cloud_feed_id'] = uuid4()
+        observer(event_dict)
+    return emit
 
 
 @attributes(['reactor', 'authenticator', 'tenant_id', 'region',
