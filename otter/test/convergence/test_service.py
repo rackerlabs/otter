@@ -6,7 +6,8 @@ from datetime import datetime
 from effect import (
     ComposedDispatcher, Effect, Error, Func, base_dispatcher, sync_perform)
 from effect.ref import ReadReference, Reference, reference_dispatcher
-from effect.testing import SequenceDispatcher
+from effect.testing import (
+    SequenceDispatcher, parallel_sequence, perform_sequence)
 
 from kazoo.exceptions import BadVersionError, NoNodeError
 from kazoo.recipe.partitioner import PartitionState
@@ -50,10 +51,8 @@ from otter.test.utils import (
     TestStep,
     intent_func,
     mock_group, mock_log,
-    nested_parallel,
     nested_sequence,
     noop,
-    perform_sequence,
     raise_,
     raise_to_exc_info,
     test_dispatcher,
@@ -481,13 +480,13 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             (Log('converge-all-groups',
                  dict(group_infos=self.group_infos, currently_converging=[])),
              lambda i: None),
-            nested_parallel([
-                (BoundFields(mock.ANY, fields={'tenant_id': '00',
-                                               'scaling_group_id': 'g1'}),
-                 nested_sequence(get_bound_sequence('00', 'g1'))),
-                (BoundFields(mock.ANY, fields={'tenant_id': '01',
-                                               'scaling_group_id': 'g2'}),
-                 nested_sequence(get_bound_sequence('01', 'g2'))),
+            parallel_sequence([
+                [(BoundFields(mock.ANY, fields={'tenant_id': '00',
+                                                'scaling_group_id': 'g1'}),
+                  nested_sequence(get_bound_sequence('00', 'g1')))],
+                [(BoundFields(mock.ANY, fields={'tenant_id': '01',
+                                                'scaling_group_id': 'g2'}),
+                  nested_sequence(get_bound_sequence('01', 'g2')))],
              ])
         ]
         self.assertEqual(perform_sequence(sequence, eff),
@@ -507,18 +506,18 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                       currently_converging=['g1'])),
              lambda i: None),
 
-            nested_parallel([
-                (BoundFields(mock.ANY, dict(tenant_id='01',
-                                            scaling_group_id='g2')),
-                 nested_sequence([
-                    (GetStat(path='/groups/divergent/01_g2'),
-                     lambda i: ZNodeStatStub(version=5)),
-                    (TenantScope(mock.ANY, '01'),
-                     nested_sequence([
-                        (('converge', '01', 'g2', 5, 3600),
-                         lambda i: 'converged two!'),
-                     ])),
-                 ])),
+            parallel_sequence([
+                [(BoundFields(mock.ANY, dict(tenant_id='01',
+                                             scaling_group_id='g2')),
+                  nested_sequence([
+                     (GetStat(path='/groups/divergent/01_g2'),
+                      lambda i: ZNodeStatStub(version=5)),
+                     (TenantScope(mock.ANY, '01'),
+                      nested_sequence([
+                         (('converge', '01', 'g2', 5, 3600),
+                          lambda i: 'converged two!'),
+                      ])),
+                  ]))],
              ])
         ]
         self.assertEqual(perform_sequence(sequence, eff), ['converged two!'])
@@ -561,10 +560,10 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                  dict(group_infos=[self.group_infos[0]],
                       currently_converging=[])),
              lambda i: None),
-            nested_parallel([
-                (BoundFields(mock.ANY, fields={'tenant_id': '00',
-                                               'scaling_group_id': 'g1'}),
-                 nested_sequence(get_bound_sequence('00', 'g1'))),
+            parallel_sequence([
+                [(BoundFields(mock.ANY, fields={'tenant_id': '00',
+                                                'scaling_group_id': 'g1'}),
+                  nested_sequence(get_bound_sequence('00', 'g1')))],
              ]),
         ]
         self.assertEqual(perform_sequence(sequence, eff), [None])
@@ -689,10 +688,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
     def get_seq(self):
         return [
             (Func(datetime.utcnow), lambda i: self.now),
-            nested_parallel([
-                (self.gsgi, lambda i: self.gsgi_result),
-                (("gacd", self.tenant_id, self.group_id, self.now),
-                 lambda i: (self.servers, ()))
+            parallel_sequence([
+                [(self.gsgi, lambda i: self.gsgi_result)],
+                [(("gacd", self.tenant_id, self.group_id, self.now),
+                  lambda i: (self.servers, ()))]
             ]),
             (UpdateServersCache(
                 self.tenant_id, self.group_id, self.now, self.cache), noop)
@@ -712,7 +711,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         for serv in self.servers:
             serv.desired_lbs = pset()
         sequence = [
-            nested_parallel([]),
+            parallel_sequence([]),
             (Log('execute-convergence', mock.ANY), noop),
             (Log('execute-convergence-results',
                  {'results': [], 'worst_status': 'SUCCESS'}), noop),
@@ -756,14 +755,14 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             return steps
 
         sequence = [
-            nested_parallel([]),
+            parallel_sequence([]),
             (Log('execute-convergence',
                  dict(servers=self.servers, lb_nodes=(), steps=steps,
                       now=self.now, desired=dgs)), noop),
-            nested_parallel([
-                ({'dgs': dgs, 'servers': self.servers,
-                  'lb_nodes': (), 'now': 0},
-                 noop)
+            parallel_sequence([
+                [({'dgs': dgs, 'servers': self.servers,
+                   'lb_nodes': (), 'now': 0},
+                  noop)]
             ]),
             (Log('execute-convergence-results',
                  {'results': [{'step': steps[0],
@@ -828,14 +827,14 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             ],
             'worst_status': 'RETRY'}
         sequence = [
-            nested_parallel([]),
+            parallel_sequence([]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
-            nested_parallel([
-                ("step_intent", lambda i: (
-                    StepResult.RETRY, [
-                        ErrorReason.Exception(exc_info),
-                        ErrorReason.String('foo'),
-                        ErrorReason.Structured({'foo': 'bar'})]))
+            parallel_sequence([
+                [("step_intent", lambda i: (
+                     StepResult.RETRY, [
+                         ErrorReason.Exception(exc_info),
+                         ErrorReason.String('foo'),
+                         ErrorReason.Structured({'foo': 'bar'})]))]
             ]),
             (Log(msg='execute-convergence-results', fields=expected_fields),
              noop)
@@ -854,17 +853,17 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             return pbag([step])
 
         sequence = [
-            nested_parallel([
-                nested_parallel([
-                    (Log('convergence-create-servers',
-                         {'num_servers': 1, 'server_config': {'foo': 'bar'},
-                          'cloud_feed': True, 'cloud_feed_id': mock.ANY}),
-                     noop)
-                ])
+            parallel_sequence([
+                [parallel_sequence([
+                     [(Log('convergence-create-servers',
+                           {'num_servers': 1, 'server_config': {'foo': 'bar'},
+                            'cloud_feed': True, 'cloud_feed_id': mock.ANY}),
+                       noop)]
+                 ])]
             ]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
-            nested_parallel([
-                ("create-server", lambda i: (StepResult.RETRY, []))
+            parallel_sequence([
+                [("create-server", lambda i: (StepResult.RETRY, []))]
             ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop)
         ]
@@ -881,10 +880,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         self.state.status = ScalingGroupStatus.DELETING
         sequence = [
-            nested_parallel([]),
+            parallel_sequence([]),
             (Log('execute-convergence', mock.ANY), noop),
-            nested_parallel([
-                ("step", lambda i: (step_result, []))
+            parallel_sequence([
+                [("step", lambda i: (step_result, []))]
             ]),
             (Log('execute-convergence-results', mock.ANY), noop),
         ]
@@ -925,12 +924,12 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 TestStep(Effect("retry"))]
 
         sequence = [
-            nested_parallel([]),
+            parallel_sequence([]),
             (Log('execute-convergence', mock.ANY), noop),
-            nested_parallel([
-                ("step1", lambda i: (StepResult.SUCCESS, [])),
-                ("retry", lambda i: (StepResult.RETRY,
-                                     [ErrorReason.String('mywish')]))
+            parallel_sequence([
+                [("step1", lambda i: (StepResult.SUCCESS, []))],
+                [("retry", lambda i: (StepResult.RETRY,
+                                      [ErrorReason.String('mywish')]))],
             ]),
             (Log('execute-convergence-results', mock.ANY), noop)
         ]
@@ -959,17 +958,17 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             return StepResult.SUCCESS, []
 
         sequence = [
-            nested_parallel([]),
+            parallel_sequence([]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
-            nested_parallel([
-                ("success1", success),
-                ("retry", lambda i: (StepResult.RETRY, [])),
-                ("success2", success),
-                ("fail1", lambda i: (StepResult.FAILURE,
-                                     [ErrorReason.Exception(exc_info)])),
-                ("fail2", lambda i: (StepResult.FAILURE,
-                                     [ErrorReason.Exception(exc_info2)])),
-                ("success3", success)
+            parallel_sequence([
+                [("success1", success)],
+                [("retry", lambda i: (StepResult.RETRY, []))],
+                [("success2", success)],
+                [("fail1", lambda i: (StepResult.FAILURE,
+                                      [ErrorReason.Exception(exc_info)]))],
+                [("fail2", lambda i: (StepResult.FAILURE,
+                                      [ErrorReason.Exception(exc_info2)]))],
+                [("success3", success)],
             ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             (UpdateGroupStatus(scaling_group=self.group,
@@ -1001,11 +1000,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             return [TestStep(Effect("fail"))]
 
         sequence = [
-            nested_parallel([]),
+            parallel_sequence([]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
-            nested_parallel([
-                ("fail", lambda i: (StepResult.FAILURE,
-                                    [ErrorReason.Exception(exc_info)]))
+            parallel_sequence([
+                [("fail", lambda i: (StepResult.FAILURE,
+                                     [ErrorReason.Exception(exc_info)]))]
             ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             (UpdateGroupStatus(scaling_group=self.group,
@@ -1033,10 +1032,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             return pbag([TestStep(Effect("step"))])
 
         sequence = [
-            nested_parallel([]),
+            parallel_sequence([]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
-            nested_parallel([
-                ("step", lambda i: (StepResult.SUCCESS, []))
+            parallel_sequence([
+                [("step", lambda i: (StepResult.SUCCESS, []))]
             ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             (UpdateGroupStatus(scaling_group=self.group,
@@ -1063,7 +1062,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         for serv in self.servers:
             serv.desired_lbs = pset()
         sequence = [
-            nested_parallel([]),
+            parallel_sequence([]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             (UpdateGroupStatus(scaling_group=self.group,
