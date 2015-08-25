@@ -16,7 +16,8 @@ from effect.fold import sequence
 from effect.testing import (
     SequenceDispatcher,
     resolve_effect as eff_resolve_effect,
-    resolve_stubs as eff_resolve_stubs)
+    resolve_stubs as eff_resolve_stubs,
+    perform_sequence as PS)
 
 from kazoo.recipe.partitioner import PartitionState
 
@@ -761,27 +762,9 @@ def retry_sequence(expected_retry_intent, performers,
         seq = [(expected_retry_intent.effect.intent, performer)
                for performer in performers]
 
-        return perform_sequence(seq, new_retry_effect,
-                                ComposedDispatcher(_dispatchers))
+        return PS(seq, new_retry_effect, ComposedDispatcher(_dispatchers))
 
     return (expected_retry_intent, perform_retry_without_delay)
-
-
-def perform_sequence(seq, eff, fallback_dispatcher=base_dispatcher):
-    """
-    Create a :obj:`SequenceDispatcher` with the given ``seq``, and perform
-    ``eff`` with it.
-
-    :param fallback_dispatcher: an optional dispatcher to compose onto the
-        sequence dispatcher.
-    """
-    sequence = SequenceDispatcher(seq)
-    if fallback_dispatcher is not None:
-        dispatcher = ComposedDispatcher([sequence, fallback_dispatcher])
-    else:
-        dispatcher = sequence
-    with sequence.consume():
-        return sync_perform(dispatcher, eff)
 
 
 def nested_sequence(seq, get_effect=attrgetter('effect'),
@@ -814,29 +797,9 @@ def nested_sequence(seq, get_effect=attrgetter('effect'),
         sequence dispatcher.
     """
     return compose(
-        partial(perform_sequence, seq,
+        partial(PS, seq,
                 fallback_dispatcher=fallback_dispatcher),
         get_effect)
-
-
-def nested_parallel(parallel, fallback_dispatcher=base_dispatcher):
-    """
-    Return a two-tuple for use in a :obj:`SequenceDispatcher` which ensures
-    that all the intents in ``parallel`` are performed in parallel. Note that
-    the items in ``parallel`` must match the order that they're given to the
-    :func:`effect.parallel` function, since the order of inputs affects the
-    order of results.
-
-    :param parallel: sequence of (intent, (intent -> result) function), like
-        what :obj:`SequenceDispatcher` accepts.
-    :param fallback_dispatcher: an optional dispatcher to compose onto the
-        sequence dispatcher.
-    """
-    return (
-        ParallelEffects(effects=mock.ANY),
-        nested_sequence(parallel,
-                        get_effect=lambda i: sequence(i.effects),
-                        fallback_dispatcher=fallback_dispatcher))
 
 
 def test_dispatcher(disp=None):
