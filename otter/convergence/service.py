@@ -563,13 +563,6 @@ def converge_all_groups(currently_converging, recently_converged,
                                      tenant_id, group_id,
                                      stat.version, build_timeout)
             result = yield Effect(TenantScope(eff, tenant_id))
-            # UGH. TODO: This is too late. This should really be removed
-            # synchronously with deleting the group from currently_converging,
-            # since there are other asynchronous things that happen after that
-            # (like deleting the divergent node in ZK.) That means that a
-            # convergence can sneak in between a previous one and the time we
-            # update the recently_converged dict here, which would defeat the
-            # mechanism.
             yield do_return(result)
 
     recent_groups = yield get_recently_converged_groups(recently_converged)
