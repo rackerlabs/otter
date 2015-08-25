@@ -5,6 +5,7 @@ from effect import (
     ComposedDispatcher, Effect, NoPerformerFoundError,
     base_dispatcher, parallel, sync_performer)
 from effect.fold import FoldError, sequence
+from effect.testing import perform_sequence
 
 from mock import ANY
 
@@ -16,8 +17,6 @@ from zope.interface import Attribute, Interface
 
 from otter.test.utils import (
     iMock,
-    nested_parallel,
-    perform_sequence,
     raise_,
     retry_sequence
 )
