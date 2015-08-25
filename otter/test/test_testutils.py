@@ -205,7 +205,7 @@ class RetrySequenceTests(SynchronousTestCase):
             retry_sequence(r, [lambda _: raise_(Exception()),
                                lambda _: raise_(Exception())])
         ]
-        self.assertRaises(NoPerformerFoundError,
+        self.assertRaises(AssertionError,
                           perform_sequence, seq, Effect(r))
 
     def test_do_not_have_to_expect_an_exact_can_retry(self):
