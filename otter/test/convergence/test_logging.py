@@ -5,8 +5,6 @@ Tests for logging in convergence (that steps are correctly logged).
 from effect import sync_perform
 from effect.testing import SequenceDispatcher
 
-from mock import ANY
-
 from pyrsistent import freeze, pbag, pset
 
 from twisted.trial.unittest import SynchronousTestCase
