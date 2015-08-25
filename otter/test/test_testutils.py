@@ -2,7 +2,7 @@
 Tests for :obj:`otter.test.utils`.
 """
 from effect import (
-    ComposedDispatcher, Effect, NoPerformerFoundError,
+    ComposedDispatcher, Effect,
     base_dispatcher, parallel, sync_performer)
 from effect.fold import FoldError, sequence
 
