@@ -224,7 +224,7 @@ class NestedParallelTests(SynchronousTestCase):
         ]
         p = sequence([Effect(1), Effect(2), Effect(3)])
         e = self.assertRaises(FoldError, perform_sequence, seq, p)
-        self.assertIs(e.wrapped_exception[0], NoPerformerFoundError)
+        self.assertIs(e.wrapped_exception[0], AssertionError)
 
 
 class RetrySequenceTests(SynchronousTestCase):
@@ -260,7 +260,7 @@ class RetrySequenceTests(SynchronousTestCase):
             retry_sequence(r, [lambda _: raise_(Exception()),
                                lambda _: raise_(Exception())])
         ]
-        self.assertRaises(NoPerformerFoundError,
+        self.assertRaises(AssertionError,
                           perform_sequence, seq, Effect(r))
 
     def test_do_not_have_to_expect_an_exact_can_retry(self):
