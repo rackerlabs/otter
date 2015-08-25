@@ -50,7 +50,8 @@ from otter.cloud_client import (
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.model import DRAINING_METADATA, group_id_from_metadata
 from otter.convergence.service import (
-    delete_divergent_flag, get_convergence_starter, mark_divergent)
+    delete_divergent_flag, get_convergence_starter, mark_divergent,
+    trigger_convergence)
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
 from otter.log.intents import msg, with_log
@@ -205,7 +206,7 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
     return d
 
 
-def delete_group(log, trans_id, group, force):
+def delete_group(dispatcher, log, trans_id, group, force):
     """
     Delete group based on the kind of tenant
 
@@ -221,7 +222,7 @@ def delete_group(log, trans_id, group, force):
 
     def check_and_delete(_group, state):
         if state.desired == 0:
-            d = trigger_convergence_deletion(log, group)
+            d = trigger_convergence_deletion(dispatcher, group, trans_id)
             return d.addCallback(lambda _: state)
         else:
             raise GroupNotEmptyError(group.tenant_id, group.uuid)
@@ -230,7 +231,7 @@ def delete_group(log, trans_id, group, force):
         if force:
             # We don't care about servers in the group. So trigger deletion
             # since it will take precedence over other status
-            d = trigger_convergence_deletion(log, group)
+            d = trigger_convergence_deletion(dispatcher, group, trans_id)
         else:
             # Delete only if desired is 0 which must be done with a lock to
             # ensure desired is not getting modified by another thread/node
@@ -247,7 +248,7 @@ def delete_group(log, trans_id, group, force):
     return d
 
 
-def trigger_convergence_deletion(log, group):
+def trigger_convergence_deletion(dispatcher, group, trans_id):
     """
     Trigger deletion of group that belongs to convergence tenant
 
@@ -258,9 +259,11 @@ def trigger_convergence_deletion(log, group):
     # Update group status and trigger convergence
     # DELETING status will take precedence over other status
     d = group.update_status(ScalingGroupStatus.DELETING)
-    cs = get_convergence_starter()
-    d.addCallback(
-        lambda _: cs.start_convergence(log, group.tenant_id, group.uuid))
+    eff = with_log(trigger_convergence(group.tenant_id, group.uuid),
+                   tenant_id=group.tenant_id,
+                   scaling_group_id=group.uuid,
+                   transaction_id=trans_id)
+    d.addCallback(lambda _: perform(dispatcher, eff))
     return d
 
 
@@ -592,7 +595,7 @@ def convergence_remove_server_from_group(
     :type state: :class:`~otter.models.interface.GroupState`
 
     :return: The updated state.
-    :rtype: deferred :class:`~otter.models.interface.GroupState`
+    :rtype: Effect of :class:`~otter.models.interface.GroupState`
 
     :raise: :class:`CannotDeleteServerBelowMinError` if the server cannot
         be deleted without replacement, and :class:`ServerNotFoundError` if
@@ -629,35 +632,8 @@ def convergence_remove_server_from_group(
         yield do_return(state)
 
 
-def perform_convergence_remove_from_group(
-        log, trans_id, server_id, replace, purge, group, state, dispatcher):
-    """
-    Create the effect to remove a server from a group and performs it with
-    the given dispatcher.
-
-    :param log: A bound logger
-    :param bytes trans_id: The transaction id for this operation.
-    :param bytes server_id: The id of the server to be removed.
-    :param bool replace: Should the server be replaced?
-    :param bool purge: Should the server be deleted from Nova?
-    :param group: The scaling group to remove a server from.
-    :type group: :class:`~otter.models.interface.IScalingGroup`
-    :param state: The current state of the group.
-    :type state: :class:`~otter.models.interface.GroupState`
-    :param dispatcher: A dispatcher that can perform all the effects used by
-        :func:`convergence_remove_server_from_group`.
-
-    :return: The end result of :func:`convergence_remove_server_from_group`
-        (the new state).
-    :rtype: deferred :class:`~otter.models.interface.GroupState`
-    """
-    eff = convergence_remove_server_from_group(
-        log, trans_id, server_id, replace, purge, group, state)
-    return perform(dispatcher, eff)
-
-
-def remove_server_from_group(log, trans_id, server_id, replace, purge,
-                             group, state, config_value=config_value):
+def remove_server_from_group(dispatcher, log, trans_id, server_id, replace,
+                             purge, group, state, config_value=config_value):
     """
     Remove a specific server from the group, optionally replacing it
     with a new one, and optionally deleting the old one from Nova.
@@ -686,13 +662,17 @@ def remove_server_from_group(log, trans_id, server_id, replace, purge,
 
     # convergence case - requires that the convergence dispatcher handles
     # EvictServerFromScalingGroup
-    cs = get_convergence_starter()
-    d = perform_convergence_remove_from_group(
-        log, trans_id, server_id, replace, purge, group, state,
-        cs.dispatcher)
+    eff = convergence_remove_server_from_group(
+        log, trans_id, server_id, replace, purge, group, state)
 
     def kick_off_convergence(new_state):
-        cs.start_convergence(log, group.tenant_id, group.uuid)
-        return new_state
+        ceff = trigger_convergence(group.tenant_id, group.uuid)
+        return ceff.on(lambda _: new_state)
 
-    return d.addCallback(kick_off_convergence)
+    return perform(
+        dispatcher,
+        with_log(eff.on(kick_off_convergence),
+                 tenant_id=group.tenant_id,
+                 scaling_group_id=group.uuid,
+                 server_id=server_id,
+                 transaction_id=trans_id))

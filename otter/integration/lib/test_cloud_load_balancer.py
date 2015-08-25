@@ -14,7 +14,7 @@ from otter.integration.lib.cloud_load_balancer import (
     HasLength)
 from otter.integration.lib.test_nova import Response, get_fake_treq
 from otter.util.deferredutils import TimedOutError
-from otter.util.http import APIError, headers
+from otter.util.http import UpstreamError, headers
 
 
 class _FakeRCS(object):
@@ -157,7 +157,7 @@ class CLBTests(SynchronousTestCase):
         clb = self.get_clb(
             *(expected_args + [Response(422), json.dumps(pending_delete)]))
         d = mutate_callable(clb, clock)
-        self.failureResultOf(d, APIError)
+        self.failureResultOf(d, UpstreamError)
 
     def test_update_node(self):
         """
@@ -348,7 +348,7 @@ class CLBTests(SynchronousTestCase):
         clb.clb_id = self.clb_id
 
         d = clb.delete(self.rcs, clock=clock)
-        self.failureResultOf(d, APIError)
+        self.failureResultOf(d, UpstreamError)
 
 
 class WaitForNodesTestCase(SynchronousTestCase):

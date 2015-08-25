@@ -1,8 +1,18 @@
+"""
+Shared utilities for trial test library.
+"""
+
+from functools import wraps
+
 from characteristic import Attribute, attributes
 
 from pyrsistent import PSet
 
+from twisted.internet.defer import FirstError
+from twisted.internet.error import ConnectionRefusedError
+
 from otter.convergence.model import ServerState
+from otter.util.http import APIError, UpstreamError
 
 
 class OvershootError(AssertionError):
@@ -89,3 +99,34 @@ def _count_dead_servers(servers):
     Count servers that are in error state.
     """
     return len([s for s in servers if s.state is ServerState.ERROR])
+
+
+def diagnose(system, message):
+    """
+    Decorator that adds a callback to the deferred return that will wrap a
+    failure so that we'll know what we were doing when that caused the failure.
+    """
+    def _unwrap_first(failure):
+        if failure.check(FirstError):
+            return _unwrap_first(failure.value.subFailure)
+        return failure
+
+    def wrap_failure(failure):
+        new_f = _unwrap_first(failure)
+
+        if new_f.check(APIError):
+            raise UpstreamError(new_f, system, message, new_f.value.url)
+
+        if new_f.check(ConnectionRefusedError, UpstreamError):
+            # allowing UpstreamError too, since the traceback will be too short
+            # and this gives us a sort of diagnosis stack
+            raise UpstreamError(new_f, system, message)
+
+        return failure
+
+    def decorate(f):
+        @wraps(f)
+        def new_function(*args, **kwargs):
+            return f(*args, **kwargs).addErrback(wrap_failure)
+        return new_function
+    return decorate

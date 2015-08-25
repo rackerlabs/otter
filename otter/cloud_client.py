@@ -571,7 +571,8 @@ def add_clb_nodes(lb_id, nodes):
         _match_errors(mappings, code, json_body)
         _process_clb_api_error(code, json_body, lb_id)
 
-    return eff.on(error=_parse_known_errors)
+    return eff.on(error=_parse_known_errors).on(
+        log_success_response('request-add-clb-nodes', identity))
 
 
 def change_clb_node(lb_id, node_id, condition, weight):
@@ -610,6 +611,7 @@ def change_clb_node(lb_id, node_id, condition, weight):
             json_body)
 
     return eff.on(error=_parse_known_errors)
+    # CLB 202 response here has no body, so no response logging needed
 
 
 def remove_clb_nodes(lb_id, node_ids):
@@ -654,6 +656,7 @@ def remove_clb_nodes(lb_id, node_ids):
         error=_only_json_api_errors(
             lambda c, b: _process_clb_api_error(c, b, lb_id))
     ).on(success=lambda _: None)
+    # CLB 202 responses here has no body, so no response logging needed.
 
 
 def get_clb_nodes(lb_id):
@@ -668,6 +671,8 @@ def get_clb_nodes(lb_id):
         error=_only_json_api_errors(
             lambda c, b: _process_clb_api_error(c, b, lb_id))
     ).on(
+        log_success_response('request-list-clb-nodes', identity)
+    ).on(
         success=lambda (response, body): body['nodes'])
 
 
@@ -675,6 +680,8 @@ def get_clbs():
     """Fetch all LBs for a tenant. Returns list of loadbalancer JSON."""
     return service_request(
         ServiceType.CLOUD_LOAD_BALANCERS, 'GET', 'loadbalancers',
+    ).on(
+        log_success_response('request-list-clbs', identity)
     ).on(
         success=lambda (response, body): body['loadBalancers'])
 
@@ -690,6 +697,8 @@ def get_clb_node_feed(lb_id, node_id):
     ).on(
         error=_only_json_api_errors(
             lambda c, b: _process_clb_api_error(c, b, lb_id))
+    ).on(
+        log_success_response('request-get-clb-node-feed', identity)
     ).on(
         success=lambda (response, body): body)
 
@@ -843,7 +852,8 @@ def set_nova_metadata_item(server_id, key, value):
         ]
         _match_errors(_nova_standard_errors + other_errors, code, json_body)
 
-    return eff.on(error=_parse_known_errors)
+    return eff.on(error=_parse_known_errors).on(
+        log_success_response('request-set-metadata-item', identity))
 
 
 def get_server_details(server_id):
@@ -872,7 +882,8 @@ def get_server_details(server_id):
         ]
         _match_errors(_nova_standard_errors + other_errors, code, json_body)
 
-    return eff.on(error=_parse_known_errors)
+    return eff.on(error=_parse_known_errors).on(
+        log_success_response('request-one-server-details', identity))
 
 
 def create_server(server_args):

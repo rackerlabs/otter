@@ -192,6 +192,10 @@ def _lbs_from_metadata(metadata):
         except (ValueError, KeyError, TypeError):
             pass
 
+    desired_lbs.extend([
+        RCv3Description(lb_id=lb_id) for lb_id in lbs.get('RackConnectV3', {})
+    ])
+
     return pset(desired_lbs)
 
 
@@ -309,9 +313,6 @@ def generate_metadata(group_id, lb_descriptions):
     Generate autoscale-specific Nova server metadata given the group ID and
     an iterable of :class:`ILBDescription` providers.
 
-    NOTE: Currently this ignores RCv3 settings and draining timeout
-    settings, since they haven't been implemented yet.
-
     :return: a metadata `dict` containing the group ID and LB information
     """
     metadata = {
@@ -327,6 +328,8 @@ def generate_metadata(group_id, lb_descriptions):
             key = 'rax:autoscale:lb:CloudLoadBalancer:{0}'.format(lb_id)
             metadata[key] = json.dumps([
                 {'port': desc.port} for desc in descs])
+        elif desc_type == RCv3Description:
+            metadata['rax:autoscale:lb:RackConnectV3:{0}'.format(lb_id)] = ""
 
     return metadata
 

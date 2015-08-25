@@ -2,7 +2,7 @@
 import json
 
 from effect import Effect, Func, base_dispatcher, sync_perform
-from effect.testing import SequenceDispatcher
+from effect.testing import SequenceDispatcher, perform_sequence
 
 from mock import ANY, patch
 
@@ -60,7 +60,6 @@ from otter.log.intents import Log
 from otter.test.utils import (
     StubResponse,
     matches,
-    perform_sequence,
     raise_,
     resolve_effect,
     stub_pure_response,
@@ -343,8 +342,12 @@ class StepAsEffectTests(SynchronousTestCase):
         meta = SetMetadataItemOnServer(server_id=server_id, key='metadata_key',
                                        value='teapot')
         eff = meta.as_effect()
+        seq = [
+            (eff.intent, lambda i: (StubResponse(202, {}), {})),
+            (Log(ANY, ANY), lambda _: None)
+        ]
         self.assertEqual(
-            resolve_effect(eff, (None, {})),
+            perform_sequence(seq, eff),
             (StepResult.SUCCESS, []))
 
         exceptions = (NoSuchServerError("msg", server_id=server_id),
@@ -354,9 +357,9 @@ class StepAsEffectTests(SynchronousTestCase):
         for exception in exceptions:
             self.assertRaises(
                 type(exception),
-                resolve_effect,
-                eff, (type(exception), exception, None),
-                is_error=True)
+                perform_sequence,
+                [(eff.intent, lambda i: raise_(exception))],
+                eff)
 
     def test_change_load_balancer_node(self):
         """
@@ -445,7 +448,8 @@ class StepAsEffectTests(SynchronousTestCase):
         """
         eff = self._add_one_node_to_clb()
         seq = SequenceDispatcher([
-            (eff.intent, lambda i: (StubResponse(202, {}), ''))
+            (eff.intent, lambda i: (StubResponse(202, {}), '')),
+            (Log(ANY, ANY), lambda _: None)
         ])
         expected = (
             StepResult.RETRY,
@@ -882,30 +886,33 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
         node_b_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
         lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
 
-        resp = StubResponse(409, {})
+        seq = [
+            (service_request(
+                service_type=ServiceType.RACKCONNECT_V3,
+                method="POST",
+                url='load_balancer_pools/nodes',
+                data=[
+                    {'load_balancer_pool': {'id': lb_b_id},
+                     'cloud_server': {'id': node_b_id}}],
+                success_pred=has_code(201, 409)).intent,
+             lambda _: (StubResponse(201, {}), None)),
+        ]
+
         body = {"errors":
                 ["Cloud Server {node_id} is already a member of Load "
                  "Balancer Pool {lb_id}"
                  .format(node_id=node_a_id, lb_id=lb_a_id)]}
+
         eff = _rcv3_check_bulk_add(
             [(lb_a_id, node_a_id),
              (lb_b_id, node_b_id)],
-            (resp, body))
-        expected_intent = service_request(
-            service_type=ServiceType.RACKCONNECT_V3,
-            method="POST",
-            url='load_balancer_pools/nodes',
-            data=[
-                {'load_balancer_pool': {'id': lb_b_id},
-                 'cloud_server': {'id': node_b_id}}],
-            success_pred=has_code(201, 409)).intent
-        self.assertEqual(eff.intent, expected_intent)
-        (partial_check_bulk_add, _), = eff.callbacks
-        self.assertEqual(partial_check_bulk_add.func,
-                         _rcv3_check_bulk_add)
-        expected_pairs = pset([(lb_b_id, node_b_id)])
-        self.assertEqual(partial_check_bulk_add.args, (expected_pairs,))
-        self.assertEqual(partial_check_bulk_add.keywords, None)
+            (StubResponse(409, {}), body))
+
+        self.assertEqual(
+            perform_sequence(seq, eff),
+            (StepResult.RETRY,
+             [ErrorReason.String(reason="must re-gather after adding to LB in "
+                                        "order to update the active cache")]))
 
     def test_node_already_a_member(self):
         """
@@ -1058,7 +1065,18 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         node_d_id = 'bc1e94c3-0c88-4828-9e93-d42259280987'
         lb_d_id = 'de52879e-1f84-4ecd-8988-91dfdc99570d'
 
-        resp = StubResponse(409, {})
+        seq = [
+            (service_request(
+                service_type=ServiceType.RACKCONNECT_V3,
+                method="DELETE",
+                url='load_balancer_pools/nodes',
+                data=[
+                    {'load_balancer_pool': {'id': lb_b_id},
+                     'cloud_server': {'id': node_b_id}}],
+                success_pred=has_code(204, 409)).intent,
+             lambda _: (StubResponse(204, {}), None)),
+        ]
+
         body = {"errors":
                 ["Node {node_id} is not a member of Load Balancer "
                  "Pool {lb_id}".format(node_id=node_a_id, lb_id=lb_a_id),
@@ -1066,27 +1084,15 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                  .format(lb_id=lb_c_id),
                  "Load Balancer Pool {lb_id} does not exist"
                  .format(lb_id=lb_d_id)]}
+
         eff = _rcv3_check_bulk_delete(
             [(lb_a_id, node_a_id),
              (lb_b_id, node_b_id),
              (lb_c_id, node_c_id),
              (lb_d_id, node_d_id)],
-            (resp, body))
-        expected_intent = service_request(
-            service_type=ServiceType.RACKCONNECT_V3,
-            method="DELETE",
-            url='load_balancer_pools/nodes',
-            data=[
-                {'load_balancer_pool': {'id': lb_b_id},
-                 'cloud_server': {'id': node_b_id}}],
-            success_pred=has_code(204, 409)).intent
-        self.assertEqual(eff.intent, expected_intent)
-        (partial_check_bulk_delete, _), = eff.callbacks
-        self.assertEqual(partial_check_bulk_delete.func,
-                         _rcv3_check_bulk_delete)
-        expected_pairs = pset([(lb_b_id, node_b_id)])
-        self.assertEqual(partial_check_bulk_delete.args, (expected_pairs,))
-        self.assertEqual(partial_check_bulk_delete.keywords, None)
+            (StubResponse(409, {}), body))
+
+        self.assertEqual(perform_sequence(seq, eff), (StepResult.SUCCESS, []))
 
     def test_nothing_to_retry(self):
         """

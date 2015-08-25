@@ -4,7 +4,6 @@ Behaviors for Autoscale
 import inspect
 import logging
 import time
-import unittest
 
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
@@ -56,7 +55,7 @@ class DefaultAsserter(object):
             self.fail(msg)
 
     def fail(self, msg):
-        raise unittest.AssertionError(msg)
+        raise AssertionError(msg)
 
 
 class AutoscaleBehaviors(BaseBehavior):

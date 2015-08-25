@@ -2,6 +2,8 @@
 
 from characteristic import Attribute, attributes
 
+from otter.integration.lib.utils import diagnose
+
 
 @attributes([
     Attribute('auth'),
@@ -35,6 +37,7 @@ class IdentityV2(object):
     def __init__(self):
         self.access = None
 
+    @diagnose("Identity", "Authing test user")
     def authenticate_user(self, rcs, resources=None, region=None):
         """Authenticates against the Identity API.  Prior to success, the
         :attr:`access` member will be set to `None`.  After authentication

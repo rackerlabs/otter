@@ -11,7 +11,7 @@ from effect import (
     TypeDispatcher,
     base_dispatcher,
     sync_perform)
-from effect.testing import EQFDispatcher, SequenceDispatcher
+from effect.testing import EQFDispatcher, SequenceDispatcher, perform_sequence
 
 import mock
 
@@ -69,7 +69,6 @@ from otter.log.intents import Log
 from otter.test.utils import (
     StubResponse,
     nested_sequence,
-    perform_sequence,
     raise_,
     resolve_effect,
     stub_json_response,
@@ -125,6 +124,19 @@ def service_request_eqf(stub_response):
         return resolve_effect(eff, stub_response)
 
     return resolve_service_request
+
+
+def log_intent(msg_type, body):
+    """
+    Return a :obj:`Log` intent for the given mesasge type and body.
+    """
+    return Log(
+        msg_type,
+        {'url': "original/request/URL",
+         'method': 'method',
+         'request_id': "original-request-id",
+         'response_body': json.dumps(body, sort_keys=True)}
+    )
 
 
 class BindServiceTests(SynchronousTestCase):
@@ -714,11 +726,11 @@ class CLBClientTests(SynchronousTestCase):
             success_pred=has_code(202))
 
         # success
-        dispatcher = EQFDispatcher([(
-            expected.intent,
-            service_request_eqf(stub_pure_response('', 202)))])
-        self.assertEqual(sync_perform(dispatcher, eff),
-                         stub_pure_response(None, 202))
+        seq = [
+            (expected.intent, lambda i: stub_json_response({}, 202, {})),
+            (log_intent('request-add-clb-nodes', {}), lambda _: None)]
+        self.assertEqual(perform_sequence(seq, eff),
+                         (StubResponse(202, {}), {}))
 
         # CLBDuplicateNodesError failure
         msg = ("Duplicate nodes detected. One or more nodes already "
@@ -832,9 +844,10 @@ class CLBClientTests(SynchronousTestCase):
         expected = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS, 'GET', 'loadbalancers')
         req = get_clbs()
+        body = {'loadBalancers': 'lbs!'}
         seq = [
-            (expected.intent,
-             lambda i: stub_json_response({'loadBalancers': 'lbs!'}))]
+            (expected.intent, lambda i: stub_json_response(body)),
+            (log_intent('request-list-clbs', body), lambda _: None)]
         self.assertEqual(perform_sequence(seq, req), 'lbs!')
 
     def test_get_clb_nodes(self):
@@ -843,9 +856,10 @@ class CLBClientTests(SynchronousTestCase):
         expected = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'GET', 'loadbalancers/123456/nodes')
+        body = {'nodes': 'nodes!'}
         seq = [
-            (expected.intent,
-             lambda i: stub_json_response({'nodes': 'nodes!'}))]
+            (expected.intent, lambda i: stub_json_response(body)),
+            (log_intent('request-list-clb-nodes', body), lambda _: None)]
         self.assertEqual(perform_sequence(seq, req), 'nodes!')
 
     def test_get_clb_nodes_error_handling(self):
@@ -862,7 +876,9 @@ class CLBClientTests(SynchronousTestCase):
             ServiceType.CLOUD_LOAD_BALANCERS,
             'GET', 'loadbalancers/123456/nodes/node1.atom',
             json_response=False)
-        seq = [(expected.intent, lambda i: stub_pure_response('feed!'))]
+        seq = [(expected.intent, lambda i: stub_pure_response('feed!')),
+               (log_intent('request-get-clb-node-feed', 'feed!'),
+                lambda _: None)]
         req = get_clb_node_feed(self.lb_id, 'node1')
         self.assertEqual(perform_sequence(seq, req), 'feed!')
 
@@ -986,15 +1002,16 @@ class NovaClientTests(SynchronousTestCase):
         returns a successful result on 200.
         """
         server_id, expected, real = self._setup_for_set_nova_metadata_item()
+        body = {"meta": {"k": "v"}}
 
-        success_body = {"meta": {"k": "v"}}
-        dispatcher = EQFDispatcher([(
-            expected.intent,
-            service_request_eqf(
-                stub_pure_response(json.dumps(success_body), 200)))])
-
-        self.assertEqual(sync_perform(dispatcher, real),
-                         (StubResponse(200, {}), success_body))
+        seq = [
+            (expected.intent,
+             service_request_eqf(stub_pure_response(json.dumps(body), 200))),
+            (log_intent('request-set-metadata-item', body), lambda _: None)
+        ]
+        resp, response_json = perform_sequence(seq, real)
+        self.assertEqual(resp, StubResponse(200, {}))
+        self.assertEqual(response_json, body)
 
     def test_set_nova_metadata_item_too_many_metadata_items(self):
         """
@@ -1050,15 +1067,15 @@ class NovaClientTests(SynchronousTestCase):
         returns a successful result on 200.
         """
         server_id, expected, real = self._setup_for_get_server_details()
-
-        success_body = {"so much": "data"}
-        dispatcher = EQFDispatcher([(
-            expected.intent,
-            service_request_eqf(
-                stub_pure_response(json.dumps(success_body), 200)))])
-
-        self.assertEqual(sync_perform(dispatcher, real),
-                         (StubResponse(200, {}), success_body))
+        body = {"so much": "data"}
+        seq = [
+            (expected.intent,
+             service_request_eqf(stub_pure_response(json.dumps(body), 200))),
+            (log_intent('request-one-server-details', body), lambda _: None)
+        ]
+        resp, response_json = perform_sequence(seq, real)
+        self.assertEqual(resp, StubResponse(200, {}))
+        self.assertEqual(response_json, body)
 
     def test_get_server_details_errors(self):
         """
@@ -1200,16 +1217,8 @@ class NovaClientTests(SynchronousTestCase):
             params=params).intent
 
     def _list_server_details_log_intent(self, body):
-        """
-        Return a :obj:`Log` intent for listing server details.
-        """
-        return Log(
-            'request-list-servers-details',
-            {'url': "original/request/URL",
-             'method': 'method',
-             'request_id': "original-request-id",
-             'response_body': json.dumps(body, sort_keys=True)}
-        )
+        """Return a :obj:`Log` intent for listing server details."""
+        return log_intent('request-list-servers-details', body)
 
     def test_list_servers_details_page(self):
         """

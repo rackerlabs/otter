@@ -16,8 +16,10 @@ from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks
 from twisted.python.log import msg
 
+from otter.integration.lib.utils import diagnose
+
 from otter.util.deferredutils import retry_and_timeout
-from otter.util.http import APIError, check_success, headers
+from otter.util.http import APIError, UpstreamError, check_success, headers
 from otter.util.retry import (
     TransientRetryError,
     repeating_interval,
@@ -33,7 +35,9 @@ def _pending_update_to_transient(f):
     API failure is a 422 PENDING_UDPATE failure, and if so, re-raises a
     TransientRetryError instead.
     """
-    f.trap(APIError)
+    f.trap(UpstreamError, APIError)
+    if f.check(UpstreamError):
+        return _pending_update_to_transient(f.value.reason)
     if f.value.code == 422 and 'PENDING_UPDATE' in f.value.body:
         raise TransientRetryError()
     return f
@@ -106,6 +110,7 @@ class CloudLoadBalancer(object):
         return "{0}/loadbalancers/{1}".format(
             str(rcs.endpoints['loadbalancers']), self.clb_id)
 
+    @diagnose("clb", "Getting the CLB state")
     def get_state(self, rcs):
         """Returns the current state of the cloud load balancer.
 
@@ -124,6 +129,7 @@ class CloudLoadBalancer(object):
             .addCallback(self.treq.json_content)
         )
 
+    @diagnose("clb", "Wait for CLB to achieve a particular status")
     def wait_for_state(
         self, rcs, state_desired, timeout, period=10, clock=reactor
     ):
@@ -161,17 +167,18 @@ class CloudLoadBalancer(object):
 
         return poll()
 
+    @diagnose("clb", "Cleaning up CLB")
     def stop(self, rcs):
         """Stops and deletes the cloud load balancer.
 
         :param TestResources rcs: The resources used to make appropriate API
             calls with.
         """
-        # TODO: Ideally .addErrback(err) should do the job but doing it
-        # causes the error to get propogated to trial after logging it
-        return self.delete(rcs).addErrback(
-            lambda f: msg("error deleting clb: {}".format(f)))
+        if getattr(self, 'clb_id', None):
+            return self.delete(rcs).addErrback(
+                lambda f: msg("error cleaning up clb: {}".format(f)))
 
+    @diagnose("clb", "Creating CLB")
     def start(self, rcs, test):
         """Creates the cloud load balancer and launches it in the cloud.
 
@@ -199,6 +206,7 @@ class CloudLoadBalancer(object):
                 .addCallback(self.treq.json_content)
                 .addCallback(record_results))
 
+    @diagnose("clb", "Deleting CLB")
     def delete(self, rcs, clock=reactor):
         """
         Delete the cloud load balancer.  This might not work due to the load
@@ -216,13 +224,13 @@ class CloudLoadBalancer(object):
             yield self.treq.delete(
                 self.endpoint(rcs),
                 headers=headers(str(rcs.token)),
-                pool=self.pool
+                pool=self.pool,
             ).addCallback(self.treq.content)
 
             try:
                 state = yield self.get_state(rcs)
-            except APIError as e:
-                if e.code != 404:
+            except UpstreamError as e:
+                if not e.reason.check(APIError) or e.reason.value.code != 404:
                     raise e
             else:
                 if state['loadBalancer']['status'] not in (
@@ -235,6 +243,7 @@ class CloudLoadBalancer(object):
 
         return really_delete()
 
+    @diagnose("clb", "Listing nodes")
     def list_nodes(self, rcs):
         """
         Get all the nodes on the load balancer.
@@ -266,6 +275,7 @@ class CloudLoadBalancer(object):
         d.addCallback(self.treq.json_content)
         return d
 
+    @diagnose("clb", "Waiting for CLB nodes to reach a particular state")
     def wait_for_nodes(self, rcs, matcher, timeout, period=10, clock=reactor):
         """
         Wait for the nodes on the load balancer to reflect a certain state,
@@ -313,6 +323,7 @@ class CloudLoadBalancer(object):
 
         return poll()
 
+    @diagnose("clb", "Updating a CLB node")
     def update_node(self, rcs, node_id, weight=None, condition=None,
                     type=None, clock=reactor):
         """
@@ -350,6 +361,7 @@ class CloudLoadBalancer(object):
 
         return really_change()
 
+    @diagnose("clb", "Deleting CLB nodes")
     def delete_nodes(self, rcs, node_ids, clock=reactor):
         """
         Delete one or more nodes from a load balancer.
@@ -377,6 +389,7 @@ class CloudLoadBalancer(object):
 
         return really_delete()
 
+    @diagnose("clb", "Adding CLB nodes")
     def add_nodes(self, rcs, node_list, clock=reactor):
         """
         Add one or more nodes to a cloud load balancer

@@ -49,6 +49,7 @@ from otter.integration.lib.trial_tools import (
     skip_if,
     tag
 )
+from otter.integration.lib.utils import diagnose
 
 
 # if this is None, the test will be skipped
@@ -248,6 +249,7 @@ class TestConvergence(unittest.TestCase):
 
         return create_clb_first().addCallback(then_test)
 
+    @diagnose("Nova", "OOB-removing metadata from some servers")
     def _remove_metadata(self, ids, rcs):
         """Given a list of server IDs, use Nova to remove their metadata.
         This will strip them of their association with Autoscale.
@@ -350,6 +352,7 @@ def _oob_disable_then(helper, rcs, num_to_disable, disabler, then,
     returnValue(scaling_group)
 
 
+@diagnose("Nova", "OOB-deleting some servers")
 def _deleter(helper, rcs, server_ids):
     """
     A disabler function to be passed to :func:`_oob_disable_then` that deletes
@@ -358,6 +361,7 @@ def _deleter(helper, rcs, server_ids):
     return delete_servers(server_ids, rcs, pool=helper.pool, _treq=helper.treq)
 
 
+@diagnose("Mimic", "OOB-erroring some servers")
 def _errorer(helper, rcs, server_ids):
     """
     A disabler function to be passed to :func:`_oob_disable_then` that invokes
