@@ -1517,11 +1517,15 @@ class ModifyAndTriggerTests(SynchronousTestCase):
 
     def setUp(self):
         self.group = util_mock_group("state", "t", "g")
-        self.cs = mock.Mock()
-        self.cs.start_convergence.return_value = defer.succeed(None)
-        set_convergence_starter(self.cs)
         set_config_data({"convergence-tenants": ["t"]})
         self.addCleanup(set_config_data, None)
+        self.mock_tg = patch(self, "otter.controller.trigger_convergence",
+                             side_effect=intent_func("tg"))
+        self.logargs = {"a": "b"}
+        self.disp = SequenceDispatcher([
+            (BoundFields(mock.ANY, self.logargs),
+             nested_sequence([(("tg", "t", "g"), noop)]))
+        ])
 
     def modify(self, group, state):
         return "newstate"
@@ -1532,16 +1536,17 @@ class ModifyAndTriggerTests(SynchronousTestCase):
         for convergence enabled tenants
         """
         self.group.pause_modify_state = True
-        d = controller.modify_and_trigger(self.group, "log", self.modify)
+        d = controller.modify_and_trigger(
+            self.disp, self.group, self.logargs, self.modify)
         # modify state is called
         self.assertNoResult(d)
         self.assertEqual(self.group.modify_state_values[-1], "newstate")
         # but convergence is not yet triggered
-        self.assertFalse(self.cs.start_convergence.called)
+        self.assertFalse(self.disp.consumed())
         # It is triggered after modify_state completes
         self.group.modify_state_pause_d.callback(None)
         self.assertIsNone(self.successResultOf(d))
-        self.cs.start_convergence.assert_called_once_with("log", "t", "g")
+        self.assertTrue(self.disp.consumed())
 
     def test_worker_tenant(self):
         """
@@ -1549,20 +1554,21 @@ class ModifyAndTriggerTests(SynchronousTestCase):
         convergence
         """
         set_config_data(None)
-        d = controller.modify_and_trigger(self.group, "log", self.modify)
+        d = controller.modify_and_trigger(
+            self.disp, self.group, self.logargs, self.modify)
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(self.group.modify_state_values[-1], "newstate")
-        self.assertFalse(self.cs.start_convergence.called)
+        self.assertFalse(self.disp.consumed())
 
     def test_error(self):
         """
         Does not trigger convergence if group.modify_state() errors
         """
         d = controller.modify_and_trigger(
-            self.group, "log", lambda *a: raise_(ValueError("a")))
+            self.disp, self.group, {}, lambda *a: raise_(ValueError("a")))
         self.failureResultOf(d, ValueError)
         self.assertEqual(self.group.modify_state_values, [])
-        self.assertFalse(self.cs.start_convergence.called)
+        self.assertFalse(self.disp.consumed())
 
     def test_error_skips_cannotexecutepolicy(self):
         """
@@ -1571,9 +1577,9 @@ class ModifyAndTriggerTests(SynchronousTestCase):
         """
         ce = controller.CannotExecutePolicyError("t", "g", "p", "w")
         d = controller.modify_and_trigger(
-            self.group, "log", lambda *a: raise_(ce))
+            self.disp, self.group, self.logargs, lambda *a: raise_(ce))
         self.failureResultOf(d, controller.CannotExecutePolicyError)
-        self.cs.start_convergence.assert_called_once_with("log", "t", "g")
+        self.assertTrue(self.disp.consumed())
 
 
 _should_retry_params = ShouldDelayAndRetry(

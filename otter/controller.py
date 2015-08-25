@@ -54,7 +54,7 @@ from otter.convergence.service import (
     trigger_convergence)
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
-from otter.log.intents import msg, with_log
+from otter.log.intents import BoundFields, msg, with_log
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
 from otter.models.interface import GroupNotEmptyError, ScalingGroupStatus
 from otter.supervisor import (
@@ -304,7 +304,7 @@ def empty_group(log, trans_id, group):
 
 
 @defer.inlineCallbacks
-def modify_and_trigger(group, log, modifier, *args, **kwargs):
+def modify_and_trigger(dispatcher, group, logargs, modifier, *args, **kwargs):
     """
     Modify group state and trigger convergence after that
 
@@ -320,8 +320,10 @@ def modify_and_trigger(group, log, modifier, *args, **kwargs):
     except CannotExecutePolicyError as ce:
         cannot_exec_pol_err = ce
     if tenant_is_enabled(group.tenant_id, config_value):
-        cs = get_convergence_starter()
-        yield cs.start_convergence(log, group.tenant_id, group.uuid)
+        eff = Effect(
+            BoundFields(
+                trigger_convergence(group.tenant_id, group.uuid), logargs))
+        yield perform(dispatcher, eff)
     if cannot_exec_pol_err is not None:
         raise cannot_exec_pol_err
 
