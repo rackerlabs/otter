@@ -791,7 +791,8 @@ def perform_sequence(seq, eff, fallback_dispatcher=base_dispatcher):
         else:
             log.append(("NOT FOUND", intent))
             raise AssertionError(
-                "Performer not found: {}!\n{}".format(intent, fmt_log()))
+                "Performer not found: {}! Log follows:\n{}".format(
+                    intent, fmt_log()))
 
     sequence = SequenceDispatcher(seq)
     log = []

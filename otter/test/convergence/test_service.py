@@ -487,7 +487,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             (Log('converge-all-groups',
                  dict(group_infos=self.group_infos, currently_converging=[])),
              noop),
-            (ReadReference(ref=self.recently_converged), lambda i: pmap()),
+            (ReadReference(self.recently_converged), lambda i: pmap()),
             (Func(time.time), lambda i: 100),
             nested_parallel([self._expect_group_converged('00', 'g1'),
                              self._expect_group_converged('01', 'g2')])
@@ -534,8 +534,8 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
     def test_dont_filter_out_non_recently_converged(self):
         """
-        If a group was converged in the past but not recently, it can be
-        converged.
+        If a group was converged in the past but not recently, it will be
+        cleaned from the ``recently_converged`` map, and it will be converged.
         """
         eff = self._converge_all_groups(['00_g1'])
         sequence = [
@@ -547,6 +547,9 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             (ReadReference(ref=self.recently_converged),
              lambda i: pmap({'g1': 5})),
             (Func(time.time), lambda i: 16),
+            (ModifyReference(self.recently_converged,
+                             match_func("literally anything", pmap())),
+             noop),
             nested_parallel([self._expect_group_converged('00', 'g1')])
         ]
         self.assertEqual(perform_sequence(sequence, eff), ['converged g1!'])

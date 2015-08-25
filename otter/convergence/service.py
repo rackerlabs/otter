@@ -572,12 +572,11 @@ def converge_all_groups(currently_converging, recently_converged,
             # mechanism.
             yield do_return(result)
 
-    recently_converged_map = yield recently_converged.read()
-    start_time = yield Effect(Func(time.time))
+    recent_groups = yield get_recently_converged_groups(recently_converged)
     effs = []
     for info in group_infos:
         tenant_id, group_id = info['tenant_id'], info['group_id']
-        if start_time - recently_converged_map.get(group_id, 0) < 10:
+        if group_id in recent_groups:
             # Don't converge a group if it has recently been converged.
             # TODO: clean up the pmap so it doesn't accumulate an entry for all
             # groups over time!
@@ -587,6 +586,23 @@ def converge_all_groups(currently_converging, recently_converged,
             with_log(eff, tenant_id=tenant_id, scaling_group_id=group_id))
 
     yield do_return(parallel(effs))
+
+
+@do
+def get_recently_converged_groups(recently_converged):
+    """
+    Return a list of recently converged groups, and garbage-collect any groups
+    in the recently_converged map that are no longer 'recent'.
+    """
+    # STM would be cool but this is synchronous so whatever
+    recent = orig = yield recently_converged.read()
+    now = yield Effect(Func(time.time))
+    for group in recent.keys():
+        if now - recent[group] > 10:
+            recent = recent.remove(group)
+    if orig != recent:
+        yield recently_converged.modify(lambda _: recent)
+    yield do_return(recent.keys())
 
 
 def _stable_hash(s):
