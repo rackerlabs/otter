@@ -47,37 +47,33 @@ log_cf_mapping = {
 }
 
 
-def _cf_log_with_id(log_effect, *args, **kwargs):
+def _cf_log(log_effect, *args, **kwargs):
     """
-    Helper helper function to generate a cloud feed ID before logging a
-    log cloud feed event.
+    Log cloud feeds message with a "cloud_feeds" tag parameter.
     """
-    def log_to_cf(uid):
-        kwargs.update({'cloud_feed': True, 'cloud_feed_id': uid})
-        return log_effect(*args, **kwargs)
-
-    return Effect(Func(uuid.uuid4)).on(str).on(log_to_cf)
+    kwargs['cloud_feed'] = True
+    return log_effect(*args, **kwargs)
 
 
 def cf_msg(msg, **fields):
     """
     Helper function to log cloud feeds event
     """
-    return _cf_log_with_id(msg_effect, msg, **fields)
+    return _cf_log(msg_effect, msg, **fields)
 
 
 def cf_err(msg, **fields):
     """
     Log cloud feed error event without failure
     """
-    return _cf_log_with_id(msg_effect, msg, isError=True, **fields)
+    return _cf_log(msg_effect, msg, isError=True, **fields)
 
 
 def cf_fail(failure, msg, **fields):
     """
     Log cloud feed error event with failure
     """
-    return _cf_log_with_id(err_effect, failure, msg, **fields)
+    return _cf_log(err_effect, failure, msg, **fields)
 
 
 def sanitize_event(event):
