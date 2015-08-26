@@ -44,8 +44,7 @@ from otter.supervisor import (
 )
 from otter.test.rest.request import (
     DummyException, RestAPITestMixin, setup_mod_and_trigger)
-from otter.test.utils import (
-    IsBoundWith, intent_func, matches, patch)
+from otter.test.utils import IsBoundWith, matches, patch
 from otter.util.config import set_config_data
 from otter.worker.validate_config import InvalidLaunchConfiguration
 
