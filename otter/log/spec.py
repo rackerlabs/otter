@@ -6,12 +6,14 @@ import math
 
 from toolz.curried import assoc
 from toolz.dicttoolz import keyfilter
-from toolz.functoolz import compose
+from toolz.functoolz import compose, curry
 
 from twisted.python.failure import Failure
 
+from otter.log.formatters import LoggingEncoder
 
-_json_len = compose(len, json.dumps)
+
+_json_len = compose(len, curry(json.dumps, cls=LoggingEncoder))
 
 
 def split_execute_convergence(event, max_length=50000):
@@ -57,6 +59,40 @@ def split_execute_convergence(event, max_length=50000):
             break
 
     return events
+
+
+@curry
+def split_cf_messages(format_message, var_length_key, event, separator=', ',
+                      max_length=255):
+    """
+    Try to split cloud feed log events out into multiple events if the message
+    is too long (the variable-length variable would cause the message to be
+    too long.)
+
+    :param str format_message: The format string to use to format the event
+    :param str var_length_key: The key in the event dictionary that contains
+        the variable-length part of the formatted message.
+    :param dict event: The event dictionary
+    :param str separator: The separator to use to join the various elements
+        that should be varied.  (e.g. if the elements in "var_length_key" are
+        ["1", "2", "3"] and the separator is "; ", "var_length_key" will be
+        represented as "1; 2; 3")
+    :param int max_length: The maximum length of the formatted message.
+
+    :return: `list` of event dictionaries with the formatted message and
+        the split event field.
+    """
+    def length_calc(e):
+        return len(format_message.format(**e))
+
+    render = compose(assoc(event, var_length_key), separator.join,
+                     curry(map, str))
+
+    if length_calc(event) <= max_length:
+        return [(render(event[var_length_key]), format_message)]
+
+    events = split(render, event[var_length_key], max_length, length_calc)
+    return [(e, format_message) for e in events]
 
 
 # mapping from msg type -> message
@@ -105,28 +141,32 @@ msg_types = {
     "request-list-clb-nodes": "Request to list a CLB's nodes succeeded",
     "request-add-clb-nodes": "Request to add nodes to a CLB succeeded.",
 
-    # CF-published log messages
+    # CF-publishing failures
     "cf-add-failure": "Failed to add event to cloud feeds",
     "cf-unsuitable-message": (
         "Tried to add unsuitable message in cloud feeds: "
         "{unsuitable_message}"),
+
+    # CF-published log messages
     "convergence-create-servers":
-        "Creating {num_servers} with config {server_config}",
-    "convergence-delete-servers": "Deleting {servers}",
-    "convergence-add-clb-nodes":
-        "Adding IPs to CLB {lb_id}: {addresses}",
-    "convergence-remove-clb-nodes":
-        "Removing nodes from CLB {lb_id}: {nodes}",
-    "convergence-change-clb-nodes":
+        "Creating {num_servers} servers.",
+    "convergence-delete-servers": split_cf_messages(
+        "Deleting {servers}", 'servers'),
+    "convergence-add-clb-nodes": split_cf_messages(
+        "Adding IPs to CLB {lb_id}: {addresses}", 'addresses'),
+    "convergence-remove-clb-nodes": split_cf_messages(
+        "Removing nodes from CLB {lb_id}: {nodes}", 'nodes'),
+    "convergence-change-clb-nodes": split_cf_messages(
         "Changing nodes on CLB {lb_id}: nodes={nodes}, type={type}, "
-        "condition={condition}, weight={weight}",
-    "convergence-add-rcv3-nodes":
-        "Adding servers to RCv3 LB {lb_id}: {servers}",
-    "convergence-remove-rcv3-nodes":
-        "Removing servers from RCv3 LB {lb_id}: {servers}",
+        "condition={condition}, weight={weight}", "nodes"),
+    "convergence-add-rcv3-nodes": split_cf_messages(
+        "Adding servers to RCv3 LB {lb_id}: {servers}", "servers"),
+    "convergence-remove-rcv3-nodes": split_cf_messages(
+        "Removing servers from RCv3 LB {lb_id}: {servers}", "servers"),
     "group-status-active": "Group's status is changed to ACTIVE",
-    "group-status-error":
-        "Group's status is changed to ERROR. Reasons: {reasons}",
+    "group-status-error": split_cf_messages(
+        "Group's status is changed to ERROR. Reasons: {reasons}", "reasons",
+        separator='; ')
 }
 
 

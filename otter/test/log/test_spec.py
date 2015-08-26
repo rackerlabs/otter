@@ -3,13 +3,16 @@ Tests for log_spec.py
 """
 import json
 
-from toolz.dicttoolz import dissoc
+from toolz.dicttoolz import assoc, dissoc
 
 from twisted.trial.unittest import SynchronousTestCase
+
+from otter.convergence.model import DesiredGroupState
 
 from otter.log.spec import (
     SpecificationObserverWrapper,
     get_validated_event,
+    split_cf_messages,
     split_execute_convergence
 )
 from otter.test.utils import CheckFailureValue, raise_
@@ -185,20 +188,28 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
     Tests for splitting "execute-convergence" type events
     (e.g. :func:`split_execute_convergence`)
     """
+    def setUp(self):
+        """
+        Set up a desired group state to use for desired, so that serializing
+        objects can be tested.
+        """
+        self.state = DesiredGroupState(server_config='config', capacity=1)
+
     def test_split_out_servers_if_servers_longer(self):
         """
         If the 'servers' parameter is longer than the 'lb_nodes' parameter,
         and the event is otherwise sufficiently small, 'servers' is the
         param that gets split into another message.
         """
-        event = {'hi': 'there', 'desired': 'desired', 'steps': ['steps'],
+        event = {'hi': 'there', 'desired': self.state, 'steps': ['steps'],
                  'lb_nodes': ['1', '2', '3'], 'servers': ['1', '2', '3', '4']}
         message = "Executing convergence"
 
         # assume that removing 'lb_nodes' would make it the perfect length, but
         # since 'servers' is bigger, it's the thing that gets removed.
         length = len(
-            json.dumps({k: event[k] for k in event if k != 'lb_nodes'}))
+            json.dumps({k: event[k] for k in event if k != 'lb_nodes'},
+                       default=repr))
 
         result = split_execute_convergence(event.copy(), max_length=length)
         expected = [
@@ -214,14 +225,15 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
         and the event is otherwise sufficiently small, 'lb_nodes' is the
         param that gets split into another message.
         """
-        event = {'hi': 'there', 'desired': 'desired', 'steps': ['steps'],
+        event = {'hi': 'there', 'desired': self.state, 'steps': ['steps'],
                  'lb_nodes': ['1', '2', '3', '4'], 'servers': ['1', '2', '3']}
         message = "Executing convergence"
 
         # assume that removing 'servers' would make it the perfect length, but
         # since 'lb_nodes' is bigger, it's the thing that gets removed.
         length = len(
-            json.dumps({k: event[k] for k in event if k != 'servers'}))
+            json.dumps({k: event[k] for k in event if k != 'servers'},
+                       default=repr),)
 
         result = split_execute_convergence(event.copy(), max_length=length)
         expected = [
@@ -236,7 +248,7 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
         Both 'lb_nodes' and 'servers' are split out if the event is too long
         to accomodate both.  The longest one is removed first.
         """
-        event = {'hi': 'there', 'desired': 'desired', 'steps': ['steps'],
+        event = {'hi': 'there', 'desired': self.state, 'steps': ['steps'],
                  'lb_nodes': ['1', '2', '3', '4'], 'servers': ['1', '2', '3']}
         message = "Executing convergence"
 
@@ -244,7 +256,7 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
                        if k not in ('servers', 'lb_nodes')}
         result = split_execute_convergence(
             event.copy(),
-            max_length=len(json.dumps(short_event)) + 5)
+            max_length=len(json.dumps(short_event, default=repr)) + 5)
 
         expected = [
             (short_event, message),
@@ -275,3 +287,44 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
         ]
 
         self.assertEqual(result, expected)
+
+
+class CFMessageSplitTests(SynchronousTestCase):
+    """
+    Tests for splitting cf message type events
+    (e.g. :func:`split_cf_messages`)
+    """
+    def test_no_need_to_split_if_below_length(self):
+        """
+        Do not split the event if the message is sufficiently short.  However,
+        do format it so that the list becomes a comma-separated string.
+        """
+        message = 'Hello {there} human being {punctuation}'
+        event = {'there': [1, 2, 3, 4], 'punctuation': '!', 'extra': 'unused'}
+        result = split_cf_messages(message, 'there')(event)
+        self.assertEqual(result,
+                         [(assoc(event, 'there', '1, 2, 3, 4'), message)])
+
+    def test_no_split_on_empty_field(self):
+        """
+        Do not split the event the field is an empty list, even if it is too
+        long.
+        """
+        message = 'Hello {there} human being {punctuation}'
+        event = {'there': [], 'punctuation': '!', 'extra': 'unused'}
+        result = split_cf_messages(message, 'there', max_length=5)(event)
+        self.assertEqual(result, [(assoc(event, 'there', ''), message)])
+
+    def test_split_only_var_key(self):
+        """
+        Only the values for the specified key will be split, no matter how long
+        the other keys are.
+        """
+        message = 'x: {x}, y: {y}'
+        event = {'x': '123', 'y': '12345'}
+        result = split_cf_messages(message, 'x', max_length=14)(event)
+        self.assertEqual(
+            result,
+            [(assoc(event, 'x', '1'), message),
+             (assoc(event, 'x', '2'), message),
+             (assoc(event, 'x', '3'), message)])

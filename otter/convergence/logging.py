@@ -52,7 +52,7 @@ def _log_set_metadata(steps):
     effs = [
         cf_msg(
             'convergence-set-server-metadata',
-            servers=', '.join(sorted(s.server_id for s in kvsteps)),
+            servers=sorted(s.server_id for s in kvsteps),
             key=key, value=value
         )
         for (key, value), kvsteps in sorted(by_kv.iteritems())
@@ -64,7 +64,7 @@ def _log_set_metadata(steps):
 def _log_delete_servers(steps):
     return cf_msg(
         'convergence-delete-servers',
-        servers=', '.join(sorted([s.server_id for s in steps])))
+        servers=sorted([s.server_id for s in steps]))
 
 
 @_logger(AddNodesToCLB)
@@ -75,7 +75,7 @@ def _log_add_nodes_clb(steps):
             lbs[step.lb_id].append('%s:%s' % (address, config.port))
     effs = [
         cf_msg('convergence-add-clb-nodes',
-               lb_id=lb_id, addresses=', '.join(sorted(addresses)))
+               lb_id=lb_id, addresses=sorted(addresses))
         for lb_id, addresses in sorted(lbs.iteritems())
     ]
     return parallel(effs)
@@ -98,7 +98,7 @@ def _log_change_clb_node(steps):
     effs = [
         cf_msg('convergence-change-clb-nodes',
                lb_id=lb,
-               nodes=', '.join(sorted([s.node_id for s in grouped_steps])),
+               nodes=sorted([s.node_id for s in grouped_steps]),
                condition=condition.name, weight=weight, type=node_type.name)
         for (lb, condition, weight, node_type), grouped_steps
         in sorted(lbs.iteritems())
@@ -111,7 +111,7 @@ def _log_bulk_rcv3(event, steps):
     effs = [
         cf_msg(event,
                lb_id=lb_id,
-               servers=', '.join(sorted(p[1] for p in pairs)))
+               servers=sorted(p[1] for p in pairs))
         for lb_id, pairs in sorted(by_lbs.iteritems())
     ]
     return parallel(effs)

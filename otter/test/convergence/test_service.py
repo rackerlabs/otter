@@ -977,8 +977,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (Log('group-status-error',
                  dict(isError=True, cloud_feed=True,
                       cloud_feed_id=mock.ANY, status='ERROR',
-                      reasons='Cloud Load Balancer does not exist: nolb1; '
-                              'Cloud Load Balancer does not exist: nolb2')),
+                      reasons=['Cloud Load Balancer does not exist: nolb1',
+                               'Cloud Load Balancer does not exist: nolb2'])),
              noop),
             (UpdateGroupErrorReasons(
                 self.group,
@@ -1012,7 +1012,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              noop),
             (Log('group-status-error',
                  dict(isError=True, cloud_feed=True, cloud_feed_id=mock.ANY,
-                      status='ERROR', reasons='Unknown error occurred')),
+                      status='ERROR', reasons=['Unknown error occurred'])),
              noop),
             (UpdateGroupErrorReasons(self.group, ['Unknown error occurred']),
              noop)
