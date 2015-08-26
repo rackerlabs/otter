@@ -20,7 +20,9 @@ from otter.json_schema.group_examples import (
 from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 from otter.supervisor import set_supervisor
-from otter.test.rest.request import DummyException, RestAPITestMixin
+from otter.test.rest.request import (
+    DummyException, RestAPITestMixin, setup_mod_and_trigger)
+from otter.test.utils import patch
 from otter.worker.validate_config import InvalidLaunchConfiguration
 
 
@@ -33,6 +35,11 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     endpoint = "/v1.0/11111/groups/1/config/"
     invalid_methods = ("DELETE", "POST")
+
+    def setUp(self):
+        super(GroupConfigTestCase, self).setUp()
+        self.mock_controller = patch(self, "otter.rest.configs.controller")
+        setup_mod_and_trigger(self)
 
     def test_get_group_config_404(self):
         """
@@ -146,8 +153,7 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(resp['error']['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
 
-    @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
-    def test_update_group_config_success(self, *args):
+    def test_update_group_config_success(self):
         """
         If the update succeeds, the complete data is updated and a 204 is
         returned.
@@ -177,9 +183,7 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
             mock.ANY, '11111', '1')
         self.mock_group.update_config.assert_called_once_with(expected_config)
 
-    @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
-    def test_update_group_config_calls_obey_config_change(
-            self, mock_controller):
+    def test_update_group_config_calls_obey_config_change(self):
         """
         If the update succeeds, the data is updated and a 204 is returned.
         Obey config change is called with the updated log, transaction id,
@@ -205,18 +209,16 @@ class GroupConfigTestCase(RestAPITestMixin, SynchronousTestCase):
             'metadata': {}
         }
 
-        self.mock_group.modify_state.assert_called_once_with(
-            mock.ANY, modify_state_reason='edit_config_for_scaling_group')
-        mock_controller.obey_config_change.assert_called_once_with(
+        self.mock_controller.obey_config_change.assert_called_once_with(
             mock.ANY, "transaction-id", expected_config, self.mock_group,
             self.mock_state, 'launch')
 
-    def test_update_group_config_propagates_modify_state_errors(self):
+    def test_update_group_config_propagates_modify_trigger_errors(self):
         """
         If the update succeeds, the data is updated and a 204 is returned.
         It does not wait for the result of calling .
         """
-        self.mock_group.modify_state.side_effect = AssertionError
+        self.mock_controller.modify_and_trigger.side_effect = AssertionError
         self.mock_group.update_config.return_value = defer.succeed(None)
         new_config = {
             'name': 'blah',

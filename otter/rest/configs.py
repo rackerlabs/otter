@@ -11,6 +11,7 @@ from functools import partial
 from otter import controller
 from otter.json_schema import group_schemas
 from otter.log import log
+from otter.log.bound import bound_log_kwargs
 from otter.rest.decorators import (
     fails_with,
     succeeds_with,
@@ -42,13 +43,14 @@ class OtterConfig(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, group_id):
+    def __init__(self, store, tenant_id, group_id, dispatcher):
         self.log = log.bind(system='otter.rest.config',
                             tenant_id=tenant_id,
                             scaling_group_id=group_id)
         self.store = store
         self.tenant_id = tenant_id
         self.group_id = group_id
+        self.dispatcher = dispatcher
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -123,13 +125,14 @@ class OtterConfig(object):
                 data, scaling_group, state))
             return d
 
-        rec = self.store.get_scaling_group(
+        group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.group_id)
-        deferred = rec.update_config(data)
+        deferred = group.update_config(data)
         deferred.addCallback(
             lambda _: controller.modify_and_trigger(
+                self.dispatcher,
                 group,
-                self.log
+                bound_log_kwargs(log),
                 _get_launch_and_obey_config_change,
                 modify_state_reason='edit_config_for_scaling_group'))
         return deferred
