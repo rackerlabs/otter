@@ -35,7 +35,10 @@ _fanout = None
 
 def add_to_fanout(observer):
     """
-    :return: the global instance of :class:`FanoutObserver`
+    Add the given observer to the global instance of :class:`FanoutObserver`
+
+    :param callable observer: The observer to fan out to.
+    :return: `None`
     """
     global _fanout
     if _fanout is None:
@@ -54,6 +57,7 @@ def get_fanout():
 def set_fanout(fanout):
     """
     Set the global instance of :class:`FanoutObserver`.
+    :return: `None`
     """
     global _fanout
     _fanout = fanout
