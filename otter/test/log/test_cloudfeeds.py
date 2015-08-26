@@ -24,7 +24,6 @@ from otter.log.cloudfeeds import (
     UnsuitableMessage,
     add_event,
     cf_err, cf_fail, cf_msg,
-    get_cf_observer,
     prepare_request,
     request_format,
     sanitize_event
@@ -35,7 +34,6 @@ from otter.test.utils import (
     CheckFailure,
     mock_log,
     nested_sequence,
-    patch,
     raise_,
     retry_sequence,
     stub_pure_response
@@ -399,45 +397,3 @@ class CloudFeedsObserverTests(SynchronousTestCase):
             None, 'cf-unsuitable-message', unsuitable_message='bad',
             event_data={'event': 'dict'}, system='otter.cloud_feed',
             cf_msg='m')
-
-    def test_get_cf_observer(self):
-        """
-        `get_cf_observer` returns CloudFeedsObserver with observer chain setup
-        before creating
-        """
-        def wrapper(name, observer):
-            def _observer(e):
-                e.update({name: 'done'})
-                observer(e)
-            return _observer
-
-        patch(self, 'otter.log.cloudfeeds.SpecificationObserverWrapper',
-              side_effect=partial(wrapper, 'spec'))
-        patch(self, 'otter.log.cloudfeeds.PEP3101FormattingWrapper',
-              side_effect=partial(wrapper, 'pep'))
-        patch(self, 'otter.log.cloudfeeds.ErrorFormattingWrapper',
-              side_effect=partial(wrapper, 'error'))
-
-        def cf_observer_called(text):
-            self.cf_observer_text = text
-
-        mock_cfo = patch(self, 'otter.log.cloudfeeds.CloudFeedsObserver')
-        cfo_class = mock_cfo.return_value
-        cfo_class.side_effect = cf_observer_called
-
-        cfo = get_cf_observer(*range(5))
-
-        mock_cfo.assert_called_once_with(
-            reactor=0, authenticator=1, tenant_id=2, region=3,
-            service_configs=4)
-
-        event_dict = {'init': 'test'}
-        cfo({'init': 'test'})
-        self.assertEqual(self.cf_observer_text,
-                         {'init': 'test',
-                          'spec': 'done',
-                          'pep': 'done',
-                          'error': 'done'})
-        self.assertEqual(event_dict, {'init': 'test'},
-                         "the original event dict shouldn't be mutated "
-                         "in case there is another observer chain.")

@@ -19,13 +19,17 @@ from otter.log import audit
 from otter.log.bound import BoundLog
 from otter.log.formatters import (
     ErrorFormattingWrapper,
+    FanoutObserver,
     JSONObserverWrapper,
     LogLevel,
     ObserverWrapper,
     PEP3101FormattingWrapper,
     StreamObserverWrapper,
     SystemFilterWrapper,
+    add_to_fanout,
+    get_fanout,
     serialize_to_jsonable,
+    set_fanout,
     throttling_wrapper)
 from otter.test.utils import SameJSON, matches
 
@@ -589,3 +593,73 @@ class ThrottlingWrapperTests(SynchronousTestCase):
             logs,
             [{'message': ('Received Ping',), 'system': 'kazoo',
               'num_duplicate_throttled': 50}])
+
+
+class FanoutObserverTests(SynchronousTestCase):
+    """Tests for :obj:`FanoutObserver`"""
+
+    def test_fanout_single_observer(self):
+        """
+        Fanout observer successfully sends all events if it only has a single
+        subobserver.
+        """
+        messages = [{str(i): 'message'} for i in range(3)]
+        obs = []
+        fanout = FanoutObserver(obs.append)
+        for mess in messages:
+            fanout(mess.copy())
+        self.assertEqual(obs, messages)
+
+    def test_fanout_multiple_observers(self):
+        """
+        More observers can be added to the Fanout observer, which successfully
+        sends all new events to all the sub-observers in its list.
+        """
+        messages = [{str(i): 'message'} for i in range(3)]
+        obs1, obs2 = [], []
+        fanout = FanoutObserver(obs1.append)
+        fanout(messages[0].copy())
+        fanout.add_observer(obs2.append)
+        fanout(messages[1].copy())
+        fanout(messages[2].copy())
+        self.assertEqual(obs1, messages)
+        self.assertEqual(obs2, messages[1:])
+
+    def test_subobservers_do_not_affect_each_other(self):
+        """
+        A subobserver that mutates events will not affect other subobservers.
+        """
+        obs, obs_mutated = [], []
+
+        def mutate(event):
+            event.pop('delete_me', None)
+            event['added'] = 'added'
+            obs_mutated.append(event)
+
+        fanout = FanoutObserver(obs.append)
+        fanout.add_observer(mutate)
+        fanout({'only': 'message', 'delete_me': 'go'})
+
+        self.assertEqual(obs, [{'only': 'message', 'delete_me': 'go'}])
+        self.assertEqual(obs_mutated, [{'only': 'message', 'added': 'added'}])
+
+    def test_global_fanout(self):
+        """
+        Setting and getting and adding to the global fanout observer.
+        """
+        obs1, obs2 = [], []
+        self.assertEqual(get_fanout(), None)
+
+        # add_to_fanout when there is no fanout
+        add_to_fanout(obs1.append)
+        fanout = get_fanout()
+        self.assertEqual(fanout.subobservers, [obs1.append])
+
+        # add_to_fanout when there is already a fanout
+        add_to_fanout(obs2.append)
+        self.assertIs(get_fanout(), fanout)
+        self.assertEqual(fanout.subobservers, [obs1.append, obs2.append])
+
+        # set_fanout
+        set_fanout(None)
+        self.assertEqual(get_fanout(), None)

@@ -30,6 +30,64 @@ THROTTLE_COUNT = 50
 NON_PEP3101_SYSTEMS = ('kazoo',)
 
 
+_fanout = None
+
+
+def add_to_fanout(observer):
+    """
+    Add the given observer to the global instance of :class:`FanoutObserver`
+
+    :param callable observer: The observer to fan out to.
+    :return: `None`
+    """
+    global _fanout
+    if _fanout is None:
+        _fanout = FanoutObserver(observer)
+    else:
+        _fanout.add_observer(observer)
+
+
+def get_fanout():
+    """
+    :return: the global instance of :class:`FanoutObserver`
+    """
+    return _fanout
+
+
+def set_fanout(fanout):
+    """
+    Set the global instance of :class:`FanoutObserver`.
+    :return: `None`
+    """
+    global _fanout
+    _fanout = fanout
+
+
+class FanoutObserver(object):
+    """
+    A fanout observer that emits events that it receives to all its sub
+    observers.
+    """
+    def __init__(self, observer):
+        """
+        Initialize the subobservers with the first observer.
+        """
+        self.subobservers = [observer]
+
+    def add_observer(self, observer):
+        """
+        Add another observer to the subobservers.
+        """
+        self.subobservers.append(observer)
+
+    def __call__(self, event_dict):
+        """
+        Emit a copy of the event dict to every subobserver.
+        """
+        for ob in self.subobservers:
+            ob(event_dict.copy())
+
+
 class LoggingEncoder(json.JSONEncoder):
     """
     A JSONEncoder that will decide how to serialize objects that the base
@@ -280,14 +338,4 @@ def throttling_wrapper(observer):
         else:
             return observer(event)
 
-    return emit
-
-
-def copying_wrapper(observer):
-    """
-    An observer that copies the event-dict, so if there is more than one
-    observer chain that mutates events, we don't get any errors.
-    """
-    def emit(event_dict):
-        return observer(event_dict.copy())
     return emit

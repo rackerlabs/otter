@@ -48,7 +48,6 @@ from otter.log.formatters import (
     LoggingEncoder,
     PEP3101FormattingWrapper,
     StreamObserverWrapper,
-    copying_wrapper
 )
 
 from otter.util.logging_treq import LoggingTreq
@@ -151,6 +150,16 @@ def pretty_print_logs(observer):
             ["", message, json.dumps(eventdict, cls=LoggingEncoder, indent=2),
              "", "-" * 8]
         )})
+    return emit
+
+
+def copying_wrapper(observer):
+    """
+    An observer that copies the event-dict, so if there is more than one
+    observer chain that mutates events, we don't get any errors.
+    """
+    def emit(event_dict):
+        return observer(event_dict.copy())
     return emit
 
 
