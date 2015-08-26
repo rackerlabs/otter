@@ -34,8 +34,7 @@ from otter.constants import (
     CONVERGENCE_DIRTY_DIR,
     CONVERGENCE_PARTITIONER_PATH,
     get_service_configs)
-from otter.convergence.service import (
-    ConvergenceStarter, Converger, set_convergence_starter)
+from otter.convergence.service import Converger
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log
 from otter.log.cloudfeeds import get_cf_observer
@@ -277,7 +276,7 @@ def makeService(config):
                                              kz_client, store, supervisor,
                                              cassandra_cluster)
             # Setup scheduler service after starting
-            scheduler = setup_scheduler(s, store, kz_client)
+            scheduler = setup_scheduler(s, dispatcher, store, kz_client)
             health_checker.checks['scheduler'] = scheduler.health_check
             otter.scheduler = scheduler
             # Give dispatcher to Otter REST object
@@ -291,10 +290,6 @@ def makeService(config):
             s.addService(FunctionalService(
                 stop=partial(call_after_supervisor,
                              kz_client.stop, supervisor)))
-
-            # set up ConvergenceStarter object
-            starter = ConvergenceStarter(dispatcher)
-            set_convergence_starter(starter)
 
             setup_converger(s, kz_client, dispatcher,
                             config_value('converger.interval') or 10,
@@ -323,7 +318,7 @@ def setup_converger(parent, kz_client, dispatcher, interval, build_timeout):
     watch_children(kz_client, CONVERGENCE_DIRTY_DIR, cvg.divergent_changed)
 
 
-def setup_scheduler(parent, store, kz_client):
+def setup_scheduler(parent, dispatcher, store, kz_client):
     """
     Setup scheduler service
     """
@@ -340,7 +335,7 @@ def setup_scheduler(parent, store, kz_client):
         kz_client, int(config_value('scheduler.interval')), partition_path,
         buckets, time_boundary)
     scheduler_service = SchedulerService(
-        int(config_value('scheduler.batchsize')),
+        dispatcher, int(config_value('scheduler.batchsize')),
         store, partitioner_factory)
     scheduler_service.setServiceParent(parent)
     return scheduler_service

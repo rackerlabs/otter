@@ -506,6 +506,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         makeService(test_config)
         self.assertFalse(mock_getobserver.called)
 
+    @mock.patch('otter.tap.api.get_full_dispatcher', return_value="disp")
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
     @mock.patch('otter.tap.api.KazooClient')
@@ -513,7 +514,7 @@ class APIMakeServiceTests(SynchronousTestCase):
     @mock.patch('otter.tap.api.TxLogger')
     def test_kazoo_client_success(self, mock_tx_logger, mock_thread_pool,
                                   mock_kazoo_client, mock_txkz,
-                                  mock_setup_scheduler):
+                                  mock_setup_scheduler, mock_gfd):
         """
         TxKazooClient is started and calls `setup_scheduler`. Its instance
         is also set in store.kz_client after start has finished, and the
@@ -554,7 +555,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         # they are called after start completes
         start_d.callback(None)
         mock_setup_scheduler.assert_called_once_with(
-            parent, self.store, kz_client)
+            parent, "disp", self.store, kz_client)
         self.assertEqual(self.store.kz_client, kz_client)
         sch = mock_setup_scheduler.return_value
         self.assertEqual(self.health_checker.checks['scheduler'],
