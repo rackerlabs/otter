@@ -42,7 +42,6 @@ def add_to_fanout(observer):
         _fanout = FanoutObserver(observer)
     else:
         _fanout.add_observer(observer)
-    return _fanout
 
 
 def get_fanout():

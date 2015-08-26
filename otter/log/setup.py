@@ -12,6 +12,7 @@ from otter.log.formatters import (
     StreamObserverWrapper,
     SystemFilterWrapper,
     add_to_fanout,
+    get_fanout,
     throttling_wrapper,
 )
 from otter.log.spec import SpecificationObserverWrapper
@@ -21,18 +22,20 @@ def make_observer_chain(ultimate_observer, indent):
     """
     Return our feature observers wrapped our the ultimate_observer
     """
+    add_to_fanout(
+        ObserverWrapper(
+            JSONObserverWrapper(
+                ultimate_observer,
+                sort_keys=True,
+                indent=indent or None),
+            hostname=socket.gethostname()))
+
     return throttling_wrapper(
         SpecificationObserverWrapper(
             PEP3101FormattingWrapper(
                 SystemFilterWrapper(
                     ErrorFormattingWrapper(
-                        add_to_fanout(
-                            ObserverWrapper(
-                                JSONObserverWrapper(
-                                    ultimate_observer,
-                                    sort_keys=True,
-                                    indent=indent or None),
-                                hostname=socket.gethostname())))))))
+                        get_fanout())))))
 
 
 def observer_factory():
