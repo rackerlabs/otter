@@ -747,7 +747,7 @@ class SchedulerSetupTests(SynchronousTestCase):
         `SchedulerService` is configured with config values and set as parent
         to passed `MultiService`
         """
-        svc = setup_scheduler(self.parent, self.store, self.kz_client)
+        svc = setup_scheduler(self.parent, "disp", self.store, self.kz_client)
         buckets = range(1, 11)
         self.store.set_scheduler_buckets.assert_called_once_with(buckets)
         self.assertEqual(self.parent.services, [svc])
@@ -755,6 +755,7 @@ class SchedulerSetupTests(SynchronousTestCase):
         self.assertEqual(svc.partitioner.buckets, buckets)
         self.assertEqual(svc.partitioner.kz_client, self.kz_client)
         self.assertEqual(svc.partitioner.partitioner_path, '/part_path')
+        self.assertEqual(svc.dispatcher, "disp")
 
     def test_mock_store_with_scheduler(self):
         """
@@ -763,6 +764,6 @@ class SchedulerSetupTests(SynchronousTestCase):
         self.config['mock'] = True
         set_config_data(self.config)
         self.assertIs(
-            setup_scheduler(self.parent, self.store, self.kz_client),
+            setup_scheduler(self.parent, "disp", self.store, self.kz_client),
             None)
         self.assertFalse(self.store.set_scheduler_buckets.called)
