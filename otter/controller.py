@@ -50,8 +50,7 @@ from otter.cloud_client import (
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.model import DRAINING_METADATA, group_id_from_metadata
 from otter.convergence.service import (
-    delete_divergent_flag, get_convergence_starter, mark_divergent,
-    trigger_convergence)
+    delete_divergent_flag, mark_divergent, trigger_convergence)
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
 from otter.log.intents import BoundFields, msg, with_log
