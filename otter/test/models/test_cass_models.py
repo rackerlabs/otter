@@ -10,7 +10,7 @@ from functools import partial
 
 from effect import (
     Constant, Effect, ParallelEffects, TypeDispatcher, sync_perform)
-from effect.testing import resolve_effect
+from effect.testing import perform_sequence, resolve_effect
 
 from jsonschema import ValidationError
 
@@ -71,7 +71,6 @@ from otter.test.utils import (
     LockMixin,
     matches,
     mock_log,
-    perform_sequence,
     patch,
     test_dispatcher)
 from otter.util.config import set_config_data
