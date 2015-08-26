@@ -593,7 +593,7 @@ class DummyException(Exception):
 
 
 @implementer(ISupervisor)
-class FakeSupervisor(object, Service):
+class FakeSupervisor(Service, object):
     """
     A fake supervisor that keeps track of calls made
     """

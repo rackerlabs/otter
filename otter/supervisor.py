@@ -77,7 +77,7 @@ class RequestBag(object):
 
 
 @implementer(ISupervisor)
-class SupervisorService(object, Service):
+class SupervisorService(Service, object):
     """
     A service which manages execution of launch configurations.
 
