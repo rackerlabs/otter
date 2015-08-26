@@ -1154,9 +1154,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(resp['error']['type'], 'GroupNotEmptyError')
         self.flushLoggedErrors(GroupNotEmptyError)
 
-    @mock.patch('otter.rest.groups.trigger_convergence',
-                side_effect=intent_func("tg"))
-    def test_group_converge_enabled_tenant(self, mock_tg):
+    def test_group_converge_enabled_tenant(self):
         """
         Calling `../converge` on convergence enabled tenant triggers
         convergence and returns Deferred with None after enabling it
@@ -1169,6 +1167,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assert_status_code(
             204, endpoint='{}converge'.format(self.endpoint),
             method='POST')
+        self.assertTrue(self.mock_controller.modify_and_trigger.called)
 
     def test_group_paused_converge(self):
         """
@@ -1182,6 +1181,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             ScalingGroupStatus.ACTIVE)
         self.assert_status_code(
             403, endpoint='{}converge'.format(self.endpoint), method='POST')
+        self.assertTrue(self.mock_controller.modify_and_trigger.called)
 
     def test_group_converge_worker_tenant(self):
         """
