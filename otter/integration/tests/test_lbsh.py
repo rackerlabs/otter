@@ -26,8 +26,7 @@ from otter.integration.lib.trial_tools import (
     TestHelper,
     get_identity,
     get_resource_mapping,
-    region,
-    tag
+    region
 )
 
 timeout_default = 600
@@ -45,7 +44,6 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         Establish resources used for each test, such as the auth token
         and a load balancer.
         """
-
         self.helper = TestHelper(self, num_clbs=1)
         self.rcs = TestResources()
         self.identity = get_identity(pool=self.helper.pool)
@@ -59,7 +57,6 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             for clb in self.helper.clbs])
         )
 
-    @tag("LBSH-001")
     @inlineCallbacks
     def test_oob_deleted_clb_node(self):
         """
@@ -100,7 +97,6 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             timeout=timeout_default
         )
 
-    @tag("LBSH-002")
     @inlineCallbacks
     def test_move_node_to_oob_lb(self):
         """
@@ -168,12 +164,11 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             timeout=timeout_default
         )
 
-    @tag("LBSH-003")
     @inlineCallbacks
     def test_oob_copy_node_to_oob_lb(self):
         """
-        This is a slight variation of lbsh-002, with the node being
-        copied to the second load balancer instead of moved.
+        This is a slight variation of :func:`test_move_node_to_oob_lb`, with
+        the node being copied to the second load balancer instead of moved.
 
         Confirm that when convergence is triggered, nodes copied to
         non-autoscale loadbalancers are removed.
@@ -184,7 +179,6 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             - Assert: Server still on LB1
             - Assert: Server removed from LB2
         """
-
         # Create another loadbalancer not to be used in autoscale
         # The CLB will not be added to the helper, since when the helper
         # creates a group, it automatically adds the clb
@@ -250,7 +244,6 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             timeout=timeout_default
         )
 
-    @tag("LBSH-004")
     @inlineCallbacks
     def test_only_autoscale_nodes_are_modified(self):
         """
