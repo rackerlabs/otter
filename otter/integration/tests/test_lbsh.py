@@ -12,7 +12,7 @@ from testtools.matchers import (
     MatchesSetwise
 )
 
-from twisted.internet.defer import gatherResults, inlineCallbacks
+from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 
 from twisted.trial import unittest
 
@@ -56,6 +56,23 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             .addCallback(clb.wait_for_state, "ACTIVE", timeout_default)
             for clb in self.helper.clbs])
         )
+
+    @inlineCallbacks
+    def create_another_clb(self):
+        """
+        Create another CLB and wait for it to become active.  It will not
+        be added to the helper.  This is used, for example, to create a CLB
+        that is not associated with an autoscaling group.
+        """
+        # Create another loadbalancer not to be used in autoscale
+        # The CLB will not be added to the helper, since when the helper
+        # creates a group, it automatically adds the clb
+        clb_other = CloudLoadBalancer(pool=self.helper.pool,
+                                      treq=self.helper.treq)
+        yield clb_other.start(self.rcs, self)
+        yield clb_other.wait_for_state(
+            self.rcs, "ACTIVE", timeout_default)
+        returnValue(clb_other)
 
     @inlineCallbacks
     def test_oob_deleted_clb_node(self):
@@ -106,16 +123,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         Assert: Server put back on LB1
         Assert: Server removed from LB2
         """
-        # Create another loadbalancer not to be used in autoscale
-        # The CLB will not be added to the helper, since when the helper
-        # creates a group, it automatically adds the clb
-        clb_other = CloudLoadBalancer(pool=self.helper.pool,
-                                      treq=self.helper.treq)
-
-        yield clb_other.start(self.rcs, self)
-        yield clb_other.wait_for_state(
-            self.rcs, "ACTIVE", timeout_default)
-
+        clb_other = yield self.create_another_clb()
         clb_as = self.helper.clbs[0]
 
         yield clb_as.wait_for_nodes(
@@ -168,7 +176,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
     def test_oob_copy_node_to_oob_lb(self):
         """
         This is a slight variation of :func:`test_move_node_to_oob_lb`, with
-        the node being copied to the second load balancer instead of moved.
+        the node copied to the second load balancer instead of moved.
 
         Confirm that when convergence is triggered, nodes copied to
         non-autoscale loadbalancers are removed.
@@ -179,16 +187,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             - Assert: Server still on LB1
             - Assert: Server removed from LB2
         """
-        # Create another loadbalancer not to be used in autoscale
-        # The CLB will not be added to the helper, since when the helper
-        # creates a group, it automatically adds the clb
-        clb_other = CloudLoadBalancer(pool=self.helper.pool,
-                                      treq=self.helper.treq)
-
-        yield clb_other.start(self.rcs, self)
-        yield clb_other.wait_for_state(
-            self.rcs, "ACTIVE", timeout_default)
-
+        clb_other = yield self.create_another_clb()
         clb_as = self.helper.clbs[0]
 
         # Confirm both LBs are empty to start
