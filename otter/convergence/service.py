@@ -590,8 +590,6 @@ def converge_all_groups(currently_converging, recently_converged,
         tenant_id, group_id = info['tenant_id'], info['group_id']
         if group_id in recent_groups:
             # Don't converge a group if it has recently been converged.
-            # TODO: clean up the pmap so it doesn't accumulate an entry for all
-            # groups over time!
             continue
         eff = converge(tenant_id, group_id, info['dirty-flag'])
         effs.append(
