@@ -278,14 +278,15 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         return Effect(('ec', tenant_id, group_id, build_timeout))
 
     def _verify_sequence(self, sequence, converging=Reference(pset()),
-                         recent=Reference(pmap())):
+                         recent=Reference(pmap()), allow_refs=True):
         """
         Verify that sequence is executed
         """
         eff = converge_one_group(
             converging, recent, self.tenant_id, self.group_id, self.version,
             3600, execute_convergence=self._execute_convergence)
-        perform_sequence(sequence, eff, fallback_dispatcher=_get_dispatcher())
+        fb_dispatcher = _get_dispatcher() if allow_refs else base_dispatcher
+        perform_sequence(sequence, eff, fallback_dispatcher=fb_dispatcher)
 
     def test_success(self):
         """
@@ -358,15 +359,26 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         Unexpected exceptions log a non-fatal error and don't clean up the
         dirty flag.
         """
+        converging = Reference(pset())
         expected_error = RuntimeError('oh no!')
         sequence = [
+            (ReadReference(converging), lambda i: pset()),
+            (ModifyReference(converging,
+                             match_func(pset(), pset([self.group_id]))),
+             noop),
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: raise_(expected_error)),
+            (ModifyReference(converging,
+                             match_func(pset([self.group_id]), pset())),
+             noop),
             (LogErr(CheckFailureValue(expected_error),
                     'converge-non-fatal-error', {}),
-             noop)
+             noop),
+            # notably there is _not_ a ModifyReference to add the group to
+            # `recently_converged` reference.
         ]
-        self._verify_sequence(sequence)
+        self._verify_sequence(sequence, converging=converging,
+                              allow_refs=False)
 
     def test_delete_node_version_mismatch(self):
         """
