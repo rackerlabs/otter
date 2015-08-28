@@ -485,7 +485,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
     def setUp(self):
         self.currently_converging = Reference(pset())
-        self.recently_converged = Reference(pset())
+        self.recently_converged = Reference(pmap())
         self.my_buckets = [1, 6]
         self.all_buckets = range(10)
         self.group_infos = [
@@ -590,6 +590,9 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         If a group was converged in the past but not recently, it will be
         cleaned from the ``recently_converged`` map, and it will be converged.
         """
+        # g1: converged a while ago; divergent -> removed and converged
+        # g2: converged recently; not divergent -> not converged
+        # g3: converged a while ago; not divergent -> removed and not converged
         eff = self._converge_all_groups(['00_g1'])
         sequence = [
             (ReadReference(ref=self.currently_converging), lambda i: pset([])),
@@ -598,10 +601,11 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                       currently_converging=[])),
              noop),
             (ReadReference(ref=self.recently_converged),
-             lambda i: pmap({'g1': 5})),
+             lambda i: pmap({'g1': 5, 'g2': 10, 'g3': 0})),
             (Func(time.time), lambda i: 16),
             (ModifyReference(self.recently_converged,
-                             match_func("literally anything", pmap())),
+                             match_func("literally anything",
+                                        pmap({'g2': 10}))),
              noop),
             parallel_sequence([[self._expect_group_converged('00', 'g1')]])
         ]
