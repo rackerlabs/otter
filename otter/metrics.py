@@ -9,17 +9,21 @@ import operator
 import sys
 import time
 from collections import namedtuple
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import partial
 
-from effect import Effect
+import attr
+
+from effect import Effect, Func, TypeDispatcher, ComposedDispatcher
+from effect.do import do, do_return
 
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in, groupby
 from toolz.dicttoolz import merge
-from toolz.functoolz import identity
+from toolz.functoolz import curry, identity
+from toolz.itertoolz import mapcat
 
 from twisted.application.internet import TimerService
 from twisted.application.service import Service
@@ -27,7 +31,7 @@ from twisted.internet import defer, task
 from twisted.internet.endpoints import clientFromString
 from twisted.python import usage
 
-from txeffect import exc_info_to_failure, perform
+from txeffect import deferred_performer, exc_info_to_failure, perform
 
 from otter.auth import generate_authenticator
 from otter.cloud_client import TenantScope, service_request
@@ -35,7 +39,11 @@ from otter.constants import ServiceType, get_service_configs
 from otter.convergence.gathering import get_all_scaling_group_servers
 from otter.effect_dispatcher import get_legacy_dispatcher
 from otter.log import log as otter_log
+from otter.log.intents import err
+from otter.util.fileio import (
+    ReadFileLines, WriteFileLines, get_dispatcher as file_dispatcher)
 from otter.util.fp import partition_bool, predicate_all
+from otter.util.timestamp import datetime_to_epoch
 
 
 QUERY_GROUPS_OF_TENANTS = (
@@ -44,16 +52,84 @@ QUERY_GROUPS_OF_TENANTS = (
     'deleting FROM scaling_group WHERE "tenantId" IN ({tids})')
 
 
+def valid_group_row(row):
+    return (
+        row.get('created_at') is not None and
+        row.get('desired') is not None and
+        row.get('status') not in ('DISABLED', 'ERROR') and
+        not row.get('deleting', False))
+
+
 @defer.inlineCallbacks
 def get_specific_scaling_groups(client, tenant_ids):
     tids = ', '.join("'{}'".format(tid) for tid in tenant_ids)
     query = QUERY_GROUPS_OF_TENANTS.format(tids=tids)
     results = yield client.execute(query, {}, ConsistencyLevel.ONE)
-    defer.returnValue(r for r in results
-                      if r.get('created_at') is not None and
-                      r.get('desired') is not None and
-                      r.get('status') not in ('DISABLED', 'ERROR') and
-                      not r.get('deleting', False))
+    defer.returnValue(filter(valid_group_row))
+
+
+def get_last_info(fname):
+    eff = Effect(ReadFileLines(fname)).on(
+        lambda lines: (int(lines[0]),
+                       datetime.utcfromtimestamp(float(lines[1]))))
+
+    def log_and_return(e):
+        _eff = err(exc_info_to_failure(e), "error reading last tenant")
+        return _eff.on(lambda _: (None, None))
+
+    return eff.on(error=log_and_return)
+
+
+def update_last_info(fname, tenants_len, time):
+    eff = Effect(
+        WriteFileLines(
+            fname, [str(tenants_len), str(datetime_to_epoch(time))]))
+    return eff.on(error=lambda e: err(exc_info_to_failure(e),
+                                      "error updating last tenant"))
+
+
+@attr.s
+class GetAllGroups(object):
+    pass
+
+
+@deferred_performer
+@curry
+def get_scaling_groups_performer(client, disp, intent):
+    return get_scaling_groups(
+        client, props=["status", "deleting"], group_pred=valid_group_row)
+
+
+def get_todays_tenants(tenants, today, last_tenants_len, last_date):
+    """
+    Get tenants that are enabled till today
+    """
+    tenants = sorted(tenants)
+    if last_tenants_len is None:
+        return tenants[:5], 5, today
+    days = (today - last_date).days
+    if days <= 0:
+        return tenants[:last_tenants_len], last_tenants_len, today
+    if len(tenants) < last_tenants_len + 5:
+        return tenants, len(tenants), today
+    return tenants[:last_tenants_len + 5], last_tenants_len + 5, today
+
+
+@do
+def get_todays_scaling_groups(convergence_tids, fname):
+    """
+    Get scaling groups that from tenants that are enabled till today
+    """
+    groups = yield Effect(GetAllGroups())
+    tenanted = groupby(lambda g: g["tenantId"], groups)
+    non_conv_tenants = set(tenanted.keys()) - set(convergence_tids)
+    last_tenants_len, last_date = yield get_last_info(fname)
+    now = yield Effect(Func(datetime.utcnow))
+    tenants, last_tenants_len, last_date = get_todays_tenants(
+        non_conv_tenants, now, last_tenants_len, last_date)
+    yield update_last_info(fname, last_tenants_len, last_date)
+    yield do_return(
+        list(mapcat(lambda t: tenanted[t], tenants + convergence_tids)))
 
 
 @defer.inlineCallbacks
@@ -243,7 +319,6 @@ def add_to_cloud_metrics(ttl, region, total_desired,
     return service_request(ServiceType.CLOUD_METRICS_INGEST,
                            'POST', 'ingest', data=data, log=log)
 
-
 def connect_cass_servers(reactor, config):
     """
     Connect to Cassandra servers and return the connection
@@ -252,6 +327,15 @@ def connect_cass_servers(reactor, config):
                       for host in config['seed_hosts']]
     return RoundRobinCassandraCluster(
         seed_endpoints, config['keyspace'], disconnect_on_cancel=True)
+
+
+def get_dispatcher(reactor, authenticator, log, service_configs, client):
+    return ComposedDispatcher([
+        get_legacy_dispatcher(reactor, authenticator, log, service_configs),
+        get_log_dispatcher(log, {}),
+        TypeDispatcher({GetAllGroups: get_scaling_groups_performer(client)}),
+        file_dispatcher(),
+    ])
 
 
 @defer.inlineCallbacks
@@ -278,18 +362,12 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     _client = client or connect_cass_servers(reactor, config['cassandra'])
     authenticator = authenticator or generate_authenticator(reactor,
                                                             config['identity'])
-    service_configs = get_service_configs(config)
-    dispatcher = get_legacy_dispatcher(reactor, authenticator, log,
-                                       service_configs)
+    dispatcher = get_dispatcher(reactor, authenticator, log,
+                                get_service_configs(config), client)
 
     # calculate metrics
-    if convergence_tids is not None:
-        cass_groups = yield get_specific_scaling_groups(
-            _client, tenant_ids=convergence_tids)
-    else:
-        cass_groups = yield get_scaling_groups(
-            _client, props=['status'],
-            group_pred=lambda g: g['status'] != 'DISABLED')
+    eff = get_todays_scaling_groups(convergence_tids, "last_tenant.txt")
+    cass_groups = yield perform(dispatcher, eff)
     group_metrics = yield get_all_metrics(
         dispatcher, cass_groups, log, _print=_print)
 

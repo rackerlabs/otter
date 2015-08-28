@@ -3,9 +3,11 @@ Tests for `metrics.py`
 """
 
 import operator
+from datetime import datetime
 from io import StringIO
 
-from effect import Constant, Effect, base_dispatcher
+from effect import Constant, Effect, Func, base_dispatcher
+from effect.testing import perform_sequence
 
 import mock
 
@@ -27,6 +29,7 @@ from otter.cloud_client import TenantScope
 from otter.constants import ServiceType
 from otter.metrics import (
     GroupMetrics,
+    GetAllGroups,
     MetricsService,
     Options,
     QUERY_GROUPS_OF_TENANTS,
@@ -38,6 +41,8 @@ from otter.metrics import (
     get_scaling_groups,
     get_specific_scaling_groups,
     get_tenant_metrics,
+    get_todays_tenants,
+    get_todays_scaling_groups,
     makeService
 )
 from otter.test.test_auth import identity_config
@@ -45,11 +50,14 @@ from otter.test.utils import (
     CheckFailureValue,
     IsCallable,
     Provides,
+    const,
     matches,
     mock_log,
+    noop,
     patch,
     resolve_effect,
 )
+from otter.util.fileio import ReadFileLines, WriteFileLines
 
 
 class GetSpecificScalingGroupsTests(SynchronousTestCase):
@@ -445,6 +453,81 @@ class UnchangedDivergentGroupsTests(SynchronousTestCase):
         self.assertEqual(
             logs,
             [(metrics[1], 3603), (metrics[2], 7203)])
+
+
+class GetTodaysTenants(SynchronousTestCase):
+    """
+    Tests for :func:`get_todays_tenants`
+    """
+
+    def setUp(self):
+        self.tenants = range(10)
+        self.today = datetime(1970, 1, 2)
+
+    def test_last_none(self):
+        """
+        returns first 5 sorted tenants with length 5 and todays date
+        """
+        self.assertEqual(
+            get_todays_tenants(self.tenants, self.today, None, None),
+            (self.tenants[:5], 5, self.today))
+
+    def test_same_day(self):
+        """
+        returns same tenants as last time if asked within same day
+        """
+        last_date = self.today.replace(hour=13, minute=20)
+        self.assertEqual(
+            get_todays_tenants(self.tenants, self.today, 3, last_date),
+            (self.tenants[:3], 3, self.today))
+
+    def test_next_day(self):
+        """
+        returns tenants with 5 more for next day
+        """
+        prev_day = datetime(1970, 1, 1)
+        self.assertEqual(
+            get_todays_tenants(self.tenants, self.today, 3, prev_day),
+            (self.tenants[:8], 8, self.today))
+
+    def test_all(self):
+        """
+        returns all tenants for new day if < 5 tenants are remaining since
+        last time
+        """
+        prev_day = datetime(1970, 1, 1)
+        self.assertEqual(
+            get_todays_tenants(self.tenants, self.today, 7, prev_day),
+            (self.tenants, 10, self.today))
+
+    def test_previous_day(self):
+        """
+        Same as `test_same_day`
+        """
+        next_day = datetime(1970, 1, 3)
+        self.assertEqual(
+            get_todays_tenants(self.tenants, self.today, 3, next_day),
+            (self.tenants[:3], 3, self.today))
+
+
+class GetTodaysScalingGroupsTests(SynchronousTestCase):
+    """
+    Tests for :func:`get_todays_scaling_groups`
+    """
+
+    def test_success(self):
+        groups = (
+            [{"tenantId": "t1", "a": "1"}, {"tenantId": "t1", "a": "2"}] +
+            [{"tenantId": "t{}".format(i), "b": str(i)} for i in range(2, 10)])
+        seq = [
+            (GetAllGroups(), const(groups)),
+            (ReadFileLines("file"), const(["2", "0.0"])),
+            (Func(datetime.utcnow), const(datetime(1970, 1, 2))),
+            (WriteFileLines("file", ["7", "86400.0"]), noop)
+        ]
+        r = perform_sequence(seq, get_todays_scaling_groups(["t1"], "file"))
+        self.assertEqual(set(freeze(r)), set(freeze(groups[:9])))
+
 
 
 class CollectMetricsTests(SynchronousTestCase):
