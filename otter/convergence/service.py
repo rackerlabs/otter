@@ -483,6 +483,12 @@ def get_my_divergent_groups(my_buckets, all_buckets, divergent_flags):
     return converging
 
 
+def eff_finally(eff, after_eff):
+    """Run some effect after another effect, whether it succeeds or fails."""
+    return eff.on(success=lambda r: after_eff.on(lambda _: r),
+                  error=lambda e: after_eff.on(lambda _: six.reraise(*e)))
+
+
 @do
 def converge_one_group(currently_converging, recently_converged,
                        tenant_id, group_id, version,
@@ -501,16 +507,15 @@ def converge_one_group(currently_converging, recently_converged,
     :param callable execute_convergence: like :func`execute_convergence`, to
         be used for test injection only
     """
-    @do
-    def cvg():
-        result = yield execute_convergence(tenant_id, group_id, build_timeout)
-        time_done = yield Effect(Func(time.time))
-        yield recently_converged.modify(
-            lambda rcg: rcg.set(group_id, time_done))
-        yield do_return(result)
+    mark_recently_converged = Effect(Func(time.time)).on(
+        lambda time_done: recently_converged.modify(
+            lambda rcg: rcg.set(group_id, time_done)))
+    cvg = eff_finally(
+        execute_convergence(tenant_id, group_id, build_timeout),
+        mark_recently_converged)
 
     try:
-        result = yield non_concurrently(currently_converging, group_id, cvg())
+        result = yield non_concurrently(currently_converging, group_id, cvg)
     except ConcurrentError:
         # We don't need to spam the logs about this, it's to be expected
         return

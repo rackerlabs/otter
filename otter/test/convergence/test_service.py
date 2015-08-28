@@ -266,6 +266,18 @@ class ConvergerTests(SynchronousTestCase):
             converger.divergent_changed(['group1', 'group2'])
 
 
+def add_to_recently(recently, group_id, cvg_time):
+    return (ModifyReference(recently,
+                            match_func(pmap(), pmap({group_id: cvg_time}))),
+            noop)
+
+
+def add_to_currently(currently, group_id):
+    return (ModifyReference(currently,
+                            match_func(pset(), pset([group_id]))),
+            noop)
+
+
 class ConvergeOneGroupTests(SynchronousTestCase):
     """Tests for :func:`converge_one_group`."""
 
@@ -309,16 +321,14 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         """
         currently = Reference(pset())
         recently = Reference(pmap())
-        remove_from_recently = match_func(pmap(), pmap({self.group_id: 100}))
-        add_to_currently = match_func(pset(), pset([self.group_id]))
         remove_from_currently = match_func(pset([self.group_id]), pset([]))
         sequence = [
             (ReadReference(currently), lambda i: pset()),
-            (ModifyReference(currently, add_to_currently), noop),
+            add_to_currently(currently, self.group_id),
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (Func(time.time), lambda i: 100),
-            (ModifyReference(recently, remove_from_recently), noop),
+            add_to_recently(recently, self.group_id, 100),
             (ModifyReference(currently, remove_from_currently), noop),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version), noop),
@@ -360,24 +370,23 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         dirty flag.
         """
         converging = Reference(pset())
+        recent = Reference(pmap())
         expected_error = RuntimeError('oh no!')
         sequence = [
             (ReadReference(converging), lambda i: pset()),
-            (ModifyReference(converging,
-                             match_func(pset(), pset([self.group_id]))),
-             noop),
+            add_to_currently(converging, self.group_id),
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: raise_(expected_error)),
+            (Func(time.time), lambda i: 100),
+            add_to_recently(recent, self.group_id, 100),
             (ModifyReference(converging,
                              match_func(pset([self.group_id]), pset())),
              noop),
             (LogErr(CheckFailureValue(expected_error),
                     'converge-non-fatal-error', {}),
              noop),
-            # notably there is _not_ a ModifyReference to add the group to
-            # `recently_converged` reference.
         ]
-        self._verify_sequence(sequence, converging=converging,
+        self._verify_sequence(sequence, converging=converging, recent=recent,
                               allow_refs=False)
 
     def test_delete_node_version_mismatch(self):
