@@ -1,11 +1,9 @@
 """
 Tests for otter.cloudfeeds
 """
-
-import uuid
 from functools import partial
 
-from effect import Effect, Func, TypeDispatcher
+from effect import Effect, TypeDispatcher
 from effect.testing import perform_sequence
 
 import mock
@@ -56,9 +54,7 @@ class CFHelperTests(SynchronousTestCase):
         `cf_msg` returns Effect with `Log` intent with cloud_feed=True
         """
         seq = [
-            (Func(uuid.uuid4), lambda _: 'uuid'),
-            (Log('message', dict(cloud_feed=True, cloud_feed_id='uuid',
-                                 a=2, b=3)),
+            (Log('message', dict(cloud_feed=True, a=2, b=3)),
                 lambda _: 'logged')
         ]
         self.assertEqual(perform_sequence(seq, cf_msg('message', a=2, b=3)),
@@ -70,9 +66,7 @@ class CFHelperTests(SynchronousTestCase):
         and isError=True
         """
         seq = [
-            (Func(uuid.uuid4), lambda _: 'uuid'),
-            (Log('message', dict(isError=True, cloud_feed=True,
-                                 cloud_feed_id='uuid', a=2, b=3)),
+            (Log('message', dict(isError=True, cloud_feed=True, a=2, b=3)),
                 lambda _: 'logged')
         ]
         self.assertEqual(perform_sequence(seq, cf_err('message', a=2, b=3)),
@@ -84,9 +78,7 @@ class CFHelperTests(SynchronousTestCase):
         """
         f = object()
         seq = [
-            (Func(uuid.uuid4), lambda _: 'uuid'),
-            (LogErr(f, 'message', dict(cloud_feed=True, cloud_feed_id='uuid',
-                                       a=2, b=3)),
+            (LogErr(f, 'message', dict(cloud_feed=True, a=2, b=3)),
                 lambda _: 'logged')
         ]
         self.assertEqual(
