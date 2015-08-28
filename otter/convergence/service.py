@@ -540,10 +540,10 @@ def converge_one_group(currently_converging, recently_converged,
 
 
 @do
-def converge_all_groups(currently_converging, recently_converged,
-                        my_buckets, all_buckets,
-                        divergent_flags, build_timeout,
-                        converge_one_group=converge_one_group):
+def converge_all_groups(
+        currently_converging, recently_converged, my_buckets, all_buckets,
+        divergent_flags, build_timeout, interval,
+        converge_one_group=converge_one_group):
     """
     Check for groups that need convergence and which match up to the
     buckets we've been allocated.
@@ -558,6 +558,9 @@ def converge_all_groups(currently_converging, recently_converged,
     :param divergent_flags: divergent flags that were found in zookeeper.
     :param number build_timeout: number of seconds to wait for servers to be in
         building before it's is timed out and deleted
+    :param number interval: number of seconds between attempts at convergence.
+        Groups will not be converged if less than this amount of time has
+        passed since the end of its last convergence.
     :param callable converge_one_group: function to use to converge a single
         group - to be used for test injection only
     """
@@ -589,7 +592,8 @@ def converge_all_groups(currently_converging, recently_converged,
             result = yield Effect(TenantScope(eff, tenant_id))
             yield do_return(result)
 
-    recent_groups = yield get_recently_converged_groups(recently_converged)
+    recent_groups = yield get_recently_converged_groups(recently_converged,
+                                                        interval)
     effs = []
     for info in group_infos:
         tenant_id, group_id = info['tenant_id'], info['group_id']
@@ -604,7 +608,7 @@ def converge_all_groups(currently_converging, recently_converged,
 
 
 @do
-def get_recently_converged_groups(recently_converged):
+def get_recently_converged_groups(recently_converged, interval):
     """
     Return a list of recently converged groups, and garbage-collect any groups
     in the recently_converged map that are no longer 'recent'.
@@ -613,7 +617,7 @@ def get_recently_converged_groups(recently_converged):
     recent = orig = yield recently_converged.read()
     now = yield Effect(Func(time.time))
     for group in recent.keys():
-        if now - recent[group] > 10:
+        if now - recent[group] > interval:
             recent = recent.remove(group)
     if orig != recent:
         yield recently_converged.modify(lambda _: recent)
@@ -654,7 +658,8 @@ class Converger(MultiService):
     """
 
     def __init__(self, log, dispatcher, num_buckets, partitioner_factory,
-                 build_timeout, converge_all_groups=converge_all_groups):
+                 build_timeout, interval,
+                 converge_all_groups=converge_all_groups):
         """
         :param log: a bound log
         :param dispatcher: The dispatcher to use to perform effects.
@@ -667,6 +672,7 @@ class Converger(MultiService):
             buckets.
         :param number build_timeout: number of seconds to wait for servers to
             be in building before it's is timed out and deleted
+        :param interval: Interval between convergence steps, per group.
         :param callable converge_all_groups: like :func:`converge_all_groups`,
             to be used for test injection only
         """
@@ -682,12 +688,14 @@ class Converger(MultiService):
         self.recently_converged = Reference(pmap())
         self.build_timeout = build_timeout
         self._converge_all_groups = converge_all_groups
+        self.interval = interval
 
     def _converge_all(self, my_buckets, divergent_flags):
         """Run :func:`converge_all_groups` and log errors."""
         eff = self._converge_all_groups(
             self.currently_converging, self.recently_converged,
-            my_buckets, self._buckets, divergent_flags, self.build_timeout)
+            my_buckets, self._buckets, divergent_flags, self.build_timeout,
+            self.interval)
         return eff.on(
             error=lambda e: err(
                 exc_info_to_failure(e), 'converge-all-groups-error'))

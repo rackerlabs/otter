@@ -318,7 +318,8 @@ def setup_converger(parent, kz_client, dispatcher, interval, build_timeout):
         partitioner_path=CONVERGENCE_PARTITIONER_PATH,
         time_boundary=15,  # time boundary
     )
-    cvg = Converger(log, dispatcher, 10, partitioner_factory, build_timeout)
+    cvg = Converger(log, dispatcher, 10, partitioner_factory, build_timeout,
+                    interval)
     cvg.setServiceParent(parent)
     watch_children(kz_client, CONVERGENCE_DIRTY_DIR, cvg.divergent_changed)
 

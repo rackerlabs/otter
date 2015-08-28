@@ -141,6 +141,7 @@ class ConvergerTests(SynchronousTestCase):
         return Converger(
             self.log, dispatcher, self.num_buckets,
             self._pfactory, build_timeout=3600,
+            interval=15,
             converge_all_groups=converge_all_groups)
 
     def _pfactory(self, buckets, log, got_buckets):
@@ -165,10 +166,11 @@ class ConvergerTests(SynchronousTestCase):
         performed.
         """
         def converge_all_groups(currently_converging, recent, _my_buckets,
-                                all_buckets, divergent_flags, build_timeout):
+                                all_buckets, divergent_flags, build_timeout,
+                                interval):
             return Effect(
                 ('converge-all', currently_converging, _my_buckets,
-                 all_buckets, divergent_flags, build_timeout))
+                 all_buckets, divergent_flags, build_timeout, interval))
 
         my_buckets = [0, 5]
         bound_sequence = [
@@ -180,7 +182,8 @@ class ConvergerTests(SynchronousTestCase):
                 my_buckets,
                 range(self.num_buckets),
                 ['flag1', 'flag2'],
-                3600),
+                3600,
+                15),
                 lambda i: 'foo')
         ]
         sequence = self._log_sequence(bound_sequence)
@@ -197,7 +200,8 @@ class ConvergerTests(SynchronousTestCase):
         logged, and None is the ultimate result.
         """
         def converge_all_groups(currently_converging, recent, _my_buckets,
-                                all_buckets, divergent_flags, build_timeout):
+                                all_buckets, divergent_flags, build_timeout,
+                                interval):
             return Effect('converge-all')
 
         bound_sequence = [
@@ -248,7 +252,8 @@ class ConvergerTests(SynchronousTestCase):
         :func:`converge_all_groups`.
         """
         def converge_all_groups(currently_converging, recent, _my_buckets,
-                                all_buckets, divergent_flags, build_timeout):
+                                all_buckets, divergent_flags, build_timeout,
+                                interval):
             return Effect(('converge-all-groups', divergent_flags))
 
         intents = [
@@ -501,6 +506,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             self.my_buckets, self.all_buckets,
             flags,
             3600,
+            15,
             converge_one_group=self._converge_one_group)
 
     def _converge_one_group(self, currently_converging, recently_converged,
@@ -601,8 +607,8 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                       currently_converging=[])),
              noop),
             (ReadReference(ref=self.recently_converged),
-             lambda i: pmap({'g1': 5, 'g2': 10, 'g3': 0})),
-            (Func(time.time), lambda i: 16),
+             lambda i: pmap({'g1': 4, 'g2': 10, 'g3': 0})),
+            (Func(time.time), lambda i: 20),
             (ModifyReference(self.recently_converged,
                              match_func("literally anything",
                                         pmap({'g2': 10}))),
@@ -619,7 +625,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         result = converge_all_groups(
             self.currently_converging, self.recently_converged,
             self.my_buckets, self.all_buckets, [],
-            3600, converge_one_group=converge_one_group)
+            3600, 15, converge_one_group=converge_one_group)
         self.assertEqual(sync_perform(_get_dispatcher(), result), None)
 
     def test_ignore_disappearing_divergent_flag(self):

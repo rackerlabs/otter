@@ -703,6 +703,7 @@ class ConvergerSetupTests(SynchronousTestCase):
         self.assertIs(converger.__class__, Converger)
         self.assertEqual(converger.build_timeout, 35)
         self.assertEqual(converger._dispatcher, dispatcher)
+        self.assertEqual(converger.interval, interval)
         [partitioner] = converger.services
         [timer] = partitioner.services
         self.assertIs(partitioner.__class__, Partitioner)
