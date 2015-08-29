@@ -614,14 +614,13 @@ def get_recently_converged_groups(recently_converged, interval):
     in the recently_converged map that are no longer 'recent'.
     """
     # STM would be cool but this is synchronous so whatever
-    recent = orig = yield recently_converged.read()
+    recent = yield recently_converged.read()
     now = yield Effect(Func(time.time))
-    for group in recent.keys():
-        if now - recent[group] > interval:
-            recent = recent.remove(group)
-    if orig != recent:
-        yield recently_converged.modify(lambda _: recent)
-    yield do_return(recent.keys())
+    to_remove = [group for group in recent if now - recent[group] > interval]
+    cleaned = reduce(lambda m, g: m.remove(g), to_remove, recent)
+    if recent != cleaned:
+        yield recently_converged.modify(lambda _: cleaned)
+    yield do_return(cleaned.keys())
 
 
 def _stable_hash(s):
