@@ -27,6 +27,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.auth import IAuthenticator
 from otter.cloud_client import TenantScope
 from otter.constants import ServiceType
+from otter.log.intents import LogErr
 from otter.metrics import (
     GroupMetrics,
     GetAllGroups,
@@ -515,18 +516,57 @@ class GetTodaysScalingGroupsTests(SynchronousTestCase):
     Tests for :func:`get_todays_scaling_groups`
     """
 
+    groups = (
+        [{"tenantId": "t1", "a": "1"}, {"tenantId": "t1", "a": "2"}] +
+        [{"tenantId": "t{}".format(i), "b": str(i)} for i in range(2, 10)])
+
     def test_success(self):
-        groups = (
-            [{"tenantId": "t1", "a": "1"}, {"tenantId": "t1", "a": "2"}] +
-            [{"tenantId": "t{}".format(i), "b": str(i)} for i in range(2, 10)])
+        """
+        Returns todays scaling groups based on number of tenants fetched
+        since last time. Updates the current fetch in file
+        """
         seq = [
-            (GetAllGroups(), const(groups)),
+            (GetAllGroups(), const(self.groups)),
             (ReadFileLines("file"), const(["2", "0.0"])),
             (Func(datetime.utcnow), const(datetime(1970, 1, 2))),
-            (WriteFileLines("file", ["7", "86400.0"]), noop)
+            (WriteFileLines("file", [7, 86400.0]), noop)
         ]
         r = perform_sequence(seq, get_todays_scaling_groups(["t1"], "file"))
-        self.assertEqual(set(freeze(r)), set(freeze(groups[:9])))
+        self.assertEqual(set(freeze(r)), set(freeze(self.groups[:9])))
+
+        # Works if there are no groups for convergence tenants
+        r = perform_sequence(seq, get_todays_scaling_groups(["t"], "file"))
+        self.assertEqual(set(freeze(r)), set(freeze(self.groups[:8])))
+
+    def test_no_last_info(self):
+        """
+        Returns first 5 non-convergence tenants if could not fetch last info
+        from file
+        """
+        seq = [
+            (GetAllGroups(), const(self.groups)),
+            (ReadFileLines("file"), lambda i: raise_(IOError("e"))),
+            (LogErr(mock.ANY, "error reading last tenant", {}), noop),
+            (Func(datetime.utcnow), const(datetime(1970, 1, 2))),
+            (WriteFileLines("file", [5, 86400.0]), noop)
+        ]
+        r = perform_sequence(seq, get_todays_scaling_groups(["t1"], "file"))
+        self.assertEqual(set(freeze(r)), set(freeze(self.groups[:7])))
+
+    def test_error_writing(self):
+        """
+        Logs and ignores error writing to the file
+        """
+        seq = [
+            (GetAllGroups(), const(self.groups)),
+            (ReadFileLines("file"), const(["2", "0.0"])),
+            (Func(datetime.utcnow), const(datetime(1970, 1, 2))),
+            (WriteFileLines("file", [7, 86400.0]),
+             lambda i: raise_(IOError("bad"))),
+            (LogErr(mock.ANY, "error updating last tenant", {}), noop)
+        ]
+        r = perform_sequence(seq, get_todays_scaling_groups(["t1"], "file"))
+        self.assertEqual(set(freeze(r)), set(freeze(self.groups[:9])))
 
 
 

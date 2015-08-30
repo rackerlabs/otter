@@ -37,7 +37,7 @@ from otter.auth import generate_authenticator
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType, get_service_configs
 from otter.convergence.gathering import get_all_scaling_group_servers
-from otter.effect_dispatcher import get_legacy_dispatcher
+from otter.effect_dispatcher import get_legacy_dispatcher, get_log_dispatcher
 from otter.log import log as otter_log
 from otter.log.intents import err
 from otter.util.fileio import (
@@ -74,7 +74,7 @@ def get_last_info(fname):
                        datetime.utcfromtimestamp(float(lines[1]))))
 
     def log_and_return(e):
-        _eff = err(exc_info_to_failure(e), "error reading last tenant")
+        _eff = err(e, "error reading last tenant")
         return _eff.on(lambda _: (None, None))
 
     return eff.on(error=log_and_return)
@@ -83,9 +83,8 @@ def get_last_info(fname):
 def update_last_info(fname, tenants_len, time):
     eff = Effect(
         WriteFileLines(
-            fname, [str(tenants_len), str(datetime_to_epoch(time))]))
-    return eff.on(error=lambda e: err(exc_info_to_failure(e),
-                                      "error updating last tenant"))
+            fname, [tenants_len, datetime_to_epoch(time)]))
+    return eff.on(error=lambda e: err(e, "error updating last tenant"))
 
 
 @attr.s
@@ -94,7 +93,6 @@ class GetAllGroups(object):
 
 
 @deferred_performer
-@curry
 def get_scaling_groups_performer(client, disp, intent):
     return get_scaling_groups(
         client, props=["status", "deleting"], group_pred=valid_group_row)
@@ -104,15 +102,17 @@ def get_todays_tenants(tenants, today, last_tenants_len, last_date):
     """
     Get tenants that are enabled till today
     """
+    batch_size = 5
     tenants = sorted(tenants)
     if last_tenants_len is None:
-        return tenants[:5], 5, today
+        return tenants[:batch_size], batch_size, today
     days = (today - last_date).days
     if days <= 0:
         return tenants[:last_tenants_len], last_tenants_len, today
-    if len(tenants) < last_tenants_len + 5:
+    if len(tenants) < last_tenants_len + batch_size:
         return tenants, len(tenants), today
-    return tenants[:last_tenants_len + 5], last_tenants_len + 5, today
+    return (tenants[:last_tenants_len + batch_size],
+            last_tenants_len + batch_size, today)
 
 
 @do
@@ -129,7 +129,8 @@ def get_todays_scaling_groups(convergence_tids, fname):
         non_conv_tenants, now, last_tenants_len, last_date)
     yield update_last_info(fname, last_tenants_len, last_date)
     yield do_return(
-        list(mapcat(lambda t: tenanted[t], tenants + convergence_tids)))
+        list(
+            mapcat(lambda t: tenanted.get(t, []), tenants + convergence_tids)))
 
 
 @defer.inlineCallbacks
@@ -333,8 +334,10 @@ def get_dispatcher(reactor, authenticator, log, service_configs, client):
     return ComposedDispatcher([
         get_legacy_dispatcher(reactor, authenticator, log, service_configs),
         get_log_dispatcher(log, {}),
-        TypeDispatcher({GetAllGroups: get_scaling_groups_performer(client)}),
-        file_dispatcher(),
+        TypeDispatcher({
+            GetAllGroups: partial(get_scaling_groups_performer, client)
+            }),
+        file_dispatcher()
     ])
 
 
@@ -363,11 +366,12 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     authenticator = authenticator or generate_authenticator(reactor,
                                                             config['identity'])
     dispatcher = get_dispatcher(reactor, authenticator, log,
-                                get_service_configs(config), client)
+                                get_service_configs(config), _client)
 
     # calculate metrics
-    eff = get_todays_scaling_groups(convergence_tids, "last_tenant.txt")
-    cass_groups = yield perform(dispatcher, eff)
+    cass_groups = yield perform(
+        dispatcher,
+        get_todays_scaling_groups(convergence_tids, "last_tenant.txt"))
     group_metrics = yield get_all_metrics(
         dispatcher, cass_groups, log, _print=_print)
 
@@ -385,14 +389,17 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
             total_desired, total_actual, total_pending))
 
     # Add to cloud metrics
-    eff = add_to_cloud_metrics(
-        config['metrics']['ttl'], config['region'], total_desired,
-        total_actual, total_pending, log=log)
-    eff = Effect(TenantScope(eff, config['metrics']['tenant_id']))
-    yield perform(dispatcher, eff)
-    log.msg('added to cloud metrics')
+    metr_conf = config.get("metrics", None)
+    if metr_conf is not None:
+        eff = add_to_cloud_metrics(
+            metr_conf['ttl'], config['region'], total_desired,
+            total_actual, total_pending, log=log)
+        eff = Effect(TenantScope(eff, metr_conf['tenant_id']))
+        yield perform(dispatcher, eff)
+        log.msg('added to cloud metrics')
+        if _print:
+            print('added to cloud metrics')
     if _print:
-        print('added to cloud metrics')
         group_metrics.sort(key=lambda g: abs(g.desired - g.actual),
                            reverse=True)
         print('groups sorted as per divergence', *group_metrics, sep='\n')
