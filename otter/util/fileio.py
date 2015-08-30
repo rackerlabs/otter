@@ -27,7 +27,7 @@ def perform_read_file_lines(disp, intent):
 @sync_performer
 def perform_write_files_lines(disp, intent):
     with open(intent.fname, "w") as f:
-        f.writelines(intent.lines)
+        f.writelines(map(lambda line: "{}\n".format(line), intent.lines))
 
 
 def get_dispatcher():
