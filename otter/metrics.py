@@ -336,15 +336,14 @@ def get_dispatcher(reactor, authenticator, log, service_configs, client):
         get_log_dispatcher(log, {}),
         TypeDispatcher({
             GetAllGroups: partial(get_scaling_groups_performer, client)
-            }),
+        }),
         file_dispatcher()
     ])
 
 
 @defer.inlineCallbacks
 def collect_metrics(reactor, config, log, client=None, authenticator=None,
-                    _print=False, perform=perform,
-                    get_legacy_dispatcher=get_legacy_dispatcher):
+                    _print=False):
     """
     Start collecting the metrics
 
@@ -361,7 +360,7 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
 
     :return: :class:`Deferred` with None
     """
-    convergence_tids = config.get('convergence-tenants', None)
+    convergence_tids = config.get('convergence-tenants', [])
     _client = client or connect_cass_servers(reactor, config['cassandra'])
     authenticator = authenticator or generate_authenticator(reactor,
                                                             config['identity'])
@@ -393,7 +392,7 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     if metr_conf is not None:
         eff = add_to_cloud_metrics(
             metr_conf['ttl'], config['region'], total_desired,
-            total_actual, total_pending, log=log)
+            total_actual, total_pending, log)
         eff = Effect(TenantScope(eff, metr_conf['tenant_id']))
         yield perform(dispatcher, eff)
         log.msg('added to cloud metrics')

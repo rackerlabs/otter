@@ -7,7 +7,7 @@ from datetime import datetime
 from io import StringIO
 
 from effect import Constant, Effect, Func, base_dispatcher
-from effect.testing import perform_sequence
+from effect.testing import SequenceDispatcher, perform_sequence
 
 import mock
 
@@ -52,8 +52,10 @@ from otter.test.utils import (
     IsCallable,
     Provides,
     const,
+    intent_func,
     matches,
     mock_log,
+    nested_sequence,
     noop,
     patch,
     resolve_effect,
@@ -586,12 +588,9 @@ class CollectMetricsTests(SynchronousTestCase):
         self.connect_cass_servers.return_value = self.client
 
         self.groups = mock.Mock()
-        self.get_specific_scaling_groups = patch(
-            self, 'otter.metrics.get_specific_scaling_groups',
-            return_value=succeed(self.groups))
-        self.get_scaling_groups = patch(
-            self, 'otter.metrics.get_scaling_groups',
-            return_value=succeed(self.groups))
+        self.get_todays_scaling_groups = patch(
+            self, 'otter.metrics.get_todays_scaling_groups',
+            side_effect=intent_func("gtsg"))
         self.log = mock_log()
 
         self.metrics = [GroupMetrics('t', 'g1', 3, 2, 0),
@@ -600,27 +599,27 @@ class CollectMetricsTests(SynchronousTestCase):
         self.get_all_metrics = patch(self, 'otter.metrics.get_all_metrics',
                                      return_value=succeed(self.metrics))
 
-        self.add_to_cloud_metrics = patch(self,
-                                          'otter.metrics.add_to_cloud_metrics',
-                                          return_value=Effect(Constant(None)))
+        self.add_to_cloud_metrics = patch(
+            self, 'otter.metrics.add_to_cloud_metrics',
+            side_effect=intent_func("atcm"))
 
         self.config = {'cassandra': 'c', 'identity': identity_config,
                        'metrics': {'service': 'ms', 'tenant_id': 'tid',
                                    'region': 'IAD',
                                    'ttl': 200},
                        'region': 'r', 'cloudServersOpenStack': 'nova',
-                       'cloudLoadBalancers': 'clb', 'rackconnect': 'rc'}
+                       'cloudLoadBalancers': 'clb', 'rackconnect': 'rc',
+                       "convergence-tenants": ["ct"]}
 
-        self.dispatcher = base_dispatcher
-        self.get_legacy_dispatcher = lambda r, auth, log, cfgs: self.dispatcher
-
-    def _fake_perform(self, dispatcher, effect):
-        """
-        Assert that the only effect passed to this perform is the scoped
-        result of add_to_cloud_metrics.
-        """
-        self.assertEqual(effect,
-                         Effect(TenantScope(Effect(Constant(None)), 'tid')))
+        self.sequence = SequenceDispatcher([
+            (("gtsg", ["ct"], "last_tenant.txt"), const(self.groups)),
+            (TenantScope(mock.ANY, "tid"),
+             nested_sequence([
+                 (("atcm", 200, "r", 107, 26, 1, self.log), noop)
+             ]))
+        ])
+        self.get_dispatcher = patch(self, "otter.metrics.get_dispatcher",
+                                    return_value=self.sequence)
 
     def test_metrics_collected(self):
         """
@@ -628,41 +627,15 @@ class CollectMetricsTests(SynchronousTestCase):
         from nova and it is added to blueflood
         """
         _reactor = mock.Mock()
-        d = collect_metrics(_reactor, self.config, self.log,
-                            perform=self._fake_perform,
-                            get_legacy_dispatcher=self.get_legacy_dispatcher)
-        self.assertEqual(self.successResultOf(d), self.metrics)
+
+        with self.sequence.consume():
+            d = collect_metrics(_reactor, self.config, self.log)
+            self.assertEqual(self.successResultOf(d), self.metrics)
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
-        self.get_scaling_groups.assert_called_once_with(
-            self.client, props=['status'], group_pred=IsCallable())
         self.get_all_metrics.assert_called_once_with(
-            self.dispatcher, self.groups, self.log, _print=False)
-        self.add_to_cloud_metrics.assert_called_once_with(
-            self.config['metrics']['ttl'], 'r', 107, 26, 1, log=self.log)
-        self.client.disconnect.assert_called_once_with()
-
-    def test_metrics_collected_convergence_tenants(self):
-        """
-        Metrics is collected after getting groups of convergence tenants only
-        from cass and servers of those tenants from nova and it is added to
-        blueflood
-        """
-        self.config['convergence-tenants'] = ['foo', 'bar']
-        _reactor = mock.Mock()
-        d = collect_metrics(_reactor, self.config, self.log,
-                            perform=self._fake_perform,
-                            get_legacy_dispatcher=self.get_legacy_dispatcher)
-        self.assertEqual(self.successResultOf(d), self.metrics)
-
-        self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
-        self.get_specific_scaling_groups.assert_called_once_with(
-            self.client, tenant_ids=['foo', 'bar'])
-        self.get_all_metrics.assert_called_once_with(
-            self.dispatcher, self.groups, self.log, _print=False)
-        self.add_to_cloud_metrics.assert_called_once_with(
-            self.config['metrics']['ttl'], 'r', 107, 26, 1,
-            log=self.log)
+            self.get_dispatcher.return_value, self.groups, self.log,
+            _print=False)
         self.client.disconnect.assert_called_once_with()
 
     def test_with_client(self):
@@ -670,10 +643,9 @@ class CollectMetricsTests(SynchronousTestCase):
         Uses client provided and does not disconnect it before returning
         """
         client = mock.Mock(spec=['disconnect'])
-        d = collect_metrics(mock.Mock(), self.config, self.log, client=client,
-                            perform=self._fake_perform,
-                            get_legacy_dispatcher=self.get_legacy_dispatcher)
-        self.assertEqual(self.successResultOf(d), self.metrics)
+        with self.sequence.consume():
+            d = collect_metrics("reactr", self.config, self.log, client=client)
+            self.assertEqual(self.successResultOf(d), self.metrics)
         self.assertFalse(self.connect_cass_servers.called)
         self.assertFalse(client.disconnect.called)
 
@@ -682,12 +654,26 @@ class CollectMetricsTests(SynchronousTestCase):
         Uses authenticator provided instead of creating new
         """
         _reactor, auth = mock.Mock(), mock.Mock()
-        d = collect_metrics(_reactor, self.config, self.log,
-                            authenticator=auth, perform=self._fake_perform,
-                            get_legacy_dispatcher=self.get_legacy_dispatcher)
-        self.assertEqual(self.successResultOf(d), self.metrics)
-        self.get_all_metrics.assert_called_once_with(
-            self.dispatcher, self.groups, self.log, _print=False)
+        with self.sequence.consume():
+            d = collect_metrics(_reactor, self.config, self.log,
+                                authenticator=auth)
+            self.assertEqual(self.successResultOf(d), self.metrics)
+        self.get_dispatcher.assert_called_once_with(
+            _reactor, auth, self.log, mock.ANY, mock.ANY)
+
+    def test_without_metrics(self):
+        """
+        Doesnt add metrics to blueflood if metrics config is not there
+        """
+        sequence = SequenceDispatcher([
+            (("gtsg", ["ct"], "last_tenant.txt"), const(self.groups))
+        ])
+        self.get_dispatcher.return_value = sequence
+        del self.config["metrics"]
+        with sequence.consume():
+            d = collect_metrics("reactor", self.config, self.log)
+            self.assertEqual(self.successResultOf(d), self.metrics)
+        self.assertFalse(self.add_to_cloud_metrics.called)
 
 
 class APIOptionsTests(SynchronousTestCase):
