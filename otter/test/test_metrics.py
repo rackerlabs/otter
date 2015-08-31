@@ -577,13 +577,13 @@ class CollectMetricsTests(SynchronousTestCase):
         self.config = {'cassandra': 'c', 'identity': identity_config,
                        'metrics': {'service': 'ms', 'tenant_id': 'tid',
                                    'region': 'IAD',
-                                   'ttl': 200},
+                                   'ttl': 200, "last_tenant_fpath": "lpath"},
                        'region': 'r', 'cloudServersOpenStack': 'nova',
                        'cloudLoadBalancers': 'clb', 'rackconnect': 'rc',
                        "convergence-tenants": ["ct"]}
 
         self.sequence = SequenceDispatcher([
-            (("gtsg", ["ct"], "last_tenant.txt"), const(self.groups)),
+            (("gtsg", ["ct"], "lpath"), const(self.groups)),
             (TenantScope(mock.ANY, "tid"),
              nested_sequence([
                  (("atcm", 200, "r", 107, 26, 1, 2, 3, self.log), noop)

@@ -360,9 +360,11 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
                                 get_service_configs(config), _client)
 
     # calculate metrics
+    fpath = get_in(["metrics", "last_tenant_fpath"], config,
+                   default="last_tenant.txt")
     tenanted_groups = yield perform(
         dispatcher,
-        get_todays_scaling_groups(convergence_tids, "last_tenant.txt"))
+        get_todays_scaling_groups(convergence_tids, fpath))
     group_metrics = yield get_all_metrics(
         dispatcher, tenanted_groups, log, _print=_print)
 
