@@ -1,11 +1,13 @@
 import sys
+import time
 import traceback
 import uuid
 from datetime import datetime
 
 from effect import (
     ComposedDispatcher, Effect, Error, Func, base_dispatcher, sync_perform)
-from effect.ref import ReadReference, Reference, reference_dispatcher
+from effect.ref import (
+    ModifyReference, ReadReference, Reference, reference_dispatcher)
 from effect.testing import (
     SequenceDispatcher, parallel_sequence, perform_sequence)
 
@@ -50,6 +52,7 @@ from otter.test.utils import (
     CheckFailureValue, FakePartitioner,
     TestStep,
     intent_func,
+    match_func,
     mock_group, mock_log,
     nested_sequence,
     noop,
@@ -138,6 +141,7 @@ class ConvergerTests(SynchronousTestCase):
         return Converger(
             self.log, dispatcher, self.num_buckets,
             self._pfactory, build_timeout=3600,
+            interval=15,
             converge_all_groups=converge_all_groups)
 
     def _pfactory(self, buckets, log, got_buckets):
@@ -161,11 +165,12 @@ class ConvergerTests(SynchronousTestCase):
         When buckets are allocated, the result of converge_all_groups is
         performed.
         """
-        def converge_all_groups(currently_converging, _my_buckets,
-                                all_buckets, divergent_flags, build_timeout):
+        def converge_all_groups(currently_converging, recent, _my_buckets,
+                                all_buckets, divergent_flags, build_timeout,
+                                interval):
             return Effect(
                 ('converge-all', currently_converging, _my_buckets,
-                 all_buckets, divergent_flags, build_timeout))
+                 all_buckets, divergent_flags, build_timeout, interval))
 
         my_buckets = [0, 5]
         bound_sequence = [
@@ -177,7 +182,8 @@ class ConvergerTests(SynchronousTestCase):
                 my_buckets,
                 range(self.num_buckets),
                 ['flag1', 'flag2'],
-                3600),
+                3600,
+                15),
                 lambda i: 'foo')
         ]
         sequence = self._log_sequence(bound_sequence)
@@ -193,8 +199,9 @@ class ConvergerTests(SynchronousTestCase):
         Errors raised from performing the converge_all_groups effect are
         logged, and None is the ultimate result.
         """
-        def converge_all_groups(currently_converging, _my_buckets,
-                                all_buckets, divergent_flags, build_timeout):
+        def converge_all_groups(currently_converging, recent, _my_buckets,
+                                all_buckets, divergent_flags, build_timeout,
+                                interval):
             return Effect('converge-all')
 
         bound_sequence = [
@@ -203,7 +210,7 @@ class ConvergerTests(SynchronousTestCase):
             ('converge-all', lambda i: raise_(RuntimeError('foo'))),
             (LogErr(
                 CheckFailureValue(RuntimeError('foo')),
-                'converge-all-groups-error', {}), lambda i: None)
+                'converge-all-groups-error', {}), noop)
         ]
         sequence = self._log_sequence(bound_sequence)
 
@@ -244,13 +251,14 @@ class ConvergerTests(SynchronousTestCase):
         and the list of child nodes is passed on to
         :func:`converge_all_groups`.
         """
-        def converge_all_groups(currently_converging, _my_buckets,
-                                all_buckets, divergent_flags, build_timeout):
+        def converge_all_groups(currently_converging, recent, _my_buckets,
+                                all_buckets, divergent_flags, build_timeout,
+                                interval):
             return Effect(('converge-all-groups', divergent_flags))
 
         intents = [
             (('converge-all-groups', ['group1', 'group2']),
-             lambda i: None)
+             noop)
         ]
         sequence = self._log_sequence(intents)
 
@@ -261,6 +269,18 @@ class ConvergerTests(SynchronousTestCase):
         self.fake_partitioner.my_buckets = [3]
         with sequence.consume():
             converger.divergent_changed(['group1', 'group2'])
+
+
+def add_to_recently(recently, group_id, cvg_time):
+    return (ModifyReference(recently,
+                            match_func(pmap(), pmap({group_id: cvg_time}))),
+            noop)
+
+
+def add_to_currently(currently, group_id):
+    return (ModifyReference(currently,
+                            match_func(pset(), pset([group_id]))),
+            noop)
 
 
 class ConvergeOneGroupTests(SynchronousTestCase):
@@ -274,37 +294,62 @@ class ConvergeOneGroupTests(SynchronousTestCase):
     def _execute_convergence(self, tenant_id, group_id, build_timeout):
         return Effect(('ec', tenant_id, group_id, build_timeout))
 
-    def _verify_sequence(self, sequence, converging=Reference(pset())):
+    def _verify_sequence(self, sequence, converging=Reference(pset()),
+                         recent=Reference(pmap()), allow_refs=True):
         """
         Verify that sequence is executed
         """
-        dispatcher = ComposedDispatcher([sequence, _get_dispatcher()])
         eff = converge_one_group(
-            converging, self.tenant_id, self.group_id, self.version,
+            converging, recent, self.tenant_id, self.group_id, self.version,
             3600, execute_convergence=self._execute_convergence)
-        with sequence.consume():
-            self.assertIsNone(sync_perform(dispatcher, eff))
+        fb_dispatcher = _get_dispatcher() if allow_refs else base_dispatcher
+        perform_sequence(sequence, eff, fallback_dispatcher=fb_dispatcher)
 
     def test_success(self):
         """
         runs execute_convergence and returns None, then deletes the dirty flag.
         """
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                        version=self.version), lambda i: None),
-            (Log('mark-clean-success', {}), lambda i: None)
-        ])
+                        version=self.version), noop),
+            (Log('mark-clean-success', {}), noop)
+        ]
         self._verify_sequence(sequence)
+
+    def test_record_recently_converged(self):
+        """
+        After converging, the group is added to ``recently_converged`` -- but
+        *before* being removed from ``currently_converging``, to avoid race
+        conditions.
+        """
+        currently = Reference(pset())
+        recently = Reference(pmap())
+        remove_from_currently = match_func(pset([self.group_id]), pset([]))
+        sequence = [
+            (ReadReference(currently), lambda i: pset()),
+            add_to_currently(currently, self.group_id),
+            (('ec', self.tenant_id, self.group_id, 3600),
+             lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
+            (Func(time.time), lambda i: 100),
+            add_to_recently(recently, self.group_id, 100),
+            (ModifyReference(currently, remove_from_currently), noop),
+            (DeleteNode(path='/groups/divergent/tenant-id_g1',
+                        version=self.version), noop),
+            (Log('mark-clean-success', {}), noop)
+        ]
+        eff = converge_one_group(
+            currently, recently, self.tenant_id, self.group_id, self.version,
+            3600, execute_convergence=self._execute_convergence)
+        perform_sequence(sequence, eff)
 
     def test_non_concurrent(self):
         """
         Won't run execute_convergence if it's already running for the same
         group ID.
         """
-        self._verify_sequence(
-            SequenceDispatcher([]), Reference(pset([self.group_id])))
+        self._verify_sequence([], Reference(pset([self.group_id])))
 
     def test_no_scaling_group(self):
         """
@@ -312,16 +357,16 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         dirty flag is cleaned up.
         """
         expected_error = NoSuchScalingGroupError(self.tenant_id, self.group_id)
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: raise_(expected_error)),
             (LogErr(CheckFailureValue(expected_error),
                     'converge-fatal-error', {}),
-             lambda i: None),
+             noop),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                        version=self.version), lambda i: None),
-            (Log('mark-clean-success', {}), lambda i: None)
-        ])
+                        version=self.version), noop),
+            (Log('mark-clean-success', {}), noop)
+        ]
         self._verify_sequence(sequence)
 
     def test_unexpected_errors(self):
@@ -329,15 +374,25 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         Unexpected exceptions log a non-fatal error and don't clean up the
         dirty flag.
         """
+        converging = Reference(pset())
+        recent = Reference(pmap())
         expected_error = RuntimeError('oh no!')
-        sequence = SequenceDispatcher([
+        sequence = [
+            (ReadReference(converging), lambda i: pset()),
+            add_to_currently(converging, self.group_id),
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: raise_(expected_error)),
+            (Func(time.time), lambda i: 100),
+            add_to_recently(recent, self.group_id, 100),
+            (ModifyReference(converging,
+                             match_func(pset([self.group_id]), pset())),
+             noop),
             (LogErr(CheckFailureValue(expected_error),
                     'converge-non-fatal-error', {}),
-             lambda i: None)
-        ])
-        self._verify_sequence(sequence)
+             noop),
+        ]
+        self._verify_sequence(sequence, converging=converging, recent=recent,
+                              allow_refs=False)
 
     def test_delete_node_version_mismatch(self):
         """
@@ -345,7 +400,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         converge_one_group, and DeleteNode raises a BadVersionError, the error
         is logged and nothing else is cleaned up.
         """
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
@@ -353,8 +408,8 @@ class ConvergeOneGroupTests(SynchronousTestCase):
              lambda i: raise_(BadVersionError())),
             (Log('mark-clean-skipped',
                  dict(path='/groups/divergent/tenant-id_g1',
-                      dirty_version=self.version)), lambda i: None)
-        ])
+                      dirty_version=self.version)), noop)
+        ]
         self._verify_sequence(sequence)
 
     def test_delete_node_not_found(self):
@@ -362,7 +417,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         When DeleteNode raises a NoNodeError, a message is logged and nothing
         else is cleaned up.
         """
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
@@ -370,13 +425,13 @@ class ConvergeOneGroupTests(SynchronousTestCase):
              lambda i: raise_(NoNodeError())),
             (Log('mark-clean-not-found',
                  dict(path='/groups/divergent/tenant-id_g1',
-                      dirty_version=self.version)), lambda i: None)
-        ])
+                      dirty_version=self.version)), noop)
+        ]
         self._verify_sequence(sequence)
 
     def test_delete_node_other_error(self):
         """When marking clean raises arbitrary errors, an error is logged."""
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
@@ -385,8 +440,8 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             (LogErr(CheckFailureValue(ZeroDivisionError()),
                     'mark-clean-failure',
                     dict(path='/groups/divergent/tenant-id_g1',
-                         dirty_version=self.version)), lambda i: None)
-        ])
+                         dirty_version=self.version)), noop)
+        ]
         self._verify_sequence(sequence)
 
     def test_retry(self):
@@ -394,10 +449,10 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         When execute_convergence returns RETRY, the divergent flag is not
         deleted.
         """
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.RETRY, ScalingGroupStatus.ACTIVE))
-        ])
+        ]
         self._verify_sequence(sequence)
 
     def test_failure(self):
@@ -405,13 +460,13 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         When execute_convergence returns FAILURE, the divergent flag is
         deleted.
         """
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.FAILURE, ScalingGroupStatus.ACTIVE)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                        version=self.version), lambda i: None),
-            (Log('mark-clean-success', {}), lambda i: None)
-        ])
+                        version=self.version), noop),
+            (Log('mark-clean-success', {}), noop)
+        ]
         self._verify_sequence(sequence)
 
     def test_delete_flag_unconditionally_when_group_deleted(self):
@@ -420,13 +475,13 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         deleted, the divergent flag is unconditionally deleted (ignoring
         mismatched versions), because a re-converge would be fruitless.
         """
-        sequence = SequenceDispatcher([
+        sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.SUCCESS, None)),
             (DeleteNode(path='/groups/divergent/tenant-id_g1', version=-1),
              noop),
             (Log('mark-clean-success', {}), noop),
-        ])
+        ]
         self._verify_sequence(sequence)
 
 
@@ -435,6 +490,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
     def setUp(self):
         self.currently_converging = Reference(pset())
+        self.recently_converged = Reference(pmap())
         self.my_buckets = [1, 6]
         self.all_buckets = range(10)
         self.group_infos = [
@@ -446,16 +502,37 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
     def _converge_all_groups(self, flags):
         return converge_all_groups(
-            self.currently_converging, self.my_buckets,
-            self.all_buckets,
+            self.currently_converging, self.recently_converged,
+            self.my_buckets, self.all_buckets,
             flags,
             3600,
+            15,
             converge_one_group=self._converge_one_group)
 
-    def _converge_one_group(self, currently_converging, tenant_id,
-                            group_id, version, build_timeout):
+    def _converge_one_group(self, currently_converging, recently_converged,
+                            tenant_id, group_id, version, build_timeout):
         return Effect(
             ('converge', tenant_id, group_id, version, build_timeout))
+
+    def _expect_group_converged(self, tenant_id, group_id):
+        """
+        Return a SequenceDispatcher two-tuple that matches the usual sequence
+        of intents for converging a single group.
+        """
+        return (
+            BoundFields(mock.ANY,
+                        dict(tenant_id=tenant_id, scaling_group_id=group_id)),
+            nested_sequence([
+                (GetStat(
+                    path='/groups/divergent/{tenant_id}_{group_id}'.format(
+                        tenant_id=tenant_id, group_id=group_id)),
+                 lambda i: ZNodeStatStub(version=5)),
+                (TenantScope(mock.ANY, tenant_id),
+                 nested_sequence([
+                     (('converge', tenant_id, group_id, 5, 3600),
+                      lambda i: 'converged {}!'.format(group_id)),
+                 ])),
+            ]))
 
     def test_converge_all_groups(self):
         """
@@ -463,39 +540,24 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         needing convergence.
         """
         eff = self._converge_all_groups(['00_g1', '01_g2'])
-
-        def get_bound_sequence(tid, gid):
-            return [
-                (GetStat(path='/groups/divergent/{}_{}'.format(tid, gid)),
-                 lambda i: ZNodeStatStub(version=1)),
-                (TenantScope(mock.ANY, tid),
-                 nested_sequence([
-                     (('converge', tid, gid, 1, 3600),
-                      lambda i: 'converged {}!'.format(tid))])),
-            ]
-
         sequence = [
             (ReadReference(ref=self.currently_converging),
              lambda i: pset()),
             (Log('converge-all-groups',
                  dict(group_infos=self.group_infos, currently_converging=[])),
-             lambda i: None),
-            parallel_sequence([
-                [(BoundFields(mock.ANY, fields={'tenant_id': '00',
-                                                'scaling_group_id': 'g1'}),
-                  nested_sequence(get_bound_sequence('00', 'g1')))],
-                [(BoundFields(mock.ANY, fields={'tenant_id': '01',
-                                                'scaling_group_id': 'g2'}),
-                  nested_sequence(get_bound_sequence('01', 'g2')))],
-             ])
+             noop),
+            (ReadReference(self.recently_converged), lambda i: pmap()),
+            (Func(time.time), lambda i: 100),
+            parallel_sequence([[self._expect_group_converged('00', 'g1')],
+                               [self._expect_group_converged('01', 'g2')]])
         ]
         self.assertEqual(perform_sequence(sequence, eff),
-                         ['converged 00!', 'converged 01!'])
+                         ['converged g1!', 'converged g2!'])
 
     def test_filter_out_currently_converging(self):
         """
         If a group is already being converged, its dirty flag is not statted
-        convergence is not run for it.
+        and convergence is not run for it.
         """
         eff = self._converge_all_groups(['00_g1', '01_g2'])
         sequence = [
@@ -504,33 +566,66 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             (Log('converge-all-groups',
                  dict(group_infos=[self.group_infos[1]],
                       currently_converging=['g1'])),
-             lambda i: None),
-
-            parallel_sequence([
-                [(BoundFields(mock.ANY, dict(tenant_id='01',
-                                             scaling_group_id='g2')),
-                  nested_sequence([
-                     (GetStat(path='/groups/divergent/01_g2'),
-                      lambda i: ZNodeStatStub(version=5)),
-                     (TenantScope(mock.ANY, '01'),
-                      nested_sequence([
-                         (('converge', '01', 'g2', 5, 3600),
-                          lambda i: 'converged two!'),
-                      ])),
-                  ]))],
-             ])
+             noop),
+            (ReadReference(ref=self.recently_converged), lambda i: pmap()),
+            (Func(time.time), lambda i: 100),
+            parallel_sequence([[self._expect_group_converged('01', 'g2')]])
         ]
-        self.assertEqual(perform_sequence(sequence, eff), ['converged two!'])
+        self.assertEqual(perform_sequence(sequence, eff), ['converged g2!'])
+
+    def test_filter_out_recently_converged(self):
+        """
+        If a group was recently converged, it will not be converged again.
+        """
+        eff = self._converge_all_groups(['00_g1'])
+        sequence = [
+            (ReadReference(ref=self.currently_converging), lambda i: pset([])),
+            (Log('converge-all-groups',
+                 dict(group_infos=[self.group_infos[0]],
+                      currently_converging=[])),
+             noop),
+            (ReadReference(ref=self.recently_converged),
+             lambda i: pmap({'g1': 5})),
+            (Func(time.time), lambda i: 14),
+            parallel_sequence([])  # No groups to converge
+        ]
+        self.assertEqual(perform_sequence(sequence, eff), [])
+
+    def test_dont_filter_out_non_recently_converged(self):
+        """
+        If a group was converged in the past but not recently, it will be
+        cleaned from the ``recently_converged`` map, and it will be converged.
+        """
+        # g1: converged a while ago; divergent -> removed and converged
+        # g2: converged recently; not divergent -> not converged
+        # g3: converged a while ago; not divergent -> removed and not converged
+        eff = self._converge_all_groups(['00_g1'])
+        sequence = [
+            (ReadReference(ref=self.currently_converging), lambda i: pset([])),
+            (Log('converge-all-groups',
+                 dict(group_infos=[self.group_infos[0]],
+                      currently_converging=[])),
+             noop),
+            (ReadReference(ref=self.recently_converged),
+             lambda i: pmap({'g1': 4, 'g2': 10, 'g3': 0})),
+            (Func(time.time), lambda i: 20),
+            (ModifyReference(self.recently_converged,
+                             match_func("literally anything",
+                                        pmap({'g2': 10}))),
+             noop),
+            parallel_sequence([[self._expect_group_converged('00', 'g1')]])
+        ]
+        self.assertEqual(perform_sequence(sequence, eff), ['converged g1!'])
 
     def test_no_log_on_no_groups(self):
         """When there's no work, no log message is emitted."""
-        def converge_one_group(log, currently_converging, tenant_id, group_id,
-                               version, build_timeout):
-            1 / 0
+        def converge_one_group(*args, **kwargs):
+            1 / 0  # This should not be run
 
         result = converge_all_groups(
-            self.currently_converging, self.my_buckets, self.all_buckets, [],
-            3600, converge_one_group=converge_one_group)
+            self.currently_converging, self.recently_converged,
+            self.my_buckets, self.all_buckets, [],
+            3600, 15, converge_one_group=converge_one_group)
         self.assertEqual(sync_perform(_get_dispatcher(), result), None)
 
     def test_ignore_disappearing_divergent_flag(self):
@@ -548,18 +643,19 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             # be run. This is the crux of what we're testing.
             znode = '/groups/divergent/{}_{}'.format(tid, gid)
             return [
-                (GetStat(path=znode), lambda i: None),
+                (GetStat(path=znode), noop),
                 (Log('converge-divergent-flag-disappeared',
                      fields={'znode': znode}),
                  noop)]
 
         sequence = [
-            (ReadReference(ref=self.currently_converging),
-             lambda i: pset()),
+            (ReadReference(ref=self.currently_converging), lambda i: pset()),
             (Log('converge-all-groups',
                  dict(group_infos=[self.group_infos[0]],
                       currently_converging=[])),
-             lambda i: None),
+             noop),
+            (ReadReference(ref=self.recently_converged), lambda i: pmap()),
+            (Func(time.time), lambda i: 100),
             parallel_sequence([
                 [(BoundFields(mock.ANY, fields={'tenant_id': '00',
                                                 'scaling_group_id': 'g1'}),

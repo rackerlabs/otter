@@ -872,6 +872,14 @@ def transform_eq(transformer, rhs):
     return TransformedEq()
 
 
+def match_func(arg, result):
+    """
+    Return an object that compares equal to a function that, when given
+    ``arg``, returns ``result``.
+    """
+    return transform_eq(lambda f: f(arg), result)
+
+
 def raise_(e):
     """Raise the exception. Useful for lambdas."""
     raise e

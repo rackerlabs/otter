@@ -83,8 +83,8 @@ The top-level entry-points into this module are :obj:`ConvergenceStarter` and
 # or config has changed), only if there are _any_ outstanding requests for
 # convergence, since convergence always uses the most recent data.
 
-
 import operator
+import time
 import uuid
 from datetime import datetime
 from functools import partial
@@ -97,7 +97,7 @@ from effect.ref import Reference
 from kazoo.exceptions import BadVersionError, NoNodeError
 from kazoo.recipe.partitioner import PartitionState
 
-from pyrsistent import pset
+from pyrsistent import pmap, pset
 from pyrsistent import thaw
 
 import six
@@ -483,14 +483,22 @@ def get_my_divergent_groups(my_buckets, all_buckets, divergent_flags):
     return converging
 
 
+def eff_finally(eff, after_eff):
+    """Run some effect after another effect, whether it succeeds or fails."""
+    return eff.on(success=lambda r: after_eff.on(lambda _: r),
+                  error=lambda e: after_eff.on(lambda _: six.reraise(*e)))
+
+
 @do
-def converge_one_group(currently_converging, tenant_id, group_id, version,
+def converge_one_group(currently_converging, recently_converged,
+                       tenant_id, group_id, version,
                        build_timeout, execute_convergence=execute_convergence):
     """
     Converge one group, non-concurrently, and clean up the dirty flag when
     done.
 
     :param Reference currently_converging: pset of currently converging groups
+    :param Reference recently_converged: pmap of recently converged groups
     :param str tenant_id: the tenant ID of the group that is converging
     :param str group_id: the ID of the group that is converging
     :param version: version number of ZNode of the group's dirty flag
@@ -499,9 +507,15 @@ def converge_one_group(currently_converging, tenant_id, group_id, version,
     :param callable execute_convergence: like :func`execute_convergence`, to
         be used for test injection only
     """
-    eff = execute_convergence(tenant_id, group_id, build_timeout)
+    mark_recently_converged = Effect(Func(time.time)).on(
+        lambda time_done: recently_converged.modify(
+            lambda rcg: rcg.set(group_id, time_done)))
+    cvg = eff_finally(
+        execute_convergence(tenant_id, group_id, build_timeout),
+        mark_recently_converged)
+
     try:
-        result = yield non_concurrently(currently_converging, group_id, eff)
+        result = yield non_concurrently(currently_converging, group_id, cvg)
     except ConcurrentError:
         # We don't need to spam the logs about this, it's to be expected
         return
@@ -526,14 +540,17 @@ def converge_one_group(currently_converging, tenant_id, group_id, version,
 
 
 @do
-def converge_all_groups(currently_converging, my_buckets, all_buckets,
-                        divergent_flags, build_timeout,
-                        converge_one_group=converge_one_group):
+def converge_all_groups(
+        currently_converging, recently_converged, my_buckets, all_buckets,
+        divergent_flags, build_timeout, interval,
+        converge_one_group=converge_one_group):
     """
     Check for groups that need convergence and which match up to the
     buckets we've been allocated.
 
     :param Reference currently_converging: pset of currently converging groups
+    :param Reference recently_converged: pmap of group ID to time last
+        convergence finished
     :param my_buckets: The buckets that should be checked for group IDs to
         converge on.
     :param all_buckets: The set of all buckets that can be checked for group
@@ -541,6 +558,9 @@ def converge_all_groups(currently_converging, my_buckets, all_buckets,
     :param divergent_flags: divergent flags that were found in zookeeper.
     :param number build_timeout: number of seconds to wait for servers to be in
         building before it's is timed out and deleted
+    :param number interval: number of seconds between attempts at convergence.
+        Groups will not be converged if less than this amount of time has
+        passed since the end of its last convergence.
     :param callable converge_one_group: function to use to converge a single
         group - to be used for test injection only
     """
@@ -566,19 +586,41 @@ def converge_all_groups(currently_converging, my_buckets, all_buckets,
         if stat is None:
             yield msg('converge-divergent-flag-disappeared', znode=dirty_flag)
         else:
-            eff = converge_one_group(currently_converging, tenant_id, group_id,
+            eff = converge_one_group(currently_converging, recently_converged,
+                                     tenant_id, group_id,
                                      stat.version, build_timeout)
             result = yield Effect(TenantScope(eff, tenant_id))
             yield do_return(result)
 
+    recent_groups = yield get_recently_converged_groups(recently_converged,
+                                                        interval)
     effs = []
     for info in group_infos:
         tenant_id, group_id = info['tenant_id'], info['group_id']
+        if group_id in recent_groups:
+            # Don't converge a group if it has recently been converged.
+            continue
         eff = converge(tenant_id, group_id, info['dirty-flag'])
         effs.append(
             with_log(eff, tenant_id=tenant_id, scaling_group_id=group_id))
 
     yield do_return(parallel(effs))
+
+
+@do
+def get_recently_converged_groups(recently_converged, interval):
+    """
+    Return a list of recently converged groups, and garbage-collect any groups
+    in the recently_converged map that are no longer 'recent'.
+    """
+    # STM would be cool but this is synchronous so whatever
+    recent = yield recently_converged.read()
+    now = yield Effect(Func(time.time))
+    to_remove = [group for group in recent if now - recent[group] > interval]
+    cleaned = reduce(lambda m, g: m.remove(g), to_remove, recent)
+    if recent != cleaned:
+        yield recently_converged.modify(lambda _: cleaned)
+    yield do_return(cleaned.keys())
 
 
 def _stable_hash(s):
@@ -615,7 +657,8 @@ class Converger(MultiService):
     """
 
     def __init__(self, log, dispatcher, num_buckets, partitioner_factory,
-                 build_timeout, converge_all_groups=converge_all_groups):
+                 build_timeout, interval,
+                 converge_all_groups=converge_all_groups):
         """
         :param log: a bound log
         :param dispatcher: The dispatcher to use to perform effects.
@@ -628,6 +671,7 @@ class Converger(MultiService):
             buckets.
         :param number build_timeout: number of seconds to wait for servers to
             be in building before it's is timed out and deleted
+        :param interval: Interval between convergence steps, per group.
         :param callable converge_all_groups: like :func:`converge_all_groups`,
             to be used for test injection only
         """
@@ -640,14 +684,17 @@ class Converger(MultiService):
             got_buckets=self.buckets_acquired)
         self.partitioner.setServiceParent(self)
         self.currently_converging = Reference(pset())
+        self.recently_converged = Reference(pmap())
         self.build_timeout = build_timeout
         self._converge_all_groups = converge_all_groups
+        self.interval = interval
 
     def _converge_all(self, my_buckets, divergent_flags):
         """Run :func:`converge_all_groups` and log errors."""
-        eff = self._converge_all_groups(self.currently_converging,
-                                        my_buckets, self._buckets,
-                                        divergent_flags, self.build_timeout)
+        eff = self._converge_all_groups(
+            self.currently_converging, self.recently_converged,
+            my_buckets, self._buckets, divergent_flags, self.build_timeout,
+            self.interval)
         return eff.on(
             error=lambda e: err(
                 exc_info_to_failure(e), 'converge-all-groups-error'))
