@@ -3,6 +3,7 @@ Tests for `metrics.py`
 """
 
 import operator
+import time
 from datetime import datetime
 from io import StringIO
 
@@ -26,7 +27,7 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import IAuthenticator
-from otter.cloud_client import TenantScope
+from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType
 from otter.log.intents import LogErr
 from otter.metrics import (
@@ -326,31 +327,32 @@ class AddToCloudMetricsTests(SynchronousTestCase):
     Tests for :func:`add_to_cloud_metrics`
     """
 
-    @mock.patch('otter.metrics.time')
-    def test_added(self, mock_time):
+    def test_added(self):
         """
         total desired, pending and actual are added to cloud metrics
         """
         td = 10
         ta = 20
         tp = 3
-        mock_time.time.return_value = 100
+        tt = 7
+        tg = 13
         m = {'collectionTime': 100000, 'ttlInSeconds': 5 * 24 * 60 * 60}
         md = merge(m, {'metricValue': td, 'metricName': 'ord.desired'})
         ma = merge(m, {'metricValue': ta, 'metricName': 'ord.actual'})
         mp = merge(m, {'metricValue': tp, 'metricName': 'ord.pending'})
-        req_data = [md, ma, mp]
+        mt = merge(m, {'metricValue': tt, 'metricName': 'ord.tenants'})
+        mg = merge(m, {'metricValue': tg, 'metricName': 'ord.groups'})
+        req_data = [md, ma, mp, mt, mg]
         log = object()
-
+        seq = [
+            (Func(time.time), const(100)),
+            (service_request(
+                ServiceType.CLOUD_METRICS_INGEST, "POST", "ingest",
+                data=req_data, log=log).intent, noop)
+        ]
         eff = add_to_cloud_metrics(
-            m['ttlInSeconds'], 'ord', td, ta, tp, log=log)
-
-        req = eff.intent
-        self.assertEqual(req.service_type, ServiceType.CLOUD_METRICS_INGEST)
-        self.assertEqual(req.method, 'POST')
-        self.assertEqual(req.url, 'ingest')
-        self.assertEqual(req.data, req_data)
-        self.assertEqual(req.log, log)
+            m['ttlInSeconds'], 'ord', td, ta, tp, tt, tg, log=log)
+        self.assertIsNone(perform_sequence(seq, eff))
 
 
 class UnchangedDivergentGroupsTests(SynchronousTestCase):
@@ -556,7 +558,6 @@ class CollectMetricsTests(SynchronousTestCase):
         self.client.disconnect.return_value = succeed(None)
         self.connect_cass_servers.return_value = self.client
 
-        self.groups = mock.Mock()
         self.get_todays_scaling_groups = patch(
             self, 'otter.metrics.get_todays_scaling_groups',
             side_effect=intent_func("gtsg"))
@@ -567,6 +568,7 @@ class CollectMetricsTests(SynchronousTestCase):
                         GroupMetrics('t2', 'g', 100, 20, 0)]
         self.get_all_metrics = patch(self, 'otter.metrics.get_all_metrics',
                                      return_value=succeed(self.metrics))
+        self.groups = {"t": "t1group", "t2": "2 groups"}
 
         self.add_to_cloud_metrics = patch(
             self, 'otter.metrics.add_to_cloud_metrics',
@@ -584,7 +586,7 @@ class CollectMetricsTests(SynchronousTestCase):
             (("gtsg", ["ct"], "last_tenant.txt"), const(self.groups)),
             (TenantScope(mock.ANY, "tid"),
              nested_sequence([
-                 (("atcm", 200, "r", 107, 26, 1, self.log), noop)
+                 (("atcm", 200, "r", 107, 26, 1, 2, 3, self.log), noop)
              ]))
         ])
         self.get_dispatcher = patch(self, "otter.metrics.get_dispatcher",

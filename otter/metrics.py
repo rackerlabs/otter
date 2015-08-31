@@ -384,8 +384,8 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     metr_conf = config.get("metrics", None)
     if metr_conf is not None:
         eff = add_to_cloud_metrics(
-            metr_conf['ttl'], config['region'], total_desired,
-            total_actual, total_pending, log)
+            metr_conf['ttl'], config['region'], total_desired, total_actual,
+            total_pending, len(tenanted_groups), len(group_metrics), log)
         eff = Effect(TenantScope(eff, metr_conf['tenant_id']))
         yield perform(dispatcher, eff)
         log.msg('added to cloud metrics')
