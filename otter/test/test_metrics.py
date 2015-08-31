@@ -17,7 +17,8 @@ from silverberg.client import CQLClient
 
 from testtools.matchers import IsInstance
 
-from toolz.dicttoolz import merge
+from toolz.dicttoolz import assoc, keyfilter, merge
+from toolz.itertoolz import groupby
 
 from twisted.internet.base import ReactorBase
 from twisted.internet.defer import fail, succeed
@@ -40,6 +41,7 @@ from otter.metrics import (
     get_all_metrics,
     get_all_metrics_effects,
     get_scaling_groups,
+    get_scaling_group_rows,
     get_specific_scaling_groups,
     get_tenant_metrics,
     get_todays_tenants,
@@ -63,14 +65,12 @@ from otter.test.utils import (
 from otter.util.fileio import ReadFileLines, WriteFileLines
 
 
-class GetSpecificScalingGroupsTests(SynchronousTestCase):
-    """Tests for :func:`get_specific_scaling_groups`."""
+class GetScalingGroupsTests(SynchronousTestCase):
+    """Tests for :func:`get_specific_scaling_groups` and
+    :func:`get_scaling_groups`"""
 
-    def test_query(self):
-        def _exec(query, params, c):
-            return succeed(exec_args[(query, freeze(params))])
-        client = mock.Mock(spec=CQLClient)
-        rows = [
+    def setUp(self):
+        self.rows = [
             {'created_at': '0', 'desired': 'some', 'status': 'ACTIVE'},
             {'desired': 'some', 'status': 'ACTIVE'},  # no created_at
             {'created_at': '0', 'status': 'ACTIVE'},  # no desired
@@ -78,19 +78,31 @@ class GetSpecificScalingGroupsTests(SynchronousTestCase):
             {'created_at': '0', 'desired': 'some', 'status': 'DISABLED'},
             {'created_at': '0', 'desired': 'some', 'deleting': 'True', },
             {'created_at': '0', 'desired': 'some', 'status': 'ERROR'}]
+        self.client = mock.Mock(spec=CQLClient)
+
+    def test_get_specific(self):
+        def _exec(query, params, c):
+            return succeed(exec_args[(query, freeze(params))])
+        self.client.execute.side_effect = _exec
         expected_query = QUERY_GROUPS_OF_TENANTS.format(tids="'foo', 'bar'")
-        exec_args = {(expected_query, freeze({})): rows}
-
-        client.execute.side_effect = _exec
-
+        exec_args = {(expected_query, freeze({})): self.rows}
         results = self.successResultOf(
-            get_specific_scaling_groups(client, ['foo', 'bar']))
-        self.assertEqual(list(results), [rows[0], rows[3]])
+            get_specific_scaling_groups(self.client, ['foo', 'bar']))
+        self.assertEqual(list(results), [self.rows[0], self.rows[3]])
+
+    @mock.patch("otter.metrics.get_scaling_group_rows")
+    def test_get_groups(self, mock_gsgr):
+        rows = [assoc(row, "tenantId", "t1") for row in self.rows]
+        mock_gsgr.return_value = succeed(rows)
+        results = self.successResultOf(get_scaling_groups(self.client))
+        self.assertEqual(results, {"t1": [rows[0], rows[3]]})
+        mock_gsgr.assert_called_once_with(
+            self.client, props=["status", "deleting", "created_at"])
 
 
-class GetScalingGroupsTests(SynchronousTestCase):
+class GetScalingGroupRowsTests(SynchronousTestCase):
     """
-    Tests for :func:`get_scaling_groups`
+    Tests for :func:`get_scaling_group_rows`
     """
 
     def setUp(self):
@@ -105,7 +117,7 @@ class GetScalingGroupsTests(SynchronousTestCase):
 
         self.client.execute.side_effect = _exec
         self.select = ('SELECT "groupId","tenantId",'
-                       'active,created_at,desired,pending '
+                       'active,desired,pending '
                        'FROM scaling_group ')
 
     def _add_exec_args(self, query, params, ret):
@@ -120,61 +132,8 @@ class GetScalingGroupsTests(SynchronousTestCase):
                   for i in range(2) for j in range(2)]
         self._add_exec_args(
             self.select + ' LIMIT :limit;', {'limit': 5}, groups)
-        d = get_scaling_groups(self.client, batch_size=5)
+        d = get_scaling_group_rows(self.client, batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups)
-
-    def test_filters_no_created_or_desired(self):
-        """
-        Does not include groups that do not have created_at or desired
-        """
-        groups = [{'tenantId': 1, 'groupId': 2,
-                   'desired': 3, 'created_at': None},
-                  {'tenantId': 1, 'groupId': 3,
-                   'desired': None, 'created_at': 'c'},
-                  {'tenantId': 1, 'groupId': 4,
-                   'desired': None, 'created_at': None},
-                  {'tenantId': 1, 'groupId': 5,
-                   'desired': 3, 'created_at': 'c'}]
-        self._add_exec_args(
-            self.select + ' LIMIT :limit;', {'limit': 5}, groups)
-        d = get_scaling_groups(self.client, batch_size=5)
-        self.assertEqual(list(self.successResultOf(d)), groups[-1:])
-
-    def test_does_not_filter_on_desired(self):
-        """
-        If `with_null_desired=True` then groups with null desired are returned
-        """
-        groups = [{'tenantId': 1, 'groupId': 2,
-                   'desired': 3, 'created_at': None},
-                  {'tenantId': 1, 'groupId': 3,
-                   'desired': None, 'created_at': 'c'},
-                  {'tenantId': 1, 'groupId': 5,
-                   'desired': 3, 'created_at': 'c'}]
-        self._add_exec_args(
-            self.select + ' LIMIT :limit;', {'limit': 5}, groups)
-        d = get_scaling_groups(self.client, batch_size=5,
-                               with_null_desired=True)
-        self.assertEqual(list(self.successResultOf(d)), groups[1:])
-
-    def test_filters_on_group_pred_arg(self):
-        """
-        If group_pred arg is given then returns groups for which
-        group_pred returns True
-        """
-        groups = [{'tenantId': 1, 'groupId': 2,
-                   'desired': 3, 'created_at': 'c'},
-                  {'tenantId': 1, 'groupId': 3,
-                   'desired': 2, 'created_at': 'c'},
-                  {'tenantId': 1, 'groupId': 4,
-                   'desired': 6, 'created_at': 'c'},
-                  {'tenantId': 1, 'groupId': 5,
-                   'desired': 4, 'created_at': 'c'}]
-        self._add_exec_args(
-            self.select + ' LIMIT :limit;', {'limit': 5}, groups)
-        d = get_scaling_groups(self.client, batch_size=5,
-                               group_pred=lambda g: g['desired'] % 3 == 0)
-        self.assertEqual(list(self.successResultOf(d)),
-                         [groups[0], groups[2]])
 
     def test_gets_props(self):
         """
@@ -185,11 +144,12 @@ class GetScalingGroupsTests(SynchronousTestCase):
                   {'tenantId': 1, 'groupId': 3, 'desired': 2,
                    'created_at': 'c', 'launch': 'b'}]
         self._add_exec_args(
-            ('SELECT "groupId","tenantId",active,created_at,'
+            ('SELECT "groupId","tenantId",active,'
              'desired,launch,pending '
              'FROM scaling_group  LIMIT :limit;'),
             {'limit': 5}, groups)
-        d = get_scaling_groups(self.client, props=['launch'], batch_size=5)
+        d = get_scaling_group_rows(self.client, props=['launch'],
+                                   batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups)
 
     def test_last_tenant_has_less_groups(self):
@@ -210,7 +170,7 @@ class GetScalingGroupsTests(SynchronousTestCase):
             self.select + ('WHERE token("tenantId") > token(:tenantId)'
                            ' LIMIT :limit;'),
             {'limit': 5, 'tenantId': 1}, [])
-        d = get_scaling_groups(self.client, batch_size=5)
+        d = get_scaling_group_rows(self.client, batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups)
 
     def test_many_tenants_having_more_than_batch_groups(self):
@@ -242,7 +202,7 @@ class GetScalingGroupsTests(SynchronousTestCase):
         self._add_exec_args(
             self.select + where_token,
             {'limit': 5, 'tenantId': 2}, [])
-        d = get_scaling_groups(self.client, batch_size=5)
+        d = get_scaling_group_rows(self.client, batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups1 + groups2)
 
 
@@ -284,9 +244,10 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
             'g4': [_server('g4', 'ACTIVE'),
                    _server('g4', 'BUILD')]}
 
-        groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 3},
-                  {'tenantId': 't1', 'groupId': 'g2', 'desired': 4},
-                  {'tenantId': 't2', 'groupId': 'g4', 'desired': 2}]
+        groups = {
+            "t1": [{'tenantId': 't1', 'groupId': 'g1', 'desired': 3},
+                   {'tenantId': 't1', 'groupId': 'g2', 'desired': 4}],
+            "t2": [{'tenantId': 't2', 'groupId': 'g4', 'desired': 2}]}
 
         tenant_servers = {'t1': servers_t1, 't2': servers_t2}
 
@@ -312,8 +273,9 @@ class GetAllMetricsEffectsTests(SynchronousTestCase):
         log = mock_log()
         log.err.return_value = None
 
-        groups = [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0},
-                  {'tenantId': 't2', 'groupId': 'g2', 'desired': 0}]
+        groups = {
+            "t1": [{'tenantId': 't1', 'groupId': 'g1', 'desired': 0}],
+            "t2": [{'tenantId': 't2', 'groupId': 'g2', 'desired': 0}]}
         effs = get_all_metrics_effects(groups, log)
         results = []
         for eff in effs:
@@ -518,9 +480,12 @@ class GetTodaysScalingGroupsTests(SynchronousTestCase):
     Tests for :func:`get_todays_scaling_groups`
     """
 
-    groups = (
-        [{"tenantId": "t1", "a": "1"}, {"tenantId": "t1", "a": "2"}] +
-        [{"tenantId": "t{}".format(i), "b": str(i)} for i in range(2, 10)])
+    def setUp(self):
+        self.groups = groupby(
+            lambda g: g["tenantId"],
+            ([{"tenantId": "t1", "a": "1"}, {"tenantId": "t1", "a": "2"}] +
+             [{"tenantId": "t{}".format(i), "b": str(i)}
+               for i in range(2, 10)]))
 
     def test_success(self):
         """
@@ -534,11 +499,10 @@ class GetTodaysScalingGroupsTests(SynchronousTestCase):
             (WriteFileLines("file", [7, 86400.0]), noop)
         ]
         r = perform_sequence(seq, get_todays_scaling_groups(["t1"], "file"))
-        self.assertEqual(set(freeze(r)), set(freeze(self.groups[:9])))
-
-        # Works if there are no groups for convergence tenants
-        r = perform_sequence(seq, get_todays_scaling_groups(["t"], "file"))
-        self.assertEqual(set(freeze(r)), set(freeze(self.groups[:8])))
+        self.assertEqual(
+            r,
+            keyfilter(lambda k: k in ["t{}".format(i) for i in range(1, 9)],
+                      self.groups))
 
     def test_no_last_info(self):
         """
@@ -553,7 +517,10 @@ class GetTodaysScalingGroupsTests(SynchronousTestCase):
             (WriteFileLines("file", [5, 86400.0]), noop)
         ]
         r = perform_sequence(seq, get_todays_scaling_groups(["t1"], "file"))
-        self.assertEqual(set(freeze(r)), set(freeze(self.groups[:7])))
+        self.assertEqual(
+            r,
+            keyfilter(lambda k: k in ["t{}".format(i) for i in range(1, 7)],
+                      self.groups))
 
     def test_error_writing(self):
         """
@@ -568,8 +535,10 @@ class GetTodaysScalingGroupsTests(SynchronousTestCase):
             (LogErr(mock.ANY, "error updating last tenant", {}), noop)
         ]
         r = perform_sequence(seq, get_todays_scaling_groups(["t1"], "file"))
-        self.assertEqual(set(freeze(r)), set(freeze(self.groups[:9])))
-
+        self.assertEqual(
+            r,
+            keyfilter(lambda k: k in ["t{}".format(i) for i in range(1, 9)],
+                      self.groups))
 
 
 class CollectMetricsTests(SynchronousTestCase):
