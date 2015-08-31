@@ -278,14 +278,12 @@ def get_all_metrics(dispatcher, tenanted_groups, log, _print=False,
     return d.addCallback(lambda x: reduce(operator.add, x, []))
 
 
-def add_to_cloud_metrics(ttl, region, total_desired,
-                         total_actual, total_pending, log=None):
+@do
+def add_to_cloud_metrics(ttl, region, total_desired, total_actual,
+                         total_pending, no_tenants, no_groups, log=None):
     """
     Add total number of desired, actual and pending servers of a region
     to Cloud metrics.
-
-    WARNING: Even though this function returns an Effect, it is
-    not pure since it uses the current system time.
 
     :param dict conf: Metrics configuration, will contain tenant ID of tenant
         used to ingest metrics and other conf like ttl
@@ -296,19 +294,23 @@ def add_to_cloud_metrics(ttl, region, total_desired,
         there in the region
     :param int total_pending: Total number of servers currently
         building in a region
+    :param int no_tenants: total number of tenants
+    :param int no_tenants: total number of groups
 
-    :return: `Deferred` with None
+    :return: `Effect` with None
     """
-    metric_part = {'collectionTime': int(time.time() * 1000),
+    epoch = yield Effect(Func(time.time))
+    metric_part = {'collectionTime': int(epoch * 1000),
                    'ttlInSeconds': ttl}
     totals = [('desired', total_desired), ('actual', total_actual),
-              ('pending', total_pending)]
+              ('pending', total_pending), ('tenants', no_tenants),
+              ('groups', no_groups)]
     data = [merge(metric_part,
                   {'metricValue': value,
                    'metricName': '{}.{}'.format(region, metric)})
             for metric, value in totals]
-    return service_request(ServiceType.CLOUD_METRICS_INGEST,
-                           'POST', 'ingest', data=data, log=log)
+    yield service_request(ServiceType.CLOUD_METRICS_INGEST,
+                          'POST', 'ingest', data=data, log=log)
 
 def connect_cass_servers(reactor, config):
     """
