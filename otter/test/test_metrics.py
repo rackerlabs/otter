@@ -31,28 +31,27 @@ from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType
 from otter.log.intents import LogErr
 from otter.metrics import (
-    GroupMetrics,
     GetAllGroups,
+    GroupMetrics,
     MetricsService,
     Options,
     QUERY_GROUPS_OF_TENANTS,
     add_to_cloud_metrics,
     collect_metrics,
-    unchanged_divergent_groups,
     get_all_metrics,
     get_all_metrics_effects,
-    get_scaling_groups,
     get_scaling_group_rows,
+    get_scaling_groups,
     get_specific_scaling_groups,
     get_tenant_metrics,
-    get_todays_tenants,
     get_todays_scaling_groups,
-    makeService
+    get_todays_tenants,
+    makeService,
+    unchanged_divergent_groups
 )
 from otter.test.test_auth import identity_config
 from otter.test.utils import (
     CheckFailureValue,
-    IsCallable,
     Provides,
     const,
     intent_func,
@@ -61,6 +60,7 @@ from otter.test.utils import (
     nested_sequence,
     noop,
     patch,
+    raise_,
     resolve_effect,
 )
 from otter.util.fileio import ReadFileLines, WriteFileLines
@@ -487,7 +487,7 @@ class GetTodaysScalingGroupsTests(SynchronousTestCase):
             lambda g: g["tenantId"],
             ([{"tenantId": "t1", "a": "1"}, {"tenantId": "t1", "a": "2"}] +
              [{"tenantId": "t{}".format(i), "b": str(i)}
-               for i in range(2, 10)]))
+              for i in range(2, 10)]))
 
     def test_success(self):
         """

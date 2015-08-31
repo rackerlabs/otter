@@ -14,7 +14,7 @@ from functools import partial
 
 import attr
 
-from effect import Effect, Func, TypeDispatcher, ComposedDispatcher
+from effect import ComposedDispatcher, Effect, Func, TypeDispatcher
 from effect.do import do, do_return
 
 from silverberg.client import ConsistencyLevel
@@ -22,8 +22,6 @@ from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in, groupby
 from toolz.dicttoolz import keyfilter, merge
-from toolz.functoolz import curry, identity
-from toolz.itertoolz import mapcat
 
 from twisted.application.internet import TimerService
 from twisted.application.service import Service
@@ -42,7 +40,7 @@ from otter.log import log as otter_log
 from otter.log.intents import err
 from otter.util.fileio import (
     ReadFileLines, WriteFileLines, get_dispatcher as file_dispatcher)
-from otter.util.fp import partition_bool, predicate_all
+from otter.util.fp import partition_bool
 from otter.util.timestamp import datetime_to_epoch
 
 
@@ -311,6 +309,7 @@ def add_to_cloud_metrics(ttl, region, total_desired, total_actual,
             for metric, value in totals]
     yield service_request(ServiceType.CLOUD_METRICS_INGEST,
                           'POST', 'ingest', data=data, log=log)
+
 
 def connect_cass_servers(reactor, config):
     """
