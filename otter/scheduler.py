@@ -198,7 +198,7 @@ def execute_event(store, log, event, deleted_policy_ids):
     policy_id = event['policyId']
     log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id,
                    policy_id=policy_id)
-    log.msg('Scheduler executing policy {policy_id}')
+    log.msg('Scheduler executing policy {policy_id}', cloud_feed=True)
     group = store.get_scaling_group(log, tenant_id, group_id)
     d = group.modify_state(
         partial(maybe_execute_scaling_policy,
