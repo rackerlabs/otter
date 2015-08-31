@@ -904,7 +904,8 @@ def const(v):
     Return function that takes an argument but always return given `v`.
     Useful with `SequenceDispatcher`. For example,
 
-    >>> SequenceDispatcher([(Func(datetime.now), const(datetime(1970, 1, 1)))])
+    >>> dt = datetime(1970, 1, 1)
+    >>> SequenceDispatcher([(Func(datetime.now), const(dt))])
     """
 
     return lambda i: v
