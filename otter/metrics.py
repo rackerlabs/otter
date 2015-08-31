@@ -126,7 +126,7 @@ def get_scaling_groups(client):
     """
     Get valid scaling groups grouped on tenantId from Cassandra
 
-    :param :class:`silverber.client.CQLClient` client: A cassandra client
+    :param :class:`silverberg.client.CQLClient` client: A cassandra client
     :return: `Deferred` fired with ``dict`` of the form
         {"tenantId1": [{group_dict_1...}, {group_dict_2..}],
          "tenantId2": [{group_dict_1...}, {group_dict_2..}, ...]}
@@ -144,7 +144,7 @@ def get_scaling_group_rows(client, props=None, batch_size=100):
     dict has 'tenantId', 'groupId', 'desired', 'active', 'pending'
     and any other properties given in `props`
 
-    :param :class:`silverber.client.CQLClient` client: A cassandra client
+    :param :class:`silverberg.client.CQLClient` client: A cassandra client
     :param ``list`` props: List of extra properties to extract
     :param int batch_size: Number of groups to fetch at a time
     :return: `Deferred` fired with ``list`` of ``dict``
