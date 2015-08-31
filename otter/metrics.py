@@ -71,7 +71,7 @@ def get_last_info(fname):
                        datetime.utcfromtimestamp(float(lines[1]))))
 
     def log_and_return(e):
-        _eff = err(e, "error reading last tenant")
+        _eff = err(e, "error reading previous number of tenants")
         return _eff.on(lambda _: (None, None))
 
     return eff.on(error=log_and_return)
@@ -81,7 +81,7 @@ def update_last_info(fname, tenants_len, time):
     eff = Effect(
         WriteFileLines(
             fname, [tenants_len, datetime_to_epoch(time)]))
-    return eff.on(error=lambda e: err(e, "error updating last tenant"))
+    return eff.on(error=lambda e: err(e, "error updating number of tenants"))
 
 
 @attr.s

@@ -514,7 +514,8 @@ class GetTodaysScalingGroupsTests(SynchronousTestCase):
         seq = [
             (GetAllGroups(), const(self.groups)),
             (ReadFileLines("file"), lambda i: raise_(IOError("e"))),
-            (LogErr(mock.ANY, "error reading last tenant", {}), noop),
+            (LogErr(mock.ANY, "error reading previous number of tenants", {}),
+             noop),
             (Func(datetime.utcnow), const(datetime(1970, 1, 2))),
             (WriteFileLines("file", [5, 86400.0]), noop)
         ]
@@ -534,7 +535,7 @@ class GetTodaysScalingGroupsTests(SynchronousTestCase):
             (Func(datetime.utcnow), const(datetime(1970, 1, 2))),
             (WriteFileLines("file", [7, 86400.0]),
              lambda i: raise_(IOError("bad"))),
-            (LogErr(mock.ANY, "error updating last tenant", {}), noop)
+            (LogErr(mock.ANY, "error updating number of tenants", {}), noop)
         ]
         r = perform_sequence(seq, get_todays_scaling_groups(["t1"], "file"))
         self.assertEqual(
