@@ -515,13 +515,14 @@ class ExecuteEventTests(SchedulerTests):
         self.log_args = {
             'tenant_id': '1234',
             'scaling_group_id': 'scal44',
-            'policy_id': 'pol44'
+            'policy_id': 'pol44',
+            "scheduled_time": "1970-01-01T00:00:00Z"
         }
         self.event = {
             'tenantId': '1234',
             'groupId': 'scal44',
             'policyId': 'pol44',
-            'trigger': 'now',
+            'trigger': datetime(1970, 1, 1),
             'cron': '*',
             'bucket': 1,
             'version': 'v2'
@@ -537,8 +538,7 @@ class ExecuteEventTests(SchedulerTests):
         self.assertIsNone(self.successResultOf(d))
         self.log.bind.assert_called_with(**self.log_args)
         log = self.log.bind.return_value
-        log.msg.assert_called_once_with(
-            'Scheduler executing policy {policy_id}')
+        log.msg.assert_called_once_with("sch-exec-pol", cloud_feed=True)
         self.maybe_exec_policy.assert_called_once_with(
             log, 'transaction-id', self.mock_group, self.mock_state,
             policy_id=self.event['policyId'], version=self.event['version'])
@@ -591,8 +591,8 @@ class ExecuteEventTests(SchedulerTests):
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(len(del_pol_ids), 0)
         self.log.bind.return_value.msg.assert_called_with(
-            'Scheduler cannot execute policy {policy_id}',
-            reason=CheckFailure(CannotExecutePolicyError))
+            "sch-cannot-exec", reason=CheckFailure(CannotExecutePolicyError),
+            cloud_feed=True)
 
     def test_unknown_error(self):
         """
@@ -607,5 +607,4 @@ class ExecuteEventTests(SchedulerTests):
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(len(del_pol_ids), 0)
         self.log.bind.return_value.err.assert_called_with(
-            CheckFailure(ValueError),
-            'Scheduler failed to execute policy {policy_id}')
+            CheckFailure(ValueError), "sch-exec-pol-err", cloud_feed=True)

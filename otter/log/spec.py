@@ -166,7 +166,14 @@ msg_types = {
     "group-status-active": "Group's status is changed to ACTIVE",
     "group-status-error": split_cf_messages(
         "Group's status is changed to ERROR. Reasons: {reasons}", "reasons",
-        separator='; ')
+        separator='; '),
+    "sch-cannot-exec": (
+        "Cannot execute scheduled policy {policy_id} because there is no "
+        "change in desired number of servers. Either group min or max "
+        "capacity has been reached or policy execution will result in current "
+        "desired number of servers"),
+    "sch-exec-policy": "Executing scheduled policy {policy_id}",
+    "sch-exec-pol-err": "Error executing scheduled policy {policy_id}"
 }
 
 
