@@ -172,7 +172,7 @@ msg_types = {
         "change in desired number of servers. Either group min or max "
         "capacity has been reached or policy execution will result in current "
         "desired number of servers"),
-    "sch-exec-policy": "Executing scheduled policy {policy_id}",
+    "sch-exec-pol": "Executing scheduled policy {policy_id}",
     "sch-exec-pol-err": "Error executing scheduled policy {policy_id}"
 }
 
