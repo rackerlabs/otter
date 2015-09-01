@@ -27,7 +27,9 @@ from otter.test.utils import (
     CheckFailure,
     DeferredFunctionMixin,
     FakePartitioner,
+    IsBoundWith,
     iMock,
+    matches,
     mock_log,
     patch
 )
@@ -72,7 +74,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
             return self.fake_partitioner
 
         self.scheduler_service = SchedulerService(
-            100, self.mock_store, pfactory, threshold=600)
+            "disp", 100, self.mock_store, pfactory, threshold=600)
         otter_log.bind.assert_called_once_with(system='otter.scheduler')
         self.scheduler_service.running = True
         self.assertIdentical(self.fake_partitioner,
@@ -193,8 +195,10 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
             scheduler_run_id='transaction-id', utcnow='utcnow')
         log = self.scheduler_service.log.bind.return_value
         self.assertEqual(self.check_events_in_bucket.mock_calls,
-                         [mock.call(log, self.mock_store, 2, 'utcnow', 100),
-                          mock.call(log, self.mock_store, 3, 'utcnow', 100)])
+                         [mock.call(log, "disp", self.mock_store, 2,
+                                    'utcnow', 100),
+                          mock.call(log, "disp", self.mock_store, 3,
+                                    'utcnow', 100)])
 
 
 class CheckEventsInBucketTests(SchedulerTests):
@@ -219,14 +223,15 @@ class CheckEventsInBucketTests(SchedulerTests):
         self.mock_store.fetch_and_delete.side_effect = _responses
         self.process_events = patch(
             self, 'otter.scheduler.process_events',
-            side_effect=lambda events, store, log: defer.succeed(len(events)))
+            side_effect=lambda e, d, s, l: defer.succeed(len(e)))
         self.log = mock.Mock()
 
     def test_fetch_called(self):
         """
         `fetch_and_delete` called correctly
         """
-        d = check_events_in_bucket(self.log, self.mock_store, 1, 'utcnow', 100)
+        d = check_events_in_bucket(self.log, "disp", self.mock_store, 1,
+                                   'utcnow', 100)
         self.successResultOf(d)
         self.mock_store.fetch_and_delete.assert_called_once_with(
             1, 'utcnow', 100)
@@ -234,10 +239,11 @@ class CheckEventsInBucketTests(SchedulerTests):
 
     def test_no_events(self):
         """When no events are fetched, they are not processed."""
-        d = check_events_in_bucket(self.log, self.mock_store, 1, 'utcnow', 100)
+        d = check_events_in_bucket(self.log, "disp", self.mock_store, 1,
+                                   'utcnow', 100)
         self.successResultOf(d)
         self.process_events.assert_called_once_with(
-            [], self.mock_store, self.log.bind())
+            [], "disp", self.mock_store, self.log.bind())
 
     def test_events_in_limit(self):
         """
@@ -252,14 +258,15 @@ class CheckEventsInBucketTests(SchedulerTests):
                   for i in range(10)]
         self.returns = [events]
 
-        d = check_events_in_bucket(self.log, self.mock_store, 1, 'utcnow', 100)
+        d = check_events_in_bucket(self.log, "disp", self.mock_store, 1,
+                                   'utcnow', 100)
 
         self.successResultOf(d)
         # Ensure fetch_and_delete and process_events is called only once
         self.mock_store.fetch_and_delete.assert_called_once_with(
             1, 'utcnow', 100)
         self.process_events.assert_called_once_with(
-            events, self.mock_store, self.log.bind())
+            events, "disp", self.mock_store, self.log.bind())
 
     def test_events_process_error(self):
         """
@@ -267,7 +274,8 @@ class CheckEventsInBucketTests(SchedulerTests):
         """
         self.returns = [ValueError('e')]
 
-        d = check_events_in_bucket(self.log, self.mock_store, 1, 'now', 100)
+        d = check_events_in_bucket(self.log, "disp", self.mock_store, 1,
+                                   'utcnow', 100)
 
         self.successResultOf(d)
         self.log.bind.return_value.err.assert_called_once_with(
@@ -292,16 +300,19 @@ class CheckEventsInBucketTests(SchedulerTests):
                    for i in range(10)]
         self.returns = [events1, events2]
 
-        d = check_events_in_bucket(self.log, self.mock_store, 1, 'now', 100)
+        d = check_events_in_bucket(self.log, "disp", self.mock_store, 1,
+                                   'now', 100)
 
         self.successResultOf(d)
         self.assertEqual(self.mock_store.fetch_and_delete.mock_calls,
                          [mock.call(1, 'now', 100)] * 2)
         self.assertEqual(self.process_events.mock_calls,
                          [mock.call(events1,
+                                    "disp",
                                     self.mock_store,
                                     self.log.bind()),
                           mock.call(events2,
+                                    "disp",
                                     self.mock_store,
                                     self.log.bind())])
 
@@ -319,14 +330,16 @@ class CheckEventsInBucketTests(SchedulerTests):
                   for i in range(100)]
         self.returns = [events, ValueError('some')]
 
-        d = check_events_in_bucket(self.log, self.mock_store, 1, 'now', 100)
+        d = check_events_in_bucket(self.log, "disp", self.mock_store, 1,
+                                   'now', 100)
 
         self.successResultOf(d)
         self.log.bind.return_value.err.assert_called_once_with(
             CheckFailure(ValueError))
         self.assertEqual(self.mock_store.fetch_and_delete.mock_calls,
                          [mock.call(1, 'now', 100)] * 2)
-        self.process_events.assert_called_once_with(events, self.mock_store,
+        self.process_events.assert_called_once_with(events, "disp",
+                                                    self.mock_store,
                                                     self.log.bind())
 
     def test_events_batch_process(self):
@@ -354,13 +367,15 @@ class CheckEventsInBucketTests(SchedulerTests):
                     'bucket': 1} for i in range(10)]
         self.returns = [events1, events2, events3]
 
-        d = check_events_in_bucket(self.log, self.mock_store, 1, 'now', 100)
+        d = check_events_in_bucket(self.log, "disp", self.mock_store, 1,
+                                   'now', 100)
 
         self.successResultOf(d)
         self.assertEqual(self.mock_store.fetch_and_delete.mock_calls,
                          [mock.call(1, 'now', 100)] * 3)
         self.assertEqual(self.process_events.mock_calls,
-                         [mock.call(events, self.mock_store, self.log.bind())
+                         [mock.call(events, "disp", self.mock_store,
+                                    self.log.bind())
                           for events in [events1, events2, events3]])
 
 
@@ -389,7 +404,8 @@ class ProcessEventsTests(SchedulerTests):
         """
         Does nothing on no events.
         """
-        process_events([], self.mock_store, self.log)
+        r = process_events([], "disp", self.mock_store, self.log)
+        self.assertEqual(r, 0)
         self.assertFalse(self.log.msg.called)
         self.assertFalse(self.execute_event.called)
         self.assertFalse(self.add_cron_events.called)
@@ -400,13 +416,13 @@ class ProcessEventsTests(SchedulerTests):
         each event and calls `add_cron_events.`
         """
         events = range(10)
-        d = process_events(events, self.mock_store, self.log)
+        d = process_events(events, "disp", self.mock_store, self.log)
         self.assertEqual(self.successResultOf(d), 10)
         self.log.msg.assert_called_once_with(
             'Processing {num_events} events', num_events=10)
         self.assertEqual(
             self.execute_event.mock_calls,
-            [mock.call(self.mock_store, self.log, event, set())
+            [mock.call("disp", self.mock_store, self.log, event, set())
              for event in events])
         self.add_cron_events.assert_called_once_with(
             self.mock_store, self.log, events, set())
@@ -495,23 +511,25 @@ class ExecuteEventTests(SchedulerTests):
         self.mock_group = iMock(IScalingGroup)
         self.mock_store.get_scaling_group.return_value = self.mock_group
 
-        # mock out modify state
-        self.mock_state = mock.MagicMock(spec=[])  # so nothing can call it
+        # mock out modify_and_trigger
+        self.mock_mt = patch(self, "otter.scheduler.modify_and_trigger")
         self.new_state = None
 
         def _set_new_state(new_state):
             self.new_state = new_state
 
-        def _mock_modify_state(modifier, modify_state_reason=None,
-                               *args, **kwargs):
-            d = modifier(self.mock_group, self.mock_state, *args, **kwargs)
+        def _mock_modify_trigger(disp, group, logargs, modifier,
+                                 modify_state_reason=None, *args, **kwargs):
+            self.assertEqual(disp, "disp")
+            d = modifier(group, "state", *args, **kwargs)
             return d.addCallback(_set_new_state)
 
-        self.mock_group.modify_state.side_effect = _mock_modify_state
+        self.mock_mt.side_effect = _mock_modify_trigger
+
         self.maybe_exec_policy = patch(
             self, 'otter.scheduler.maybe_execute_scaling_policy',
             return_value=defer.succeed('newstate'))
-        self.log = mock.Mock()
+        self.log = mock_log()
         self.log_args = {
             'tenant_id': '1234',
             'scaling_group_id': 'scal44',
@@ -533,16 +551,17 @@ class ExecuteEventTests(SchedulerTests):
         Event is executed successfully and appropriate logs logged.
         """
         del_pol_ids = set()
-        d = execute_event(self.mock_store, self.log, self.event, del_pol_ids)
+        d = execute_event("disp", self.mock_store, self.log, self.event,
+                          del_pol_ids)
 
         self.assertIsNone(self.successResultOf(d))
-        self.log.bind.assert_called_with(**self.log_args)
-        log = self.log.bind.return_value
-        log.msg.assert_called_once_with("sch-exec-pol", cloud_feed=True)
+        self.log.msg.assert_called_once_with(
+            "sch-exec-pol", cloud_feed=True, **self.log_args)
         self.maybe_exec_policy.assert_called_once_with(
-            log, 'transaction-id', self.mock_group, self.mock_state,
+            matches(IsBoundWith(**self.log_args)), 'transaction-id',
+            self.mock_group, "state",
             policy_id=self.event['policyId'], version=self.event['version'])
-        self.assertTrue(self.mock_group.modify_state.called)
+        self.assertTrue(self.mock_mt.called)
         self.assertEqual(self.new_state, 'newstate')
         self.assertEqual(len(del_pol_ids), 0)
 
@@ -552,10 +571,11 @@ class ExecuteEventTests(SchedulerTests):
         Its policyId is logged, and no attempt is made to execute it.
         """
         del_pol_ids = set()
-        self.mock_group.modify_state.side_effect = \
+        self.mock_mt.side_effect = \
             lambda *_, **__: defer.fail(NoSuchScalingGroupError(1, 2))
 
-        d = execute_event(self.mock_store, self.log, self.event, del_pol_ids)
+        d = execute_event("disp", self.mock_store, self.log, self.event,
+                          del_pol_ids)
 
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(del_pol_ids, set(['pol44']))
@@ -568,10 +588,11 @@ class ExecuteEventTests(SchedulerTests):
         made to execute it.
         """
         del_pol_ids = set()
-        self.mock_group.modify_state.side_effect = (
+        self.mock_mt.side_effect = (
             lambda *_, **__: defer.fail(NoSuchPolicyError(1, 2, 3)))
 
-        d = execute_event(self.mock_store, self.log, self.event, del_pol_ids)
+        d = execute_event("disp", self.mock_store, self.log, self.event,
+                          del_pol_ids)
 
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(del_pol_ids, set(['pol44']))
@@ -586,25 +607,27 @@ class ExecuteEventTests(SchedulerTests):
         self.maybe_exec_policy.return_value = defer.fail(
             CannotExecutePolicyError(*range(4)))
 
-        d = execute_event(self.mock_store, self.log, self.event, del_pol_ids)
+        d = execute_event("disp", self.mock_store, self.log, self.event,
+                          del_pol_ids)
 
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(len(del_pol_ids), 0)
-        self.log.bind.return_value.msg.assert_called_with(
+        self.log.msg.assert_called_with(
             "sch-cannot-exec", reason=CheckFailure(CannotExecutePolicyError),
-            cloud_feed=True)
+            cloud_feed=True, **self.log_args)
 
     def test_unknown_error(self):
         """
         Unknown error occurs. It is logged and not propagated.
         """
         del_pol_ids = set()
-        self.log.bind.return_value.err.return_value = None
         self.maybe_exec_policy.return_value = defer.fail(ValueError(4))
 
-        d = execute_event(self.mock_store, self.log, self.event, del_pol_ids)
+        d = execute_event("disp", self.mock_store, self.log, self.event,
+                          del_pol_ids)
 
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(len(del_pol_ids), 0)
-        self.log.bind.return_value.err.assert_called_with(
-            CheckFailure(ValueError), "sch-exec-pol-err", cloud_feed=True)
+        self.log.err.assert_called_with(
+            CheckFailure(ValueError), "sch-exec-pol-err", cloud_feed=True,
+            **self.log_args)

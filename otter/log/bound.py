@@ -29,3 +29,23 @@ class BoundLog(object):
         err = functools.partial(self.err, **kwargs)
 
         return self.__class__(msg, err)
+
+
+def bound_log_kwargs(log):
+    """
+    Return keyword arguments bound to given logger
+    """
+    f = log.msg
+    kwargs_list = []
+    while True:
+        try:
+            kwargs_list.append(f.keywords)
+        except AttributeError:
+            break
+        else:
+            f = f.func
+    # combine them in order they were bound
+    kwargs = {}
+    for kwa in reversed(kwargs_list):
+        kwargs.update(kwa)
+    return kwargs

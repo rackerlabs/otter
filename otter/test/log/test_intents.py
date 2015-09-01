@@ -105,6 +105,16 @@ class LogDispatcherTests(SynchronousTestCase):
             CheckFailureValue(RuntimeError('original')),
             'why', f1='v')
 
+    def test_err_from_tuple(self):
+        """
+        exc_info tuple can be passed as failure when constructing LogErr
+        in which case failure will be constructed from the tuple
+        """
+        eff = err((ValueError, ValueError("a"), None), "why")
+        sync_perform(self.disp, eff)
+        self.log.err.assert_called_once_with(
+            CheckFailureValue(ValueError('a')), 'why', f1='v')
+
     def test_err_with_params(self):
         """
         error is logged with its fields combined

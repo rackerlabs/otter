@@ -67,7 +67,8 @@ class Otter(object):
         """
         execute route handled by OtterExecute
         """
-        return OtterExecute(self.store, cap_version, cap_hash).app.resource()
+        return OtterExecute(self.store, cap_version, cap_hash,
+                            self.dispatcher).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/limits')
     def limits(self, request, tenant_id):

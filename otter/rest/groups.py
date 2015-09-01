@@ -13,7 +13,6 @@ from txeffect import perform
 from otter import controller
 from otter.controller import GroupPausedError
 from otter.convergence.composition import tenant_is_enabled
-from otter.convergence.service import trigger_convergence
 from otter.effect_dispatcher import get_working_cql_dispatcher
 from otter.json_schema.group_schemas import (
     MAX_ENTITIES,
@@ -21,7 +20,7 @@ from otter.json_schema.group_schemas import (
 )
 from otter.json_schema.rest_schemas import create_group_request
 from otter.log import log
-from otter.log.intents import with_log
+from otter.log.bound import bound_log_kwargs
 from otter.models.cass import CassScalingGroupServersCache
 from otter.models.interface import ScalingGroupStatus
 from otter.rest.bobby import get_bobby
@@ -412,9 +411,14 @@ class OtterGroups(object):
             launch = result['launchConfiguration']
             group = self.store.get_scaling_group(
                 self.log, self.tenant_id, group_id)
-            d = group.modify_state(partial(
-                controller.obey_config_change, self.log,
-                transaction_id(request), config, launch_config=launch),
+            log = self.log.bind(scaling_group_id=group_id)
+            d = controller.modify_and_trigger(
+                self.dispatcher,
+                group,
+                bound_log_kwargs(log),
+                partial(
+                    controller.obey_config_change, log,
+                    transaction_id(request), config, launch_config=launch),
                 modify_state_reason='create_new_scaling_group')
             return d.addCallback(lambda _: result)
 
@@ -673,13 +677,11 @@ class OtterGroup(object):
         if tenant_is_enabled(self.tenant_id, config_value):
             group = self.store.get_scaling_group(
                 self.log, self.tenant_id, self.group_id)
-            d = group.modify_state(is_group_paused)
-            eff = with_log(trigger_convergence(self.tenant_id, self.group_id),
-                           tenant_id=self.tenant_id,
-                           scaling_group_id=self.group_id,
-                           transaction_id=transaction_id(request))
-            return d.addCallback(lambda _: perform(self.dispatcher, eff))
-
+            return controller.modify_and_trigger(
+                self.dispatcher,
+                group,
+                bound_log_kwargs(log),
+                is_group_paused)
         else:
             request.setResponseCode(404)
 
@@ -727,7 +729,8 @@ class OtterGroup(object):
         """
         config route handled by OtterConfig
         """
-        config = OtterConfig(self.store, self.tenant_id, self.group_id)
+        config = OtterConfig(self.store, self.tenant_id, self.group_id,
+                             self.dispatcher)
         return config.app.resource()
 
     @app.route('/launch/')
@@ -743,7 +746,8 @@ class OtterGroup(object):
         """
         policies routes handled by OtterPolicies
         """
-        policies = OtterPolicies(self.store, self.tenant_id, self.group_id)
+        policies = OtterPolicies(self.store, self.tenant_id, self.group_id,
+                                 self.dispatcher)
         return policies.app.resource()
 
 
@@ -793,10 +797,14 @@ class OtterServers(object):
         """
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.scaling_group_id)
-        d = group.modify_state(
+        log = self.log.bind(server_id=server_id)
+        d = controller.modify_and_trigger(
+            self.dispatcher,
+            group,
+            bound_log_kwargs(log),
             partial(controller.remove_server_from_group,
                     self.dispatcher,
-                    self.log.bind(server_id=server_id),
+                    log,
                     transaction_id(request), server_id,
                     extract_bool_arg(request, 'replace', True),
                     extract_bool_arg(request, 'purge', True)),

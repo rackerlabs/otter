@@ -1469,8 +1469,8 @@ class ConvergeTestCase(SynchronousTestCase):
 
     def test_real_convergence_nonzero_delta(self):
         """
-        When a tenant is configured for convergence, convergence is triggered
-        and state is returned after convergence triggering is successful
+        When a tenant is configured for convergence, the state.desired is
+        updated with new desired and state is returned
         """
         log = mock_log()
         state = GroupState('tenant', 'group', "test", [], [], None, {},
@@ -1479,23 +1479,19 @@ class ConvergeTestCase(SynchronousTestCase):
         policy = {'change': 5}
         config_data = {'convergence-tenants': ['tenant']}
 
-        start_convergence = self.cvg_starter_mock.start_convergence
-        start_convergence.return_value = defer.succeed("ignored")
-
         result = controller.converge(log, 'txn-id', group_config, self.group,
                                      state, 'launch', policy,
                                      config_value=config_data.get)
         self.assertEqual(self.successResultOf(result), state)
-        start_convergence.assert_called_once_with(log, 'tenant', 'group')
+        self.assertEqual(state.desired, 5)
 
         # And execute_launch_config is _not_ called
         self.assertFalse(self.mocks['execute_launch_config'].called)
 
     def test_real_convergence_zero_delta(self):
         """
-        When a tenant is configured for convergence, if the delta is zero, the
-        ConvergenceStarter service's ``start_convergence`` method is still
-        invoked. However, None is returned synchronously
+        When a tenant is configured for convergence, if the delta is zero,
+        state.desired is not udpated and None is returned synchronously
         """
         log = mock_log()
         state = GroupState('tenant', 'group-id', "test", [], [], None, {},
@@ -1504,17 +1500,86 @@ class ConvergeTestCase(SynchronousTestCase):
         policy = {'change': 0}
         config_data = {'convergence-tenants': ['tenant']}
 
-        start_convergence = self.cvg_starter_mock.start_convergence
-        start_convergence.return_value = defer.succeed("ignored")
-
         result = controller.converge(log, 'txn-id', group_config, self.group,
                                      state, 'launch', policy,
                                      config_value=config_data.get)
         self.assertIsNone(result)
-        start_convergence.assert_called_once_with(log, 'tenant', 'group')
+        self.assertEqual(state.desired, 0)
 
         # And execute_launch_config is _not_ called
         self.assertFalse(self.mocks['execute_launch_config'].called)
+
+
+class ModifyAndTriggerTests(SynchronousTestCase):
+    """
+    Tests for :func:`modify_and_trigger`
+    """
+
+    def setUp(self):
+        self.group = util_mock_group("state", "t", "g")
+        set_config_data({"convergence-tenants": ["t"]})
+        self.addCleanup(set_config_data, None)
+        self.mock_tg = patch(self, "otter.controller.trigger_convergence",
+                             side_effect=intent_func("tg"))
+        self.logargs = {"a": "b"}
+        self.disp = SequenceDispatcher([
+            (BoundFields(mock.ANY, self.logargs),
+             nested_sequence([(("tg", "t", "g"), noop)]))
+        ])
+
+    def modify(self, group, state):
+        return "newstate"
+
+    def test_convergence_tenant(self):
+        """
+        Calls group.modify_state() and triggers convergence after that
+        for convergence enabled tenants
+        """
+        self.group.pause_modify_state = True
+        d = controller.modify_and_trigger(
+            self.disp, self.group, self.logargs, self.modify)
+        # modify state is called
+        self.assertNoResult(d)
+        self.assertEqual(self.group.modify_state_values[-1], "newstate")
+        # but convergence is not yet triggered
+        self.assertFalse(self.disp.consumed())
+        # It is triggered after modify_state completes
+        self.group.modify_state_pause_d.callback(None)
+        self.assertIsNone(self.successResultOf(d))
+        self.assertTrue(self.disp.consumed())
+
+    def test_worker_tenant(self):
+        """
+        Only calls group.modify_state() for worker tenants. Does not trigger
+        convergence
+        """
+        set_config_data(None)
+        d = controller.modify_and_trigger(
+            self.disp, self.group, self.logargs, self.modify)
+        self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.group.modify_state_values[-1], "newstate")
+        self.assertFalse(self.disp.consumed())
+
+    def test_error(self):
+        """
+        Does not trigger convergence if group.modify_state() errors
+        """
+        d = controller.modify_and_trigger(
+            self.disp, self.group, {}, lambda *a: raise_(ValueError("a")))
+        self.failureResultOf(d, ValueError)
+        self.assertEqual(self.group.modify_state_values, [])
+        self.assertFalse(self.disp.consumed())
+
+    def test_error_skips_cannotexecutepolicy(self):
+        """
+        triggers convergence if group.modify_state() errors with
+        CannotExecutePolicyError
+        """
+        ce = controller.CannotExecutePolicyError("t", "g", "p", "w")
+        d = controller.modify_and_trigger(
+            self.disp, self.group, self.logargs, lambda *a: raise_(ce))
+        self.failureResultOf(d, controller.CannotExecutePolicyError)
+        self.assertTrue(self.disp.consumed())
 
 
 _should_retry_params = ShouldDelayAndRetry(
