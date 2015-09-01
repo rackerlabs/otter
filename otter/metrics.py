@@ -291,7 +291,7 @@ def add_to_cloud_metrics(ttl, region, total_desired, total_actual,
     :param int total_pending: Total number of servers currently
         building in a region
     :param int no_tenants: total number of tenants
-    :param int no_tenants: total number of groups
+    :param int no_groups: total number of groups
 
     :return: `Effect` with None
     """
