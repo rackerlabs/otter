@@ -37,7 +37,7 @@ import re
 
 from argparse import ArgumentParser
 from os.path import abspath, expanduser
-from sys import argv
+from sys import argv, stdout
 
 from twisted.python.filepath import FilePath
 
@@ -80,8 +80,9 @@ def process_file(filename, filter_callable, previous_line=None):
                     return line
 
         if event is not None and filter_callable(event):
-            print "\n"
-            print json.dumps(event, indent=2)
+            stdout.write('\n')
+            json.dump(event, stdout, indent=2)
+            stdout.write('\n')
 
 
 def run(args):
