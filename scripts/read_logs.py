@@ -1,5 +1,6 @@
 r"""
-Look through a directory full of otter logs for specified log events.  This
+Look through a directory full of otter logs (looks at files whose names start
+with "@4" and a file named "current") for specified log events.  This
 expects that all the logs use the non-debug otter logging format (one line per
 JSON event).
 
