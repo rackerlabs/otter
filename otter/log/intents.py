@@ -14,6 +14,8 @@ from toolz.dicttoolz import merge
 
 from twisted.python.failure import Failure
 
+from txeffect import exc_info_to_failure
+
 from otter.log import log as default_log
 
 
@@ -42,6 +44,8 @@ class LogErr(object):
         # Failure here.
         if failure is None:
             failure = Failure()
+        if type(failure) is tuple:
+            failure = exc_info_to_failure(failure)
         self.failure = failure
         self.msg = msg
         self.fields = fields

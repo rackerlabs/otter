@@ -9,17 +9,19 @@ import operator
 import sys
 import time
 from collections import namedtuple
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import partial
 
-from effect import Effect
+import attr
+
+from effect import ComposedDispatcher, Effect, Func, TypeDispatcher
+from effect.do import do, do_return
 
 from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in, groupby
-from toolz.dicttoolz import merge
-from toolz.functoolz import identity
+from toolz.dicttoolz import keyfilter, merge
 
 from twisted.application.internet import TimerService
 from twisted.application.service import Service
@@ -27,70 +29,122 @@ from twisted.internet import defer, task
 from twisted.internet.endpoints import clientFromString
 from twisted.python import usage
 
-from txeffect import exc_info_to_failure, perform
+from txeffect import deferred_performer, exc_info_to_failure, perform
 
 from otter.auth import generate_authenticator
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType, get_service_configs
 from otter.convergence.gathering import get_all_scaling_group_servers
-from otter.effect_dispatcher import get_legacy_dispatcher
+from otter.effect_dispatcher import get_legacy_dispatcher, get_log_dispatcher
 from otter.log import log as otter_log
-from otter.util.fp import partition_bool, predicate_all
+from otter.log.intents import err
+from otter.util.fileio import (
+    ReadFileLines, WriteFileLines, get_dispatcher as file_dispatcher)
+from otter.util.fp import partition_bool
+from otter.util.timestamp import datetime_to_epoch
 
 
-QUERY_GROUPS_OF_TENANTS = (
-    'SELECT '
-    '"tenantId", "groupId", desired, active, pending, created_at, status, '
-    'deleting FROM scaling_group WHERE "tenantId" IN ({tids})')
+def get_last_info(fname):
+    eff = Effect(ReadFileLines(fname)).on(
+        lambda lines: (int(lines[0]),
+                       datetime.utcfromtimestamp(float(lines[1]))))
+
+    def log_and_return(e):
+        _eff = err(e, "error reading previous number of tenants")
+        return _eff.on(lambda _: (None, None))
+
+    return eff.on(error=log_and_return)
 
 
-@defer.inlineCallbacks
-def get_specific_scaling_groups(client, tenant_ids):
-    tids = ', '.join("'{}'".format(tid) for tid in tenant_ids)
-    query = QUERY_GROUPS_OF_TENANTS.format(tids=tids)
-    results = yield client.execute(query, {}, ConsistencyLevel.ONE)
-    defer.returnValue(r for r in results
-                      if r.get('created_at') is not None and
-                      r.get('desired') is not None and
-                      r.get('status') not in ('DISABLED', 'ERROR') and
-                      not r.get('deleting', False))
+def update_last_info(fname, tenants_len, time):
+    eff = Effect(
+        WriteFileLines(
+            fname, [tenants_len, datetime_to_epoch(time)]))
+    return eff.on(error=lambda e: err(e, "error updating number of tenants"))
 
 
-@defer.inlineCallbacks
-def get_scaling_groups(client, props=None, batch_size=100, group_pred=None,
-                       with_null_desired=False):
+@attr.s
+class GetAllGroups(object):
+    pass
+
+
+def get_todays_tenants(tenants, today, last_tenants_len, last_date):
     """
-    Return scaling groups from Cassandra as a list of ``dict`` where each
+    Get tenants that are enabled till today
+    """
+    batch_size = 5
+    tenants = sorted(tenants)
+    if last_tenants_len is None:
+        return tenants[:batch_size], batch_size, today
+    days = (today - last_date).days
+    if days <= 0:
+        return tenants[:last_tenants_len], last_tenants_len, today
+    tenants = tenants[:last_tenants_len + batch_size]
+    return tenants, len(tenants), today
+
+
+@do
+def get_todays_scaling_groups(convergence_tids, fname):
+    """
+    Get scaling groups that from tenants that are enabled till today
+    """
+    groups = yield Effect(GetAllGroups())
+    non_conv_tenants = set(groups.keys()) - set(convergence_tids)
+    last_tenants_len, last_date = yield get_last_info(fname)
+    now = yield Effect(Func(datetime.utcnow))
+    tenants, last_tenants_len, last_date = get_todays_tenants(
+        non_conv_tenants, now, last_tenants_len, last_date)
+    yield update_last_info(fname, last_tenants_len, last_date)
+    yield do_return(
+        keyfilter(lambda t: t in set(tenants + convergence_tids), groups))
+
+
+def valid_group_row(row):
+    """
+    Return True if given scaling group row is valid scaling group
+    """
+    return (
+        row.get('created_at') is not None and
+        row.get('desired') is not None and
+        row.get('status') not in ('DISABLED', 'ERROR') and
+        not row.get('deleting', False))
+
+
+def get_scaling_groups(client):
+    """
+    Get valid scaling groups grouped on tenantId from Cassandra
+
+    :param :class:`silverberg.client.CQLClient` client: A cassandra client
+    :return: `Deferred` fired with ``dict`` of the form
+        {"tenantId1": [{group_dict_1...}, {group_dict_2..}],
+         "tenantId2": [{group_dict_1...}, {group_dict_2..}, ...]}
+    """
+    d = get_scaling_group_rows(
+        client, props=["status", "deleting", "created_at"])
+    d.addCallback(filter(valid_group_row))
+    return d.addCallback(groupby(lambda g: g["tenantId"]))
+
+
+@defer.inlineCallbacks
+def get_scaling_group_rows(client, props=None, batch_size=100):
+    """
+    Return scaling group rows from Cassandra as a list of ``dict`` where each
     dict has 'tenantId', 'groupId', 'desired', 'active', 'pending'
     and any other properties given in `props`
 
-    :param :class:`silverber.client.CQLClient` client: A cassandra client
+    :param :class:`silverberg.client.CQLClient` client: A cassandra client
     :param ``list`` props: List of extra properties to extract
     :param int batch_size: Number of groups to fetch at a time
-    :param callable group_pred: A dict -> bool function used to filter groups
-        returned
-    :param bool with_null_desired: Include groups that has no desired?
-    :return: `Deferred` with ``list`` of ``dict``
+    :return: `Deferred` fired with ``list`` of ``dict``
     """
     # TODO: Currently returning all groups as one giant list for now.
     # Will try to use Twisted tubes to do streaming later
     _props = set(['"tenantId"', '"groupId"', 'desired',
-                  'active', 'pending', 'created_at']) | set(props or [])
+                  'active', 'pending']) | set(props or [])
     query = ('SELECT ' + ','.join(sorted(list(_props))) +
              ' FROM scaling_group {where} LIMIT :limit;')
     where_key = 'WHERE "tenantId"=:tenantId AND "groupId">:groupId'
     where_token = 'WHERE token("tenantId") > token(:tenantId)'
-
-    # setup group filtering function
-    def has_created_at(g): return g['created_at'] is not None
-    group_pred = group_pred or identity
-    if with_null_desired:
-        group_filter = filter(predicate_all(has_created_at, group_pred))
-    else:
-        def has_desired(g): return g['desired'] is not None
-        group_filter = filter(predicate_all(has_desired,
-                                            has_created_at,
-                                            group_pred))
 
     # We first start by getting all groups limited on batch size
     # It will return groups sorted first based on hash of tenant id
@@ -99,7 +153,7 @@ def get_scaling_groups(client, props=None, batch_size=100, group_pred=None,
     batch = yield client.execute(query.format(where=''),
                                  {'limit': batch_size}, ConsistencyLevel.ONE)
     if len(batch) < batch_size:
-        defer.returnValue(group_filter(batch))
+        defer.returnValue(batch)
 
     # We got batch size response. That means there are probably more groups
     groups = batch
@@ -122,7 +176,7 @@ def get_scaling_groups(client, props=None, batch_size=100, group_pred=None,
                                       'tenantId': tenant_id},
                                      ConsistencyLevel.ONE)
         groups.extend(batch)
-    defer.returnValue(group_filter(groups))
+    defer.returnValue(groups)
 
 
 GroupMetrics = namedtuple('GroupMetrics',
@@ -156,18 +210,17 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
     return metrics
 
 
-def get_all_metrics_effects(cass_groups, log, _print=False):
+def get_all_metrics_effects(tenanted_groups, log, _print=False):
     """
     Gather server data for and produce metrics for all groups
     across all tenants in a region
 
-    :param iterable cass_groups: Groups as retrieved from cassandra
+    :param dict tenanted_groups: Scaling groups grouped with tenantId
     :param bool _print: Should the function print while processing?
 
     :return: ``list`` of :obj:`Effect` of (``list`` of :obj:`GroupMetrics`)
              or None
     """
-    tenanted_groups = groupby(lambda g: g['tenantId'], cass_groups)
     effs = []
     for tenant_id, groups in tenanted_groups.iteritems():
         eff = get_all_scaling_group_servers(
@@ -193,32 +246,30 @@ def _perform_limited_effects(dispatcher, effects, limit):
     return defer.gatherResults(defs)
 
 
-def get_all_metrics(dispatcher, cass_groups, log, _print=False,
+def get_all_metrics(dispatcher, tenanted_groups, log, _print=False,
                     get_all_metrics_effects=get_all_metrics_effects):
     """
     Gather server data and produce metrics for all groups across all tenants
     in a region.
 
     :param dispatcher: An Effect dispatcher.
-    :param iterable cass_groups: Groups as retrieved from cassandra
+    :param dict tenanted_groups: Scaling Groups grouped on tenantid
     :param bool _print: Should the function print while processing?
 
     :return: ``list`` of `GroupMetrics` as `Deferred`
     """
-    effs = get_all_metrics_effects(cass_groups, log, _print=_print)
+    effs = get_all_metrics_effects(tenanted_groups, log, _print=_print)
     d = _perform_limited_effects(dispatcher, effs, 10)
     d.addCallback(filter(lambda x: x is not None))
     return d.addCallback(lambda x: reduce(operator.add, x, []))
 
 
-def add_to_cloud_metrics(ttl, region, total_desired,
-                         total_actual, total_pending, log=None):
+@do
+def add_to_cloud_metrics(ttl, region, total_desired, total_actual,
+                         total_pending, no_tenants, no_groups, log=None):
     """
     Add total number of desired, actual and pending servers of a region
     to Cloud metrics.
-
-    WARNING: Even though this function returns an Effect, it is
-    not pure since it uses the current system time.
 
     :param dict conf: Metrics configuration, will contain tenant ID of tenant
         used to ingest metrics and other conf like ttl
@@ -229,19 +280,23 @@ def add_to_cloud_metrics(ttl, region, total_desired,
         there in the region
     :param int total_pending: Total number of servers currently
         building in a region
+    :param int no_tenants: total number of tenants
+    :param int no_groups: total number of groups
 
-    :return: `Deferred` with None
+    :return: `Effect` with None
     """
-    metric_part = {'collectionTime': int(time.time() * 1000),
+    epoch = yield Effect(Func(time.time))
+    metric_part = {'collectionTime': int(epoch * 1000),
                    'ttlInSeconds': ttl}
     totals = [('desired', total_desired), ('actual', total_actual),
-              ('pending', total_pending)]
+              ('pending', total_pending), ('tenants', no_tenants),
+              ('groups', no_groups)]
     data = [merge(metric_part,
                   {'metricValue': value,
                    'metricName': '{}.{}'.format(region, metric)})
             for metric, value in totals]
-    return service_request(ServiceType.CLOUD_METRICS_INGEST,
-                           'POST', 'ingest', data=data, log=log)
+    yield service_request(ServiceType.CLOUD_METRICS_INGEST,
+                          'POST', 'ingest', data=data, log=log)
 
 
 def connect_cass_servers(reactor, config):
@@ -254,10 +309,21 @@ def connect_cass_servers(reactor, config):
         seed_endpoints, config['keyspace'], disconnect_on_cancel=True)
 
 
+def get_dispatcher(reactor, authenticator, log, service_configs, client):
+    return ComposedDispatcher([
+        get_legacy_dispatcher(reactor, authenticator, log, service_configs),
+        get_log_dispatcher(log, {}),
+        TypeDispatcher({
+            GetAllGroups: deferred_performer(
+                lambda d, i: get_scaling_groups(client))
+        }),
+        file_dispatcher()
+    ])
+
+
 @defer.inlineCallbacks
 def collect_metrics(reactor, config, log, client=None, authenticator=None,
-                    _print=False, perform=perform,
-                    get_legacy_dispatcher=get_legacy_dispatcher):
+                    _print=False):
     """
     Start collecting the metrics
 
@@ -272,26 +338,23 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
         if this is not given
     :param bool _print: Should debug messages be printed to stdout?
 
-    :return: :class:`Deferred` with None
+    :return: :class:`Deferred` fired with ``list`` of `GroupMetrics`
     """
-    convergence_tids = config.get('convergence-tenants', None)
+    convergence_tids = config.get('convergence-tenants', [])
     _client = client or connect_cass_servers(reactor, config['cassandra'])
     authenticator = authenticator or generate_authenticator(reactor,
                                                             config['identity'])
-    service_configs = get_service_configs(config)
-    dispatcher = get_legacy_dispatcher(reactor, authenticator, log,
-                                       service_configs)
+    dispatcher = get_dispatcher(reactor, authenticator, log,
+                                get_service_configs(config), _client)
 
     # calculate metrics
-    if convergence_tids is not None:
-        cass_groups = yield get_specific_scaling_groups(
-            _client, tenant_ids=convergence_tids)
-    else:
-        cass_groups = yield get_scaling_groups(
-            _client, props=['status'],
-            group_pred=lambda g: g['status'] != 'DISABLED')
+    fpath = get_in(["metrics", "last_tenant_fpath"], config,
+                   default="last_tenant.txt")
+    tenanted_groups = yield perform(
+        dispatcher,
+        get_todays_scaling_groups(convergence_tids, fpath))
     group_metrics = yield get_all_metrics(
-        dispatcher, cass_groups, log, _print=_print)
+        dispatcher, tenanted_groups, log, _print=_print)
 
     # Calculate total desired, actual and pending
     total_desired, total_actual, total_pending = 0, 0, 0
@@ -307,14 +370,17 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
             total_desired, total_actual, total_pending))
 
     # Add to cloud metrics
-    eff = add_to_cloud_metrics(
-        config['metrics']['ttl'], config['region'], total_desired,
-        total_actual, total_pending, log=log)
-    eff = Effect(TenantScope(eff, config['metrics']['tenant_id']))
-    yield perform(dispatcher, eff)
-    log.msg('added to cloud metrics')
+    metr_conf = config.get("metrics", None)
+    if metr_conf is not None:
+        eff = add_to_cloud_metrics(
+            metr_conf['ttl'], config['region'], total_desired, total_actual,
+            total_pending, len(tenanted_groups), len(group_metrics), log)
+        eff = Effect(TenantScope(eff, metr_conf['tenant_id']))
+        yield perform(dispatcher, eff)
+        log.msg('added to cloud metrics')
+        if _print:
+            print('added to cloud metrics')
     if _print:
-        print('added to cloud metrics')
         group_metrics.sort(key=lambda g: abs(g.desired - g.actual),
                            reverse=True)
         print('groups sorted as per divergence', *group_metrics, sep='\n')

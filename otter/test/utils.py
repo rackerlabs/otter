@@ -907,6 +907,18 @@ def noop(_):
     pass
 
 
+def const(v):
+    """
+    Return function that takes an argument but always return given `v`.
+    Useful with `SequenceDispatcher`. For example,
+
+    >>> dt = datetime(1970, 1, 1)
+    >>> SequenceDispatcher([(Func(datetime.now), const(dt))])
+    """
+
+    return lambda i: v
+
+
 def intent_func(fname):
     """
     Return function that returns Effect of tuple of fname and its args. Useful
