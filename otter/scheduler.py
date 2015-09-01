@@ -205,8 +205,9 @@ def execute_event(dispatcher, store, log, event, deleted_policy_ids):
     group_id = event['groupId']
     policy_id = event['policyId']
     log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id,
-                   policy_id=policy_id)
-    log.msg('Scheduler executing policy {policy_id}')
+                   policy_id=policy_id,
+                   scheduled_time=event["trigger"].isoformat() + "Z")
+    log.msg('sch-exec-pol', cloud_feed=True)
     group = store.get_scaling_group(log, tenant_id, group_id)
     d = modify_and_trigger(
         dispatcher,
@@ -217,12 +218,12 @@ def execute_event(dispatcher, store, log, event, deleted_policy_ids):
                 policy_id=policy_id, version=event['version']),
         modify_state_reason='scheduler.execute_event')
     d.addErrback(ignore_and_log, CannotExecutePolicyError,
-                 log, 'Scheduler cannot execute policy {policy_id}')
+                 log, "sch-cannot-exec", cloud_feed=True)
 
     def collect_deleted_policy(failure):
         failure.trap(NoSuchScalingGroupError, NoSuchPolicyError)
         deleted_policy_ids.add(policy_id)
 
     d.addErrback(collect_deleted_policy)
-    d.addErrback(log.err, 'Scheduler failed to execute policy {policy_id}')
+    d.addErrback(log.err, "sch-exec-pol-err", cloud_feed=True)
     return d

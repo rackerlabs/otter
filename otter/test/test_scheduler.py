@@ -533,13 +533,14 @@ class ExecuteEventTests(SchedulerTests):
         self.log_args = {
             'tenant_id': '1234',
             'scaling_group_id': 'scal44',
-            'policy_id': 'pol44'
+            'policy_id': 'pol44',
+            "scheduled_time": "1970-01-01T00:00:00Z"
         }
         self.event = {
             'tenantId': '1234',
             'groupId': 'scal44',
             'policyId': 'pol44',
-            'trigger': 'now',
+            'trigger': datetime(1970, 1, 1),
             'cron': '*',
             'bucket': 1,
             'version': 'v2'
@@ -555,7 +556,7 @@ class ExecuteEventTests(SchedulerTests):
 
         self.assertIsNone(self.successResultOf(d))
         self.log.msg.assert_called_once_with(
-            'Scheduler executing policy {policy_id}', **self.log_args)
+            "sch-exec-pol", cloud_feed=True, **self.log_args)
         self.maybe_exec_policy.assert_called_once_with(
             matches(IsBoundWith(**self.log_args)), 'transaction-id',
             self.mock_group, "state",
@@ -612,8 +613,8 @@ class ExecuteEventTests(SchedulerTests):
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(len(del_pol_ids), 0)
         self.log.msg.assert_called_with(
-            'Scheduler cannot execute policy {policy_id}',
-            reason=CheckFailure(CannotExecutePolicyError), **self.log_args)
+            "sch-cannot-exec", reason=CheckFailure(CannotExecutePolicyError),
+            cloud_feed=True, **self.log_args)
 
     def test_unknown_error(self):
         """
@@ -628,5 +629,5 @@ class ExecuteEventTests(SchedulerTests):
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(len(del_pol_ids), 0)
         self.log.err.assert_called_with(
-            CheckFailure(ValueError),
-            'Scheduler failed to execute policy {policy_id}', **self.log_args)
+            CheckFailure(ValueError), "sch-exec-pol-err", cloud_feed=True,
+            **self.log_args)

@@ -41,6 +41,7 @@ log_cf_mapping = {
     "username": "username",
     "desired_capacity": "desiredCapacity",
     "current_capacity": "currentCapacity",
+    "scheduled_time": "scheduledTime",
     "message": "message"
 }
 
