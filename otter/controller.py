@@ -50,11 +50,10 @@ from otter.cloud_client import (
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.model import DRAINING_METADATA, group_id_from_metadata
 from otter.convergence.service import (
-    delete_divergent_flag, get_convergence_starter, mark_divergent,
-    trigger_convergence)
+    delete_divergent_flag, mark_divergent, trigger_convergence)
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
-from otter.log.intents import msg, with_log
+from otter.log.intents import BoundFields, msg, with_log
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
 from otter.models.interface import GroupNotEmptyError, ScalingGroupStatus
 from otter.supervisor import (
@@ -303,6 +302,31 @@ def empty_group(log, trans_id, group):
     return d
 
 
+@defer.inlineCallbacks
+def modify_and_trigger(dispatcher, group, logargs, modifier, *args, **kwargs):
+    """
+    Modify group state and trigger convergence after that
+
+    :param IScalingGroup group: Scaling group whose state is getting modified
+    :param log: Bound logger
+    :param modifier: Callable as described in IScalingGroup.modify_state
+
+    :return: Deferred with None
+    """
+    cannot_exec_pol_err = None
+    try:
+        yield group.modify_state(modifier, *args, **kwargs)
+    except CannotExecutePolicyError as ce:
+        cannot_exec_pol_err = ce
+    if tenant_is_enabled(group.tenant_id, config_value):
+        eff = Effect(
+            BoundFields(
+                trigger_convergence(group.tenant_id, group.uuid), logargs))
+        yield perform(dispatcher, eff)
+    if cannot_exec_pol_err is not None:
+        raise cannot_exec_pol_err
+
+
 def converge(log, transaction_id, config, scaling_group, state, launch_config,
              policy, config_value=config_value):
     """
@@ -329,17 +353,11 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
         # For convergence tenants, find delta based on group's desired
         # capacity
         delta = apply_delta(log, state.desired, state, config, policy)
-        # Delta could be 0, however we may still want to trigger convergence
-        d = get_convergence_starter().start_convergence(
-            log, scaling_group.tenant_id, scaling_group.uuid)
         if delta == 0:
             # No change in servers. Return None synchronously
             return None
         else:
-            # We honor start_convergence's deferred here so that we can
-            # communicate back a strong acknowledgement that convergence
-            # has been triggered on the group
-            return d.addCallback(lambda _: state)
+            return defer.succeed(state)
 
     # For non-convergence tenants, the value used for desired-capacity is
     # the sum of active+pending, which is 0, so the delta ends up being

@@ -8,8 +8,6 @@ from copy import deepcopy
 
 from datetime import datetime
 
-from effect.testing import SequenceDispatcher
-
 from jsonschema import ValidationError
 
 import mock
@@ -29,7 +27,6 @@ from otter.json_schema.group_examples import (
     policy as policy_examples,
 )
 from otter.json_schema.group_schemas import MAX_ENTITIES
-from otter.log.intents import BoundFields
 from otter.models.interface import (
     GroupNotEmptyError,
     GroupState,
@@ -45,9 +42,9 @@ from otter.supervisor import (
     ServerNotFoundError,
     set_supervisor,
 )
-from otter.test.rest.request import DummyException, RestAPITestMixin
-from otter.test.utils import (
-    IsBoundWith, intent_func, matches, nested_sequence, noop, patch)
+from otter.test.rest.request import (
+    DummyException, RestAPITestMixin, setup_mod_and_trigger)
+from otter.test.utils import IsBoundWith, matches, patch
 from otter.util.config import set_config_data
 from otter.worker.validate_config import InvalidLaunchConfiguration
 
@@ -269,6 +266,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         super(AllGroupsEndpointTestCase, self).setUp()
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
+        setup_mod_and_trigger(self)
 
         # Patch supervisor
         self.supervisor = mock.Mock(spec=['validate_launch_config'])
@@ -726,18 +724,23 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             manifest)
         self._test_successful_create(manifest)
 
-        self.mock_group.modify_state.assert_called_once_with(
-            mock.ANY, modify_state_reason='create_new_scaling_group')
+        self.mock_controller.modify_and_trigger.assert_called_once_with(
+            "disp", self.mock_group,
+            dict(tenant_id="11111", scaling_group_id="1",
+                 transaction_id="transaction-id",
+                 system="otter.rest.groups.create_new_scaling_group"),
+            mock.ANY,
+            modify_state_reason='create_new_scaling_group')
         self.mock_controller.obey_config_change.assert_called_once_with(
             mock.ANY, "transaction-id", expected_config, self.mock_group,
             self.mock_state, launch_config=launch)
 
-    def test_create_group_propagates_modify_state_errors(self):
+    def test_create_group_propagates_modify_trigger_errors(self):
         """
-        If there is an error when modify state is called, even if the group
-        creation succeeds, a 500 is returned.
+        If there is an error when modify_and_trigger is called, even if the
+        group creation succeeds, a 500 is returned.
         """
-        self.mock_group.modify_state.side_effect = AssertionError
+        self.mock_controller.modify_and_trigger.side_effect = AssertionError
         config = config_examples()[0]
         launch = launch_examples()[0]
 
@@ -809,6 +812,7 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
         set_config_data({'url_root': ''})
         self.addCleanup(set_config_data, {})
+        setup_mod_and_trigger(self)
 
         # Patch supervisor
         supervisor = mock.Mock(spec=['validate_launch_config'])
@@ -880,9 +884,9 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         Set the uuid of the group to "one"
         """
         super(OneGroupTestCase, self).setUp()
-        self.otter.dispatcher = "disp"
-        self.mock_group.uuid = "one"
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
+        setup_mod_and_trigger(self)
+        self.mock_group.uuid = "one"
 
     def test_view_manifest_404(self):
         """
@@ -1149,30 +1153,20 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(resp['error']['type'], 'GroupNotEmptyError')
         self.flushLoggedErrors(GroupNotEmptyError)
 
-    @mock.patch('otter.rest.groups.trigger_convergence',
-                side_effect=intent_func("tg"))
-    def test_group_converge_enabled_tenant(self, mock_tg):
+    def test_group_converge_enabled_tenant(self):
         """
         Calling `../converge` on convergence enabled tenant triggers
         convergence and returns Deferred with None after enabling it
         """
         set_config_data({'convergence-tenants': ['11111']})
         self.addCleanup(set_config_data, {})
-        self.otter.dispatcher = SequenceDispatcher([
-            (BoundFields(mock.ANY,
-                         dict(tenant_id='11111', scaling_group_id="one",
-                              transaction_id="transaction-id")),
-             nested_sequence([
-                (("tg", "11111", "one"), noop)
-             ]))
-        ])
         self.mock_state = GroupState(
             '11111', 'one', '', {}, {}, None, {}, False,
             ScalingGroupStatus.ACTIVE)
-        with self.otter.dispatcher.consume():
-            self.assert_status_code(
-                204, endpoint='{}converge'.format(self.endpoint),
-                method='POST')
+        self.assert_status_code(
+            204, endpoint='{}converge'.format(self.endpoint),
+            method='POST')
+        self.assertTrue(self.mock_controller.modify_and_trigger.called)
 
     def test_group_paused_converge(self):
         """
@@ -1186,6 +1180,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             ScalingGroupStatus.ACTIVE)
         self.assert_status_code(
             403, endpoint='{}converge'.format(self.endpoint), method='POST')
+        self.assertTrue(self.mock_controller.modify_and_trigger.called)
 
     def test_group_converge_worker_tenant(self):
         """

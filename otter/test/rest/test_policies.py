@@ -12,17 +12,17 @@ import mock
 from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.controller import CannotExecutePolicyError
-from otter.json_schema.group_examples import policy as policy_examples
-from otter.json_schema import rest_schemas, validate
-from otter.models.interface import NoSuchPolicyError
-from otter.rest.decorators import InvalidJsonError
-from otter.rest.application import Otter
-
-from otter.test.rest.request import DummyException, RestAPITestMixin
-from otter.test.utils import mock_log
-from otter.rest.bobby import set_bobby
 from otter.bobby import BobbyClient
+from otter.controller import CannotExecutePolicyError
+from otter.json_schema import rest_schemas, validate
+from otter.json_schema.group_examples import policy as policy_examples
+from otter.models.interface import NoSuchPolicyError
+from otter.rest.application import Otter
+from otter.rest.bobby import set_bobby
+from otter.rest.decorators import InvalidJsonError
+from otter.test.rest.request import (
+    DummyException, RestAPITestMixin, setup_mod_and_trigger)
+from otter.test.utils import mock_log, patch
 
 
 class AllPoliciesTestCase(RestAPITestMixin, SynchronousTestCase):
@@ -409,10 +409,8 @@ class OnePolicyTestCase(RestAPITestMixin, SynchronousTestCase):
         Set up common policy mocks.
         """
         super(OnePolicyTestCase, self).setUp()
-
-        controller_patcher = mock.patch('otter.rest.policies.controller')
-        self.mock_controller = controller_patcher.start()
-        self.addCleanup(controller_patcher.stop)
+        self.mock_controller = patch(self, 'otter.rest.policies.controller')
+        setup_mod_and_trigger(self)
 
     def test_get_policy(self):
         """
@@ -567,14 +565,14 @@ class OnePolicyTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         Try to execute a policy.
         """
-        response_body = self.assert_status_code(202,
-                                                endpoint=self.endpoint + 'execute/',
-                                                method="POST")
+        response_body = self.assert_status_code(
+            202, endpoint=self.endpoint + 'execute/', method="POST")
         self.assertEqual(response_body, "{}")
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
-        self.assertEqual(self.mock_group.modify_state.call_count, 1)
-
-        self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
+        self.assertEqual(self.mock_controller.modify_and_trigger.call_count, 1)
+        exec_pol = self.mock_controller.maybe_execute_scaling_policy
+        exec_pol.assert_called_once_with(
             mock.ANY,
             'transaction-id',
             self.mock_group,
@@ -586,8 +584,8 @@ class OnePolicyTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         Try to execute a nonexistant policy, fails with a 404.
         """
-        self.mock_group.modify_state.side_effect = None
-        self.mock_group.modify_state.return_value = defer.fail(
+        self.mock_controller.modify_and_trigger.side_effect = None
+        self.mock_controller.modify_and_trigger.return_value = defer.fail(
             NoSuchPolicyError('11111', '1', '2'))
 
         response_body = self.assert_status_code(404,
@@ -599,11 +597,11 @@ class OnePolicyTestCase(RestAPITestMixin, SynchronousTestCase):
 
     def test_execute_policy_failure_403(self):
         """
-        If a policy cannot be executed due to cooldowns or budgetary constraints,
-        fail with a 403.
+        If a policy cannot be executed due to cooldowns or budgetary
+        constraints, fail with a 403.
         """
-        self.mock_group.modify_state.side_effect = None
-        self.mock_group.modify_state.return_value = defer.fail(
+        self.mock_controller.modify_and_trigger.side_effect = None
+        self.mock_controller.modify_and_trigger.return_value = defer.fail(
             CannotExecutePolicyError('11111', '1', '2', 'meh'))
 
         response_body = self.assert_status_code(403,

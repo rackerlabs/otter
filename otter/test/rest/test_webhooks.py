@@ -11,15 +11,15 @@ import mock
 from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.controller import CannotExecutePolicyError
 from otter.json_schema import rest_schemas, validate
 from otter.models.interface import (
-    NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
+    NoSuchPolicyError, NoSuchScalingGroupError, NoSuchWebhookError,
     UnrecognizedCapabilityError)
 from otter.rest.decorators import InvalidJsonError
-
-from otter.test.rest.request import DummyException, RestAPITestMixin
-
-from otter.controller import CannotExecutePolicyError
+from otter.test.rest.request import (
+    DummyException, RestAPITestMixin, setup_mod_and_trigger)
+from otter.test.utils import IsBoundWith, matches, patch
 
 
 class WebhookCollectionTestCase(RestAPITestMixin, SynchronousTestCase):
@@ -261,11 +261,8 @@ class OneWebhookTestCase(RestAPITestMixin, SynchronousTestCase):
         Set up webhook specific mocks.
         """
         super(OneWebhookTestCase, self).setUp()
-
-        controller_patcher = mock.patch('otter.rest.webhooks.controller')
-        self.mock_controller = controller_patcher.start()
-        self.addCleanup(controller_patcher.stop)
-
+        self.mock_controller = patch(self, 'otter.rest.webhooks.controller')
+        setup_mod_and_trigger(self)
         self.mock_group.uuid = self.group_id
 
     def test_get_webhook_unknown_error_is_500(self):
@@ -454,27 +451,34 @@ class OneWebhookTestCase(RestAPITestMixin, SynchronousTestCase):
             204, None, 'DELETE')
         self.assertEqual(response_body, "")
 
-    @mock.patch('otter.rest.webhooks.log')
-    def test_execute_webhook(self, log):
+    def test_execute_webhook(self):
         """
         Execute a webhook by hash returns a 202
         """
-        log = log.bind().bind()
         self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
             (self.tenant_id, self.group_id, self.policy_id))
+        self.mock_controller.maybe_execute_scaling_policy.return_value = \
+            defer.succeed(None)
 
         response_body = self.assert_status_code(
             202, '/v1.0/execute/1/11111/', 'POST')
 
         self.mock_store.get_scaling_group.assert_called_once_with(
-            log.bind.return_value, self.tenant_id, self.group_id)
+            mock.ANY, self.tenant_id, self.group_id)
 
-        log.bind.assert_called_once_with(tenant_id=self.tenant_id,
-                                         scaling_group_id=self.group_id,
-                                         policy_id=self.policy_id)
-
-        self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
-            log.bind.return_value,
+        logargs = dict(tenant_id=self.tenant_id,
+                       scaling_group_id=self.group_id,
+                       policy_id=self.policy_id,
+                       transaction_id='transaction-id',
+                       capability_hash='11111',
+                       capability_version='1',
+                       system='otter.rest.webhooks.execute_webhook')
+        self.mock_controller.modify_and_trigger.assert_called_once_with(
+            "disp", self.mock_group, logargs, mock.ANY,
+            modify_state_reason="execute_webhook")
+        exec_pol = self.mock_controller.maybe_execute_scaling_policy
+        exec_pol.assert_called_once_with(
+            matches(IsBoundWith(**logargs)),
             'transaction-id',
             self.mock_group,
             self.mock_state,
@@ -522,20 +526,25 @@ class OneWebhookTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(excs[0].value, exc)
 
     @mock.patch('otter.rest.webhooks.log')
-    def test_execute_webhook_logs_info_message_when_policy_cannot_be_executed(self, log):
+    @mock.patch('otter.rest.webhooks.bound_log_kwargs', return_value=None)
+    def test_exe_wbhk_logs_info_message_when_policy_cannot_be_executed(self,
+                                                                       blk,
+                                                                       log):
         """
         Executing a webhook logs an information message about non-fatal, policy
         execution failures.
         """
         cap_log = log.bind.return_value.bind.return_value
-
-        for exc in [CannotExecutePolicyError('tenant', 'group', 'policy', 'test'),
-                    NoSuchPolicyError('tenant', 'group', 'policy'),
-                    NoSuchScalingGroupError('tenant', 'group'),
-                    UnrecognizedCapabilityError("11111", 1)]:
+        exceptions = [
+            CannotExecutePolicyError('tenant', 'group', 'policy', 'test'),
+            NoSuchPolicyError('tenant', 'group', 'policy'),
+            NoSuchScalingGroupError('tenant', 'group'),
+            UnrecognizedCapabilityError("11111", 1)]
+        for exc in exceptions:
             self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
                 ('tenant', 'group', 'policy'))
-            self.mock_group.modify_state.side_effect = lambda *args, **kwargs: defer.fail(exc)
+            self.mock_controller.modify_and_trigger.side_effect = \
+                lambda *args, **kwargs: defer.fail(exc)
             self.assert_status_code(202, '/v1.0/execute/1/11111/', 'POST')
 
             cap_log.bind().msg.assert_any_call(
