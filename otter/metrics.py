@@ -44,27 +44,6 @@ from otter.util.fp import partition_bool
 from otter.util.timestamp import datetime_to_epoch
 
 
-QUERY_GROUPS_OF_TENANTS = (
-    'SELECT '
-    '"tenantId", "groupId", desired, active, pending, created_at, status, '
-    'deleting FROM scaling_group WHERE "tenantId" IN ({tids})')
-
-
-def valid_group_row(row):
-    return (
-        row.get('created_at') is not None and
-        row.get('desired') is not None and
-        row.get('status') not in ('DISABLED', 'ERROR') and
-        not row.get('deleting', False))
-
-
-def get_specific_scaling_groups(client, tenant_ids):
-    tids = ', '.join("'{}'".format(tid) for tid in tenant_ids)
-    query = QUERY_GROUPS_OF_TENANTS.format(tids=tids)
-    d = client.execute(query, {}, ConsistencyLevel.ONE)
-    return d.addCallback(filter(valid_group_row))
-
-
 def get_last_info(fname):
     eff = Effect(ReadFileLines(fname)).on(
         lambda lines: (int(lines[0]),
@@ -118,6 +97,17 @@ def get_todays_scaling_groups(convergence_tids, fname):
     yield update_last_info(fname, last_tenants_len, last_date)
     yield do_return(
         keyfilter(lambda t: t in set(tenants + convergence_tids), groups))
+
+
+def valid_group_row(row):
+    """
+    Return True if given scaling group row is valid scaling group
+    """
+    return (
+        row.get('created_at') is not None and
+        row.get('desired') is not None and
+        row.get('status') not in ('DISABLED', 'ERROR') and
+        not row.get('deleting', False))
 
 
 def get_scaling_groups(client):
