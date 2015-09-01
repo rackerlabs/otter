@@ -18,6 +18,7 @@ from twisted.trial import unittest
 
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer,
+    ExcludesAllIPs,
     ContainsAllIPs,
     HasLength
 )
@@ -75,6 +76,23 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         returnValue(clb_other)
 
     @inlineCallbacks
+    def confirm_clb_nodecounts(self, clbs):
+        """
+        Confirm that the provided CLBs have no nodes.
+
+        :param list clbs: a `list` of `tuple` of (:obj:`CloudLoadBalancer`,
+            number of expected nodes)
+
+        :return: `list` of nodes in the same order as the CLBs given
+        """
+        nodes = yield gatherResults([
+            clb.wait_for_nodes(
+                self.rcs, HasLength(numnodes), timeout=timeout_default)
+            for clb, numnodes in clbs
+        ])
+        returnValue(nodes)
+
+    @inlineCallbacks
     def test_oob_deleted_clb_node(self):
         """
         If an autoscaled server is removed from the CLB out of band its
@@ -87,15 +105,12 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         5. Assert that the server is put back on the CLB.
         """
         clb = self.helper.clbs[0]
-
-        yield clb.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+        yield self.confirm_clb_nodecounts([(clb, 0)])
 
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
-        nodes = yield clb.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
+        nodes = yield self.confirm_clb_nodecounts([(clb, 1)])
 
         the_node = nodes[0]
 
@@ -123,21 +138,17 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         Assert: Server put back on LB1
         Assert: Server removed from LB2
         """
-        clb_other = yield self.create_another_clb()
         clb_as = self.helper.clbs[0]
+        clb_other = yield self.create_another_clb()
 
-        yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
-        yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+        yield self.confirm_clb_nodecounts([(clb_as, 0), (clb_other, 0)])
 
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
-        nodes_as = yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
-        yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+        nodes = yield self.confirm_clb_nodecounts([(clb_as, 1),
+                                                   (clb_other, 0)])
+        nodes_as = nodes[0]
 
         the_node = nodes_as[0]
         node_info = {
@@ -149,11 +160,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         yield clb_as.delete_nodes(self.rcs, [the_node['id']])
         yield clb_other.add_nodes(self.rcs, [node_info])
-
-        yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
-        yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
+        yield self.confirm_clb_nodecounts([(clb_as, 0), (clb_other, 1)])
 
         yield group.trigger_convergence(self.rcs)
 
@@ -187,23 +194,17 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             - Assert: Server still on LB1
             - Assert: Server removed from LB2
         """
-        clb_other = yield self.create_another_clb()
         clb_as = self.helper.clbs[0]
-
-        # Confirm both LBs are empty to start
-        yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
-        yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+        clb_other = yield self.create_another_clb()
+        yield self.confirm_clb_nodecounts([(clb_as, 0), (clb_other, 0)])
 
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
         # One node should have been added to clb_as, none to clb_other
-        nodes_as = yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
-        yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+        nodes = yield self.confirm_clb_nodecounts([(clb_as, 1),
+                                                   (clb_other, 0)])
+        nodes_as = nodes[0]
 
         the_node = nodes_as[0]
         node_info = {
@@ -318,3 +319,76 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             ),
             timeout=timeout_default
         )
+
+    @inlineCallbacks
+    def test_changing_disowned_server_is_not_converged(self):
+        """
+        Moving a disowned autoscale server to a different CLB and converging
+        will not move the disowned server back on its intended CLB.
+
+        1. Create an AS group with 2 servers.
+        2. Disown 1 server.
+        3. Move both servers to a different CLB.
+        4. Converge group.
+        6. Assert that the group's server is back on its CLB, and that the
+           disowned server's remains on the wrong CLB.
+        """
+        clb_as = self.helper.clbs[0]
+        clb_other = yield self.create_another_clb()
+        yield self.confirm_clb_nodecounts([(clb_as, 0), (clb_other, 0)])
+
+        group, _ = self.helper.create_group()
+        yield self.helper.start_group_and_wait(group, self.rcs, desired=2)
+        ips = yield group.get_servicenet_ips(self.rcs)
+        disowned_server = ips.keys()[0]
+        remaining_server = ips.keys()[1]
+
+        yield group.disown(self.rcs, disowned_server)
+
+        # move both servers to the other CLB
+        nodes = yield clb_as.list_nodes(self.rcs)
+        yield gatherResults([
+            clb_as.delete_nodes(self.rcs, [n['id'] for n in nodes['nodes']]),
+            clb_other.add_nodes(
+                self.rcs,
+                [{'address': ip, 'port': 80, 'condition': 'ENABLED',
+                  'type': 'PRIMARY'} for ip in ips.values()])
+        ])
+
+        # trigger group
+        yield group.trigger_convergence(self.rcs)
+
+        # assert that the disowned server remains on the new CLB, and the
+        # remaining server remains is on the old CLB
+        yield gatherResults([
+            clb_as.wait_for_nodes(
+                self.rcs,
+                MatchesAll(
+                    ExcludesAllIPs([ips[disowned_server]]),
+                    ContainsAllIPs([ips[remaining_server]]),
+                    HasLength(1)
+                ),
+                timeout=timeout_default
+            ),
+            clb_other.wait_for_nodes(
+                self.rcs,
+                MatchesAll(
+                    ExcludesAllIPs([ips[remaining_server]]),
+                    ContainsAllIPs([ips[disowned_server]]),
+                    HasLength(1)
+                ),
+                timeout=timeout_default
+            ),
+            group.wait_for_state(
+                self.rcs,
+                MatchesAll(
+                    ContainsDict({
+                        'pendingCapacity': Equals(0),
+                        'desiredCapacity': Equals(1),
+                        'status': Equals('ACTIVE'),
+                        'active': HasLength(1)
+                    })
+                ),
+                timeout=timeout_default
+            )
+        ])
