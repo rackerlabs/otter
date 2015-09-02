@@ -97,7 +97,7 @@ class ServerState(Names):
     UNKNOWN_TO_OTTER = NamedConstant()
     """
     Indicates that some state was returned by Nova that Otter doesn't know
-    about. The real state will be on the NovaServer object.
+    about. The real state will be in `NovaServer.json`.
     """
 
 
@@ -256,7 +256,10 @@ class NovaServer(object):
 
         :return: :obj:`NovaServer` instance
         """
-        server_state = ServerState.lookupByName(server_json['status'])
+        try:
+            server_state = ServerState.lookupByName(server_json['status'])
+        except ValueError:
+            server_state = ServerState.UNKNOWN_TO_OTTER
         if server_json.get("OS-EXT-STS:task_state", "") == "deleting":
             server_state = ServerState.DELETED
         metadata = server_json.get('metadata', {})

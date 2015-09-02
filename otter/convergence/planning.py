@@ -215,7 +215,9 @@ STATES_TO_DESTINY = {
     for state in states}
 
 
-get_destiny = STATES_TO_DESTINY.get
+def get_destiny(server):
+    """Get the obj:`Destiny` of a server."""
+    return STATES_TO_DESTINY.get(server.state)
 
 
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
@@ -241,9 +243,7 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     """
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
 
-    servers = defaultdict(
-        lambda: [],
-        groupby(lambda s: get_destiny(s.state), newest_to_oldest))
+    servers = defaultdict(lambda: [], groupby(get_destiny, newest_to_oldest))
     servers_in_active = servers[Destiny.CONSIDER_AVAILABLE]
 
     building_too_long, waiting_for_build = partition_bool(

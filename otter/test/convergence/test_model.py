@@ -655,6 +655,18 @@ class NovaServerTests(SynchronousTestCase):
                 'valid_image', 'valid_flavor', self.links[0], set(), '',
                 expected_json]]))
 
+    def test_unknown_state(self):
+        """
+        When nova provides an unknown server state, it's set to
+        ``ServerState.UNKNOWN_TO_OTTER`` on the :obj:`NovaServer`.
+        """
+        server_json = self.servers[0].copy()
+        # add a bunch more fields
+        server_json['status'] = 'ablrduelh'
+        server = NovaServer.from_server_details_json(server_json)
+        self.assertEqual(server.state, ServerState.UNKNOWN_TO_OTTER)
+        self.assertEqual(server.json['status'], 'ablrduelh')
+
 
 class IPAddressTests(SynchronousTestCase):
     """
