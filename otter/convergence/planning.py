@@ -173,16 +173,36 @@ class Destiny(Names):
     """
     What otter will be doing with a server.
     """
+
     CONSIDER_AVAILABLE = NamedConstant()
+    """The server will count as "active"."""
+
     WAIT_WITH_TIMEOUT = NamedConstant()
+    """
+    Waiting for the server to transition to active, and will delete it if it
+    doesn't transition in a given period.
+    """
+
     WAIT = NamedConstant()
+    """Waiting for the server to transition to active"""
+
     DRAIN = NamedConstant()
+    """We intend to delete this server after some period."""
+
     DELETE = NamedConstant()
+    """We intend to delete this server immediately."""
+
     CLEANUP = NamedConstant()
+    """This server needs associated resources cleaned up."""
+
     IGNORE = NamedConstant()
+    """This server will not count as part of the group at all."""
 
 
-DESTINY_TO_STATES = {
+# Indicate which states are part of which destiny. It's feasible that things
+# other than states can determine the destiny, but so far this is the only way
+# we know the destiny.
+_DESTINY_TO_STATES = {
     Destiny.CONSIDER_AVAILABLE: [ServerState.ACTIVE],
     Destiny.WAIT_WITH_TIMEOUT: [ServerState.BUILD],
     Destiny.WAIT: [
@@ -194,6 +214,7 @@ DESTINY_TO_STATES = {
         ServerState.RESIZE,
         ServerState.REVERT_RESIZE,
         ServerState.VERIFY_RESIZE,
+        ServerState.SUSPENDED,
         ],
     Destiny.DRAIN: [ServerState.DRAINING],
     Destiny.DELETE: [ServerState.SHUTOFF, ServerState.ERROR],
@@ -203,21 +224,22 @@ DESTINY_TO_STATES = {
         ServerState.UNKNOWN_TO_OTTER],
 }
 
+# Ensure we've covered all the server states
 for st in ServerState.iterconstants():
-    assert st in concat(DESTINY_TO_STATES.values()), st
-
-_all_destiny_states = list(concat(DESTINY_TO_STATES.values()))
+    assert st in concat(_DESTINY_TO_STATES.values()), st
+# Ensure states only map to one destiny
+_all_destiny_states = list(concat(_DESTINY_TO_STATES.values()))
 assert len(_all_destiny_states) == len(set(_all_destiny_states))
 
-STATES_TO_DESTINY = {
+STATE_TO_DESTINY = {
     state: destiny
-    for destiny, states in DESTINY_TO_STATES.iteritems()
+    for destiny, states in _DESTINY_TO_STATES.iteritems()
     for state in states}
 
 
 def get_destiny(server):
     """Get the obj:`Destiny` of a server."""
-    return STATES_TO_DESTINY.get(server.state)
+    return STATE_TO_DESTINY.get(server.state)
 
 
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,

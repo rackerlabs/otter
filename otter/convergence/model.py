@@ -73,9 +73,9 @@ class ServerState(Names):
     Most of these constants correspond to Nova states of the same name.
     """
     ACTIVE = NamedConstant()
-    ERROR = NamedConstant()
     BUILD = NamedConstant()
     DELETED = NamedConstant()
+    ERROR = NamedConstant()
     HARD_REBOOT = NamedConstant()
     MIGRATING = NamedConstant()
     PASSWORD = NamedConstant()
@@ -83,9 +83,10 @@ class ServerState(Names):
     RESCUE = NamedConstant()
     RESIZE = NamedConstant()
     REVERT_RESIZE = NamedConstant()
-    VERIFY_RESIZE = NamedConstant()
     SHUTOFF = NamedConstant()
+    SUSPENDED = NamedConstant()
     UNKNOWN = NamedConstant()
+    VERIFY_RESIZE = NamedConstant()
 
     DRAINING = NamedConstant()
     """"
