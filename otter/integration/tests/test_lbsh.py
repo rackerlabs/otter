@@ -22,6 +22,7 @@ from otter.integration.lib.cloud_load_balancer import (
     ExcludesAllIPs,
     HasLength
 )
+from otter.integration.lib.nova import NovaServer
 from otter.integration.lib.resources import TestResources
 from otter.integration.lib.trial_tools import (
     TestHelper,
@@ -359,6 +360,12 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         # trigger group
         yield group.trigger_convergence(self.rcs)
 
+        # make sure the disowned server hasn't been deleted - this will
+        # execute before the group cleanup, since addCleanup is LIFO
+        s = NovaServer(id=disowned_server, pool=self.helper.pool,
+                       treq=self.helper.treq)
+        self.addCleanup(s.details, self.rcs)
+
         returnValue((group, clb_as, clb_other, ips[disowned_server],
                      ips[remaining_server]))
 
@@ -410,7 +417,8 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
                     })
                 ),
                 timeout=timeout_default
-            )
+            ),
+
         ])
 
     @skip_me("Otter bug 1698")
