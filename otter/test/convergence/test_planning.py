@@ -11,13 +11,13 @@ from otter.convergence.model import (
     CLBNode,
     CLBNodeCondition,
     CLBNodeType,
-    DRAINING_METADATA,
     DesiredGroupState,
     ErrorReason,
     RCv3Description,
     RCv3Node,
     ServerState)
-from otter.convergence.planning import Destiny, converge, plan
+from otter.convergence.planning import (
+    DRAINING_METADATA, Destiny, converge, plan)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -551,7 +551,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set(),
                 0),
@@ -589,7 +590,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
@@ -616,7 +618,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
@@ -639,7 +642,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=2.0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc,
                                           other_clb_desc))]),
@@ -741,7 +745,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',

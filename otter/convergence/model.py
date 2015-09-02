@@ -88,13 +88,6 @@ class ServerState(Names):
     UNKNOWN = NamedConstant()
     VERIFY_RESIZE = NamedConstant()
 
-    DRAINING = NamedConstant()
-    """"
-    Autoscale is deleting the server.  This state is meant to supercede Nova's
-    ``BUILD`` and ``ACTIVE`` states, because this state means that the server
-    is basically functional, but that Autoscale would like to delete it.
-    """
-
     UNKNOWN_TO_OTTER = NamedConstant()
     """
     Indicates that some state was returned by Nova that Otter doesn't know
@@ -265,10 +258,6 @@ class NovaServer(object):
             server_state = ServerState.DELETED
         metadata = server_json.get('metadata', {})
 
-        if (server_state in (ServerState.ACTIVE, ServerState.BUILD) and
-                metadata.get(DRAINING_METADATA[0]) == DRAINING_METADATA[1]):
-            server_state = ServerState.DRAINING
-
         return cls(
             id=server_json['id'],
             state=server_state,
@@ -338,9 +327,6 @@ def generate_metadata(group_id, lb_descriptions):
             metadata['rax:autoscale:lb:RackConnectV3:{0}'.format(lb_id)] = ""
 
     return metadata
-
-
-DRAINING_METADATA = ('rax:autoscale:server:state', 'DRAINING')
 
 
 @attributes(['server_config', 'capacity',

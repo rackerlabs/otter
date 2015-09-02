@@ -16,7 +16,6 @@ from otter.convergence.model import (
     CLBNode,
     CLBNodeCondition,
     CLBNodeType,
-    DRAINING_METADATA,
     IDrainable,
     ILBDescription,
     ILBNode,
@@ -545,67 +544,6 @@ class NovaServerTests(SynchronousTestCase):
                        servicenet_address='',
                        links=freeze(self.links[0]),
                        json=freeze(self.servers[0])))
-
-    def test_draining_from_metadata_trumps_active_build_nova_states(self):
-        """
-        If a draining key and value are in the metadata, the server is in
-        DRAINING state so long as the Nova vm state is either ACTIVE or BUILD.
-        """
-        self.servers[0]['metadata'] = dict([DRAINING_METADATA])
-
-        for status in ("ACTIVE", "BUILD"):
-            self.servers[0]['status'] = status
-            self.assertEqual(
-                NovaServer.from_server_details_json(self.servers[0]),
-                NovaServer(id='a',
-                           state=ServerState.DRAINING,
-                           image_id='valid_image',
-                           flavor_id='valid_flavor',
-                           created=self.createds[0][1],
-                           desired_lbs=pset(),
-                           servicenet_address='',
-                           links=freeze(self.links[0]),
-                           json=freeze(self.servers[0])))
-
-    def test_draining_state_invalid_values(self):
-        """
-        If a draining key is in the metadata, but the value is invalid, the
-        server is not recognized to be in DRAINING state and will just go
-        with the Nova vm state.
-        """
-        self.servers[0]['metadata'] = {DRAINING_METADATA[0]: "meh"}
-        self.assertEqual(
-            NovaServer.from_server_details_json(self.servers[0]),
-            NovaServer(id='a',
-                       state=ServerState.ACTIVE,
-                       image_id='valid_image',
-                       flavor_id='valid_flavor',
-                       created=self.createds[0][1],
-                       desired_lbs=pset(),
-                       servicenet_address='',
-                       links=freeze(self.links[0]),
-                       json=freeze(self.servers[0])))
-
-    def test_error_and_deleted_nova_state_trumps_draining_from_metadata(self):
-        """
-        If a draining key and value are in the metadata, but the Nova vm state
-        is DELETED, then the server is in DELETED state, not DRAINING state.
-        """
-        self.servers[0]['metadata'] = dict([DRAINING_METADATA])
-        for status, state in (("ERROR", ServerState.ERROR),
-                              ("DELETED", ServerState.DELETED)):
-            self.servers[0]['status'] = status
-            self.assertEqual(
-                NovaServer.from_server_details_json(self.servers[0]),
-                NovaServer(id='a',
-                           state=state,
-                           image_id='valid_image',
-                           flavor_id='valid_flavor',
-                           created=self.createds[0][1],
-                           desired_lbs=pset(),
-                           servicenet_address='',
-                           links=freeze(self.links[0]),
-                           json=freeze(self.servers[0])))
 
     def test_deleting_server(self):
         """
