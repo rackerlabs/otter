@@ -18,8 +18,8 @@ from twisted.trial import unittest
 
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer,
-    ExcludesAllIPs,
     ContainsAllIPs,
+    ExcludesAllIPs,
     HasLength
 )
 from otter.integration.lib.resources import TestResources
@@ -321,17 +321,14 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         )
 
     @inlineCallbacks
-    def test_changing_disowned_server_is_not_converged(self):
+    def _disown_change_and_converge(self, remove_from_clb=True):
         """
-        Moving a disowned autoscale server to a different CLB and converging
-        will not move the disowned server back on its intended CLB.
+        Test helper for
+        :func:`test_changing_disowned_server_is_not_converged_1` and
+        :func:`test_changing_disowned_server_is_not_converged_2`.
 
-        1. Create an AS group with 2 servers.
-        2. Disown 1 server.
-        3. Move both servers to a different CLB.
-        4. Converge group.
-        6. Assert that the group's server is back on its CLB, and that the
-           disowned server's remains on the wrong CLB.
+        Create an AS group with 2 servers, disowns 1 of them, perterbs the
+        CLBs they are on, and then triggers convergence.
         """
         clb_as = self.helper.clbs[0]
         clb_other = yield self.create_another_clb()
@@ -345,27 +342,49 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         yield group.disown(self.rcs, disowned_server)
 
-        # move both servers to the other CLB
-        nodes = yield clb_as.list_nodes(self.rcs)
-        yield gatherResults([
-            clb_as.delete_nodes(self.rcs, [n['id'] for n in nodes['nodes']]),
+        # copy/move the untouched server to the other CLB
+        clb_manipulation = [
             clb_other.add_nodes(
                 self.rcs,
                 [{'address': ip, 'port': 80, 'condition': 'ENABLED',
                   'type': 'PRIMARY'} for ip in ips.values()])
-        ])
+        ]
+        if remove_from_clb:
+            nodes = yield clb_as.list_nodes(self.rcs)
+            clb_manipulation.append(
+                clb_as.delete_nodes(
+                    self.rcs, [n['id'] for n in nodes['nodes']]))
+        yield gatherResults(clb_manipulation)
 
         # trigger group
         yield group.trigger_convergence(self.rcs)
 
-        # assert that the disowned server remains on the new CLB, and the
-        # remaining server remains is on the old CLB
+        returnValue((group, clb_as, clb_other, ips[disowned_server],
+                     ips[remaining_server]))
+
+    @inlineCallbacks
+    def test_changing_disowned_server_is_not_converged_1(
+            self, remove_from_clb=True):
+        """
+        Moving a disowned autoscale server to a different CLB and converging
+        will not move the disowned server back on its intended CLB.
+
+        1. Create an AS group with 2 servers.
+        2. Disown 1 server.
+        3. Move both servers to a different CLB.
+        4. Converge group.
+        6. Assert that the group's server is back on its CLB, and that the
+           disowned server's remains on the wrong CLB.
+        """
+        group, clb_as, clb_other, gone_ip, stay_ip = (
+            yield self._disown_change_and_converge())
+
         yield gatherResults([
             clb_as.wait_for_nodes(
                 self.rcs,
                 MatchesAll(
-                    ExcludesAllIPs([ips[disowned_server]]),
-                    ContainsAllIPs([ips[remaining_server]]),
+                    ExcludesAllIPs([gone_ip]),
+                    ContainsAllIPs([stay_ip]),
                     HasLength(1)
                 ),
                 timeout=timeout_default
@@ -373,8 +392,63 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             clb_other.wait_for_nodes(
                 self.rcs,
                 MatchesAll(
-                    ExcludesAllIPs([ips[remaining_server]]),
-                    ContainsAllIPs([ips[disowned_server]]),
+                    ExcludesAllIPs([stay_ip]),
+                    ContainsAllIPs([gone_ip]),
+                    HasLength(1)
+                ),
+                timeout=timeout_default
+            ),
+            group.wait_for_state(
+                self.rcs,
+                MatchesAll(
+                    ContainsDict({
+                        'pendingCapacity': Equals(0),
+                        'desiredCapacity': Equals(1),
+                        'status': Equals('ACTIVE'),
+                        'active': HasLength(1)
+                    })
+                ),
+                timeout=timeout_default
+            )
+        ])
+
+    @inlineCallbacks
+    def test_changing_disowned_server_is_not_converged_2(self):
+        """
+        Copying a disowned autoscale server to a different CLB and converging
+        will not move the disowned server back on its intended CLB.
+
+        1. Create an AS group with 2 servers.
+        2. Disown 1 server.
+        3. Place both servers on a different CLB in addition to the original
+           CLB.
+        4. Converge group.
+        6. Assert that the group's server is back on its CLB only, and that the
+           disowned server's remains on both CLBs.
+
+        This is slightly different than
+        :func:`test_changing_disowned_server_is_not_converged_1` in that it
+        does not remove the servers from their original CLB.  This tests
+        that autoscale will not remove disowned servers from the original
+        autoscale CLB.
+        """
+        group, clb_as, clb_other, gone_ip, stay_ip = (
+            yield self._disown_change_and_converge(False))
+
+        yield gatherResults([
+            clb_as.wait_for_nodes(
+                self.rcs,
+                MatchesAll(
+                    ContainsAllIPs([gone_ip, stay_ip]),
+                    HasLength(2)
+                ),
+                timeout=timeout_default
+            ),
+            clb_other.wait_for_nodes(
+                self.rcs,
+                MatchesAll(
+                    ExcludesAllIPs([stay_ip]),
+                    ContainsAllIPs([gone_ip]),
                     HasLength(1)
                 ),
                 timeout=timeout_default

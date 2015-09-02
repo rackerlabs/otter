@@ -465,13 +465,13 @@ class ScalingGroup(object):
         return d.addCallback(check_success, [204])
 
     @diagnose("AS", "Disown server")
-    def disown(self, rcs, server_id, delete=False, replace=False):
+    def disown(self, rcs, server_id, purge=False, replace=False):
         """
         Disown a server from the autoscaling group.
         """
         d = self.treq.delete(
             "{0}/servers/{1}".format(self._endpoint(rcs), server_id),
-            params={'replace': replace, 'delete': delete},
+            params={'replace': replace, 'purge': purge},
             headers=headers(str(rcs.token)), pool=self.pool)
         return d.addCallback(check_success, [202])
 
