@@ -69,22 +69,23 @@ class CLBNodeType(Names):
 class ServerState(Names):
     """
     Constants representing the state of a Nova cloud server.
-    """
 
+    Most of these constants correspond to Nova states of the same name.
+    """
     ACTIVE = NamedConstant()
-    """
-    Corresponds to Nova's ``ACTIVE`` state.
-    """
-
     ERROR = NamedConstant()
-    """
-    Corresponds to Nova's ``ERROR`` state.
-    """
-
     BUILD = NamedConstant()
-    """
-    Corresponds to Nova's ``BUILD`` and ``BUILDING`` states.
-    """
+    DELETED = NamedConstant()
+    HARD_REBOOT = NamedConstant()
+    MIGRATING = NamedConstant()
+    PASSWORD = NamedConstant()
+    REBUILD = NamedConstant()
+    RESCUE = NamedConstant()
+    RESIZE = NamedConstant()
+    REVERT_RESIZE = NamedConstant()
+    VERIFY_RESIZE = NamedConstant()
+    SHUTOFF = NamedConstant()
+    UNKNOWN = NamedConstant()
 
     DRAINING = NamedConstant()
     """"
@@ -93,9 +94,10 @@ class ServerState(Names):
     is basically functional, but that Autoscale would like to delete it.
     """
 
-    DELETED = NamedConstant()
+    UNKNOWN_TO_OTTER = NamedConstant()
     """
-    Corresponds to Nova's ``DELETED`` state.
+    Indicates that some state was returned by Nova that Otter doesn't know
+    about. The real state will be on the NovaServer object.
     """
 
 
