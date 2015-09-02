@@ -111,9 +111,8 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
-        nodes = yield self.confirm_clb_nodecounts([(clb, 1)])
-
-        the_node = nodes[0]
+        clbs_nodes = yield self.confirm_clb_nodecounts([(clb, 1)])
+        the_node = clbs_nodes[0][0]
 
         yield clb.delete_nodes(self.rcs, [the_node['id']])
 
