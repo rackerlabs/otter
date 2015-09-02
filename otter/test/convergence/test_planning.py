@@ -1,5 +1,7 @@
 """Tests for convergence planning."""
 
+from itertools import combinations
+
 from pyrsistent import b, pbag, pmap, pset, s
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -15,7 +17,7 @@ from otter.convergence.model import (
     RCv3Description,
     RCv3Node,
     ServerState)
-from otter.convergence.planning import converge, plan
+from otter.convergence.planning import Destiny, converge, plan
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -800,7 +802,37 @@ class ConvergeTests(SynchronousTestCase):
                 0),
             pbag([
                 ConvergeLater(
-                    reasons=[ErrorReason.String('building servers')])]))
+                    reasons=[ErrorReason.String('waiting for servers')])]))
+
+    def test_count_waiting_as_meeting_capacity(self):
+        """
+        If a server's destiny is WAIT, we won't provision more servers to take
+        up the slack, but rather just wait for it to come back.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.HARD_REBOOT)]),
+                set(),
+                0),
+            pbag([
+                ConvergeLater(
+                    reasons=[ErrorReason.String('waiting for servers')])]))
+
+    def test_count_do_not_replace_as_meeting_capacity(self):
+        """
+        If a server's destiny is DO_NOT_REPLACE, we won't provision more servers
+        to take up the slack, and just leave it there without causing another
+        convergence iteration, because servers in this status are only
+        transitioned to other states manually.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.RESCUE)]),
+                set(),
+                0),
+            pbag([]))
 
     def test_delete_nodes_in_error_state(self):
         """
@@ -922,6 +954,38 @@ class ConvergeTests(SynchronousTestCase):
                 set(),
                 0),
             pbag([DeleteServer(server_id='def')]))
+
+    def test_scale_down_order(self):
+        """Preferred order of servers to delete when scaling down:
+
+        - WAIT_WITH_TIMEOUT
+        - WAIT
+        - DO_NOT_REPLACE
+        - CONSIDER_ACTIVE
+        """
+        order = (Destiny.WAIT_WITH_TIMEOUT, Destiny.WAIT,
+                 Destiny.DO_NOT_REPLACE, Destiny.CONSIDER_AVAILABLE)
+        examples = {Destiny.WAIT_WITH_TIMEOUT: ServerState.BUILD,
+                    Destiny.WAIT: ServerState.HARD_REBOOT,
+                    Destiny.DO_NOT_REPLACE: ServerState.RESCUE,
+                    Destiny.CONSIDER_AVAILABLE: ServerState.ACTIVE}
+        for combo in combinations(order, 2):
+            before, after = combo
+            also = []
+            if after == Destiny.WAIT:
+                # If we're waiting for some other servers we need to also
+                # expect a ConvergeLater
+                also = [ConvergeLater(reasons=[
+                    ErrorReason.String('waiting for servers')])]
+            self.assertEqual(
+                converge(
+                    DesiredGroupState(server_config={}, capacity=2),
+                    set([server('abc', examples[after], created=0),
+                         server('def', examples[before], created=1),
+                         server('ghi', examples[after], created=2)]),
+                    set(),
+                    0),
+                pbag([DeleteServer(server_id='def')] + also))
 
     def test_timeout_building(self):
         """

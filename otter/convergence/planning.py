@@ -184,16 +184,22 @@ class Destiny(Names):
     """
 
     WAIT = NamedConstant()
-    """Waiting for the server to transition to active"""
+    """Waiting for the server to transition to active."""
+
+    DO_NOT_REPLACE = NamedConstant()
+    """
+    Unavailable, still costing money, and not imminently transitioning to
+    another state, but we want to leave it around anyway.
+    """
 
     DRAIN = NamedConstant()
-    """We intend to delete this server after some period."""
+    """Delete this server after some period."""
 
     DELETE = NamedConstant()
-    """We intend to delete this server immediately."""
+    """Delete this server immediately."""
 
     CLEANUP = NamedConstant()
-    """This server needs associated resources cleaned up."""
+    """Clean up associated resources."""
 
     IGNORE = NamedConstant()
     """This server will not count as part of the group at all."""
@@ -201,7 +207,7 @@ class Destiny(Names):
 
 # Indicate which states are part of which destiny. It's feasible that things
 # other than states can determine the destiny, but so far this is the only way
-# we know the destiny.
+# we calculate it.
 _DESTINY_TO_STATES = {
     Destiny.CONSIDER_AVAILABLE: [ServerState.ACTIVE],
     Destiny.WAIT_WITH_TIMEOUT: [ServerState.BUILD],
@@ -210,14 +216,20 @@ _DESTINY_TO_STATES = {
         ServerState.MIGRATING,
         ServerState.PASSWORD,
         ServerState.REBUILD,
-        ServerState.RESCUE,
-        ServerState.RESIZE,
+        ServerState.RESIZE, # either transitions to ACTIVE or VERIFY_RESIZE
         ServerState.REVERT_RESIZE,
+    ],
+    Destiny.DO_NOT_REPLACE: [
+        ServerState.RESCUE,
         ServerState.VERIFY_RESIZE,
         ServerState.SUSPENDED,
         ],
     Destiny.DRAIN: [ServerState.DRAINING],
-    Destiny.DELETE: [ServerState.SHUTOFF, ServerState.ERROR],
+    Destiny.DELETE: [
+        # We could implement rebooting for `SHUTOFF` servers, but instead we'll
+        # just delete/replace them.
+        ServerState.SHUTOFF,
+        ServerState.ERROR],
     Destiny.CLEANUP: [ServerState.DELETED],
     Destiny.IGNORE: [
         ServerState.UNKNOWN,
@@ -279,14 +291,21 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                             for server in building_too_long]
 
     # create servers
-    create_steps = [create_server] * (desired_state.capacity
-                                      - (len(servers_in_active)
-                                         + len(waiting_for_build)))
+    create_steps = [create_server] * (
+        desired_state.capacity
+        - (len(servers_in_active)
+           + len(waiting_for_build)
+           + len(servers[Destiny.WAIT])
+           + len(servers[Destiny.DO_NOT_REPLACE])))
 
-    # Scale down over capacity, starting with building, then active,
-    # preferring older.  Also, finish draining/deleting servers already in
-    # draining state
-    servers_in_preferred_order = servers_in_active + waiting_for_build
+    # Scale down over capacity, starting with building, then WAIT, then
+    # DO_NOT_REPLACE, then active, preferring older.  Also, finish
+    # draining/deleting servers already in draining state
+    servers_in_preferred_order = (
+        servers_in_active
+        + servers[Destiny.DO_NOT_REPLACE]
+        + servers[Destiny.WAIT]
+        + waiting_for_build)
     servers_to_delete = servers_in_preferred_order[desired_state.capacity:]
 
     def drain_and_delete_a_server(server):
@@ -322,11 +341,12 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
             [node for node in load_balancer_contents if node.matches(server)])
         ]
 
-    # if there are any building servers left, also return a ConvergeLater step.
+    # Converge again if we expect state transitions on any servers
     converge_later = []
-    if any((s not in servers_to_delete for s in waiting_for_build)):
+    if any((s not in servers_to_delete
+            for s in waiting_for_build + servers[Destiny.WAIT])):
         converge_later = [
-            ConvergeLater(reasons=[ErrorReason.String('building servers')])]
+            ConvergeLater(reasons=[ErrorReason.String('waiting for servers')])]
 
     return pbag(create_steps +
                 scale_down_steps +
