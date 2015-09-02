@@ -5,7 +5,7 @@ from collections import defaultdict
 from pyrsistent import pbag, pset
 
 from toolz.curried import filter
-from toolz.itertoolz import concat, groupby, mapcat
+from toolz.itertoolz import concat, concatv, groupby, mapcat
 
 from twisted.python.constants import NamedConstant, Names
 
@@ -216,7 +216,7 @@ _DESTINY_TO_STATES = {
         ServerState.MIGRATING,
         ServerState.PASSWORD,
         ServerState.REBUILD,
-        ServerState.RESIZE, # either transitions to ACTIVE or VERIFY_RESIZE
+        ServerState.RESIZE,  # either transitions to ACTIVE or VERIFY_RESIZE
         ServerState.REVERT_RESIZE,
     ],
     Destiny.DO_NOT_REPLACE: [
@@ -292,21 +292,21 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
 
     # create servers
     create_steps = [create_server] * (
-        desired_state.capacity
-        - (len(servers_in_active)
-           + len(waiting_for_build)
-           + len(servers[Destiny.WAIT])
-           + len(servers[Destiny.DO_NOT_REPLACE])))
+        desired_state.capacity - (
+            len(servers_in_active) +
+            len(waiting_for_build) +
+            len(servers[Destiny.WAIT]) +
+            len(servers[Destiny.DO_NOT_REPLACE])))
 
     # Scale down over capacity, starting with building, then WAIT, then
     # DO_NOT_REPLACE, then active, preferring older.  Also, finish
     # draining/deleting servers already in draining state
-    servers_in_preferred_order = (
-        servers_in_active
-        + servers[Destiny.DO_NOT_REPLACE]
-        + servers[Destiny.WAIT]
-        + waiting_for_build)
-    servers_to_delete = servers_in_preferred_order[desired_state.capacity:]
+    servers_in_preferred_order = concatv(
+        servers_in_active,
+        servers[Destiny.DO_NOT_REPLACE],
+        servers[Destiny.WAIT],
+        waiting_for_build)
+    servers_to_delete = list(servers_in_preferred_order)[desired_state.capacity:]
 
     def drain_and_delete_a_server(server):
         return _drain_and_delete(

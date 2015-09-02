@@ -821,9 +821,9 @@ class ConvergeTests(SynchronousTestCase):
 
     def test_count_do_not_replace_as_meeting_capacity(self):
         """
-        If a server's destiny is DO_NOT_REPLACE, we won't provision more servers
-        to take up the slack, and just leave it there without causing another
-        convergence iteration, because servers in this status are only
+        If a server's destiny is DO_NOT_REPLACE, we won't provision more
+        servers to take up the slack, and just leave it there without causing
+        another convergence iteration, because servers in this status are only
         transitioned to other states manually.
         """
         self.assertEqual(
@@ -847,6 +847,21 @@ class ConvergeTests(SynchronousTestCase):
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
+                CreateServer(server_config=pmap()),
+            ]))
+
+    def test_ignore_ignored(self):
+        """
+        If a server we created becomes IGNORED, we leave it be and reprovision
+        a server.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.UNKNOWN_TO_OTTER)]),
+                set(),
+                0),
+            pbag([
                 CreateServer(server_config=pmap()),
             ]))
 
