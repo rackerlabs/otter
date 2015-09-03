@@ -369,7 +369,6 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         returnValue((group, clb_as, clb_other, ips[disowned_server],
                      ips[remaining_server]))
 
-    @skip_me("Otter bug 1698")
     @inlineCallbacks
     def test_changing_disowned_server_is_not_converged_1(
             self, remove_from_clb=True):
@@ -421,7 +420,6 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         ])
 
-    @skip_me("Otter bug 1698")
     @inlineCallbacks
     def test_changing_disowned_server_is_not_converged_2(self):
         """
