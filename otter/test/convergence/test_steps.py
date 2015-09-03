@@ -17,11 +17,13 @@ from otter.cloud_client import (
     CLBDuplicateNodesError,
     CLBImmutableError,
     CLBNodeLimitError,
+    CLBNotActiveError,
     CLBNotFoundError,
     CLBRateLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
     NoSuchCLBError,
+    NoSuchCLBNodeError,
     NoSuchServerError,
     NovaComputeFaultError,
     NovaRateLimitError,
@@ -50,8 +52,6 @@ from otter.convergence.steps import (
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_ALREADY_A_MEMBER_PATTERN,
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
-    _clb_check_change_node,
-    _clb_check_change_node_handlers,
     _rcv3_check_bulk_add,
     _rcv3_check_bulk_delete,
     delete_and_verify,
@@ -373,21 +373,30 @@ class StepAsEffectTests(SynchronousTestCase):
             weight=50,
             type=CLBNodeType.PRIMARY)
         eff = change_node.as_effect()
+        retry_result = (
+            StepResult.RETRY,
+            [ErrorReason.String(
+                'must re-gather after CLB change in order to update the '
+                'active cache')])
+        seq = [(eff.intent, lambda i: (StubResponse(202, {}), {}))]
+        self.assertEqual(perform_sequence(seq, eff), retry_result)
+        terminal = (NoSuchCLBNodeError(lb_id=u'abc123', node_id=u'node1'),
+                    CLBNotFoundError(lb_id=u'abc123'),
+                    CLBNotActiveError(lb_id=u'abc123'),
+                    APIError(code=400, body="", headers={}))
+        for exception in terminal:
+            self.assertEqual(
+                perform_sequence([(eff.intent, lambda i: raise_(exception))],
+                                 eff),
+                (StepResult.FAILURE, [ANY]))
 
-        handled_codes = _clb_check_change_node_handlers.keys()
-        expected_intent = service_request(
-            ServiceType.CLOUD_LOAD_BALANCERS,
-            'PUT',
-            'loadbalancers/abc123/nodes/node1',
-            data={'condition': 'DRAINING',
-                  'weight': 50},
-            success_pred=has_code(*handled_codes)).intent
-        self.assertEqual(eff.intent, expected_intent)
-
-        (on_success, on_error), = eff.callbacks
-        self.assertIdentical(on_error, None)
-        self.assertIdentical(on_success.func, _clb_check_change_node)
-        self.assertEqual(on_success.args, (change_node,))
+        nonterminal = (APIError(code=500, body="", headers={}),
+                       CLBRateLimitError(lb_id=u'abc123'))
+        for exception in nonterminal:
+            self.assertEqual(
+                perform_sequence([(eff.intent, lambda i: raise_(exception))],
+                                 eff),
+                (StepResult.RETRY, ANY))
 
     def test_add_nodes_to_clb(self):
         """
@@ -711,41 +720,6 @@ class StepAsEffectTests(SynchronousTestCase):
         load balancers.
         """
         self._generic_bulk_rcv3_step_test(BulkRemoveFromRCv3, "DELETE")
-
-
-class CLBCheckChangeNodeTests(SynchronousTestCase):
-    """
-    Tests for :func:`_clb_check_change_node`.
-    """
-    example_step = ChangeCLBNode(lb_id="lb_id",
-                                 node_id="node_id",
-                                 condition=CLBNodeCondition.ENABLED,
-                                 weight=10,
-                                 type=CLBNodeType.PRIMARY)
-
-    def test_good_response(self):
-        """
-        If the response code indicates success, the response was successful.
-        """
-        response = StubResponse(202, {})
-        body = None
-        result = _clb_check_change_node(self.example_step, (response, body))
-        self.assertEqual(result, (StepResult.SUCCESS, []))
-
-    def test_disappearing_server(self):
-        """
-        If the node we're trying to update has vanished, retry convergence.
-        """
-        response = StubResponse(404, {})
-        body = None
-        result = _clb_check_change_node(self.example_step, (response, body))
-        self.assertEqual(
-            result,
-            (StepResult.RETRY,
-             [ErrorReason.Structured(
-                 {"reason": "CLB node not found",
-                  "node": self.example_step.node_id,
-                  "lb": self.example_step.lb_id})]))
 
 
 _RCV3_TEST_DATA = {
