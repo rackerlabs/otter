@@ -819,9 +819,9 @@ class ConvergeTests(SynchronousTestCase):
                 ConvergeLater(
                     reasons=[ErrorReason.String('waiting for servers')])]))
 
-    def test_count_do_not_replace_as_meeting_capacity(self):
+    def test_count_AVOID_REPLACING_as_meeting_capacity(self):
         """
-        If a server's destiny is DO_NOT_REPLACE, we won't provision more
+        If a server's destiny is AVOID_REPLACING, we won't provision more
         servers to take up the slack, and just leave it there without causing
         another convergence iteration, because servers in this status are only
         transitioned to other states manually.
@@ -975,14 +975,14 @@ class ConvergeTests(SynchronousTestCase):
 
         - WAIT_WITH_TIMEOUT
         - WAIT
-        - DO_NOT_REPLACE
+        - AVOID_REPLACING
         - CONSIDER_ACTIVE
         """
         order = (Destiny.WAIT_WITH_TIMEOUT, Destiny.WAIT,
-                 Destiny.DO_NOT_REPLACE, Destiny.CONSIDER_AVAILABLE)
+                 Destiny.AVOID_REPLACING, Destiny.CONSIDER_AVAILABLE)
         examples = {Destiny.WAIT_WITH_TIMEOUT: ServerState.BUILD,
                     Destiny.WAIT: ServerState.HARD_REBOOT,
-                    Destiny.DO_NOT_REPLACE: ServerState.RESCUE,
+                    Destiny.AVOID_REPLACING: ServerState.RESCUE,
                     Destiny.CONSIDER_AVAILABLE: ServerState.ACTIVE}
         for combo in combinations(order, 2):
             before, after = combo
