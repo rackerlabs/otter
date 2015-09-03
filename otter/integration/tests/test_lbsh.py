@@ -319,3 +319,41 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             ),
             timeout=timeout_default
         )
+
+    @inlineCallbacks
+    def test_heal_clb_node_attribute_changes(self):
+        """
+        Any changes to a node's attributes (condition, weight, type) are fixed
+        on convergence.
+        """
+        clb = self.helper.clbs[0]
+        group, _ = self.helper.create_group(min_entities=1)
+        yield self.helper.start_group_and_wait(group, self.rcs)
+
+        # sanity check to ensure we haven't changed the default CLB attributes
+        nodes = yield clb.wait_for_nodes(
+            self.rcs,
+            MatchesSetwise(ContainsDict({
+                'type': Equals('PRIMARY'),
+                'condition': Equals('ENABLED'),
+                'weight': Equals(1)})),
+            timeout=timeout_default)
+
+        yield clb.update_node(self.rcs, nodes[0]['id'], weight=2,
+                              type='SECONDARY', condition='DISABLED')
+
+        yield clb.wait_for_nodes(
+            self.rcs,
+            MatchesSetwise(ContainsDict({
+                'type': Equals('SECONDARY'),
+                'condition': Equals('DISABLED'),
+                'weight': Equals(2)})),
+            timeout=timeout_default)
+
+        yield group.trigger_convergence(self.rcs)
+
+        yield clb.wait_for_nodes(
+            self.rcs,
+            MatchesSetwise(Equals(nodes[0])),
+            timeout=timeout_default
+        )
