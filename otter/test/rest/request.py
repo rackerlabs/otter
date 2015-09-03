@@ -313,6 +313,25 @@ class RestAPITestMixin(RequestTestMixin):
             self.assert_status_code(405, method=method)
 
 
+def setup_mod_and_trigger(testcase):
+    """
+    Mock `modify_and_trigger` function by calling internal modifier
+
+    :param testcase: test case that is expected to have mocked controller
+        as `mock_controller` attr
+    """
+
+    testcase.otter.dispatcher = "disp"
+
+    def mod_and_trigger(disp, group, la, mod, modify_state_reason=None,
+                        *args, **kwargs):
+        testcase.assertEqual(disp, "disp")
+        return defer.maybeDeferred(
+            mod, testcase.mock_group, testcase.mock_state, *args, **kwargs)
+
+    testcase.mock_controller.modify_and_trigger.side_effect = mod_and_trigger
+
+
 class AdminRestAPITestMixin(RequestTestMixin):
     """
     Mixin for setting up tests against the OtterAdmin REST API

@@ -4,6 +4,7 @@ Composable log observers for use with Twisted's log module.
 import json
 import time
 from datetime import datetime
+from uuid import uuid4
 
 from pyrsistent import pmap
 
@@ -338,4 +339,15 @@ def throttling_wrapper(observer):
         else:
             return observer(event)
 
+    return emit
+
+
+def cf_id_wrapper(observer):
+    """
+    Wrapper that adds a cloud feeds ID to each cloud feeds event dictionary.
+    """
+    def emit(event_dict):
+        if event_dict.get('cloud_feed', False):
+            event_dict['cloud_feed_id'] = str(uuid4())
+        observer(event_dict)
     return emit

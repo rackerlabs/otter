@@ -6,26 +6,26 @@ policy.
 (/tenantId/groups/groupId/policy/policyId/webhook
  /tenantId/groups/groupId/policy/policyId/webhook/webhookId)
 """
-from functools import partial
 import json
+from functools import partial
 
-from otter.log import log
+from otter import controller
+from otter.controller import CannotExecutePolicyError
 from otter.json_schema import group_schemas
 from otter.json_schema import rest_schemas
-from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   with_transaction_id, paginatable)
+from otter.log import log
+from otter.log.bound import bound_log_kwargs
+from otter.models.interface import (
+    NoSuchPolicyError,
+    NoSuchScalingGroupError,
+    UnrecognizedCapabilityError
+)
+from otter.rest.decorators import (
+    fails_with, paginatable, succeeds_with, validate_body, with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
-from otter.util.http import get_autoscale_links, transaction_id, get_webhooks_links
-
-from otter.models.interface import (
-    UnrecognizedCapabilityError,
-    NoSuchPolicyError,
-    NoSuchScalingGroupError
-)
-
-from otter.controller import CannotExecutePolicyError
-from otter import controller
+from otter.util.http import (
+    get_autoscale_links, get_webhooks_links, transaction_id)
 
 
 def _format_webhook(webhook_model, tenant_id, group_id, policy_id,
@@ -333,13 +333,14 @@ class OtterExecute(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, capability_version, capability_hash):
+    def __init__(self, store, capability_version, capability_hash, dispatcher):
         self.log = log.bind(system='otter.rest.execute',
                             capability_version=capability_version,
                             capability_hash=capability_hash)
         self.store = store
         self.capability_version = capability_version
         self.capability_hash = capability_hash
+        self.dispatcher = dispatcher
 
     @app.route('/', methods=['POST'])
     @with_transaction_id()
@@ -370,7 +371,10 @@ class OtterExecute(object):
             logl[0] = bound_log
             group = self.store.get_scaling_group(bound_log, tenant_id,
                                                  group_id)
-            return group.modify_state(
+            return controller.modify_and_trigger(
+                self.dispatcher,
+                group,
+                bound_log_kwargs(bound_log),
                 partial(controller.maybe_execute_scaling_policy,
                         bound_log, transaction_id(request),
                         policy_id=policy_id),

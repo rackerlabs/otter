@@ -1,6 +1,4 @@
-"""
-Integration point for HTTP clients in otter.
-"""
+"""A general-ish purpose Rackspace cloud client API, using Effect."""
 import json
 import re
 from functools import partial, wraps

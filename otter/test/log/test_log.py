@@ -10,7 +10,9 @@ import mock
 from testtools.matchers import (
     Contains,
     ContainsDict,
-    Equals)
+    Equals,
+    MatchesRegex
+)
 
 from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
@@ -27,6 +29,7 @@ from otter.log.formatters import (
     StreamObserverWrapper,
     SystemFilterWrapper,
     add_to_fanout,
+    cf_id_wrapper,
     get_fanout,
     serialize_to_jsonable,
     set_fanout,
@@ -663,3 +666,27 @@ class FanoutObserverTests(SynchronousTestCase):
         # set_fanout
         set_fanout(None)
         self.assertEqual(get_fanout(), None)
+
+
+class CFIDWrapperTests(SynchronousTestCase):
+    """
+    Tests for generating a CF ID as an observer/wrapper (:func:`cfid_wrapper`)
+    """
+    def test_add_cf_id_to_cloud_feeds_events(self):
+        """
+        CF event dictionaries have an ID added to them, non-CF events do not.
+        """
+        obs = []
+        id_observer = cf_id_wrapper(obs.append)
+        id_observer({'cloud_feed': True, 'this': 'is a cf event'})
+        id_observer({'this': 'is not a cf event'})
+
+        def hex_repeat(num):
+            return "[a-fA-F0-9]{{{num}}}".format(num=num)
+
+        uuid_regex = "-".join([hex_repeat(i) for i in (8, 4, 4, 4, 12)])
+        self.assertEqual(
+            obs,
+            [{'cloud_feed': True, 'this': 'is a cf event',
+              'cloud_feed_id': matches(MatchesRegex(uuid_regex))},
+             {'this': 'is not a cf event'}])

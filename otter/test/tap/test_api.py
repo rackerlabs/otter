@@ -519,6 +519,7 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.assertEqual(get_fanout(), None)
 
+    @mock.patch('otter.tap.api.get_full_dispatcher', return_value="disp")
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
     @mock.patch('otter.tap.api.KazooClient')
@@ -526,7 +527,7 @@ class APIMakeServiceTests(SynchronousTestCase):
     @mock.patch('otter.tap.api.TxLogger')
     def test_kazoo_client_success(self, mock_tx_logger, mock_thread_pool,
                                   mock_kazoo_client, mock_txkz,
-                                  mock_setup_scheduler):
+                                  mock_setup_scheduler, mock_gfd):
         """
         TxKazooClient is started and calls `setup_scheduler`. Its instance
         is also set in store.kz_client after start has finished, and the
@@ -567,7 +568,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         # they are called after start completes
         start_d.callback(None)
         mock_setup_scheduler.assert_called_once_with(
-            parent, self.store, kz_client)
+            parent, "disp", self.store, kz_client)
         self.assertEqual(self.store.kz_client, kz_client)
         sch = mock_setup_scheduler.return_value
         self.assertEqual(self.health_checker.checks['scheduler'],
@@ -716,6 +717,7 @@ class ConvergerSetupTests(SynchronousTestCase):
         self.assertIs(converger.__class__, Converger)
         self.assertEqual(converger.build_timeout, 35)
         self.assertEqual(converger._dispatcher, dispatcher)
+        self.assertEqual(converger.interval, interval)
         [partitioner] = converger.services
         [timer] = partitioner.services
         self.assertIs(partitioner.__class__, Partitioner)
@@ -759,7 +761,7 @@ class SchedulerSetupTests(SynchronousTestCase):
         `SchedulerService` is configured with config values and set as parent
         to passed `MultiService`
         """
-        svc = setup_scheduler(self.parent, self.store, self.kz_client)
+        svc = setup_scheduler(self.parent, "disp", self.store, self.kz_client)
         buckets = range(1, 11)
         self.store.set_scheduler_buckets.assert_called_once_with(buckets)
         self.assertEqual(self.parent.services, [svc])
@@ -767,6 +769,7 @@ class SchedulerSetupTests(SynchronousTestCase):
         self.assertEqual(svc.partitioner.buckets, buckets)
         self.assertEqual(svc.partitioner.kz_client, self.kz_client)
         self.assertEqual(svc.partitioner.partitioner_path, '/part_path')
+        self.assertEqual(svc.dispatcher, "disp")
 
     def test_mock_store_with_scheduler(self):
         """
@@ -775,6 +778,6 @@ class SchedulerSetupTests(SynchronousTestCase):
         self.config['mock'] = True
         set_config_data(self.config)
         self.assertIs(
-            setup_scheduler(self.parent, self.store, self.kz_client),
+            setup_scheduler(self.parent, "disp", self.store, self.kz_client),
             None)
         self.assertFalse(self.store.set_scheduler_buckets.called)

@@ -32,19 +32,21 @@ def unwrap_first_error(possible_first_error):
     return possible_first_error  # not a defer.FirstError
 
 
-def ignore_and_log(failure, exception_type, log, msg):
+def ignore_and_log(failure, exception_type, log, msg, **kwargs):
     """
-    Ignore the given exception type and log it. This method is to be used as errback handler
+    Ignore the given exception type and log it. This method can be used
+    as errback handler
 
     :param failure: `Failure` instance representing the error
     :param exception_type: Exception class that needs to be trapped
     :param log: A bound logger
     :param msg: message to be logged
+    :param dict kwargs: Other arguments to log
 
     :return: None if exception is trapped. Otherwise, raises other error
     """
     failure.trap(exception_type)
-    log.msg(msg, reason=failure)
+    log.msg(msg, reason=failure, **kwargs)
 
 
 class TimedOutError(Exception):
