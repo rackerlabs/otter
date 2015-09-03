@@ -29,7 +29,6 @@ from otter.integration.lib.trial_tools import (
     get_identity,
     get_resource_mapping,
     region,
-    skip_me
 )
 
 timeout_default = 600
