@@ -5,7 +5,7 @@ from collections import defaultdict
 from pyrsistent import pbag, pset
 
 from toolz.curried import filter
-from toolz.itertoolz import concat, groupby, mapcat
+from toolz.itertoolz import groupby, mapcat
 
 from twisted.python.constants import NamedConstant, Names
 
@@ -236,14 +236,8 @@ _DESTINY_TO_STATES = {
         ServerState.UNKNOWN_TO_OTTER],
 }
 
-# Ensure we've covered all the server states
-for st in ServerState.iterconstants():
-    assert st in concat(_DESTINY_TO_STATES.values()), st
-# Ensure states only map to one destiny
-_all_destiny_states = list(concat(_DESTINY_TO_STATES.values()))
-assert len(_all_destiny_states) == len(set(_all_destiny_states))
 
-STATE_TO_DESTINY = {
+_STATE_TO_DESTINY = {
     state: destiny
     for destiny, states in _DESTINY_TO_STATES.iteritems()
     for state in states}
@@ -251,7 +245,7 @@ STATE_TO_DESTINY = {
 
 def get_destiny(server):
     """Get the obj:`Destiny` of a server."""
-    return STATE_TO_DESTINY.get(server.state)
+    return _STATE_TO_DESTINY.get(server.state)
 
 
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,

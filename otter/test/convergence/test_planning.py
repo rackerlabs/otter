@@ -17,7 +17,7 @@ from otter.convergence.model import (
     RCv3Description,
     RCv3Node,
     ServerState)
-from otter.convergence.planning import Destiny, converge, plan
+from otter.convergence.planning import Destiny, converge, get_destiny, plan
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -1113,3 +1113,13 @@ class PlanTests(SynchronousTestCase):
                 DeleteServer(server_id='server1'),
                 CreateServer(server_config=pmap({}))
             ]))
+
+
+class DestinyTests(SynchronousTestCase):
+    """Tests for :func:`get_destiny`."""
+
+    def test_all_server_states_have_destinies(self):
+        """All server states have an associated destiny."""
+        for st in ServerState.iterconstants():
+            s = server('s1', state=st)
+            self.assertIsNot(get_destiny(s), None)
