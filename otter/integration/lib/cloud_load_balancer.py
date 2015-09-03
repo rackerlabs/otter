@@ -90,13 +90,13 @@ class CloudLoadBalancer(object):
             }
         }
 
-    def scaling_group_spec(self):
+    def scaling_group_spec(self, port=80):
         """Computes the necessary CLB specification to use when creating a
         scaling group.  See also the lib.autoscale.create_scaling_group_dict
         function for more details.
         """
         return {
-            "port": 80,
+            "port": port,
             "loadBalancerId": self.clb_id,
         }
 
