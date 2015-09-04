@@ -19,6 +19,7 @@ from otter.constants import (
     CONVERGENCE_DIRTY_DIR, ServiceType, get_service_configs)
 from otter.convergence.service import Converger
 from otter.log.cloudfeeds import CloudFeedsObserver
+from otter.log.formatters import get_fanout, set_fanout
 from otter.models.cass import CassScalingGroupCollection as OriginalStore
 from otter.supervisor import SupervisorService, get_supervisor, set_supervisor
 from otter.tap.api import (
@@ -30,6 +31,7 @@ from otter.tap.api import (
     setup_scheduler
 )
 from otter.test.test_auth import identity_config
+from otter.test.test_effect_dispatcher import full_intents
 from otter.test.utils import CheckFailure, matches, patch
 from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
@@ -51,7 +53,8 @@ test_config = {
     'cloudLoadBalancers': 'cloudLoadBalancers',
     'rackconnect': 'rackconnect',
     'metrics': {'service': 'cloudMetricsIngest',
-                'region': 'IAD'}
+                'region': 'IAD'},
+    'limits': {'absolute': {'maxGroups': 100}}
 }
 
 
@@ -421,8 +424,15 @@ class APIMakeServiceTests(SynchronousTestCase):
         """
         makeService(test_config)
         self.Otter.assert_called_once_with(self.store, 'ord',
-                                           self.health_checker.health_check,
-                                           es_host=None)
+                                           self.health_checker.health_check)
+
+    def test_max_groups(self):
+        """
+        CassScalingGroupCollection is created with max groups taken from
+        config
+        """
+        makeService(test_config)
+        self.assertEqual(self.store.max_groups, 100)
 
     @mock.patch('otter.tap.api.reactor')
     @mock.patch('otter.tap.api.generate_authenticator')
@@ -466,11 +476,13 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.assertEqual(get_supervisor(), supervisor_service)
 
-    @mock.patch('otter.tap.api.addObserver')
-    def test_cloudfeeds_setup(self, mock_addobserver):
+    def test_cloudfeeds_setup(self):
         """
         Cloud feeds observer is setup if it is there in config
         """
+        self.addCleanup(set_fanout, None)
+        self.assertEqual(get_fanout(), None)
+
         conf = deepcopy(test_config)
         conf['cloudfeeds'] = {'service': 'cloudFeeds', 'tenant_id': 'tid',
                               'url': 'url'}
@@ -478,27 +490,36 @@ class APIMakeServiceTests(SynchronousTestCase):
         serv_confs = get_service_configs(conf)
         serv_confs[ServiceType.CLOUD_FEEDS] = {
             'name': 'cloudFeeds', 'region': 'ord', 'url': 'url'}
-        cf = CloudFeedsObserver(
-            reactor=self.reactor,
-            authenticator=matches(IsInstance(CachingAuthenticator)),
-            region='ord', tenant_id='tid',
-            service_configs=serv_confs)
-        mock_addobserver.assert_called_once_with(cf)
 
-        # Observer has single tenant auth
-        real_cf = mock_addobserver.call_args[0][0]
+        self.assertEqual(len(get_fanout().subobservers), 1)
+        cf_observer = get_fanout().subobservers[0]
+        self.assertEqual(
+            cf_observer,
+            CloudFeedsObserver(
+                reactor=self.reactor,
+                authenticator=matches(IsInstance(CachingAuthenticator)),
+                tenant_id='tid',
+                region='ord',
+                service_configs=serv_confs))
+
+        # single tenant authenticator is created
+        authenticator = cf_observer.authenticator
         self.assertIsInstance(
-            real_cf.authenticator._authenticator._authenticator._authenticator,
+            authenticator._authenticator._authenticator._authenticator,
             SingleTenantAuthenticator)
 
-    @mock.patch('otter.tap.api.addObserver')
-    def test_cloudfeeds_no_setup(self, mock_addobserver):
+    def test_cloudfeeds_no_setup(self):
         """
         Cloud feeds observer is not setup if it is not there in config
         """
-        makeService(test_config)
-        self.assertFalse(mock_addobserver.called)
+        self.addCleanup(set_fanout, None)
+        self.assertEqual(get_fanout(), None)
 
+        makeService(test_config)
+
+        self.assertEqual(get_fanout(), None)
+
+    @mock.patch('otter.tap.api.get_full_dispatcher', return_value="disp")
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
     @mock.patch('otter.tap.api.KazooClient')
@@ -506,7 +527,7 @@ class APIMakeServiceTests(SynchronousTestCase):
     @mock.patch('otter.tap.api.TxLogger')
     def test_kazoo_client_success(self, mock_tx_logger, mock_thread_pool,
                                   mock_kazoo_client, mock_txkz,
-                                  mock_setup_scheduler):
+                                  mock_setup_scheduler, mock_gfd):
         """
         TxKazooClient is started and calls `setup_scheduler`. Its instance
         is also set in store.kz_client after start has finished, and the
@@ -547,7 +568,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         # they are called after start completes
         start_d.callback(None)
         mock_setup_scheduler.assert_called_once_with(
-            parent, self.store, kz_client)
+            parent, "disp", self.store, kz_client)
         self.assertEqual(self.store.kz_client, kz_client)
         sch = mock_setup_scheduler.return_value
         self.assertEqual(self.health_checker.checks['scheduler'],
@@ -649,6 +670,34 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.successResultOf(d)
         self.assertTrue(kz_client.stop.called)
 
+    @mock.patch('otter.tap.api.setup_scheduler')
+    @mock.patch('otter.tap.api.TxKazooClient')
+    @mock.patch('otter.tap.api.setup_converger')
+    def test_converger_dispatcher(self, mock_setup_converger,
+                                  mock_txkz, mock_setup_scheduler):
+        """
+        The converger dispatcher that is set up after kazoo is ready can handle
+        all intents.
+        """
+        config = test_config.copy()
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
+        kz_client = mock.Mock(spec=['start', 'stop'])
+        kz_client.start.return_value = defer.succeed(None)
+        mock_txkz.return_value = kz_client
+
+        parent = makeService(config)
+
+        mock_setup_converger.assert_called_once_with(
+            parent, kz_client, mock.ANY, 10, 3600)
+
+        dispatcher = mock_setup_converger.call_args[0][2]
+
+        # Check dispatcher is set in otter object
+        self.assertIs(self.Otter.return_value.dispatcher, dispatcher)
+
+        for intent in full_intents():
+            self.assertIsNot(dispatcher(intent), None)
+
 
 class ConvergerSetupTests(SynchronousTestCase):
     """Tests for :func:`setup_converger`."""
@@ -663,10 +712,12 @@ class ConvergerSetupTests(SynchronousTestCase):
         kz_client = object()
         dispatcher = object()
         interval = 50
-        setup_converger(ms, kz_client, dispatcher, interval)
+        setup_converger(ms, kz_client, dispatcher, interval, build_timeout=35)
         [converger] = ms.services
         self.assertIs(converger.__class__, Converger)
+        self.assertEqual(converger.build_timeout, 35)
         self.assertEqual(converger._dispatcher, dispatcher)
+        self.assertEqual(converger.interval, interval)
         [partitioner] = converger.services
         [timer] = partitioner.services
         self.assertIs(partitioner.__class__, Partitioner)
@@ -710,7 +761,7 @@ class SchedulerSetupTests(SynchronousTestCase):
         `SchedulerService` is configured with config values and set as parent
         to passed `MultiService`
         """
-        svc = setup_scheduler(self.parent, self.store, self.kz_client)
+        svc = setup_scheduler(self.parent, "disp", self.store, self.kz_client)
         buckets = range(1, 11)
         self.store.set_scheduler_buckets.assert_called_once_with(buckets)
         self.assertEqual(self.parent.services, [svc])
@@ -718,6 +769,7 @@ class SchedulerSetupTests(SynchronousTestCase):
         self.assertEqual(svc.partitioner.buckets, buckets)
         self.assertEqual(svc.partitioner.kz_client, self.kz_client)
         self.assertEqual(svc.partitioner.partitioner_path, '/part_path')
+        self.assertEqual(svc.dispatcher, "disp")
 
     def test_mock_store_with_scheduler(self):
         """
@@ -726,6 +778,6 @@ class SchedulerSetupTests(SynchronousTestCase):
         self.config['mock'] = True
         set_config_data(self.config)
         self.assertIs(
-            setup_scheduler(self.parent, self.store, self.kz_client),
+            setup_scheduler(self.parent, "disp", self.store, self.kz_client),
             None)
         self.assertFalse(self.store.set_scheduler_buckets.called)

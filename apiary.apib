@@ -4,7 +4,7 @@ FORMAT: 1A
 
 ## Authentication and Endpoints
 
-Every REST request for Auto Scale requires the inclusion of the X-Auth-Token HTTP header. 
+Every REST request for Auto Scale requires the inclusion of the X-Auth-Token HTTP header.
 The regions you have access to are available in your service catalog.
 Obtain this token and your service catalog via the [Authentication service](http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content/Retrieving_Auth_Token.html).
 
@@ -68,7 +68,7 @@ format containing id and links is returned.
 
 + Request (application/json)
     + Body
-       
+
             {
               "launchConfiguration": {
                 "args": {
@@ -84,7 +84,6 @@ format containing id and links is returned.
                     "flavorRef": "2",
                     "OS-DCF:diskConfig": "AUTO",
                     "metadata": {
-                      "build_config": "core",
                       "meta_key_1": "meta_value_1",
                       "meta_key_2": "meta_value_2"
                     },
@@ -128,7 +127,7 @@ format containing id and links is returned.
 
 + Response 201 (application/json)
     + Body
-        
+
             {
               "group": {
                 "launchConfiguration": {
@@ -159,7 +158,6 @@ format containing id and links is returned.
                         }
                       ],
                       "metadata": {
-                        "build_config": "core",
                         "meta_key_1": "meta_value_1",
                         "meta_key_2": "meta_value_2"
                       }
@@ -210,12 +208,6 @@ format containing id and links is returned.
               }
             }
 
-## History [/{tenantId}/group/{groupId}/history]
-
-### Get History [GET]
-Returns the most recent events for the Auto Scale group.
-
-+ Response 501
 
 ## Specific Groups [/{tenantId}/groups/{groupId}]
 
@@ -226,7 +218,7 @@ the body of the response in JSON format.
 
 + Response 200 (application/json)
     + Body
-        
+
             {
               "group": {
                 "launchConfiguration": {
@@ -257,7 +249,6 @@ the body of the response in JSON format.
                         }
                       ],
                       "metadata": {
-                        "build_config": "core",
                         "meta_key_1": "meta_value_1",
                         "meta_key_2": "meta_value_2"
                       }
@@ -322,7 +313,7 @@ of entities.  This data is returned in the body of the response in JSON format.
 
 + Response 200
     + Body
-       
+
             {
                 "group": {
                     "paused": false,
@@ -349,7 +340,7 @@ format.
 
 + Response 200 (application/json)
     + Body
-        
+
             {
                 "groupConfiguration": {
                     "name": "workers",
@@ -370,9 +361,9 @@ number of entities, the maximum number of entities, global cooldown, and
 other metadata.  This data provided in the request body in JSON format.
 If successful, no response body will be returned.
 
-+ Request 
++ Request
     + Body
-        
+
             {
                 "name": "workers",
                 "cooldown": 60,
@@ -396,7 +387,7 @@ This data is returned in the body of the response in JSON format.
 
 + Response 200
     + Body
-        
+
             {
                 "launchConfiguration": {
                     "type": "launch_server",
@@ -440,7 +431,7 @@ If successful, no response body will be returned.
 
 + Request
     + Body
-        
+
             {
                 "type": "launch_server",
                 "args": {
@@ -505,7 +496,7 @@ body of the response in JSON format.
 
 + Response 200 (application/json)
     + Body
-        
+
             {
                 "policies": [
                     {
@@ -590,7 +581,7 @@ An array of scaling policies is provided in the request body in JSON format.
 
 + Request (application/json)
     + Body
-        
+
             [
                 {
                     "change": 1,
@@ -631,7 +622,7 @@ An array of scaling policies is provided in the request body in JSON format.
             ]
 
 + Response 201 (application/json)
-    + Body 
+    + Body
 
             {
                 "policies": [
@@ -720,7 +711,7 @@ JSON format.
 
 + Response 200 (application/json)
     + Body
-        
+
             {
                 "policy": {
                     "args": {
@@ -745,9 +736,9 @@ Scaling policies must include a name, type,
 adjustment, and cooldown.
 If successful, no response body will be returned.
 
-+ Request 
++ Request
     + Body
-       
+
             {
                 "change": 1,
                 "cooldown": 1800,
@@ -757,7 +748,7 @@ If successful, no response body will be returned.
 + Response 204
 
 
-### Delete scaling policy [DELETE] 
+### Delete scaling policy [DELETE]
 If successful, no response body will be returned.
 
 + Response 204
@@ -769,7 +760,7 @@ If successful, a response body will be returned.
 
 + Response 202
     + Body
-    
+
             {}
 
 # Group Anonymous Policy Execution URLs
@@ -782,7 +773,7 @@ authentication.
 
 + Response 202 (application/json)
     + Body
-      
+
             {}
 
 
@@ -798,7 +789,7 @@ This data is returned in the body of the response in JSON format.
 
 + Response 200
     + Body
-       
+
             {
                 "webhooks": [
                     {
@@ -934,7 +925,7 @@ If successful, no response body will be returned.
 
 + Request
     + Body
-    
+
             {
                 "name": "alice",
                 "metadata": {
@@ -958,7 +949,7 @@ Provides details about account usage limits.
 
 + Response 200 (application/json)
     + Body
-            
+
             {
                 "limits": {
                     "absolute": {

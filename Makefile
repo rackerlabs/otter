@@ -5,7 +5,7 @@ SCRIPTSDIR=scripts
 PYDIRS=${CODEDIR} ${SCRIPTSDIR} autoscale_cloudcafe autoscale_cloudroast
 CQLSH ?= $(shell which cqlsh)
 DOCDIR=doc
-UNITTESTS ?= ${CODEDIR}
+UNITTESTS ?= ${CODEDIR}.test ${CODEDIR}.integration.lib
 CASSANDRA_HOST ?= localhost
 export CASSANDRA_HOST
 CASSANDRA_PORT ?= 9160
@@ -70,11 +70,12 @@ TRIAL_OPTIONS_UNIT=${TRIAL_OPTIONS} --jobs 4
 
 unit:
 ifneq ($(JENKINS_URL), )
-	trial ${TRIAL_OPTIONS_UNIT} --reporter=subunit ${UNITTESTS} \
-		| tee subunit-output.txt
+	PYRSISTENT_NO_C_EXTENSION=true trial ${TRIAL_OPTIONS_UNIT} \
+		--reporter=subunit ${UNITTESTS} \
+		| subunit-1to2 | tee subunit-output.txt
 	tail -n +4 subunit-output.txt | subunit2junitxml > test-report.xml
 else
-	trial ${TRIAL_OPTIONS_UNIT} ${UNITTESTS}
+	PYRSISTENT_NO_C_EXTENSION=true trial ${TRIAL_OPTIONS_UNIT} ${UNITTESTS}
 endif
 
 integration:
@@ -92,7 +93,8 @@ else
 endif
 
 coverage:
-	coverage run --source=${CODEDIR} --branch `which trial` \
+	PYRSISTENT_NO_C_EXTENSION=true coverage run --source=${CODEDIR} \
+		--branch `which trial` \
 	    ${TRIAL_OPTIONS} ${UNITTESTS}
 
 coverage-html: coverage

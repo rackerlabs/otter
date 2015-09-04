@@ -1,8 +1,11 @@
 """Tests for otter.util.fp"""
 
+from pyrsistent import pmap
+
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.util.fp import predicate_all, predicate_any
+from otter.util.fp import (
+    assoc_obj, predicate_all, predicate_any, set_in)
 
 
 class PredicateAllTests(SynchronousTestCase):
@@ -93,3 +96,58 @@ class PredicateAnyTests(SynchronousTestCase):
             predicate_any(
                 lambda **k: k['a'] % 2 == 0 and k['b'] % 2 == 0,
                 lambda **k: k['a'] % 3 == 0 and k['b'] % 3 == 0)(a=2, b=4))
+
+
+class SetInTests(SynchronousTestCase):
+    """
+    Tests for :func:`otter.util.fp.set_in`
+    """
+    def test_insufficient_keys_raises_value_error(self):
+        """
+        If zero keys are passed, a :class:`ValueError` is raised.
+        """
+        self.assertRaises(ValueError, set_in, {1: 2}, (), None)
+
+    def test_returns_new_pmap_given_pmap(self):
+        """
+        If a PMap is passed in, a new PMap is returned, and even the new value
+        that was passed in gets frozen.
+        """
+        self.assertEquals(set_in(pmap({1: 2}), (1,), {1: 3}),
+                          pmap({1: pmap({1: 3})}))
+
+    def test_returns_new_pmap_given_dict(self):
+        """
+        If a dictionary is passed in, a new PMap is returned and the old
+        dictionary is unaffected.
+        """
+        a = {1: 2}
+        self.assertEquals(set_in(a, (1,), {1: 3}), pmap({1: pmap({1: 3})}))
+        self.assertEquals(a, {1: 2})
+
+    def test_creates_dictionaries(self):
+        """
+        Create dictionaries as needed, if the old dict didn't have them.
+        """
+        self.assertEquals(set_in({}, (1, 2, 3), 4),
+                          pmap({1: pmap({2: pmap({3: 4})})}))
+
+
+class AssocObjTests(SynchronousTestCase):
+    """Tests for :func:`assoc_obj`."""
+
+    def test_assoc(self):
+        """
+        Creates a new object that's a copy of the old one, with the
+        specified attributes rebound. Existing attributes are identical.
+        """
+        class Foo(object):
+            def __init__(self):
+                self.l = [1, 2]
+                self.name = "foo"
+
+        o = Foo()
+        new = assoc_obj(o, name="bar")
+        self.assertEqual(o.name, "foo")
+        self.assertEqual(new.name, "bar")
+        self.assertIs(o.l, new.l)

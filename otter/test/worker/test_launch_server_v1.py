@@ -57,7 +57,6 @@ from otter.worker.launch_server_v1 import (
     delete_and_verify,
     delete_server,
     find_server,
-    generate_server_metadata,
     launch_server,
     prepare_launch_config,
     remove_from_load_balancer,
@@ -1573,27 +1572,20 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
                          'loadBalancers': [
                              {'loadBalancerId': 12345, 'port': 80},
-                             {'loadBalancerId': 54321, 'port': 81}
-                         ]}
-
-        load_balancer_metadata = {
-            'rax:auto_scaling_server_name': 'as000000',
-            'rax:auto_scaling_group_id': '1111111-11111-11111-11111111'}
+                             {'loadBalancerId': 54321, 'port': 81}]}
 
         prepared_load_balancers = [
-            {'loadBalancerId': 12345, 'port': 80,
-             'metadata': load_balancer_metadata},
-            {'loadBalancerId': 54321, 'port': 81,
-             'metadata': load_balancer_metadata}
+            {'loadBalancerId': 12345, 'port': 80},
+            {'loadBalancerId': 54321, 'port': 81}
         ]
 
         expected_server_config = {
             'imageRef': '1', 'flavorRef': '1', 'name': 'as000000',
             'metadata': {
                 'rax:auto_scaling_group_id': '1111111-11111-11111-11111111',
-                'rax:auto_scaling_lbids': '[12345, 54321]',
-                'rax:auto_scaling:lb:12345': '{"port": 80}',
-                'rax:auto_scaling:lb:54321': '{"port": 81}'
+                'rax:autoscale:group:id': '1111111-11111-11111-11111111',
+                'rax:autoscale:lb:CloudLoadBalancer:12345': '[{"port": 80}]',
+                'rax:autoscale:lb:CloudLoadBalancer:54321': '[{"port": 81}]'
             }
         }
 
@@ -1704,8 +1696,11 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         wait_for_active.return_value = succeed(server_details)
 
         d = self._launch_server(launch_config)
-        expected_metadata = generate_server_metadata(self.scaling_group.uuid,
-                                                     launch_config)
+        expected_metadata = {
+            "rax:auto_scaling_group_id": self.scaling_group.uuid,
+            "rax:autoscale:group:id": self.scaling_group.uuid,
+            "rax:autoscale:lb:CloudLoadBalancer:12345": '[{"port": 80}]'
+        }
 
         self.successResultOf(d)
         self.assertEqual(
@@ -1871,24 +1866,33 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_active')
-    def test_launch_retries_on_error(self, mock_wfa, mock_cs, mock_addlb, mock_vd):
+    def test_launch_retries_on_error(self, mock_wfa, mock_cs, mock_addlb,
+                                     mock_vd):
         """
-        If server goes into ERROR state, launch_server deletes it and creates a new
-        one instead
+        If server goes into ERROR state, launch_server deletes it and creates
+        a new one instead
         """
-        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
-                         'loadBalancers': [
-                             {'loadBalancerId': 12345, 'port': 80},
-                             {'loadBalancerId': 54321, 'port': 81}
-                         ]}
+        launch_config = {
+            'server': {'imageRef': '1', 'flavorRef': '1'},
+            'loadBalancers': [{'loadBalancerId': 12345, 'port': 80},
+                              {'loadBalancerId': 54321, 'port': 81}]
+        }
+
+        metadata = {
+            "rax:auto_scaling_group_id": self.scaling_group.uuid,
+            "rax:autoscale:group:id": self.scaling_group.uuid,
+            "rax:autoscale:lb:CloudLoadBalancer:12345": '[{"port": 80}]',
+            "rax:autoscale:lb:CloudLoadBalancer:54321": '[{"port": 81}]'
+        }
 
         server_details = {
             'server': {
                 'id': '1',
                 'addresses': {'private': [
                     {'version': 4, 'addr': '10.0.0.1'}]},
-                'metadata': generate_server_metadata(self.scaling_group.uuid,
-                                                     launch_config)}}
+                'metadata': metadata
+            }
+        }
 
         mock_cs.side_effect = lambda *a, **kw: succeed(server_details)
 
@@ -2036,34 +2040,6 @@ class ConfigPreparationTests(SynchronousTestCase):
 
         self.scaling_group_uuid = '1111111-11111-11111-11111111'
 
-    def test_generate_server_metadata_adds_scaling_group_name(self):
-        """
-        The server metadata contains the group name.
-        """
-        output = generate_server_metadata(self.scaling_group_uuid,
-                                          {'server': {}})
-        self.assertEqual(output,
-                         {'rax:auto_scaling_group_id': self.scaling_group_uuid})
-
-    def test_generate_server_metadata_adds_lb_index_and_lb_keys(self):
-        """
-        If load balancers are configured, load balancer ids and the relevant
-        information needed to add the the server to the load balancer (IP and
-        port for now)
-        """
-        output = generate_server_metadata(
-            self.scaling_group_uuid,
-            {"loadBalancers": [
-                {'loadBalancerId': 1, 'port': 80},
-                {'loadBalancerId': 2, 'port': 2200}
-            ]})
-        self.assertEqual(output, {
-            'rax:auto_scaling_group_id': self.scaling_group_uuid,
-            'rax:auto_scaling_lbids': '[1, 2]',
-            'rax:auto_scaling:lb:1': '{"port": 80}',
-            'rax:auto_scaling:lb:2': '{"port": 2200}'
-        })
-
     def test_server_name_suffix(self):
         """
         The server name uses the name specified in the launch config as a
@@ -2093,9 +2069,15 @@ class ConfigPreparationTests(SynchronousTestCase):
         """
         The auto scaling group should be added to the server metadata.
         """
-        test_config = {'server': {}}
+        test_config = {'server': {},
+                       "loadBalancers": [{'loadBalancerId': 1, 'port': 80},
+                                         {'loadBalancerId': 2, 'port': 2200}]}
         expected_metadata = {
-            'rax:auto_scaling_group_id': self.scaling_group_uuid}
+            'rax:auto_scaling_group_id': self.scaling_group_uuid,
+            'rax:autoscale:group:id': self.scaling_group_uuid,
+            'rax:autoscale:lb:CloudLoadBalancer:1': '[{"port": 80}]',
+            'rax:autoscale:lb:CloudLoadBalancer:2': '[{"port": 2200}]'
+        }
 
         launch_config = prepare_launch_config(self.scaling_group_uuid,
                                               test_config)
@@ -2110,6 +2092,7 @@ class ConfigPreparationTests(SynchronousTestCase):
         test_config = {'server': {'metadata': {'foo': 'bar'}}}
         expected_metadata = {
             'rax:auto_scaling_group_id': self.scaling_group_uuid,
+            'rax:autoscale:group:id': self.scaling_group_uuid,
             'foo': 'bar'}
 
         launch_config = prepare_launch_config(self.scaling_group_uuid,
@@ -2117,42 +2100,6 @@ class ConfigPreparationTests(SynchronousTestCase):
 
         self.assertEqual(expected_metadata,
                          launch_config['server']['metadata'])
-
-    def test_load_balancer_metadata(self):
-        """
-        auto scaling group and auto scaling server name should be
-        added to the node metadata for a load balancer.
-        """
-        test_config = {'server': {},
-                       'loadBalancers': [{'loadBalancerId': 1, 'port': 80}]}
-
-        expected_metadata = {
-            'rax:auto_scaling_group_id': self.scaling_group_uuid,
-            'rax:auto_scaling_server_name': 'as000000'}
-
-        launch_config = prepare_launch_config(self.scaling_group_uuid,
-                                              test_config)
-
-        self.assertEqual(expected_metadata,
-                         launch_config['loadBalancers'][0]['metadata'])
-
-    def test_load_balancer_metadata_merge(self):
-        """
-        auto scaling metadata should be merged with user specified metadata.
-        """
-        test_config = {'server': {}, 'loadBalancers': [
-            {'loadBalancerId': 1, 'port': 80, 'metadata': {'foo': 'bar'}}]}
-
-        expected_metadata = {
-            'rax:auto_scaling_group_id': self.scaling_group_uuid,
-            'rax:auto_scaling_server_name': 'as000000',
-            'foo': 'bar'}
-
-        launch_config = prepare_launch_config(self.scaling_group_uuid,
-                                              test_config)
-
-        self.assertEqual(expected_metadata,
-                         launch_config['loadBalancers'][0]['metadata'])
 
     def test_launch_config_is_copy(self):
         """
@@ -2176,8 +2123,14 @@ sample_launch_config = {
         {'loadBalancerId': 54321, 'port': 81}
     ]
 }
-sample_otter_metadata = generate_server_metadata("group_id",
-                                                 sample_launch_config)
+
+sample_otter_metadata = {
+    "rax:auto_scaling_group_id": "group_id",
+    "rax:autoscale:group:id": "group_id",
+    "rax:autoscale:lb:CloudLoadBalancer:12345": '[{"port": 80}]',
+    "rax:autoscale:lb:CloudLoadBalancer:54321": '[{"port": 81}]'
+}
+
 sample_user_metadata = {"some_user_key": "some_user_value"}
 
 
@@ -2191,10 +2144,10 @@ class MetadataScrubbingTests(SynchronousTestCase):
         keys and correctly keeps other keys.
         """
         samples = [
-            ({}, {}),
-            (sample_otter_metadata, {}),
-            (merge(sample_otter_metadata, sample_user_metadata),
-             sample_user_metadata)
+            ({'metadata': {}}, {'metadata': {}}),
+            ({'metadata': sample_otter_metadata}, {'metadata': {}}),
+            ({'metadata': merge(sample_otter_metadata, sample_user_metadata)},
+             {'metadata': sample_user_metadata})
         ]
 
         for metadata, expected_scrubbed_metadata in samples:
@@ -2214,11 +2167,13 @@ class MetadataScrubbingTests(SynchronousTestCase):
         treq = StubTreq2([(("GET", expected_url,
                             {"headers": expected_headers(),
                              "data": None}),
-                           (200, json.dumps(merge(sample_otter_metadata,
-                                                  sample_user_metadata)))),
+                           (200, json.dumps({
+                               'metadata': merge(sample_otter_metadata,
+                                                 sample_user_metadata)}))),
                           (("PUT", expected_url,
                             {"headers": expected_headers(),
-                             "data": json.dumps(sample_user_metadata)}),
+                             "data": json.dumps({
+                                 'metadata': sample_user_metadata})}),
                            (200, ""))])
 
         d = scrub_otter_metadata(log=log,
@@ -2265,12 +2220,17 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.remove_from_load_balancer.return_value = succeed(None)
 
         self.clock = Clock()
+        self.url = 'http://url'
+        self.server_id = 'serverId'
 
     def _delete_server(self, instance_details):
         """
         Helper method to call :func:`delete_server`.
         """
-        return delete_server(self.log, self.request_bag, instance_details)
+        d = delete_server(self.log, self.request_bag, instance_details,
+                          clock=self.clock)
+        self.clock.advance(0.4)
+        return d
 
     def test_delete_server_no_lbs(self):
         """
@@ -2421,14 +2381,19 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self._test_delete_server_propagates_verified_delete_failures(
             instance_details)
 
+    def _delete_and_verify(self):
+        d = delete_and_verify(self.log, self.url, self.request_bag,
+                              self.server_id, self.clock)
+        self.clock.advance(0.4)
+        return d
+
     def test_delete_and_verify_does_not_verify_if_404(self):
         """
         :func:`delete_and_verify` does not verify if the deletion response
         code is a 404.
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 0)
@@ -2442,12 +2407,49 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.delete.return_value = succeed(mock.Mock(code=204))
         self.treq.get.return_value = succeed(mock.Mock(code=404))
 
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
         self.successResultOf(d)
+
+    def test_delete_and_verify_limits(self):
+        """
+        :func:`delete_and_verify` limits the number of delete server requests
+        to 1. It also delays response by 1 second
+        """
+        deferreds = [Deferred() for i in range(3)]
+        delete_ds = deferreds[:]
+        self.treq.delete.side_effect = lambda *a, **kw: deferreds.pop(0)
+
+        ret_ds = [delete_and_verify(self.log, 'http://url/',
+                                    self.request_bag, 'serverId', self.clock)
+                  for i in range(3)]
+
+        # no result in any of them and only 1 treq.delete is called
+        for d in ret_ds:
+            self.assertNoResult(d)
+        self.assertEqual(self.treq.delete.call_count, 1)
+
+        # fire first deferred and notice that next treq.delete is still not
+        # called due to delay
+        delete_ds[0].callback(mock.Mock(code=404))
+        self.assertEqual(self.treq.delete.call_count, 1)
+
+        # advance clock and notice next delete called
+        self.clock.advance(1)
+        self.assertEqual(self.treq.delete.call_count, 2)
+        self.successResultOf(ret_ds[0])
+        self.assertNoResult(ret_ds[1])
+        self.assertNoResult(ret_ds[2])
+
+        # fire others
+        delete_ds[1].callback(mock.Mock(code=404))
+        self.clock.advance(1)
+        delete_ds[2].callback(mock.Mock(code=404))
+        self.clock.advance(1)
+        self.successResultOf(ret_ds[1])
+        self.successResultOf(ret_ds[2])
 
     def test_delete_and_verify_succeeds_if_task_state_is_deleting(self):
         """
@@ -2459,8 +2461,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.json_content.return_value = succeed(
             {'server': {'OS-EXT-STS:task_state': 'deleting'}})
 
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
@@ -2476,8 +2477,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.json_content.return_value = succeed(
             {'server': {'OS-EXT-STS:task_state': 'build'}})
 
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
@@ -2492,8 +2492,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.get.return_value = succeed(mock.Mock(code=200))
         self.treq.json_content.return_value = succeed({'server': {}})
 
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
@@ -2506,8 +2505,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=500))
 
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 0)
@@ -2521,8 +2519,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq.delete.return_value = succeed(mock.Mock(code=204))
         self.treq.get.return_value = succeed(mock.Mock(code=500))
 
-        d = delete_and_verify(self.log, 'http://url/', self.request_bag,
-                              'serverId')
+        d = self._delete_and_verify()
         self.assertEqual(len(self.bags), 1)
         self.assertEqual(self.treq.delete.call_count, 1)
         self.assertEqual(self.treq.get.call_count, 1)
@@ -2553,7 +2550,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
             delete_and_verify.mock_calls,
             [mock.call(matches(IsBoundWith(server_id='serverId')),
                        'http://url/',
-                       self.request_bag, 'serverId')] * 2)
+                       self.request_bag, 'serverId', self.clock)] * 2)
         self.successResultOf(d)
 
         # the loop has stopped
@@ -2589,7 +2586,8 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.assertEqual(
             delete_and_verify.mock_calls,
             [mock.call(matches(IsBoundWith(server_id='serverId')),
-                       'http://url/', self.request_bag, 'serverId')] * 3)
+                       'http://url/', self.request_bag, 'serverId',
+                       self.clock)] * 3)
 
         # the loop has stopped
         self.clock.pump([16, 32])

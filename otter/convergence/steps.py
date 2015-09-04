@@ -9,22 +9,29 @@ from effect import Constant, Effect, Func, catch
 
 from pyrsistent import PMap, PSet, freeze, pset, thaw
 
-from toolz.dicttoolz import get_in
-from toolz.itertoolz import concat
+import six
 
 from twisted.python.constants import NamedConstant
 
 from zope.interface import Interface, implementer
 
 from otter.cloud_client import (
+    CLBNodeLimitError,
+    CLBNotFoundError,
+    CreateServerConfigurationError,
+    CreateServerOverQuoteError,
+    NoSuchCLBNodeError,
+    add_clb_nodes,
+    create_server,
     has_code,
+    remove_clb_nodes,
     service_request,
     set_nova_metadata_item)
 from otter.constants import ServiceType
-from otter.convergence.model import StepResult
-from otter.util.fp import predicate_any
+from otter.convergence.model import ErrorReason, StepResult
+from otter.util.fp import set_in
 from otter.util.hashkey import generate_server_name
-from otter.util.http import APIError, append_segments, try_json_with_keys
+from otter.util.http import APIError, append_segments
 from otter.util.retry import (
     exponential_backoff_interval,
     retry_effect,
@@ -38,7 +45,12 @@ class IStep(Interface):
     """
 
     def as_effect():
-        """Return an Effect which performs this step."""
+        """
+        Return an Effect which performs this step.
+
+        :return: A two-tuple of a :obj:`StepResult` and a list of
+        :obj:`ErrorReason`s.
+        """
 
 
 def set_server_name(server_config_args, name_suffix):
@@ -55,52 +67,59 @@ def set_server_name(server_config_args, name_suffix):
         name = '{0}-{1}'.format(name, name_suffix)
     else:
         name = name_suffix
-    return server_config_args.set_in(('server', 'name'), name)
+    return set_in(server_config_args, ('server', 'name'), name)
 
 
-def _forbidden_plaintext(message):
-    return re.compile(
-        "^403 Forbidden\n\nAccess was denied to this resource\.\n\n ({0})$"
-        .format(message))
-
-_NOVA_403_NO_PUBLIC_NETWORK = _forbidden_plaintext(
-    "Networks \(00000000-0000-0000-0000-000000000000\) not allowed")
-_NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED = _forbidden_plaintext(
-    "Networks \(00000000-0000-0000-0000-000000000000,"
-    "11111111-1111-1111-1111-111111111111\) required but missing")
-_NOVA_403_RACKCONNECT_NETWORK_REQUIRED = _forbidden_plaintext(
-    "Exactly 1 isolated network\(s\) must be attached")
-
-
-def _parse_nova_user_error(api_error):
+def _ignore_errors(*ignored_err_types):
     """
-    Parse API errors for user failures on creating a server.
-
-    :param api_error: The error returned from Nova
-    :type api_error: :class:`APIError`
-
-    :return: the nova message as to why the creation failed, if it was a user
-        failure.  None otherwise.
-    :rtype: `str` or `None`
+    Return an error-handler function that returns None if the exception matches
+    any of the given error types.
     """
-    if api_error.code == 400:
-        message = try_json_with_keys(api_error.body,
-                                     ("badRequest", "message"))
-        if message:
-            return message
+    def handler(exc_info):
+        if isinstance(exc_info[1], ignored_err_types):
+            return None
+        six.reraise(*exc_info)
+    return handler
 
-    elif api_error.code == 403:
-        message = try_json_with_keys(api_error.body,
-                                     ("forbidden", "message"))
-        if message:
-            return message
 
-        for pat in (_NOVA_403_RACKCONNECT_NETWORK_REQUIRED,
-                    _NOVA_403_NO_PUBLIC_NETWORK,
-                    _NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED):
-            m = pat.match(api_error.body)
-            if m:
-                return m.groups()[0]
+def _failure_reporter(*terminal_err_types):
+    """
+    Return a callable that takes an error tuple which interprets the error
+    tuple.
+
+    If the error is an APIError with status code 4xx, or one of the provided
+    ``terminal_err_types``, then the callable returns a tuple of::
+
+        (StepResult.FAILURE, [ErrorReason.Exception(exc_tuple)])
+
+    else it returns a tuple of::
+
+        (StepResult.RETRY, [ErrorReason.Exception(exc_tuple)])
+    """
+    def reporter(exc_tuple):
+        err_type, error, traceback = exc_tuple
+
+        terminal_error = (
+            any(issubclass(err_type, etype)
+                for etype in terminal_err_types) or
+            err_type == APIError and 400 <= error.code < 500)
+
+        if terminal_error:
+            return StepResult.FAILURE, [ErrorReason.Exception(exc_tuple)]
+        return StepResult.RETRY, [ErrorReason.Exception(exc_tuple)]
+
+    return reporter
+
+
+def _success_reporter(success_reason):
+    """
+    Return a callable that takes a result and returns a::
+
+        (StepResult.RETRY, [ErrorReason.String(success_reason)])
+    """
+    def reporter(_):
+        return StepResult.RETRY, [ErrorReason.String(success_reason)]
+    return reporter
 
 
 @implementer(IStep)
@@ -118,39 +137,12 @@ class CreateServer(object):
 
         def got_name(random_name):
             server_config = set_server_name(self.server_config, random_name)
-            return service_request(
-                ServiceType.CLOUD_SERVERS,
-                'POST',
-                'servers',
-                data=thaw(server_config),
-                success_pred=has_code(202),
-                reauth_codes=(401,))
+            return create_server(thaw(server_config))
 
-        def report_success(result):
-            """
-            On success, return "RETRY", because servers go into building for
-            a while, and we need to retry convergence to ensure it goes into
-            active.
-            """
-            return StepResult.RETRY, ['waiting for server to become active']
-
-        def report_failure(result):
-            """
-            If the failure is an APIError with a recognized user error,
-            return a :obj:`StepResult.FAILURE` along with that user error as
-            a message, otherwise return a :obj:`StepResult.RETRY` without
-            a message.
-            """
-            err_type, error, traceback = result
-            if err_type == APIError:
-                message = _parse_nova_user_error(error)
-                if message is not None:
-                    return StepResult.FAILURE, [message]
-
-            return StepResult.RETRY, [error]
-
-        return eff.on(got_name).on(success=report_success,
-                                   error=report_failure)
+        return eff.on(got_name).on(
+            success=_success_reporter('waiting for server to become active'),
+            error=_failure_reporter(CreateServerConfigurationError,
+                                    CreateServerOverQuoteError))
 
 
 class UnexpectedServerStatus(Exception):
@@ -180,10 +172,10 @@ def delete_and_verify(server_id):
     only when looking at the extended status of a server.
     """
 
-    def check_task_state((resp, json_blob)):
+    def check_task_state((resp, server_blob)):
         if resp.code == 404:
             return
-        server_details = json_blob['server']
+        server_details = server_blob['server']
         is_deleting = server_details.get("OS-EXT-STS:task_state", "")
         if is_deleting.strip().lower() != "deleting":
             raise UnexpectedServerStatus(server_id, is_deleting, "deleting")
@@ -193,7 +185,7 @@ def delete_and_verify(server_id):
             raise _type, error, traceback
         ver_eff = service_request(
             ServiceType.CLOUD_SERVERS, 'GET',
-            append_segments('servers', server_id, 'details'),
+            append_segments('servers', server_id),
             success_pred=has_code(200, 404))
         return ver_eff.on(check_task_state)
 
@@ -216,13 +208,14 @@ class DeleteServer(object):
         """Produce a :obj:`Effect` to delete a server."""
 
         eff = retry_effect(
-            delete_and_verify(self.server_id), can_retry=retry_times(10),
+            delete_and_verify(self.server_id), can_retry=retry_times(3),
             next_interval=exponential_backoff_interval(2))
 
         def report_success(result):
             return StepResult.RETRY, [
-                'must re-gather after deletion in order to update the active '
-                'cache']
+                ErrorReason.String(
+                    'must re-gather after deletion in order to update the '
+                    'active cache')]
 
         return eff.on(success=report_success)
 
@@ -250,45 +243,6 @@ class SetMetadataItemOnServer(object):
         return eff.on(success=lambda _: (StepResult.SUCCESS, []))
 
 
-_CLB_DUPLICATE_NODES_PATTERN = re.compile(
-    "^Duplicate nodes detected. One or more nodes already configured "
-    "on load balancer.$")
-_CLB_PENDING_UPDATE_PATTERN = re.compile(
-    "^Load Balancer '\d+' has a status of 'PENDING_UPDATE' and is considered "
-    "immutable.$")
-_CLB_DELETED_PATTERN = re.compile(
-    "^(Load Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
-    "The load balancer is deleted and) considered immutable.$")
-_CLB_NODE_REMOVED_PATTERN = re.compile(
-    "^Node ids ((?:\d+,)*(?:\d+)) are not a part of your loadbalancer\s*$")
-
-
-def _check_clb_422(*regex_matches):
-    """
-    A success predicate that succeeds if the status code is 422 and the content
-    matches the regex.  Used for detecting duplicate nodes on add to CLB, and
-    the load balancer being deleted or pending delete on remove from CLB.
-
-    It's unfortunate this involves parsing the body.
-    """
-    def check_response(response, content):
-        """
-        Check that the given response has a 422 code and its body matches the
-        regex.
-
-        Expects the content to be JSON, so whatever uses this should make sure
-        that the service request is called with ``json_response=True``,
-        which it should be by default.
-        """
-        if response.code == 422:
-            message = try_json_with_keys(content, ('message',))
-            return any([regex.search(message or '')
-                        for regex in regex_matches])
-        return False
-
-    return check_response
-
-
 @implementer(IStep)
 @attributes([Attribute('lb_id', instance_of=basestring),
              Attribute('address_configs', instance_of=PSet)])
@@ -304,51 +258,27 @@ class AddNodesToCLB(object):
     :ivar iterable address_configs: A collection of two-tuples of address and
         :obj:`CLBDescription`.
 
-    Succeed unconditionally on 202 and 413 (over limit, so try again later).
+    Retry if successful (to re-gather to update the active cache) or if there
+    was a non-terminal failure (if there were duplicate nodes, if the CLB is
+    in PENDING_UDPATE, or if the CLB rate-limited the request).  These can
+    all be fixed in the next convergence cycle.
 
-    Succeed conditionally on 422 if duplicate nodes are detected - the
-    duplicate codes are not enumerated, so just try again the next convergence
-    cycle.
-
-    Succeed conditionally on 422 if the load balancer is in PENDING_UPDATE
-    state, which happens because CLB locks for a few seconds and cannot be
-    changed again after an update - can be fixed next convergence cycle.
+    Fail otherwise.
     """
-
     def as_effect(self):
         """Produce a :obj:`Effect` to add nodes to CLB"""
-        eff = service_request(
-            ServiceType.CLOUD_LOAD_BALANCERS,
-            'POST',
-            append_segments('loadbalancers', str(self.lb_id), "nodes"),
-            data={'nodes': [{'address': address, 'port': lbc.port,
-                             'condition': lbc.condition.name,
-                             'weight': lbc.weight,
-                             'type': lbc.type.name}
-                            for address, lbc in self.address_configs]},
-            success_pred=predicate_any(
-                has_code(202),
-                _check_clb_422(_CLB_DUPLICATE_NODES_PATTERN)))
+        eff = add_clb_nodes(
+            self.lb_id,
+            [{'address': address, 'port': lbc.port,
+              'condition': lbc.condition.name, 'weight': lbc.weight,
+              'type': lbc.type.name}
+             for address, lbc in self.address_configs])
 
-        def report_success(result):
-            return StepResult.SUCCESS, []
-
-        def report_api_failure(result):
-            """
-            If the error is a 404 or 422 PENDING_DELETE then fail.
-            Otherwise, retry.
-            """
-            err_type, error, traceback = result
-            if error.code == 404:
-                return StepResult.FAILURE, [error]
-            if error.code == 422:
-                message = try_json_with_keys(error.body, ("message",))
-                if message and _CLB_DELETED_PATTERN.search(message):
-                    return StepResult.FAILURE, [error]
-            return StepResult.RETRY, [error]
-
-        return eff.on(success=report_success,
-                      error=catch(APIError, report_api_failure))
+        return eff.on(
+            success=_success_reporter(
+                'must re-gather after adding to CLB in order to update '
+                'the active cache'),
+            error=_failure_reporter(CLBNotFoundError, CLBNodeLimitError))
 
 
 @implementer(IStep)
@@ -360,62 +290,18 @@ class RemoveNodesFromCLB(object):
 
     :ivar str lb_id: The cloud load balancer ID to remove nodes from.
     :ivar iterable node_ids: A collection of node IDs to remove from the CLB.
-
-    Succeed unconditionally on 202 and 413 (over limit, so try again later).
-
-    Succeed conditionally on 422 if the load balancer is in PENDING_UPDATE
-    state, which happens because CLB locks for a few seconds and cannot be
-    changed again after an update - can be fixed next convergence cycle.
-
-    Succeed conditionally on 422 if the load balancer is in PENDING_DELETE
-    state, or already deleted, which means we don't have to remove any nodes.
     """
 
     def as_effect(self):
         """Produce a :obj:`Effect` to remove a load balancer node."""
-        eff = service_request(
-            ServiceType.CLOUD_LOAD_BALANCERS,
-            'DELETE',
-            append_segments('loadbalancers', str(self.lb_id), 'nodes'),
-            params={'id': [str(node_id) for node_id in self.node_ids]},
-            success_pred=predicate_any(
-                has_code(202, 413, 400),
-                _check_clb_422(_CLB_PENDING_UPDATE_PATTERN,
-                               _CLB_DELETED_PATTERN)))
-        # 400 means that there are some nodes that are no longer on the
-        # load balancer.  Parse them out and try again.
-        return eff.on(partial(
-            _clb_check_bulk_delete, self.lb_id, self.node_ids))
-
-
-def _clb_check_bulk_delete(lb_id, attempted_nodes, result):
-    """
-    Check if the CLB bulk deletion command failed with a 400, and if so,
-    returns the next step to try and remove the remaining nodes. This is
-    necessary because CLB bulk deletes are atomic-ish.
-
-    This seems to be the only case in which this API endpoint returns a 400.
-
-    All other cases are considered unambiguous successes.
-
-    :param result: The result of the :class:`ServiceRequest`. This should be a
-        2-tuple of the response object and the (parsed) body.
-    :ivar str lb_id: The cloud load balancer ID to remove nodes from.
-    :param attempted_nodes: The node IDs that were attempted to be
-        removed. This is the :attr:`node_ids` attribute of
-        :class:`RemoveNodesFromCLB` instances.
-
-    This assumes that the result body is already parsed into JSON.
-    """
-    response, body = result
-    if response.code == 400:
-        message = get_in(["validationErrors", "messages", 0], body)
-        match = _CLB_NODE_REMOVED_PATTERN.match(message)
-        if match:
-            removed = concat([group.split(',') for group in match.groups()])
-            retry = RemoveNodesFromCLB(
-                lb_id=lb_id, node_ids=pset(attempted_nodes) - pset(removed))
-            return retry.as_effect()
+        eff = remove_clb_nodes(self.lb_id, self.node_ids)
+        # Since we're deleting a node, we'll ignore any errors which indicate
+        # that the node doesn't exist.
+        return eff.on(
+            error=_ignore_errors(CLBNotFoundError, NoSuchCLBNodeError)
+        ).on(
+            success=lambda r: (StepResult.SUCCESS, []),
+            error=_failure_reporter())
 
 
 @implementer(IStep)
@@ -457,9 +343,10 @@ def _clb_check_change_node_retry_on_404(step, result):
     """
     When updating a node results in a 404, convergence should be retried.
     """
-    return StepResult.RETRY, [{'reason': 'CLB node not found',
-                               'lb': step.lb_id,
-                               'node': step.node_id}]
+    return StepResult.RETRY, [
+        ErrorReason.Structured({'reason': 'CLB node not found',
+                                'lb': step.lb_id,
+                                'node': step.node_id})]
 
 
 _clb_check_change_node_handlers = {
@@ -550,7 +437,9 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
     response, body = result
 
     if response.code == 201:  # All done!
-        return StepResult.SUCCESS, []
+        return StepResult.RETRY, [
+            ErrorReason.String('must re-gather after adding to LB in order to '
+                               'update the active cache')]
 
     failure_reasons = []
     to_retry = pset(attempted_pairs)
@@ -575,6 +464,8 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
         next_step = BulkAddToRCv3(lb_node_pairs=to_retry)
         return next_step.as_effect()
     else:
+        # It's unclear when this condition is reached. Should we really be
+        # returning SUCCESS?
         return StepResult.SUCCESS, []
 
 

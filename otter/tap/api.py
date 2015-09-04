@@ -1,6 +1,7 @@
 """
 Twisted Application plugin for otter API nodes.
 """
+import os
 
 from copy import deepcopy
 from functools import partial
@@ -19,7 +20,6 @@ from twisted.internet.defer import gatherResults, maybeDeferred
 from twisted.internet.endpoints import clientFromString
 from twisted.internet.task import coiterate
 from twisted.python import usage
-from twisted.python.log import addObserver
 from twisted.python.threadpool import ThreadPool
 from twisted.web.server import Site
 
@@ -33,11 +33,11 @@ from otter.constants import (
     CONVERGENCE_DIRTY_DIR,
     CONVERGENCE_PARTITIONER_PATH,
     get_service_configs)
-from otter.convergence.service import (
-    ConvergenceStarter, Converger, set_convergence_starter)
+from otter.convergence.service import Converger
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log
 from otter.log.cloudfeeds import CloudFeedsObserver
+from otter.log.formatters import add_to_fanout
 from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.rest.admin import OtterAdmin
 from otter.rest.application import Otter
@@ -48,6 +48,11 @@ from otter.util.config import config_value, set_config_data
 from otter.util.cqlbatch import TimingOutCQLClient
 from otter.util.deferredutils import timeout_deferred
 from otter.util.zkpartitioner import Partitioner
+
+assert os.environ.get("PYRSISTENT_NO_C_EXTENSION"), (
+    "The environment variable PYRSISTENT_NO_C_EXTENSION must be set to "
+    "a non-empty string because the C extension sometimes causes segfaults "
+    "in otter.")
 
 
 class Options(usage.Options):
@@ -196,7 +201,8 @@ def makeService(config):
             config_value('cassandra.timeout') or 30),
         log.bind(system='otter.silverberg'))
 
-    store = CassScalingGroupCollection(cassandra_cluster, reactor)
+    store = CassScalingGroupCollection(
+        cassandra_cluster, reactor, config_value('limits.absolute.maxGroups'))
     admin_store = CassAdmin(cassandra_cluster)
 
     bobby_url = config_value('bobby_url')
@@ -223,8 +229,7 @@ def makeService(config):
         s.addService(FunctionalService(stop=partial(
             call_after_supervisor, cassandra_cluster.disconnect, supervisor)))
 
-    otter = Otter(store, region, health_checker.health_check,
-                  es_host=config_value('elasticsearch.host'))
+    otter = Otter(store, region, health_checker.health_check)
     site = Site(otter.app.resource())
     site.displayTracebacks = False
 
@@ -245,12 +250,12 @@ def makeService(config):
     if cf_conf is not None:
         id_conf = deepcopy(config['identity'])
         id_conf['strategy'] = 'single_tenant'
-        addObserver(
-            CloudFeedsObserver(
-                reactor=reactor,
-                authenticator=generate_authenticator(reactor, id_conf),
-                region=region, tenant_id=cf_conf['tenant_id'],
-                service_configs=service_configs))
+        add_to_fanout(CloudFeedsObserver(
+            reactor=reactor,
+            authenticator=generate_authenticator(reactor, id_conf),
+            tenant_id=cf_conf['tenant_id'],
+            region=region,
+            service_configs=service_configs))
 
     # Setup Kazoo client
     if config_value('zookeeper'):
@@ -271,11 +276,14 @@ def makeService(config):
         def on_client_ready(_):
             dispatcher = get_full_dispatcher(reactor, authenticator, log,
                                              get_service_configs(config),
-                                             kz_client, store)
+                                             kz_client, store, supervisor,
+                                             cassandra_cluster)
             # Setup scheduler service after starting
-            scheduler = setup_scheduler(s, store, kz_client)
+            scheduler = setup_scheduler(s, dispatcher, store, kz_client)
             health_checker.checks['scheduler'] = scheduler.health_check
             otter.scheduler = scheduler
+            # Give dispatcher to Otter REST object
+            otter.dispatcher = dispatcher
             # Set the client after starting
             # NOTE: There is small amount of time when the start is
             # not finished and the kz_client is not set in which case
@@ -286,12 +294,9 @@ def makeService(config):
                 stop=partial(call_after_supervisor,
                              kz_client.stop, supervisor)))
 
-            # set up ConvergenceStarter object
-            starter = ConvergenceStarter(dispatcher)
-            set_convergence_starter(starter)
-
             setup_converger(s, kz_client, dispatcher,
-                            config_value('converger.interval') or 10)
+                            config_value('converger.interval') or 10,
+                            config_value('converger.build_timeout') or 3600)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
@@ -299,26 +304,25 @@ def makeService(config):
     return s
 
 
-def setup_converger(parent, kz_client, dispatcher, interval):
+def setup_converger(parent, kz_client, dispatcher, interval, build_timeout):
     """
     Create a Converger service, which has a Partitioner as a child service, so
     that if the Converger is stopped, the partitioner is also stopped.
     """
-    converger_buckets = range(1, 10)
     partitioner_factory = partial(
         Partitioner,
-        kz_client,
-        interval,
-        CONVERGENCE_PARTITIONER_PATH,
-        converger_buckets,
-        15,  # time boundary
+        kz_client=kz_client,
+        interval=interval,
+        partitioner_path=CONVERGENCE_PARTITIONER_PATH,
+        time_boundary=15,  # time boundary
     )
-    cvg = Converger(log, dispatcher, converger_buckets, partitioner_factory)
+    cvg = Converger(log, dispatcher, 10, partitioner_factory, build_timeout,
+                    interval)
     cvg.setServiceParent(parent)
     watch_children(kz_client, CONVERGENCE_DIRTY_DIR, cvg.divergent_changed)
 
 
-def setup_scheduler(parent, store, kz_client):
+def setup_scheduler(parent, dispatcher, store, kz_client):
     """
     Setup scheduler service
     """
@@ -335,7 +339,7 @@ def setup_scheduler(parent, store, kz_client):
         kz_client, int(config_value('scheduler.interval')), partition_path,
         buckets, time_boundary)
     scheduler_service = SchedulerService(
-        int(config_value('scheduler.batchsize')),
+        dispatcher, int(config_value('scheduler.batchsize')),
         store, partitioner_factory)
     scheduler_service.setServiceParent(parent)
     return scheduler_service

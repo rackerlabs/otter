@@ -202,7 +202,7 @@ def policy():
             "changePercent": -5.5,
             "type": "schedule",
             "args": {
-                "at": "2015-05-20T00:00:00Z"
+                "at": "2050-05-20T00:00:00Z"
             }
         },
         {

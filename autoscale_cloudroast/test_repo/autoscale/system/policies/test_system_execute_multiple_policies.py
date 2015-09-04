@@ -56,7 +56,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             execute_policy=True)
         self.resources.add(self.group, self.empty_scaling_group)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_policy_up_cooldown(self):
         """
         Execute a scale up policy with cooldown > 0 more than once within the
@@ -93,7 +93,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             ' for group {1}'
             .format(execute_on_cooldown.status_code, self.group.id))
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_execute_different_policies_simaltaneously(self):
         """
         The policy cooldown times are not enforced when executing different
@@ -130,7 +130,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             self.group.launchConfiguration.server.name,
             self.group.groupConfiguration.minEntities)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_scale_up_scale_down_multiple_policies_in_sequence(self):
         """
         Different scale up and scale down policies on the scaling group can be
@@ -157,7 +157,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             self.group.launchConfiguration.server.name,
             self.group.groupConfiguration.minEntities)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_multiple_webhook_policies_in_group_in_different_requests(self):
         """
         Creating multiple webhook policies with the same payload, using

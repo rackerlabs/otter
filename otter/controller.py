@@ -23,8 +23,13 @@ Storage model for state information:
 import json
 from datetime import datetime
 from decimal import Decimal, ROUND_UP
+from functools import partial
 
-from effect import Effect, parallel_all_errors
+from effect import (
+    Effect,
+    parallel,
+    parallel_all_errors)
+
 from effect.do import do, do_return
 
 import iso8601
@@ -35,21 +40,29 @@ from toolz.dicttoolz import get_in
 
 from twisted.internet import defer
 
+from txeffect import perform
+
 from otter.cloud_client import (
     NoSuchServerError,
+    TenantScope,
     get_server_details,
     set_nova_metadata_item)
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.model import DRAINING_METADATA, group_id_from_metadata
-from otter.convergence.service import get_convergence_starter
+from otter.convergence.service import (
+    delete_divergent_flag, mark_divergent, trigger_convergence)
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
-from otter.models.intents import GetScalingGroupInfo
+from otter.log.intents import BoundFields, msg, with_log
+from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
+from otter.models.interface import GroupNotEmptyError, ScalingGroupStatus
 from otter.supervisor import (
     CannotDeleteServerBelowMinError,
     ServerNotFoundError,
     exec_scale_down,
     execute_launch_config)
+from otter.supervisor import (
+    remove_server_from_group as worker_remove_server_from_group)
 from otter.util.config import config_value
 from otter.util.deferredutils import unwrap_first_error
 from otter.util.fp import assoc_obj
@@ -71,7 +84,31 @@ class CannotExecutePolicyError(Exception):
             .format(t=tenant_id, g=group_id, p=policy_id, w=why))
 
 
-def pause_scaling_group(log, transaction_id, scaling_group):
+class GroupPausedError(Exception):
+    """
+    Exception to be raised when an operation cannot be performed because
+    group is paused
+    """
+    def __init__(self, tenant_id, group_id, operation, extra=None):
+        fmt = "Cannot {o} for group {g} for tenant {t} because group is paused"
+        if extra is not None:
+            fmt = "{}. {}".format(fmt, extra)
+        super(GroupPausedError, self).__init__(
+            fmt.format(t=tenant_id, g=group_id, o=operation))
+
+
+def conv_pause_group_eff(group, transaction_id):
+    """
+    Pause scaling group of convergence enabled tenant
+    """
+    eff = parallel([Effect(ModifyGroupStatePaused(group, True)),
+                    delete_divergent_flag(group.tenant_id, group.uuid, -1)])
+    return with_log(eff, transaction_id=transaction_id,
+                    tenant_id=group.tenant_id,
+                    scaling_group_id=group.uuid).on(lambda _: None)
+
+
+def pause_scaling_group(log, transaction_id, scaling_group, dispatcher):
     """
     Pauses the scaling group, causing all scaling policy executions to be
     rejected until unpaused.  This is an idempotent change, if it's already
@@ -81,10 +118,25 @@ def pause_scaling_group(log, transaction_id, scaling_group):
 
     :return: None
     """
-    raise NotImplementedError('Pause is not yet implemented')
+    if not tenant_is_enabled(scaling_group.tenant_id, config_value):
+        raise NotImplementedError("Pause is not implemented for legay groups")
+    return perform(dispatcher,
+                   conv_pause_group_eff(scaling_group, transaction_id))
 
 
-def resume_scaling_group(log, transaction_id, scaling_group):
+def conv_resume_group_eff(trans_id, group):
+    """
+    Resume scaling group of convergence enabled tenant
+    """
+    eff = parallel([
+        Effect(ModifyGroupStatePaused(group, False)),
+        mark_divergent(group.tenant_id, group.uuid).on(
+            lambda _: msg("mark-dirty-success"))])
+    return with_log(eff, transaction_id=trans_id, tenant_id=group.tenant_id,
+                    scaling_group_id=group.uuid).on(lambda _: None)
+
+
+def resume_scaling_group(log, transaction_id, scaling_group, dispatcher):
     """
     Resumes the scaling group, causing all scaling policy executions to be
     evaluated as normal again.  This is an idempotent change, if it's already
@@ -94,7 +146,11 @@ def resume_scaling_group(log, transaction_id, scaling_group):
 
     :return: None
     """
-    raise NotImplementedError('Resume is not yet implemented')
+    if not tenant_is_enabled(scaling_group.tenant_id, config_value):
+        raise NotImplementedError(
+            'Resume is not implemented for legacy groups')
+    return perform(dispatcher,
+                   conv_resume_group_eff(transaction_id, scaling_group))
 
 
 def _do_convergence_audit_log(_, log, delta, state):
@@ -149,6 +205,128 @@ def obey_config_change(log, transaction_id, config, scaling_group, state,
     return d
 
 
+def delete_group(dispatcher, log, trans_id, group, force):
+    """
+    Delete group based on the kind of tenant
+
+    :param log: Bound logger
+    :param str trans_id: Transaction ID of request doing this
+    :param otter.models.interface.IScalingGroup scaling_group: the scaling
+        group object
+    :param bool force: Should group be deleted even if it has servers?
+
+    :return: Deferred that fires with None
+    :raise: `GroupNotEmptyError` if group is not empty and force=False
+    """
+
+    def check_and_delete(_group, state):
+        if state.desired == 0:
+            d = trigger_convergence_deletion(dispatcher, group, trans_id)
+            return d.addCallback(lambda _: state)
+        else:
+            raise GroupNotEmptyError(group.tenant_id, group.uuid)
+
+    if tenant_is_enabled(group.tenant_id, config_value):
+        if force:
+            # We don't care about servers in the group. So trigger deletion
+            # since it will take precedence over other status
+            d = trigger_convergence_deletion(dispatcher, group, trans_id)
+        else:
+            # Delete only if desired is 0 which must be done with a lock to
+            # ensure desired is not getting modified by another thread/node
+            # when executing policy
+            d = group.modify_state(
+                check_and_delete,
+                modify_state_reason='delete_group')
+    else:
+        if force:
+            d = empty_group(log, trans_id, group)
+            d.addCallback(lambda _: group.delete_group())
+        else:
+            d = group.delete_group()
+    return d
+
+
+def trigger_convergence_deletion(dispatcher, group, trans_id):
+    """
+    Trigger deletion of group that belongs to convergence tenant
+
+    :param log: Bound logger
+    :param otter.models.interface.IScalingGroup scaling_group: the scaling
+        group object
+    """
+    # Update group status and trigger convergence
+    # DELETING status will take precedence over other status
+    d = group.update_status(ScalingGroupStatus.DELETING)
+    eff = with_log(trigger_convergence(group.tenant_id, group.uuid),
+                   tenant_id=group.tenant_id,
+                   scaling_group_id=group.uuid,
+                   transaction_id=trans_id)
+    d.addCallback(lambda _: perform(dispatcher, eff))
+    return d
+
+
+def empty_group(log, trans_id, group):
+    """
+    Empty a scaling group by deleting all its resources (Servers/CLB)
+
+    :param log: Bound logger
+    :param str trans_id: Transaction ID of request doing this
+    :param otter.models.interface.IScalingGroup scaling_group: the scaling
+        group object
+
+    :return: Deferred that fires with None
+    """
+    d = group.view_manifest(with_policies=False)
+
+    def update_config(group_info):
+        group_info['groupConfiguration']['minEntities'] = 0
+        group_info['groupConfiguration']['maxEntities'] = 0
+        du = group.update_config(group_info['groupConfiguration'])
+        return du.addCallback(lambda _: group_info)
+
+    d.addCallback(update_config)
+
+    def modify_state(group_info):
+        d = group.modify_state(
+            partial(
+                obey_config_change,
+                log,
+                trans_id,
+                group_info['groupConfiguration'],
+                launch_config=group_info['launchConfiguration']),
+            modify_state_reason='empty_group')
+        return d
+
+    d.addCallback(modify_state)
+    return d
+
+
+@defer.inlineCallbacks
+def modify_and_trigger(dispatcher, group, logargs, modifier, *args, **kwargs):
+    """
+    Modify group state and trigger convergence after that
+
+    :param IScalingGroup group: Scaling group whose state is getting modified
+    :param log: Bound logger
+    :param modifier: Callable as described in IScalingGroup.modify_state
+
+    :return: Deferred with None
+    """
+    cannot_exec_pol_err = None
+    try:
+        yield group.modify_state(modifier, *args, **kwargs)
+    except CannotExecutePolicyError as ce:
+        cannot_exec_pol_err = ce
+    if tenant_is_enabled(group.tenant_id, config_value):
+        eff = Effect(
+            BoundFields(
+                trigger_convergence(group.tenant_id, group.uuid), logargs))
+        yield perform(dispatcher, eff)
+    if cannot_exec_pol_err is not None:
+        raise cannot_exec_pol_err
+
+
 def converge(log, transaction_id, config, scaling_group, state, launch_config,
              policy, config_value=config_value):
     """
@@ -172,24 +350,18 @@ def converge(log, transaction_id, config, scaling_group, state, launch_config,
         are to be made to the group, None will synchronously be returned.
     """
     if tenant_is_enabled(scaling_group.tenant_id, config_value):
-        # Note that convergence must be run whether or not delta is 0, because
-        # delta will be zero when a group is initially created with a non-zero
-        # min-entities (desired=min entities, so there is technically no
-        # change).
+        # For convergence tenants, find delta based on group's desired
+        # capacity
+        delta = apply_delta(log, state.desired, state, config, policy)
+        if delta == 0:
+            # No change in servers. Return None synchronously
+            return None
+        else:
+            return defer.succeed(state)
 
-        # For non-convergence tenants, the value used for desired-capacity is
-        # the sum of active+pending, which is 0, so the delta ends up being
-        # the min entities due to constraint calculation.
-
-        apply_delta(log, state.desired, state, config, policy)
-        d = get_convergence_starter().start_convergence(
-            log, scaling_group.tenant_id, scaling_group.uuid)
-
-        # We honor start_convergence's deferred here so that we can communicate
-        # back a strong acknowledgement that a group has been marked dirty for
-        # convergence.
-        return d.addCallback(lambda _: state)
-
+    # For non-convergence tenants, the value used for desired-capacity is
+    # the sum of active+pending, which is 0, so the delta ends up being
+    # the min entities due to constraint calculation.
     delta = calculate_delta(log, state, config, policy)
     execute_log = log.bind(server_delta=delta)
 
@@ -231,17 +403,25 @@ def maybe_execute_scaling_policy(
     :return: a ``Deferred`` that fires with the updated
         :class:`otter.models.interface.GroupState` if successful
 
-    :raises: :class:`NoSuchScalingGroupError` if this scaling group does not exist
+    :raises: :class:`NoSuchScalingGroupError` if this scaling group does not
+        exist
     :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-    :raises: :class:`CannotExecutePolicyException` if the policy cannot be executed
+    :raises: :class:`CannotExecutePolicyException` if the policy cannot be
+        executed
 
-    :raises: Some exception about why you don't want to execute the policy. This
-        Exception should also have an audit log id
+    :raises: Some exception about why you don't want to execute the policy.
+        This Exception should also have an audit log id
     """
-    bound_log = log.bind(scaling_group_id=scaling_group.uuid, policy_id=policy_id)
+    bound_log = log.bind(scaling_group_id=scaling_group.uuid,
+                         policy_id=policy_id)
     bound_log.msg("beginning to execute scaling policy")
 
-    # make sure that the policy (and the group) exists before doing anything else
+    if state.paused:
+        raise GroupPausedError(scaling_group.tenant_id, scaling_group.uuid,
+                               "execute policy {}".format(policy_id))
+
+    # make sure that the policy (and the group) exists before doing
+    # anything else
     deferred = scaling_group.get_policy(policy_id, version)
 
     def _do_get_configs(policy):
@@ -381,14 +561,17 @@ def _is_server_in_group(group, server_id):
     the group.  If it isn't, it raises a :class:`ServerNotFoundError`.
     """
     try:
-        server_info = yield retry_effect(get_server_details(server_id),
-                                         retry_times(3),
-                                         exponential_backoff_interval(2))
+        response, server_info = yield Effect(TenantScope(
+            retry_effect(get_server_details(server_id),
+                         retry_times(3),
+                         exponential_backoff_interval(2)),
+            group.tenant_id))
     except NoSuchServerError:
         raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
 
     group_id = group_id_from_metadata(
         get_in(('server', 'metadata'), server_info, {}))
+
     if group_id != group.uuid:
         raise ServerNotFoundError(group.tenant_id, group.uuid, server_id)
 
@@ -399,7 +582,7 @@ def _can_scale_down(group, server_id):
     Given a group and a server ID, determines if the group can be scaled down.
     If not, it raises a :class:`CannotDeleteServerBelowMinError`.
     """
-    manifest = yield Effect(GetScalingGroupInfo(
+    _, manifest = yield Effect(GetScalingGroupInfo(
         tenant_id=group.tenant_id, group_id=group.uuid))
     min_entities = manifest['groupConfiguration']['minEntities']
     state = manifest['state']
@@ -411,7 +594,7 @@ def _can_scale_down(group, server_id):
 
 @do
 def convergence_remove_server_from_group(
-        log, transaction_id, group, state, server_id, replace, purge):
+        log, transaction_id, server_id, replace, purge, group, state):
     """
     Remove a specific server from the group, optionally decrementing the
     desired capacity.
@@ -420,15 +603,17 @@ def convergence_remove_server_from_group(
     the group by removing otter-specific metdata from the server.
 
     :param log: A bound logger
-    :param bytes transaction_id: The transaction id for this operation.
-    :param group: The scaling group to remove a server from.
-    :type group: :class:`~otter.models.interface.IScalingGroup`
+    :param bytes trans_id: The transaction id for this operation.
     :param bytes server_id: The id of the server to be removed.
     :param bool replace: Should the server be replaced?
     :param bool purge: Should the server be deleted from Nova?
+    :param group: The scaling group to remove a server from.
+    :type group: :class:`~otter.models.interface.IScalingGroup`
+    :param state: The current state of the group.
+    :type state: :class:`~otter.models.interface.GroupState`
 
     :return: The updated state.
-    :rtype: deferred :class:`~otter.models.interface.GroupState`
+    :rtype: Effect of :class:`~otter.models.interface.GroupState`
 
     :raise: :class:`CannotDeleteServerBelowMinError` if the server cannot
         be deleted without replacement, and :class:`ServerNotFoundError` if
@@ -455,9 +640,57 @@ def convergence_remove_server_from_group(
                                         transaction_id=transaction_id,
                                         scaling_group=group,
                                         server_id=server_id))
-    yield retry_effect(eff, retry_times(3), exponential_backoff_interval(2))
+    yield Effect(TenantScope(
+        retry_effect(eff, retry_times(3), exponential_backoff_interval(2)),
+        group.tenant_id))
 
     if not replace:
         yield do_return(assoc_obj(state, desired=state.desired - 1))
     else:
         yield do_return(state)
+
+
+def remove_server_from_group(dispatcher, log, trans_id, server_id, replace,
+                             purge, group, state, config_value=config_value):
+    """
+    Remove a specific server from the group, optionally replacing it
+    with a new one, and optionally deleting the old one from Nova.
+
+    If the old server is not deleted from Nova, otter-specific metadata
+    is removed: otherwise, a different part of otter may later mistake
+    the server as one that *should* still be in the group.
+
+    :param log: A bound logger
+    :param bytes trans_id: The transaction id for this operation.
+    :param bytes server_id: The id of the server to be removed.
+    :param bool replace: Should the server be replaced?
+    :param bool purge: Should the server be deleted from Nova?
+    :param group: The scaling group to remove a server from.
+    :type group: :class:`~otter.models.interface.IScalingGroup`
+    :param state: The current state of the group.
+    :type state: :class:`~otter.models.interface.GroupState`
+
+    :return: The updated state.
+    :rtype: deferred :class:`~otter.models.interface.GroupState`
+    """
+    # worker case
+    if not tenant_is_enabled(group.tenant_id, config_value):
+        return worker_remove_server_from_group(
+            log, trans_id, server_id, replace, purge, group, state)
+
+    # convergence case - requires that the convergence dispatcher handles
+    # EvictServerFromScalingGroup
+    eff = convergence_remove_server_from_group(
+        log, trans_id, server_id, replace, purge, group, state)
+
+    def kick_off_convergence(new_state):
+        ceff = trigger_convergence(group.tenant_id, group.uuid)
+        return ceff.on(lambda _: new_state)
+
+    return perform(
+        dispatcher,
+        with_log(eff.on(kick_off_convergence),
+                 tenant_id=group.tenant_id,
+                 scaling_group_id=group.uuid,
+                 server_id=server_id,
+                 transaction_id=trans_id))

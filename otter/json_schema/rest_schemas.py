@@ -9,7 +9,8 @@ from copy import deepcopy
 from itertools import cycle
 
 from otter.json_schema.group_schemas import (
-    policy, config, launch_config, webhook)
+    config, launch_config, policy, webhook)
+from otter.models.interface import ScalingGroupStatus
 from otter.util.config import config_value
 
 
@@ -144,6 +145,22 @@ group_state = _openstackify_schema("group", {
             'type': 'integer',
             'minimum': 0,
             'required': True
+        },
+        'status': {
+            'type': 'string',
+            'required': True,
+            'pattern': '|'.join(
+                x.name for x in ScalingGroupStatus.iterconstants())
+        },
+        'errors': {
+            'type': 'array',
+            'required': False,
+            'items': {
+                'type': 'object',
+                'properties': {
+                    'message': {'type': 'string', 'required': True}
+                }
+            }
         }
     },
     'additionalProperties': False

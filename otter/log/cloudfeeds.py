@@ -1,26 +1,24 @@
 """
 Publishing events to Cloud feeds
 """
-
-import uuid
 from copy import deepcopy
-from functools import partial
 
 from characteristic import attributes
 
-from effect import Effect, Func
-from effect.twisted import perform
+from effect import Effect
 
 from toolz.dicttoolz import keyfilter
 
-from otter.cloud_client import TenantScope, service_request
-from otter.constants import ServiceType
-from otter.effect_dispatcher import get_full_dispatcher
+from txeffect import perform
+
+from otter.cloud_client import TenantScope, publish_to_cloudfeeds
+from otter.effect_dispatcher import get_legacy_dispatcher
 from otter.log import log as otter_log
-from otter.log.formatters import PEP3101FormattingWrapper
-from otter.util.http import append_segments
-from otter.util.pure_http import has_code
+from otter.log.formatters import LogLevel
+from otter.log.intents import err as err_effect, msg as msg_effect
+from otter.util.http import APIError
 from otter.util.retry import (
+    compose_retries,
     exponential_backoff_interval,
     retry_effect,
     retry_times)
@@ -43,8 +41,38 @@ log_cf_mapping = {
     "username": "username",
     "desired_capacity": "desiredCapacity",
     "current_capacity": "currentCapacity",
+    "scheduled_time": "scheduledTime",
     "message": "message"
 }
+
+
+def _cf_log(log_effect, *args, **kwargs):
+    """
+    Log cloud feeds message with a "cloud_feeds" tag parameter.
+    """
+    kwargs['cloud_feed'] = True
+    return log_effect(*args, **kwargs)
+
+
+def cf_msg(msg, **fields):
+    """
+    Helper function to log cloud feeds event
+    """
+    return _cf_log(msg_effect, msg, **fields)
+
+
+def cf_err(msg, **fields):
+    """
+    Log cloud feed error event without failure
+    """
+    return _cf_log(msg_effect, msg, isError=True, **fields)
+
+
+def cf_fail(failure, msg, **fields):
+    """
+    Log cloud feed error event with failure
+    """
+    return _cf_log(err_effect, failure, msg, **fields)
 
 
 def sanitize_event(event):
@@ -53,30 +81,35 @@ def sanitize_event(event):
 
     :param dict event: Event to sanitize as given by Twisted
 
-    :return: (dict, bool, str) tuple where dict -> sanitized event,
-        bool -> is it error event?, str -> ISO8601 formatted UTC time of event
+    :return: (dict, bool, str, str) tuple where dict -> sanitized event,
+        bool -> is it error event?, str -> ISO8601 formatted UTC time of event,
+        str -> tenant ID
     """
     cf_event = {}
     error = False
 
-    # format message
-    event_copy = deepcopy(event)
-    PEP3101FormattingWrapper(lambda e: None)(event_copy)
-    msg = event_copy["message"]
-    event["message"] = msg[0]
+    # Get message
+    cf_event["message"] = event["message"][0]
 
     # map keys in event to CF keys
     for log_key, cf_key in log_cf_mapping.iteritems():
-        if log_key in event:
+        if log_key in event and log_key != 'message':
             cf_event[cf_key] = event[log_key]
 
-    if event.get('isError', False):
+    if event["level"] == LogLevel.ERROR:
         error = True
         if ('traceback' in cf_event['message'] or
            'exception' in cf_event['message']):
             raise UnsuitableMessage(cf_event['message'])
 
-    return (cf_event, error, epoch_to_utctimestr(event["time"]))
+    if 'tenant_id' not in event or 'cloud_feed_id' not in event:
+        raise UnsuitableMessage(cf_event['message'])
+
+    return (cf_event,
+            error,
+            epoch_to_utctimestr(event["time"]),
+            event['tenant_id'],
+            event['cloud_feed_id'])
 
 
 request_format = {
@@ -103,7 +136,7 @@ request_format = {
 }
 
 
-def prepare_request(req_fmt, event, error, timestamp, region, _id):
+def prepare_request(req_fmt, event, error, timestamp, region, tenant_id, _id):
     """
     Prepare request based on request format
     """
@@ -113,36 +146,33 @@ def prepare_request(req_fmt, event, error, timestamp, region, _id):
     request['entry']['content']['event']['region'] = region
     request['entry']['content']['event']['eventTime'] = timestamp
     request['entry']['content']['event']['product'].update(event)
+    request['entry']['content']['event']['tenantId'] = tenant_id
     request['entry']['content']['event']['id'] = _id
     return request
 
 
-def add_event(event, tenant_id, region, log):
+def add_event(event, admin_tenant_id, region, log):
     """
     Add event to cloud feeds
     """
-    event, error, timestamp = sanitize_event(event)
-    eff = Effect(Func(uuid.uuid4)).on(str).on(
-        partial(prepare_request, request_format, event,
-                error, timestamp, region))
+    event, error, timestamp, event_tenant_id, event_id = sanitize_event(event)
+    req = prepare_request(request_format, event, error, timestamp, region,
+                          event_tenant_id, event_id)
 
-    def _send_event(req):
-        eff = retry_effect(
-            service_request(
-                ServiceType.CLOUD_FEEDS, 'POST',
-                append_segments('autoscale', 'events'),
-                headers={
-                    'content-type': ['application/vnd.rackspace.atom+json']},
-                data=req, log=log, success_pred=has_code(201)),
-            retry_times(5), exponential_backoff_interval(2))
-        return Effect(TenantScope(tenant_id=tenant_id, effect=eff))
-
-    return eff.on(_send_event)
+    eff = retry_effect(
+        publish_to_cloudfeeds(req, log=log),
+        compose_retries(
+            lambda f: (not f.check(APIError) or
+                       f.value.code < 400 or
+                       f.value.code >= 500),
+            retry_times(5)),
+        exponential_backoff_interval(2))
+    return Effect(TenantScope(tenant_id=admin_tenant_id, effect=eff))
 
 
 @attributes(['reactor', 'authenticator', 'tenant_id', 'region',
              'service_configs', 'log', 'get_disp', 'add_event'],
-            defaults={'log': otter_log, 'get_disp': get_full_dispatcher,
+            defaults={'log': otter_log, 'get_disp': get_legacy_dispatcher,
                       'add_event': add_event})
 class CloudFeedsObserver(object):
     """
@@ -165,13 +195,10 @@ class CloudFeedsObserver(object):
         try:
             eff = self.add_event(event_dict, self.tenant_id, self.region, log)
         except UnsuitableMessage as me:
-            log.err(None, ('Tried to add unsuitable message in cloud feeds: '
-                           '{unsuitable_message}'),
-                    otter_msg_type='cf-unsuitable-message',
+            log.err(None, 'cf-unsuitable-message',
                     unsuitable_message=me.unsuitable_message)
         else:
             return perform(
                 self.get_disp(self.reactor, self.authenticator, log,
                               self.service_configs),
-                eff).addErrback(log.err, "Failed to add event",
-                                otter_msg_type='cf-add-failure')
+                eff).addErrback(log.err, 'cf-add-failure')

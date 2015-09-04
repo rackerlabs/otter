@@ -30,7 +30,7 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
             execute_policy=True)
         self.resources.add(self.group, self.empty_scaling_group)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_scale_down_policy_execution_change(self):
         """
         A scale down policy with change can be executed
@@ -55,7 +55,7 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
             self.group.launchConfiguration.server.name,
             self.group.groupConfiguration.minEntities)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_scale_down_policy_execution_change_percent(self):
         """
         A scale down policy with change percent can be executed
@@ -79,7 +79,7 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
             self.group.launchConfiguration.server.name,
             servers_from_scale_down)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_scale_down_policy_execution_desired_capacity(self):
         """
         A scale down policy with desired capacity can be executed
@@ -100,7 +100,7 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
             self.group.launchConfiguration.server.name,
             policy_down['desired_capacity'])
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_execute_scale_down_below_minentities_change(self):
         """
         Executing a scale down when change results in servers less than
@@ -121,7 +121,7 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_execute_scale_down_below_minentities_change_percent(self):
         """
         Executing a scale down when change percent results in servers less than
@@ -145,7 +145,7 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
             self.group.launchConfiguration.server.name,
             self.group.groupConfiguration.minEntities)
 
-    @tags(speed='slow')
+    @tags(speed='slow', convergence='yes')
     def test_execute_scale_down_below_minentities_desired_capacity(self):
         """
         Executing a scale down when desired capacity results in servers less

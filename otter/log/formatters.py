@@ -4,6 +4,7 @@ Composable log observers for use with Twisted's log module.
 import json
 import time
 from datetime import datetime
+from uuid import uuid4
 
 from pyrsistent import pmap
 
@@ -26,6 +27,66 @@ THROTTLED_MESSAGES = [
 ]
 
 THROTTLE_COUNT = 50
+
+NON_PEP3101_SYSTEMS = ('kazoo',)
+
+
+_fanout = None
+
+
+def add_to_fanout(observer):
+    """
+    Add the given observer to the global instance of :class:`FanoutObserver`
+
+    :param callable observer: The observer to fan out to.
+    :return: `None`
+    """
+    global _fanout
+    if _fanout is None:
+        _fanout = FanoutObserver(observer)
+    else:
+        _fanout.add_observer(observer)
+
+
+def get_fanout():
+    """
+    :return: the global instance of :class:`FanoutObserver`
+    """
+    return _fanout
+
+
+def set_fanout(fanout):
+    """
+    Set the global instance of :class:`FanoutObserver`.
+    :return: `None`
+    """
+    global _fanout
+    _fanout = fanout
+
+
+class FanoutObserver(object):
+    """
+    A fanout observer that emits events that it receives to all its sub
+    observers.
+    """
+    def __init__(self, observer):
+        """
+        Initialize the subobservers with the first observer.
+        """
+        self.subobservers = [observer]
+
+    def add_observer(self, observer):
+        """
+        Add another observer to the subobservers.
+        """
+        self.subobservers.append(observer)
+
+    def __call__(self, event_dict):
+        """
+        Emit a copy of the event dict to every subobserver.
+        """
+        for ob in self.subobservers:
+            ob(event_dict.copy())
 
 
 class LoggingEncoder(json.JSONEncoder):
@@ -127,16 +188,17 @@ def PEP3101FormattingWrapper(observer):
     :rtype: :class:`ILogObserver`
     """
     def PEP3101FormattingObserver(eventDict):
-        if eventDict.get('why'):
+        if (eventDict.get('why') and
+                eventDict.get('system') not in NON_PEP3101_SYSTEMS):
             eventDict['why'] = eventDict['why'].format(**eventDict)
 
         if 'message' in eventDict:
             message = ' '.join(eventDict['message'])
 
-            if message:
+            if message and eventDict.get('system') not in NON_PEP3101_SYSTEMS:
                 try:
                     eventDict['message'] = (message.format(**eventDict),)
-                except:
+                except Exception:
                     failure = Failure()
                     eventDict['message_formatting_error'] = str(failure)
                     eventDict['message'] = message
@@ -150,94 +212,6 @@ ERROR_FIELDS = {"isError", "failure", "why"}
 
 PRIMITIVE_FIELDS = {"time", "system", "id", "audit_log", "message"}
 
-AUDIT_LOG_FIELDS = {
-    "audit_log": bool,
-    "message": basestring,
-    "request_ip": basestring,
-    "user_id": basestring,
-    "tenant_id": basestring,
-    "scaling_group_id": basestring,
-    "policy_id": basestring,
-    "webhook_id": basestring,
-    "data": dict,
-    "transaction_id": basestring,
-    "event_type": basestring,
-    "is_error": bool,
-    "desired_capacity": int,
-    "pending_capacity": int,
-    "current_capacity": int,
-    "previous_desired_capacity": int,
-    "fault": dict,
-    "parent_id": basestring,
-    "as_user_id": basestring,
-    "convergence_delta": int,
-    "server_id": basestring,
-}
-
-
-def audit_log_formatter(eventDict, timestamp, hostname):
-    """
-    Format an eventDict into another dictionary that conforms to the audit log
-    format.
-
-    :param dict eventDict: an eventDict as would be passed into an observer
-    :param timestamp: a timestamp to use in the timestamp field
-
-    :returns: an audit-log formatted dictionary
-    """
-    audit_log_params = {
-        "@version": 1,
-        "@timestamp": timestamp,
-        "host": hostname,
-        "is_error": False
-    }
-
-    for key, value in eventDict.iteritems():
-        if key in AUDIT_LOG_FIELDS and isinstance(value, AUDIT_LOG_FIELDS[key]):
-                audit_log_params[key] = value
-
-    if "message" not in audit_log_params:
-        audit_log_params["message"] = " ".join([
-            str(m) for m in eventDict["message"]])
-
-    if eventDict.get("isError", False):
-        audit_log_params["is_error"] = True
-
-        # create the fault dictionary, if it doesn't exist, without clobbering
-        # any existing details
-        fault = {'details': {}}
-        fault.update(audit_log_params.get('fault', {}))
-        audit_log_params['fault'] = fault
-
-        if 'failure' in eventDict:
-            # Do not clobber any details already in there
-            fault['details'].update(getattr(eventDict['failure'].value,
-                                            'details', {}))
-
-            if 'message' not in fault:
-                fault['message'] = eventDict['failure'].value.message
-
-        audit_log_params["message"] = 'Failed: {0}.'.format(
-            audit_log_params["message"])
-
-        if 'why' in eventDict and eventDict['why']:
-            audit_log_params["message"] = '{0} {1}'.format(
-                audit_log_params["message"], eventDict['why'])
-
-        # strip out any repeated info in the details dict
-        delete = []
-        for key, value in fault['details'].iteritems():
-            if key in AUDIT_LOG_FIELDS:
-                if (key not in audit_log_params and
-                        isinstance(value, AUDIT_LOG_FIELDS[key])):
-                    audit_log_params[key] = value
-                delete.append(key)
-
-        for key in delete:
-            del fault['details'][key]
-
-    return audit_log_params
-
 
 @singledispatch
 def serialize_to_jsonable(obj):
@@ -245,6 +219,12 @@ def serialize_to_jsonable(obj):
     Serialize any object to a JSONable form
     """
     return repr(obj)
+
+
+class LogLevel(object):
+    """ Log levels """
+    INFO = 6
+    ERROR = 3
 
 
 def ErrorFormattingWrapper(observer):
@@ -264,7 +244,7 @@ def ErrorFormattingWrapper(observer):
         message = ""
 
         if event.get("isError", False):
-            level = 3
+            level = LogLevel.ERROR
 
             if 'failure' in event:
                 excp = event['failure'].value
@@ -279,7 +259,7 @@ def ErrorFormattingWrapper(observer):
                 message = '{0}: {1}'.format(event['why'], message)
 
         else:
-            level = 6
+            level = LogLevel.INFO
 
         event.update({
             "message": (''.join(event.get("message", '')) or message, ),
@@ -323,12 +303,6 @@ def ObserverWrapper(observer, hostname, seconds=None):
             if key not in PRIMITIVE_FIELDS:
                 log_params[key] = value
 
-        # emit an audit log entry also, if it's an audit log
-        if 'audit_log' in eventDict:
-            log_params['audit_log_event_source'] = True
-            observer(audit_log_formatter(eventDict, log_params['@timestamp'],
-                                         hostname))
-
         observer(log_params)
 
     return Observer
@@ -354,7 +328,6 @@ def throttling_wrapper(observer):
         return True
 
     def emit(event):
-        event = event.copy()
         template = _get_matching_template(event)
         if template is not None:
             event_counts[template] += 1
@@ -366,4 +339,15 @@ def throttling_wrapper(observer):
         else:
             return observer(event)
 
+    return emit
+
+
+def cf_id_wrapper(observer):
+    """
+    Wrapper that adds a cloud feeds ID to each cloud feeds event dictionary.
+    """
+    def emit(event_dict):
+        if event_dict.get('cloud_feed', False):
+            event_dict['cloud_feed_id'] = str(uuid4())
+        observer(event_dict)
     return emit

@@ -4,17 +4,15 @@ Errors mapped to http status codes in the rest module
 
 from jsonschema import ValidationError
 
-from otter.controller import CannotExecutePolicyError
-from otter.supervisor import ServerNotFoundError, CannotDeleteServerBelowMinError
-
+from otter.controller import CannotExecutePolicyError, GroupPausedError
 from otter.models.interface import (
-    GroupNotEmptyError, NoSuchScalingGroupError,
-    NoSuchPolicyError, NoSuchWebhookError, ScalingGroupOverLimitError,
-    WebhooksOverLimitError, PoliciesOverLimitError)
-
-from otter.worker.validate_config import InvalidLaunchConfiguration
-
+    GroupNotEmptyError, NoSuchPolicyError, NoSuchScalingGroupError,
+    NoSuchWebhookError, PoliciesOverLimitError,
+    ScalingGroupOverLimitError, WebhooksOverLimitError)
 from otter.rest.decorators import InvalidJsonError, InvalidQueryArgument
+from otter.supervisor import (
+    CannotDeleteServerBelowMinError, ServerNotFoundError)
+from otter.worker.validate_config import InvalidLaunchConfiguration
 
 
 class InvalidMinEntities(Exception):
@@ -32,6 +30,7 @@ exception_codes = {
     NoSuchWebhookError: 404,
     ServerNotFoundError: 404,
     GroupNotEmptyError: 403,
+    GroupPausedError: 403,
     CannotDeleteServerBelowMinError: 403,
     CannotExecutePolicyError: 403,
     InvalidQueryArgument: 400,

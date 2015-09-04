@@ -2,23 +2,29 @@
 Autoscale REST endpoints having to do with creating/reading/updating/deleting
 the scaling policies associated with a particular scaling group.
 
-(/tenantId/groups/groupId/policies and /tenantId/groups/groupId/policies/policyId)
+(/tenantId/groups/groupId/policies and
+ /tenantId/groups/groupId/policies/policyId)
 """
 
-from functools import partial
 import json
+from functools import partial
+
+from jsonschema import ValidationError
+
 from twisted.internet import defer
 
-from otter.json_schema import rest_schemas, group_schemas
+from otter import controller
+from otter.json_schema import group_schemas, rest_schemas
 from otter.log import log
-from otter.rest.decorators import (validate_body, fails_with, auditable,
-                                   succeeds_with, with_transaction_id, paginatable)
+from otter.log.bound import bound_log_kwargs
+from otter.rest.decorators import (
+    auditable, fails_with, paginatable, succeeds_with, validate_body,
+    with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.rest.webhooks import OtterWebhooks
-from otter.util.http import get_autoscale_links, transaction_id, get_policies_links
-from otter import controller
-from jsonschema import ValidationError
+from otter.util.http import (
+    get_autoscale_links, get_policies_links, transaction_id)
 
 
 def linkify_policy_list(policy_list, tenantId, groupId):
@@ -55,13 +61,14 @@ class OtterPolicies(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, scaling_group_id):
+    def __init__(self, store, tenant_id, scaling_group_id, dispatcher):
         self.log = log.bind(system='otter.rest.policies',
                             tenant_id=tenant_id,
                             scaling_group_id=scaling_group_id)
         self.store = store
         self.tenant_id = tenant_id
         self.scaling_group_id = scaling_group_id
+        self.dispatcher = dispatcher
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -258,7 +265,7 @@ class OtterPolicies(object):
         """
         return OtterPolicy(self.store, self.tenant_id,
                            self.scaling_group_id,
-                           policy_id).app.resource()
+                           policy_id, self.dispatcher).app.resource()
 
 
 class OtterPolicy(object):
@@ -267,7 +274,8 @@ class OtterPolicy(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, scaling_group_id, policy_id):
+    def __init__(self, store, tenant_id, scaling_group_id, policy_id,
+                 dispatcher):
         self.log = log.bind(system='otter.log.policy',
                             tenant_id=tenant_id,
                             scaling_group_id=scaling_group_id,
@@ -276,6 +284,7 @@ class OtterPolicy(object):
         self.tenant_id = tenant_id
         self.scaling_group_id = scaling_group_id
         self.policy_id = policy_id
+        self.dispatcher = dispatcher
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -369,10 +378,16 @@ class OtterPolicy(object):
 
             {}
         """
-        group = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
-        d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
-                                       self.log, transaction_id(request),
-                                       policy_id=self.policy_id))
+        group = self.store.get_scaling_group(self.log, self.tenant_id,
+                                             self.scaling_group_id)
+        d = controller.modify_and_trigger(
+            self.dispatcher,
+            group,
+            bound_log_kwargs(self.log),
+            partial(controller.maybe_execute_scaling_policy,
+                    self.log, transaction_id(request),
+                    policy_id=self.policy_id),
+            modify_state_reason='execute_policy')
         d.addCallback(lambda _: "{}")  # Return value TBD
         return d
 
@@ -382,4 +397,5 @@ class OtterPolicy(object):
         webhook routes handled by OtterWebhooks
         """
         return OtterWebhooks(self.store, self.tenant_id,
-                             self.scaling_group_id, self.policy_id).app.resource()
+                             self.scaling_group_id,
+                             self.policy_id).app.resource()

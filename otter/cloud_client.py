@@ -1,8 +1,10 @@
-"""
-Integration point for HTTP clients in otter.
-"""
+"""A general-ish purpose Rackspace cloud client API, using Effect."""
+import json
 import re
 from functools import partial, wraps
+from urlparse import parse_qs, urlparse
+
+import attr
 
 from characteristic import Attribute, attributes
 
@@ -16,8 +18,19 @@ from effect import (
 
 import six
 
+from toolz.dicttoolz import get_in
+from toolz.functoolz import identity
+from toolz.itertoolz import concat
+
+from twisted.internet.defer import DeferredLock
+from twisted.internet.task import deferLater
+
+from txeffect import deferred_performer, perform as twisted_perform
+
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType
+from otter.log.intents import msg as msg_effect
+from otter.util.config import config_value
 from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (
@@ -147,7 +160,7 @@ class TenantScope(object):
 
 
 def concretize_service_request(
-        authenticator, log, service_configs,
+        authenticator, log, service_configs, throttler,
         tenant_id,
         service_request):
     """
@@ -156,10 +169,13 @@ def concretize_service_request(
     performer interface, but it's intended to be used by a performer.
 
     :param ICachingAuthenticator authenticator: the caching authenticator
-    :param tenant_id: tenant ID.
     :param BoundLog log: info about requests will be logged to this.
     :param dict service_configs: As returned by
         :func:`otter.constants.get_service_configs`.
+    :param callable throttler: A function of ServiceType, HTTP method ->
+        Deferred bracketer or None, used to throttle requests. See
+        :obj:`_Throttle`.
+    :param tenant_id: tenant ID.
     """
     auth_eff = Effect(Authenticate(authenticator, tenant_id, log))
     invalidate_eff = Effect(InvalidateToken(authenticator, tenant_id))
@@ -190,12 +206,87 @@ def concretize_service_request(
             service_request.url,
             headers=service_request.headers,
             data=service_request.data,
+            params=service_request.params,
             log=log)
-    return auth_eff.on(got_auth)
+
+    eff = auth_eff.on(got_auth)
+    bracket = throttler(service_request.service_type,
+                        service_request.method.lower())
+    if bracket is not None:
+        return Effect(_Throttle(bracket=bracket, effect=eff))
+    else:
+        return eff
+
+
+@attributes(['bracket', 'effect'])
+class _Throttle(object):
+    """
+    A grody hack to allow using a Deferred concurrency limiter in Effectful
+    code.
+
+    A "Deferred bracket" is some function of type
+    ``((f, *args, **kwargs) -> Deferred) -> Deferred``
+    basically, something that "brackets" a call to some Deferred-returning
+    function. This is the case for the ``run`` method of objects like
+    :obj:`.DeferredSemaphore` and :obj:`.DeferredLock`.
+
+    https://wiki.haskell.org/Bracket_pattern
+
+    Ideally Effect would just have built-in concurrency limiters/idioms without
+    relying on Twisted and Deferreds.
+
+    :param callable bracket: The bracket to run the effect in
+    :param Effect effect: The effect to perform inside the bracket
+    """
+
+
+@deferred_performer
+def _perform_throttle(dispatcher, throttle):
+    """
+    Perform :obj:`_Throttle` by performing the effect after acquiring a lock
+    and delaying but some period of time.
+    """
+    lock = throttle.bracket
+    eff = throttle.effect
+    return lock(twisted_perform, dispatcher, eff)
+
+
+def _serialize_and_delay(clock, delay):
+    """
+    Return a function that when invoked with another function will run it
+    serialized and after a delay.
+    """
+    lock = DeferredLock()
+    return partial(lock.run, deferLater, clock, delay)
+
+
+def _default_throttler(clock, stype, method):
+    """Get a throttler function with default throttling policies."""
+    # Serialize creation and deletion of cloud servers because the Compute team
+    # has suggested we do this.
+
+    # Compute suggested 150 deletion req/min. A delay of 0.4 should guarantee
+    # no more than that are executed by a node, plus serialization of requests
+    # will make it quite a bit lower than that.
+
+    cloud_client_config = config_value('cloud_client')
+    if cloud_client_config is None:
+        cloud_client_config = {}
+    throttling_config = cloud_client_config.get('throttling', {})
+    create_server_delay = throttling_config.get('create_server_delay', 1)
+    delete_server_delay = throttling_config.get('delete_server_delay', 0.4)
+
+    policy = {
+        (ServiceType.CLOUD_SERVERS, 'post'):
+            _serialize_and_delay(clock, create_server_delay),
+        (ServiceType.CLOUD_SERVERS, 'delete'):
+            _serialize_and_delay(clock, delete_server_delay),
+    }
+    return policy.get((stype, method))
 
 
 def perform_tenant_scope(
-        authenticator, log, service_configs,
+        authenticator, log, service_configs, throttler,
         dispatcher, tenant_scope, box,
         _concretize=concretize_service_request):
     """
@@ -211,7 +302,7 @@ def perform_tenant_scope(
     @sync_performer
     def scoped_performer(dispatcher, service_request):
         return _concretize(
-            authenticator, log, service_configs,
+            authenticator, log, service_configs, throttler,
             tenant_scope.tenant_id, service_request)
     new_disp = ComposedDispatcher([
         TypeDispatcher({ServiceRequest: scoped_performer}),
@@ -219,38 +310,136 @@ def perform_tenant_scope(
     perform(new_disp, tenant_scope.effect.on(box.succeed, box.fail))
 
 
+def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
+    """
+    Get a dispatcher suitable for running :obj:`ServiceRequest` and
+    :obj:`TenantScope` intents.
+    """
+    # this throttler could be parameterized but for now it's basically a hack
+    # that we want to keep private to this module
+    throttler = partial(_default_throttler, reactor)
+    return TypeDispatcher({
+        TenantScope: partial(perform_tenant_scope, authenticator, log,
+                             service_configs, throttler),
+        _Throttle: _perform_throttle,
+    })
+
+
+# ----- Logging responses -----
+
+
+def log_success_response(msg_type, response_body_filter):
+    """
+    :param str msg_type: A string representing the message type of the log
+        message
+    :param callable response_body_filter: A callable that takes a the response
+        body and returns a version of the body that should be logged - this
+        should not mutate the original response body.
+    :return: a function that accepts success result from a `ServiceRequest` and
+        log the response body.  This assumes a JSON response, which is a
+        tuple of (response, response_content).  (non-JSON responses do not
+        currently include the original response)
+    """
+    def _log_it(result):
+        resp, json_body = result
+        # So we can link it to any non-cloud_client logs
+        request_id = resp.request.headers.getRawHeaders(
+            'x-otter-request-id', [None])[0]
+
+        eff = msg_effect(
+            msg_type,
+            method=resp.request.method,
+            url=resp.request.absoluteURI,
+            response_body=json.dumps(response_body_filter(json_body),
+                                     sort_keys=True),
+            request_id=request_id)
+        return eff.on(lambda _: result)
+
+    return _log_it
+
+
 # ----- CLB requests and error parsing -----
+def _regex(pattern):
+    """
+    Compile a case-insensitive pattern.
+    """
+    return re.compile(pattern, re.I)
 
-_CLB_PENDING_UPDATE_PATTERN = re.compile(
-    "^Load Balancer '\d+' has a status of 'PENDING_UPDATE' and is considered "
-    "immutable.$")
-_CLB_DELETED_PATTERN = re.compile(
-    "^(Load Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
-    "The load balancer is deleted and) considered immutable.$")
-_CLB_NO_SUCH_NODE_PATTERN = re.compile(
-    "^Node with id #\d+ not found for loadbalancer #\d+$")
-_CLB_NO_SUCH_LB_PATTERN = re.compile(
-    "^Load balancer not found.$")
+
+_CLB_IMMUTABLE_PATTERN = _regex(
+    "Load\s*Balancer '\d+' has a status of '[^']+' and is considered "
+    "immutable")
+_CLB_NOT_ACTIVE_PATTERN = _regex("Load\s*Balancer is not ACTIVE")
+_CLB_DELETED_PATTERN = _regex(
+    "(Load\s*Balancer '\d+' has a status of 'PENDING_DELETE' and is|"
+    "The load balancer is deleted and) considered immutable")
+_CLB_MARKED_DELETED_PATTERN = _regex(
+    "The load\s*balancer is marked as deleted")
+_CLB_NO_SUCH_NODE_PATTERN = _regex(
+    "Node with id #\d+ not found for load\s*balancer #\d+$")
+_CLB_NO_SUCH_LB_PATTERN = _regex(
+    "Load\s*balancer not found")
+_CLB_DUPLICATE_NODES_PATTERN = _regex(
+    "Duplicate nodes detected. One or more nodes already configured "
+    "on load\s*balancer")
+_CLB_NODE_LIMIT_PATTERN = _regex(
+    "Nodes must not exceed \d+ per load\s*balancer")
+_CLB_NODE_REMOVED_PATTERN = _regex(
+    "Node ids ((?:\d+,)*(?:\d+)) are not a part of your load\s*balancer")
+_CLB_OVER_LIMIT_PATTERN = _regex("OverLimit Retry\.{3}")
+
+
+@attr.s(these={"message": attr.ib()}, init=False)
+class ExceptionWithMessage(Exception):
+    """
+    The builtin `Exception` doesn't have equality (it tests for identity).
+    ``attr`` provides equality based on the attributes.
+
+    But letting ``attr`` generate the `__init__` function for you means that
+    means extra kwargs do not get passed to the superclass's
+    ``__init__``.
+
+    So this gives us a base class that does both.  By using providing
+    our own ``__init__`` function, we can make this compatible with the builtin
+    Exception and also get the Python27 Exception's ``__str__`` function
+    automatically.
+
+    Also useful to note that Python 3 does not store the message on the
+    Exception, it just stores the args passed to it, so this lets us have a
+    message attribute in Python 3 as well.
+    """
+    def __init__(self, message):
+        """
+        Set ``self.message`` and also call the base class's ``__init__``.
+        """
+        super(ExceptionWithMessage, self).__init__(message)
+        self.message = message
 
 
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
-class CLBPendingUpdateError(Exception):
+class CLBImmutableError(Exception):
     """
-    Error to be raised when the CLB is in PENDING_UPDATE status and is
-    immutable (temporarily).
+    Error to be raised when the CLB is in some status that causes is to be
+    temporarily immutable.
+
+    This exception is _not_ used when the status is PENDING_DELETE. See
+    :obj:`CLBDeletedError`.
     """
 
 
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
-class CLBDeletedError(Exception):
+class CLBNotFoundError(Exception):
+    """A CLB doesn't exist. Superclass of other, more specific exceptions."""
+
+
+class CLBDeletedError(CLBNotFoundError):
     """
     Error to be raised when the CLB has been deleted or is being deleted.
     This is distinct from it not existing.
     """
 
 
-@attributes([Attribute('lb_id', instance_of=six.text_type)])
-class NoSuchCLBError(Exception):
+class NoSuchCLBError(CLBNotFoundError):
     """
     Error to be raised when the CLB never existed in the first place (or it
     has been deleted so long that there is no longer a record of it).
@@ -267,10 +456,123 @@ class NoSuchCLBNodeError(Exception):
 
 
 @attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBNotActiveError(Exception):
+    """
+    Error to be raised when a CLB is not ACTIVE (and we have no more
+    information about what its actual state is).
+    """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
 class CLBRateLimitError(Exception):
     """
     Error to be raised when CLB returns 413 (rate limiting).
     """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBDuplicateNodesError(Exception):
+    """
+    Error to be raised only when adding one or more nodes to a CLB whose
+    address and port are mapped on the CLB.
+    """
+
+
+@attributes([Attribute('lb_id', instance_of=six.text_type)])
+class CLBNodeLimitError(Exception):
+    """
+    Error to be raised only when adding one or more nodes to a CLB: adding
+    that number of nodes would exceed the maximum number of nodes allowed on
+    the CLB.
+    """
+
+
+def _match_errors(code_keys_exc_mapping, status_code, response_dict):
+    """
+    Take a list of tuples of:
+    (status code, json keys, regex pattern (optional), exception callable),
+    and attempt to match them against the given status code and response
+    dict.  If a match is found raises the given exception type with the
+    exception callable, passing along the message.
+    """
+    for code, keys, pattern, make_exc in code_keys_exc_mapping:
+        if code == status_code:
+            message = get_in(keys, response_dict, None)
+            if message is not None and (not pattern or pattern.match(message)):
+                raise make_exc(message)
+
+
+def _only_json_api_errors(f):
+    """
+    Helper function so that we only catch APIErrors with bodies that can be
+    parsed into JSON.
+
+    Should decorate a function that expects two parameters: http status code
+    and JSON body.
+
+    If the decorated function cannot parse the error (either because it's not
+    JSON or not recognized), reraise the error.
+    """
+    @wraps(f)
+    def try_parsing(api_error_exc_info):
+        api_error = api_error_exc_info[1]
+        try:
+            body = json.loads(api_error.body)
+        except (ValueError, TypeError):
+            pass
+        else:
+            f(api_error.code, body)
+
+        six.reraise(*api_error_exc_info)
+
+    return catch(APIError, try_parsing)
+
+
+def add_clb_nodes(lb_id, nodes):
+    """
+    Generate effect to add one or more nodes to a load balancer.
+
+    Note: This is not correctly documented in the load balancer documentation -
+    it is documented as "Add Node" (singular), but the examples show multiple
+    nodes being added.
+
+    :param str lb_id: The load balancer ID to add the nodes to
+    :param list nodes: A list of node dictionaries that each look like::
+
+        {
+            "address": "valid ip address",
+            "port": 80,
+            "condition": "ENABLED",
+            "weight": 1,
+            "type": "PRIMARY"
+        }
+
+        (weight and type are optional)
+
+    :return: :class:`ServiceRequest` effect
+
+    :raises: :class:`CLBImmutableError`, :class:`CLBDeletedError`,
+        :class:`NoSuchCLBError`, :class:`CLBDuplicateNodesError`,
+        :class:`APIError`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'POST',
+        append_segments('loadbalancers', lb_id, 'nodes'),
+        data={'nodes': nodes},
+        success_pred=has_code(202))
+
+    @_only_json_api_errors
+    def _parse_known_errors(code, json_body):
+        mappings = _expand_clb_matches(
+            [(422, _CLB_DUPLICATE_NODES_PATTERN, CLBDuplicateNodesError),
+             (413, _CLB_NODE_LIMIT_PATTERN, CLBNodeLimitError)],
+            lb_id)
+        _match_errors(mappings, code, json_body)
+        _process_clb_api_error(code, json_body, lb_id)
+
+    return eff.on(error=_parse_known_errors).on(
+        log_success_response('request-add-clb-nodes', identity))
 
 
 def change_clb_node(lb_id, node_id, condition, weight):
@@ -288,7 +590,7 @@ def change_clb_node(lb_id, node_id, condition, weight):
 
     :return: :class:`ServiceRequest` effect
 
-    :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
+    :raises: :class:`CLBImmutableError`, :class:`CLBDeletedError`,
         :class:`NoSuchCLBError`, :class:`NoSuchCLBNodeError`, :class:`APIError`
     """
     eff = service_request(
@@ -298,56 +600,176 @@ def change_clb_node(lb_id, node_id, condition, weight):
         data={'condition': condition, 'weight': weight},
         success_pred=has_code(202))
 
-    def _check_no_such_node(api_error_code, json_body):
-        if (api_error_code == 404 and _CLB_NO_SUCH_NODE_PATTERN.match(
-                json_body.get('message', ''))):
-            raise NoSuchCLBNodeError(lb_id=lb_id, node_id=node_id)
+    @_only_json_api_errors
+    def _parse_known_errors(code, json_body):
+        _process_clb_api_error(code, json_body, lb_id)
+        _match_errors(
+            _expand_clb_matches(
+                [(404, _CLB_NO_SUCH_NODE_PATTERN, NoSuchCLBNodeError)],
+                lb_id=lb_id, node_id=node_id),
+            code,
+            json_body)
 
-    parse_err = partial(_process_clb_api_error, lb_id=lb_id,
-                        extra_parsing=_check_no_such_node)
-
-    return eff.on(error=catch(APIError, parse_err))
+    return eff.on(error=_parse_known_errors)
+    # CLB 202 response here has no body, so no response logging needed
 
 
-def _process_clb_api_error(exc_info, lb_id, extra_parsing):
+def remove_clb_nodes(lb_id, node_ids):
+    """
+    Remove multiple nodes from a load balancer.
+
+    :param str lb_id: A load balancer ID.
+    :param node_ids: iterable of node IDs.
+    :return: Effect of None.
+
+    Succeeds on 202.
+
+    This function will handle the case where *some* of the nodes are valid and
+    some aren't, by retrying deleting only the valid ones.
+    """
+    node_ids = map(str, node_ids)
+    eff = service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'DELETE',
+        append_segments('loadbalancers', lb_id, 'nodes'),
+        params={'id': node_ids},
+        success_pred=has_code(202))
+
+    def check_invalid_nodes(exc_info):
+        code = exc_info[1].code
+        body = exc_info[1].body
+        if code == 400:
+            message = try_json_with_keys(
+                body, ["validationErrors", "messages", 0])
+            if message is not None:
+                match = _CLB_NODE_REMOVED_PATTERN.match(message)
+                if match:
+                    removed = concat([group.split(',')
+                                      for group in match.groups()])
+                    return remove_clb_nodes(lb_id,
+                                            set(node_ids) - set(removed))
+        six.reraise(*exc_info)
+
+    return eff.on(
+        error=catch(APIError, check_invalid_nodes)
+    ).on(
+        error=_only_json_api_errors(
+            lambda c, b: _process_clb_api_error(c, b, lb_id))
+    ).on(success=lambda _: None)
+    # CLB 202 responses here has no body, so no response logging needed.
+
+
+def get_clb_nodes(lb_id):
+    """
+    Fetch the nodes of the given load balancer. Returns list of node JSON.
+    """
+    return service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'GET',
+        append_segments('loadbalancers', str(lb_id), 'nodes'),
+    ).on(
+        error=_only_json_api_errors(
+            lambda c, b: _process_clb_api_error(c, b, lb_id))
+    ).on(
+        log_success_response('request-list-clb-nodes', identity)
+    ).on(
+        success=lambda (response, body): body['nodes'])
+
+
+def get_clbs():
+    """Fetch all LBs for a tenant. Returns list of loadbalancer JSON."""
+    return service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS, 'GET', 'loadbalancers',
+    ).on(
+        log_success_response('request-list-clbs', identity)
+    ).on(
+        success=lambda (response, body): body['loadBalancers'])
+
+
+def get_clb_node_feed(lb_id, node_id):
+    """Get the atom feed associated with a CLB node. Returns feed as str."""
+    return service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'GET',
+        append_segments('loadbalancers', str(lb_id), 'nodes',
+                        '{}.atom'.format(node_id)),
+        json_response=False
+    ).on(
+        error=_only_json_api_errors(
+            lambda c, b: _process_clb_api_error(c, b, lb_id))
+    ).on(
+        log_success_response('request-get-clb-node-feed', identity)
+    ).on(
+        success=lambda (response, body): body)
+
+
+def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
+    """
+    All CLB messages have only the keys ("message",), and the exception tpye
+    takes a load balancer ID and maybe a node ID.  So expand a tuple that looks
+    like:
+
+    (code, pattern, exc_type)
+
+    to
+
+    (code, ("message",), pattern, partial(exc_type, lb_id=lb_id))
+
+    and maybe the partial will include the node ID too if it's provided.
+    """
+    params = {"lb_id": six.text_type(lb_id)}
+    if node_id is not None:
+        params["node_id"] = six.text_type(node_id)
+
+    return [(m[0], ("message",), m[1], partial(m[2], **params))
+            for m in matches_tuples]
+
+
+def _process_clb_api_error(api_error_code, json_body, lb_id):
     """
     Attempt to parse generic CLB API error messages, and raise recognized
-    exceptions in their place.  If that doesn't work, calls the
-    ``extra_parsing`` callable with the HTTP status code, and parsed JSON body.
+    exceptions in their place.
 
-    If that still doesn't cut it, re-raise the original exception.
-
-    :param string lb_id: The load balancer ID
     :param int api_error_code: The status code from the HTTP request
-    :param dict error_json: The error message, parsed as a JSON dict.
+    :param dict json_body: The error message, parsed as a JSON dict.
+    :param string lb_id: The load balancer ID
 
-    :raises: :class:`CLBPendingUpdateError`, :class:`CLBDeletedError`,
+    :raises: :class:`CLBImmutableError`, :class:`CLBDeletedError`,
         :class:`NoSuchCLBError`, :class:`APIError` by itself
     """
-    api_error = exc_info[1]
-    message = try_json_with_keys(api_error.body, ['message'])
-
-    if message:
-        if api_error.code == 413:
-            raise CLBRateLimitError(message, lb_id=lb_id)
-
-        generic_mappings = [
-            (422, _CLB_DELETED_PATTERN, CLBDeletedError),
-            (422, _CLB_PENDING_UPDATE_PATTERN, CLBPendingUpdateError),
-            (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)
-        ]
-        for status, pattern, exc_type in generic_mappings:
-            if status == api_error.code and pattern.match(message):
-                raise exc_type(message, lb_id=lb_id)
-
-        # No generic exceptions were raised - try the extra_parsing.
-        extra_parsing(api_error.code, try_json_with_keys(api_error.body, []))
-
-    # No? Re-raise, then
-    six.reraise(*exc_info)
+    mappings = (
+        # overLimit is different than the other CLB messages because it's
+        # produced by repose
+        [(413, ("overLimit", "message"), _CLB_OVER_LIMIT_PATTERN,
+          partial(CLBRateLimitError, lb_id=six.text_type(lb_id)))] +
+        _expand_clb_matches(
+            [(422, _CLB_DELETED_PATTERN, CLBDeletedError),
+             (410, _CLB_MARKED_DELETED_PATTERN, CLBDeletedError),
+             (422, _CLB_IMMUTABLE_PATTERN, CLBImmutableError),
+             (422, _CLB_NOT_ACTIVE_PATTERN, CLBNotActiveError),
+             (404, _CLB_NO_SUCH_LB_PATTERN, NoSuchCLBError)],
+            lb_id))
+    return _match_errors(mappings, api_error_code, json_body)
 
 
 # ----- Nova requests and error parsing -----
+
+def _forbidden_plaintext(message):
+    return _regex(
+        "403 Forbidden\s+Access was denied to this resource\.\s+({0})$"
+        .format(message))
+
+_NOVA_403_NO_PUBLIC_NETWORK = _forbidden_plaintext(
+    "Networks \(00000000-0000-0000-0000-000000000000\) not allowed")
+_NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED = _forbidden_plaintext(
+    "Networks \(00000000-0000-0000-0000-000000000000,"
+    "11111111-1111-1111-1111-111111111111\) required but missing")
+_NOVA_403_RACKCONNECT_NETWORK_REQUIRED = _forbidden_plaintext(
+    "Exactly 1 isolated network\(s\) must be attached")
+_NOVA_403_QUOTA = _regex(
+    "Quota exceeded for (\S+): Requested \d+, but already used \d+ of \d+ "
+    "(\S+)")
+
 
 @attributes([Attribute('server_id', instance_of=six.text_type)])
 class NoSuchServerError(Exception):
@@ -364,14 +786,36 @@ class ServerMetadataOverLimitError(Exception):
     """
 
 
-@attributes([])
-class NovaRateLimitError(Exception):
+class NovaRateLimitError(ExceptionWithMessage):
     """
     Exception to be raised when Nova has rate-limited requests.
     """
 
 
-_MAX_METADATA_PATTERN = re.compile('^Maximum number of metadata items .*$')
+class NovaComputeFaultError(ExceptionWithMessage):
+    """
+    Exception to be raised when there is a service failure from Nova.
+    """
+
+
+class CreateServerConfigurationError(ExceptionWithMessage):
+    """
+    Exception to be raised when creating a server with invalid arguments.  The
+    message to be returned is the message that comes back from Nova.
+    """
+
+
+class CreateServerOverQuoteError(ExceptionWithMessage):
+    """
+    Exception to be raised when unable to create a server because the quote for
+    some item (e.g. RAM, instances, on-metal instances) has been exceeded.
+
+    This could possibly be parsed down into more structured data eventually,
+    since the string format is the same no matter what the quota is for.
+    """
+
+
+_MAX_METADATA_PATTERN = _regex('Maximum number of metadata items')
 
 
 def set_nova_metadata_item(server_id, key, value):
@@ -384,8 +828,10 @@ def set_nova_metadata_item(server_id, key, value):
 
     Succeed on 200.
 
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
     :raise: :class:`NoSuchServer`, :class:`MetadataOverLimit`,
-        :class:`NovaRateLimitError`, :class:`APIError`
+        :class:`NovaRateLimitError`, :class:`NovaComputeFaultError`,
+        :class:`APIError`
     """
     eff = service_request(
         ServiceType.CLOUD_SERVERS,
@@ -395,26 +841,19 @@ def set_nova_metadata_item(server_id, key, value):
         reauth_codes=(401,),
         success_pred=has_code(200))
 
-    def _parse_err(exc_info):
-        api_error = exc_info[1]
-        _check_nova_rate_limit(api_error)
-
-        matches = [
-            (404, ('itemNotFound', 'message'), None, NoSuchServerError),
+    @_only_json_api_errors
+    def _parse_known_errors(code, json_body):
+        other_errors = [
+            (404, ('itemNotFound', 'message'), None,
+             partial(NoSuchServerError, server_id=six.text_type(server_id))),
             (403, ('forbidden', 'message'), _MAX_METADATA_PATTERN,
-             ServerMetadataOverLimitError),
+             partial(ServerMetadataOverLimitError,
+                     server_id=six.text_type(server_id))),
         ]
+        _match_errors(_nova_standard_errors + other_errors, code, json_body)
 
-        for code, keys, pattern, exc_class in matches:
-            if api_error.code == code:
-                message = try_json_with_keys(api_error.body, keys)
-                if message and (not pattern or pattern.match(message)):
-                    raise exc_class(message,
-                                    server_id=six.text_type(server_id))
-
-        six.reraise(*exc_info)
-
-    return eff.on(error=catch(APIError, _parse_err))
+    return eff.on(error=_parse_known_errors).on(
+        log_success_response('request-set-metadata-item', identity))
 
 
 def get_server_details(server_id):
@@ -425,8 +864,9 @@ def get_server_details(server_id):
 
     Succeed on 200.
 
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
     :raise: :class:`NoSuchServer`, :class:`NovaRateLimitError`,
-        :class:`APIError`
+        :class:`NovaComputeFaultError`, :class:`APIError`
     """
     eff = service_request(
         ServiceType.CLOUD_SERVERS,
@@ -434,26 +874,164 @@ def get_server_details(server_id):
         append_segments('servers', server_id),
         success_pred=has_code(200))
 
-    def _parse_err(exc_info):
-        api_error = exc_info[1]
-        _check_nova_rate_limit(api_error)
+    @_only_json_api_errors
+    def _parse_known_errors(code, json_body):
+        other_errors = [
+            (404, ('itemNotFound', 'message'), None,
+             partial(NoSuchServerError, server_id=six.text_type(server_id))),
+        ]
+        _match_errors(_nova_standard_errors + other_errors, code, json_body)
 
-        if api_error.code == 404:
-            message = try_json_with_keys(api_error.body,
-                                         ('itemNotFound', 'message'))
-            if message:
-                raise NoSuchServerError(message, server_id=server_id)
-
-        six.reraise(*exc_info)
-
-    return eff.on(error=catch(APIError, _parse_err))
+    return eff.on(error=_parse_known_errors).on(
+        log_success_response('request-one-server-details', identity))
 
 
-def _check_nova_rate_limit(api_error):
+def create_server(server_args):
     """
-    Check if the API error is a nova rate limiting error.
+    Create a server using Nova.
+
+    :ivar dict server_args:  The dictionary to pass to Nova specifying how
+        the server should be built.
+
+    Succeed on 202, and only reauthenticate on 401 because 403s may be terminal
+    errors.
+
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
+    :raise: :class:`CreateServerConfigurationError`,
+        :class:`CreateServerOverQuoteError`, :class:`NovaRateLimitError`,
+        :class:`NovaComputFaultError`, :class:`APIError`
     """
-    if api_error.code == 413:
-        message = try_json_with_keys(api_error.body, ('overLimit', 'message'))
-        if message:
-            raise NovaRateLimitError(message)
+    eff = service_request(
+        ServiceType.CLOUD_SERVERS,
+        'POST',
+        'servers',
+        data=server_args,
+        success_pred=has_code(202),
+        reauth_codes=(401,))
+
+    @_only_json_api_errors
+    def _parse_known_json_errors(code, json_body):
+        other_errors = [
+            (400, ('badRequest', 'message'), None,
+             CreateServerConfigurationError),
+            (403, ('forbidden', 'message'), _NOVA_403_QUOTA,
+             CreateServerOverQuoteError)
+        ]
+        _match_errors(_nova_standard_errors + other_errors, code, json_body)
+
+    def _parse_known_string_errors(api_error_exc_info):
+        api_error = api_error_exc_info[1]
+        if api_error.code == 403:
+            for pat in (_NOVA_403_RACKCONNECT_NETWORK_REQUIRED,
+                        _NOVA_403_NO_PUBLIC_NETWORK,
+                        _NOVA_403_PUBLIC_SERVICENET_BOTH_REQUIRED):
+                m = pat.match(api_error.body)
+                if m:
+                    raise CreateServerConfigurationError(m.groups()[0])
+
+        six.reraise(*api_error_exc_info)
+
+    def _remove_admin_pass_for_logging(response):
+        return {'server': {
+            k: v for k, v in response['server'].items() if k != "adminPass"
+        }}
+
+    return (eff
+            .on(error=catch(APIError, _parse_known_string_errors))
+            .on(error=_parse_known_json_errors)
+            .on(log_success_response('request-create-server',
+                                     _remove_admin_pass_for_logging)))
+
+
+def list_servers_details_page(parameters=None):
+    """
+    List a single page of servers details given filtering and pagination
+    parameters.
+
+    :ivar dict parameters: A dictionary with pagination information,
+        changes-since filters, and name filters.
+
+    Succeed on 200.
+
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
+    :raise: :class:`NovaRateLimitError`, :class:`NovaComputeFaultError`,
+        :class:`APIError`
+    """
+    @_only_json_api_errors
+    def _parse_known_errors(code, json_body):
+        _match_errors(_nova_standard_errors, code, json_body)
+
+    return (
+        service_request(
+            ServiceType.CLOUD_SERVERS,
+            'GET', append_segments('servers', 'detail'),
+            params=parameters)
+        .on(error=_parse_known_errors)
+        .on(log_success_response('request-list-servers-details', identity))
+    )
+
+
+def list_servers_details_all(parameters=None):
+    """
+    List all pages of servers details, starting at the page specified by the
+    given filtering and pagination parameters.
+
+    :ivar dict parameters: A dictionary with pagination information,
+        changes-since filters, and name filters.
+
+    Succeed on 200.
+
+    :return: a `list` of server details `dict`s
+    :raise: :class:`NovaRateLimitError`, :class:`NovaComputeFaultError`,
+        :class:`APIError`
+    """
+    last_link = []
+
+    def continue_(result, servers_so_far=None):
+        if servers_so_far is None:
+            servers_so_far = []
+
+        _response, body = result
+        servers = servers_so_far + body['servers']
+
+        # Only continue if pagination is supported and there is another page
+        continuation = [link['href'] for link in body.get('servers_links', [])
+                        if link['rel'] == 'next']
+        if continuation:
+            # blow up if we try to fetch the same link twice
+            if last_link and last_link[-1] == continuation[0]:
+                raise NovaComputeFaultError(
+                    "When gathering server details, got the same 'next' link "
+                    "twice from Nova: {0}".format(last_link[-1]))
+
+            last_link[:] = [continuation[0]]
+            parsed_query = parse_qs(urlparse(continuation[0]).query)
+            return list_servers_details_page(parsed_query).on(
+                partial(continue_, servers_so_far=servers))
+
+        return servers
+
+    return list_servers_details_page(parameters).on(continue_)
+
+
+_nova_standard_errors = [
+    (413, ('overLimit', 'message'), None, NovaRateLimitError),
+    (500, ('computeFault', 'message'), None, NovaComputeFaultError)
+]
+
+
+# ----- Cloud feeds requests -----
+def publish_to_cloudfeeds(event, log=None):
+    """
+    Publish an event dictionary to cloudfeeds.
+    """
+    return service_request(
+        ServiceType.CLOUD_FEEDS, 'POST',
+        append_segments('autoscale', 'events'),
+        # note: if we actually wanted a JSON response instead of XML,
+        # we'd have to pass the header:
+        # 'accept': ['application/vnd.rackspace.atom+json'],
+        headers={
+            'content-type': ['application/vnd.rackspace.atom+json']},
+        data=event, log=log, success_pred=has_code(201),
+        json_response=False)

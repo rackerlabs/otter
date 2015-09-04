@@ -48,9 +48,6 @@
       "headers": ["http://redirected_to_api.com"],
       "body": "Moved to http://redirected_to_api.com"
     },
-    "elasticsearch": {
-      "host": "http://127.0.0.1:9200"
-    },
     "metrics": {
         "service": "cloudMetricsIngest",
         "region": "IAD",
@@ -59,9 +56,19 @@
         "ttl": 432000,
         "interval": 60
     },
-    "cloudfeeds": {"service": "cloudFeeds", "tenant_id": "tenant",
-                   "url": "http://cfurl.net/"},
+    "cloudfeeds": {
+        "service": "cloudFeeds",
+        "tenant_id": "identity_admin_tenant",
+        "url": "http://cfurl.net/not/in/service/catalog"
+    },
     "converger": {
+        "build_timeout": 3600,
         "interval": 30
+    },
+    "cloud_client": {
+    	"throttling": {
+    	    "create_server_delay": 1,
+    	    "delete_server_delay": 0.2
+    	}
     }
 }

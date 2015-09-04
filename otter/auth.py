@@ -42,9 +42,9 @@ from functools import partial
 
 from characteristic import attributes
 
-from effect.twisted import deferred_performer
-
 from twisted.internet.defer import succeed
+
+from txeffect import deferred_performer
 
 from zope.interface import Interface, implementer
 
@@ -504,6 +504,8 @@ class NoSuchEndpoint(Exception):
     Exception to be raised when the service catalog does not contain an
     endpoint for the given service in the given region.
     """
+    def __str__(self):
+        return repr(self)
 
 
 def public_endpoint_url(service_catalog, service_name, region):

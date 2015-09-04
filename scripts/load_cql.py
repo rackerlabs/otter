@@ -8,21 +8,23 @@ from __future__ import print_function
 import argparse
 import re
 import sys
-from pprint import pprint
 
 from cql.apivalues import ProgrammingError
 from cql.connection import connect
 
-from effect.twisted import perform
-
-from silverberg.client import CQLClient
+from silverberg.client import CQLClient, ConsistencyLevel
 
 from twisted.internet import task
+from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.endpoints import clientFromString
 
-from otter.effect_dispatcher import get_cql_dispatcher
+from txeffect import perform
+
+from otter.effect_dispatcher import get_working_cql_dispatcher
+from otter.metrics import get_scaling_group_rows
 from otter.models.cass import CassScalingGroupCollection
 from otter.test.resources import CQLGenerator
+from otter.util.cqlbatch import batch
 
 
 the_parser = argparse.ArgumentParser(description="Load data into Cassandra.")
@@ -33,12 +35,9 @@ the_parser.add_argument(
     help='Directory containing *.cql files to merge and replace.')
 
 the_parser.add_argument(
-    '--webhook-migrate', action='store_true',
-    help='Migrate webhook indexes to table')
-
-the_parser.add_argument(
-    '--webhook-index-only', action='store_true',
-    help='List webhook from indexes that is not there in webhook_keys table')
+    '--migrate', '-m', type=str,
+    choices=['webhook_migrate', 'webhook_index', 'insert_deleting_false'],
+    help='Run a migration job')
 
 the_parser.add_argument(
     '--keyspace', type=str, default='otter',
@@ -154,6 +153,42 @@ def execute_commands(cursor, commands, verbose):
                 print("Ok.")
 
 
+def webhook_index(reactor, conn):
+    """
+    Show webhook indexes that is not there table connection
+    """
+    store = CassScalingGroupCollection(None, None, 3)
+    eff = store.get_webhook_index_only()
+    return perform(get_working_cql_dispatcher(reactor, conn), eff)
+
+
+def webhook_migrate(reactor, conn):
+    """
+    Migrate webhook indexes to table
+    """
+    store = CassScalingGroupCollection(None, None, 3)
+    eff = store.get_webhook_index_only().on(store.add_webhook_keys)
+    return perform(get_working_cql_dispatcher(reactor, conn), eff)
+
+
+@inlineCallbacks
+def insert_deleting_false(reactor, conn):
+    """
+    Insert false to all group's deleting column
+    """
+    groups = yield get_scaling_group_rows(conn)
+    query = (
+        'INSERT INTO scaling_group ("tenantId", "groupId", deleting) '
+        'VALUES (:tenantId{i}, :groupId{i}, false);')
+    queries, params = [], {}
+    for i, group in enumerate(groups):
+        queries.append(query.format(i=i))
+        params['tenantId{}'.format(i)] = group['tenantId']
+        params['groupId{}'.format(i)] = group['groupId']
+    yield conn.execute(batch(queries), params, ConsistencyLevel.ONE)
+    returnValue(None)
+
+
 def setup_connection(reactor, args):
     """
     Return Cassandra connection
@@ -163,33 +198,16 @@ def setup_connection(reactor, args):
         args.keyspace)
 
 
-def webhook_index(reactor, args):
-    """
-    Show webhook indexes that is not there table connection
-    """
-    store = CassScalingGroupCollection(None, None)
-    eff = store.get_webhook_index_only()
+def run_migration(reactor, job, args):
+    """ Run migration job """
     conn = setup_connection(reactor, args)
-    return perform(get_cql_dispatcher(reactor, conn), eff).addCallback(
-        pprint).addCallback(lambda _: conn.disconnect())
-
-
-def webhook_migrate(reactor, args):
-    """
-    Migrate webhook indexes to table
-    """
-    store = CassScalingGroupCollection(None, None)
-    eff = store.get_webhook_index_only().on(store.add_webhook_keys)
-    conn = setup_connection(reactor, args)
-    return perform(get_cql_dispatcher(reactor, conn), eff).addCallback(
-        lambda _: conn.disconnect())
+    d = globals()[job](reactor, conn)
+    return d.addCallback(lambda _: conn.disconnect())
 
 
 def run(args):
-    if args.webhook_migrate:
-        task.react(webhook_migrate, (args,))
-    elif args.webhook_index_only:
-        task.react(webhook_index, (args,))
+    if args.migrate:
+        task.react(run_migration, (args.migrate, args))
     else:
         generate(args)
 

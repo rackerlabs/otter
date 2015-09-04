@@ -4,7 +4,6 @@ Behaviors for Autoscale
 import inspect
 import logging
 import time
-import unittest
 
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
@@ -56,7 +55,7 @@ class DefaultAsserter(object):
             self.fail(msg)
 
     def fail(self, msg):
-        raise unittest.AssertionError(msg)
+        raise AssertionError(msg)
 
 
 class AutoscaleBehaviors(BaseBehavior):
@@ -547,23 +546,26 @@ class AutoscaleBehaviors(BaseBehavior):
                     'servers'.format(group_id, expected_servers,
                                      group_state.desiredCapacity))
 
-                if len(active_list) == expected_servers:
+                num_servers = len(active_list)
+                if num_servers == expected_servers:
                     return [server.id for server in active_list]
             else:
                 # We're looking at the RackConnect API for our server list
                 # here.
                 nodes = self.rcv3_client.get_nodes_on_pool(group_id).entity
                 server_list = [n for n in nodes.nodes
-                               if (safe_hasattr(n, "cloud_server"))
-                               and (n.status == "ACTIVE")]
-                if len(server_list) == expected_servers:
+                               if (safe_hasattr(n, "cloud_server")) and
+                               (n.status == "ACTIVE")]
+                num_servers = len(server_list)
+                if num_servers == expected_servers:
                     return [n.id for n in server_list]
 
             asserter.fail(
                 "wait_for_active_list_in_group_state ran for {0} seconds "
                 "for group/pool ID {1} and did not observe the active "
-                "server list achieving the expected servers count: {2}."
-                .format(time_elapsed, group_id, expected_servers)
+                "server list achieving the expected servers count: {2}, "
+                "found: {3}."
+                .format(time_elapsed, group_id, expected_servers, num_servers)
             )
 
         return self.retry(do_polling, timeout, interval_time, time_scale)

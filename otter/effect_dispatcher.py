@@ -1,13 +1,12 @@
 """Effect dispatchers for Otter."""
 
-from functools import partial
-
 from effect import (
     ComposedDispatcher,
     TypeDispatcher,
     base_dispatcher)
 from effect.ref import reference_dispatcher
-from effect.twisted import make_twisted_dispatcher
+
+from txeffect import make_twisted_dispatcher
 
 from .auth import (
     Authenticate,
@@ -15,12 +14,14 @@ from .auth import (
     perform_authenticate,
     perform_invalidate_token,
 )
-from .cloud_client import TenantScope, perform_tenant_scope
-from .models.cass import CQLQueryExecute, perform_cql_query
+from .cloud_client import get_cloud_client_dispatcher
+from .log.intents import get_log_dispatcher
+from .models.cass import get_cql_dispatcher
 from .models.intents import get_model_dispatcher
 from .util.pure_http import Request, perform_request
 from .util.retry import Retry, perform_retry
 from .util.zk import get_zk_dispatcher
+from .worker_intents import get_eviction_dispatcher
 
 
 def get_simple_dispatcher(reactor):
@@ -47,7 +48,7 @@ def get_simple_dispatcher(reactor):
 
 
 def get_full_dispatcher(reactor, authenticator, log, service_configs,
-                        kz_client, store):
+                        kz_client, store, supervisor, cass_client):
     """
     Return a dispatcher that can perform all of Otter's effects.
     """
@@ -55,6 +56,20 @@ def get_full_dispatcher(reactor, authenticator, log, service_configs,
         get_legacy_dispatcher(reactor, authenticator, log, service_configs),
         get_zk_dispatcher(kz_client),
         get_model_dispatcher(log, store),
+        get_eviction_dispatcher(supervisor),
+        get_log_dispatcher(log, {}),
+        get_cql_dispatcher(cass_client)
+    ])
+
+
+def get_working_cql_dispatcher(reactor, cass_client):
+    """
+    Get dispatcher with CQLQueryExecute performer along with any other
+    dependent performers to make it work
+    """
+    return ComposedDispatcher([
+        get_simple_dispatcher(reactor),
+        get_cql_dispatcher(cass_client)
     ])
 
 
@@ -64,23 +79,7 @@ def get_legacy_dispatcher(reactor, authenticator, log, service_configs):
     worker code.
     """
     return ComposedDispatcher([
-        TypeDispatcher({
-            TenantScope: partial(perform_tenant_scope, authenticator, log,
-                                 service_configs)}),
+        get_cloud_client_dispatcher(
+            reactor, authenticator, log, service_configs),
         get_simple_dispatcher(reactor),
-    ])
-
-
-def get_cql_dispatcher(reactor, connection):
-    """
-    Get dispatcher with `CQLQueryExecute`'s performer in it
-
-    :param reactor: Twisted reactor
-    :param connection: Silverberg connection
-    """
-    return ComposedDispatcher([
-        get_simple_dispatcher(reactor),
-        TypeDispatcher({
-            CQLQueryExecute: partial(perform_cql_query, connection)
-        })
     ])

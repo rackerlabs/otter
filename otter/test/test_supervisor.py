@@ -18,7 +18,7 @@ from otter.auth import IAuthenticator
 from otter.cloud_client import TenantScope
 from otter.constants import ServiceType
 from otter.models.interface import (
-    GroupState, IScalingGroup, NoSuchScalingGroupError)
+    GroupState, IScalingGroup, NoSuchScalingGroupError, ScalingGroupStatus)
 from otter.supervisor import (
     CannotDeleteServerBelowMinError,
     ISupervisor,
@@ -442,8 +442,9 @@ class FindPendingJobsToCancelTests(SynchronousTestCase):
             '5': {'created': '2014-01-05T00:00:00Z'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
 
-        self.cancellable_state = GroupState('t', 'g', 'n', {}, self.data, None, {},
-                                            False)
+        self.cancellable_state = GroupState(
+            't', 'g', 'n', {}, self.data, None, {}, False,
+            ScalingGroupStatus.ACTIVE)
 
     def test_returns_most_recent_jobs(self):
         """
@@ -485,8 +486,8 @@ class FindServersToEvictTests(SynchronousTestCase):
             '5': {'created': '2014-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
 
-        self.deletable_state = GroupState('t', 'g', 'n', self.data, {}, None, {},
-                                          False)
+        self.deletable_state = GroupState('t', 'g', 'n', self.data, {}, None,
+                                          {}, False, ScalingGroupStatus.ACTIVE)
 
     def test_returns_oldest_servers(self):
         """
@@ -528,8 +529,8 @@ class DeleteActiveServersTests(SynchronousTestCase):
                   'lb': 'lb'},
             '5': {'created': '2014-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
-        self.fake_state = GroupState('t', 'g', 'n', self.data, {}, False, False,
-                                     False)
+        self.fake_state = GroupState('t', 'g', 'n', self.data, {}, False,
+                                     False, False, ScalingGroupStatus.ACTIVE)
         self.evict_servers = {'1': self.data['1'], '4': self.data['4'],
                               '3': self.data['3']}
 
@@ -703,7 +704,8 @@ class ExecScaleDownTests(SynchronousTestCase):
             'a5': {'created': '2014-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: a1, a4, a3, a2, a5
         self.fake_state = GroupState('t', 'g', '', self.active, self.pending,
-                                     False, False, False)
+                                     False, False, False,
+                                     ScalingGroupStatus.ACTIVE)
         self.find_pending_jobs_to_cancel = patch(
             self, 'otter.supervisor.find_pending_jobs_to_cancel')
         self.del_active_servers = patch(
@@ -768,7 +770,8 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
                 return jself.d
 
         patch(self, 'otter.supervisor._Job', new=FakeJob)
-        self.state = GroupState('t', 'g', 'n', {}, {}, *range(3))
+        self.state = GroupState('t', 'g', 'n', {}, {}, 0, 1, 2,
+                                ScalingGroupStatus.ACTIVE)
 
     def test_no_jobs_started(self):
         """
@@ -809,8 +812,10 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         """
         self.transaction_id = 'transaction_id'
         self.job_id = 'job_id'
-        patch(self, 'otter.supervisor.generate_job_id', return_value=self.job_id)
-        self.state = GroupState('tenant', 'group', 'name', {}, {}, None, {}, False)
+        patch(self, 'otter.supervisor.generate_job_id',
+              return_value=self.job_id)
+        self.state = GroupState('tenant', 'group', 'name', {}, {}, None, {},
+                                False, ScalingGroupStatus.ACTIVE)
         self.group = mock_group(self.state, 'tenant', 'group')
 
         self.supervisor = iMock(ISupervisor)
@@ -948,7 +953,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         audit logged as a "server.deletable" event.
         """
         self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
-                                {}, False, desired=0)
+                                {}, False, ScalingGroupStatus.ACTIVE,
+                                desired=0)
         self.job.start(self.mock_launch)
         self.completion_deferred.callback({'id': 'yay'})
 
@@ -1011,7 +1017,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         server is deleted
         """
         self.group.modify_state.side_effect = (
-            lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
+            lambda *args, **kw:
+                fail(NoSuchScalingGroupError('tenant', 'group')))
         d = Deferred()
         self.del_job.return_value.start.return_value = d
 
@@ -1030,7 +1037,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         audit logged as a "server.deletable" event.
         """
         self.group.modify_state.side_effect = (
-            lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
+            lambda *args, **kw:
+                fail(NoSuchScalingGroupError('tenant', 'group')))
 
         self.job.start(self.mock_launch)
         self.completion_deferred.callback({'id': 'yay'})
@@ -1052,7 +1060,8 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         failure can be ignored (not logged)
         """
         self.group.modify_state.side_effect = (
-            lambda *args: fail(NoSuchScalingGroupError('tenant', 'group')))
+            lambda *args, **kw:
+                fail(NoSuchScalingGroupError('tenant', 'group')))
 
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
@@ -1064,7 +1073,7 @@ class PrivateJobHelperTestCase(SynchronousTestCase):
         is logged
         """
         self.group.modify_state.side_effect = (
-            lambda *args: fail(DummyException('e')))
+            lambda *args, **kw: fail(DummyException('e')))
 
         self.job.start(self.mock_launch)
         self.completion_deferred.callback({'id': 'active'})
@@ -1087,9 +1096,11 @@ class RemoveServerTests(SynchronousTestCase):
         self.tid = 'trans_id'
         self.log = mock_log()
         self.state = GroupState('tid', 'gid', 'g', {'s0': {'id': 's0'}}, {},
-                                None, None, None, desired=1)
+                                None, None, None, ScalingGroupStatus.ACTIVE,
+                                desired=1)
         self.group = mock_group(self.state)
-        self.gen_jobid = patch(self, 'otter.supervisor.generate_job_id', return_value='jid')
+        self.gen_jobid = patch(self, 'otter.supervisor.generate_job_id',
+                               return_value='jid')
         self.supervisor = FakeSupervisor()
         set_supervisor(self.supervisor)
         self.addCleanup(set_supervisor, None)

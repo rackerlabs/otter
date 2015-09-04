@@ -6,7 +6,7 @@ from itertools import chain
 from urllib import quote, urlencode
 from urlparse import parse_qs, urlsplit, urlunsplit
 
-from characteristic import Attribute, attributes
+from characteristic import attributes
 
 from toolz.dicttoolz import get_in
 
@@ -96,11 +96,17 @@ class UpstreamError(Exception):
         self.url = url
         msg = self.system + ' error: '
         if self.reason.check(APIError):
-            self.apierr_message = _extract_error_message(self.system, self.reason.value.body,
-                                                         'Could not parse API error body')
-            msg += '{} - {}'.format(self.reason.value.code, self.apierr_message)
+            if system in ('nova', 'clb', 'identity'):
+                self.apierr_message = _extract_error_message(
+                    self.system, self.reason.value.body,
+                    'Could not parse API error body')
+            else:
+                self.apierr_message = self.reason.value.body
+            msg += '{} - {}'.format(
+                self.reason.value.code, self.apierr_message)
         else:
             msg += str(self.reason.value)
+        msg += " ({0})".format(operation)
         super(UpstreamError, self).__init__(msg)
 
     @property
@@ -170,8 +176,8 @@ def append_segments(uri, *segments):
     return uri
 
 
-@attributes(['code', 'body',
-             Attribute('headers', default_value=None)], apply_with_init=False)
+@attributes(['code', 'body', 'headers', 'method', 'url'],
+            apply_with_init=False)
 class APIError(Exception):
     """
     An error raised when a non-success response is returned by the API.
@@ -179,16 +185,21 @@ class APIError(Exception):
     :param int code: HTTP Response code for this error.
     :param str body: HTTP Response body for this error or None.
     :param Headers headers: HTTP Response headers for this error, or None
+    :param str method: The HTTP method for the request
+    :param str url: The url that was hit
     """
-    def __init__(self, code, body, headers=None):
+    def __init__(self, code, body, headers=None, method="no_method",
+                 url="no_url"):
         Exception.__init__(
             self,
-            'API Error code={0!r}, body={1!r}, headers={2!r}'.format(
-                code, body, headers))
+            'API Error code={0}, body={1!r}, headers={2!r} ({3} {4})'.format(
+                code, body, headers, method, url))
 
         self.code = code
         self.body = body
         self.headers = headers
+        self.url = url
+        self.method = method
 
 
 def check_success(response, success_codes, _treq=None):
@@ -209,7 +220,8 @@ def check_success(response, success_codes, _treq=None):
         _treq = treq
 
     def _raise_api_error(body):
-        raise APIError(response.code, body, response.headers)
+        raise APIError(response.code, body, response.headers,
+                       response.request.method, response.request.absoluteURI)
 
     if response.code not in success_codes:
         return _treq.content(response).addCallback(_raise_api_error)

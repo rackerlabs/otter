@@ -3,17 +3,21 @@
 import json
 from itertools import starmap
 
-from effect import Constant, Effect, Func
+from effect import ComposedDispatcher, Constant, Effect, Func
 from effect.testing import Stub
-from effect.twisted import perform
 
 from testtools import TestCase
 
 from twisted.trial.unittest import SynchronousTestCase
 
+from txeffect import perform
+
 from otter.effect_dispatcher import get_simple_dispatcher
+from otter.log import log as default_log
+from otter.log.intents import get_log_dispatcher, with_log
 from otter.test.utils import (
-    StubResponse, StubTreq, resolve_stubs, stub_pure_response)
+    IsBoundWith, StubResponse, StubTreq, matches, mock_log,
+    resolve_stubs, stub_pure_response)
 from otter.util.http import APIError
 from otter.util.pure_http import (
     Request,
@@ -49,7 +53,8 @@ class RequestEffectTests(SynchronousTestCase):
         The Request effect dispatches a request to treq, and returns a
         two-tuple of the Twisted Response object and the content as bytes.
         """
-        req = ('GET', 'http://google.com/', None, None, None, {'log': None})
+        req = ('GET', 'http://google.com/', None, None, None,
+               {'log': default_log})
         response = StubResponse(200, {})
         treq = StubTreq(reqs=[(req, response)],
                         contents=[(response, "content")])
@@ -75,6 +80,54 @@ class RequestEffectTests(SynchronousTestCase):
         dispatcher = get_simple_dispatcher(None)
         self.assertEqual(
             self.successResultOf(perform(dispatcher, Effect(req))),
+            (response, "content"))
+
+    def test_log_effectful_fields(self):
+        """
+        The log passed to treq is bound with the fields from BoundFields.
+        """
+        log = mock_log().bind(duplicate='should be overridden')
+        expected_log = matches(IsBoundWith(duplicate='effectful',
+                                           bound='stuff'))
+        req = ('GET', 'http://google.com/', None, None, None,
+               {'log': expected_log})
+        response = StubResponse(200, {})
+        treq = StubTreq(reqs=[(req, response)],
+                        contents=[(response, "content")])
+        req = Request(method="get", url="http://google.com/", log=log)
+        req.treq = treq
+        req_eff = Effect(req)
+        bound_log_eff = with_log(req_eff, bound='stuff', duplicate='effectful')
+        dispatcher = ComposedDispatcher([
+            get_simple_dispatcher(None),
+            get_log_dispatcher(log, {})])
+        self.assertEqual(
+            self.successResultOf(perform(dispatcher, bound_log_eff)),
+            (response, "content"))
+
+    def test_log_none_effectful_fields(self):
+        """
+        When log is not passed, but there are log fields from BoundFields,
+        the log passed to treq has those fields.
+        """
+        log = mock_log()
+        # we have to include system='otter' in the expected log here because
+        # the code falls back to otter.log.log, which has the system key bound.
+        expected_log = matches(IsBoundWith(bound='stuff', system='otter'))
+        req = ('GET', 'http://google.com/', None, None, None,
+               {'log': expected_log})
+        response = StubResponse(200, {})
+        treq = StubTreq(reqs=[(req, response)],
+                        contents=[(response, "content")])
+        req = Request(method="get", url="http://google.com/")
+        req.treq = treq
+        req_eff = Effect(req)
+        bound_log_eff = with_log(req_eff, bound='stuff')
+        dispatcher = ComposedDispatcher([
+            get_simple_dispatcher(None),
+            get_log_dispatcher(log, {})])
+        self.assertEqual(
+            self.successResultOf(perform(dispatcher, bound_log_eff)),
             (response, "content"))
 
 

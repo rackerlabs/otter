@@ -5,10 +5,10 @@ from datetime import datetime, timedelta
 
 from effect import (
     ComposedDispatcher,
-    TypeDispatcher,
-    sync_perform,
-    sync_performer)
-from effect.testing import SequenceDispatcher
+    Effect,
+    sync_perform)
+from effect.testing import (
+    SequenceDispatcher, parallel_sequence, perform_sequence)
 
 import mock
 
@@ -20,28 +20,137 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter import controller
 from otter.cloud_client import (
     NoSuchServerError,
+    TenantScope,
     get_server_details,
     set_nova_metadata_item)
 from otter.convergence.model import DRAINING_METADATA
 from otter.convergence.service import (
     get_convergence_starter, set_convergence_starter)
-from otter.models.intents import GetScalingGroupInfo
+from otter.log.intents import BoundFields, Log
+from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
 from otter.models.interface import (
-    GroupState, IScalingGroup, NoSuchPolicyError)
+    GroupNotEmptyError, GroupState, IScalingGroup, NoSuchPolicyError,
+    NoSuchScalingGroupError, ScalingGroupStatus)
 from otter.supervisor import (
     CannotDeleteServerBelowMinError,
     ServerNotFoundError)
 from otter.test.utils import (
+    StubResponse,
     iMock,
+    intent_func,
     matches,
+    mock_group as util_mock_group,
     mock_log,
+    nested_sequence,
+    noop,
     patch,
     raise_,
     test_dispatcher)
+from otter.util.config import set_config_data
+from otter.util.fp import assoc_obj
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN
+from otter.util.zk import CreateOrSet, DeleteNode
 from otter.worker_intents import EvictServerFromScalingGroup
+
+
+class PauseGroupTests(SynchronousTestCase):
+    """
+    Tests for pausing and resuming group functions
+    """
+
+    def setUp(self):
+        self.group = util_mock_group(sample_group_state(), "tid", "gid")
+        self.log = mock_log()
+
+    def test_conv_pause_group_eff(self):
+        """
+        `conv_pause_group_eff` returns effect that modifies group state paused
+        and deletes divergent flag with bound log context
+        """
+        eff = controller.conv_pause_group_eff(self.group, "transid")
+        seq = [
+            (BoundFields(mock.ANY, dict(transaction_id="transid",
+                                        tenant_id="tid",
+                                        scaling_group_id="gid")),
+             nested_sequence([
+                 parallel_sequence([
+                     [(ModifyGroupStatePaused(self.group, True), noop)],
+                     [(DeleteNode(path="/groups/divergent/tid_gid",
+                                  version=-1),
+                       noop),
+                      (Log("mark-clean-success", {}), noop)],
+                 ])
+             ]))
+        ]
+        self.assertEqual(perform_sequence(seq, eff), None)
+
+    @mock.patch("otter.controller.conv_pause_group_eff",
+                return_value=Effect("pause"))
+    def test_pause_group_conv(self, mock_cpge):
+        """
+        `pause_scaling_group` performs effect got from conv_pause_group_eff
+        for convergence tenants
+        """
+        set_config_data({"convergence-tenants": ["tid"]})
+        self.addCleanup(set_config_data, None)
+        dispatcher = SequenceDispatcher([("pause", lambda i: "paused")])
+        d = controller.pause_scaling_group(
+            self.log, "transid", self.group, dispatcher)
+        self.assertEqual(self.successResultOf(d), "paused")
+
+    def test_pause_group_worker(self):
+        """
+        `pause_scaling_group` is not implemented for worker tenants
+        """
+        self.assertRaises(
+            NotImplementedError, controller.pause_scaling_group, self.log,
+            "transid", self.group, object())
+
+    def test_resume_group_eff(self):
+        """
+        `conv_resume_group_eff` returns Effect to update group state paused
+        and mark divergent flag
+        """
+        eff = controller.conv_resume_group_eff("transid", self.group)
+        seq = [
+            (BoundFields(mock.ANY, dict(transaction_id="transid",
+                                        tenant_id="tid",
+                                        scaling_group_id="gid")),
+             nested_sequence([
+                 parallel_sequence([
+                     [(ModifyGroupStatePaused(self.group, False), noop)],
+                     [(CreateOrSet(path="/groups/divergent/tid_gid",
+                                   content="dirty"),
+                       noop),
+                      (Log("mark-dirty-success", {}), noop)]
+                 ])
+             ]))
+        ]
+        self.assertEqual(perform_sequence(seq, eff), None)
+
+    @mock.patch("otter.controller.conv_resume_group_eff",
+                return_value=Effect("resume"))
+    def test_resume_group_conv(self, mock_crge):
+        """
+        `resume_scaling_group` performs effect got from conv_resume_group_eff
+        for convergence tenants
+        """
+        set_config_data({"convergence-tenants": ["tid"]})
+        self.addCleanup(set_config_data, None)
+        dispatcher = SequenceDispatcher([("resume", lambda i: "resumed")])
+        d = controller.resume_scaling_group(
+            self.log, "transid", self.group, dispatcher)
+        self.assertEqual(self.successResultOf(d), "resumed")
+
+    def test_resume_group_worker(self):
+        """
+        `resume_scaling_group` is not implemented for worker tenants
+        """
+        self.assertRaises(
+            NotImplementedError, controller.resume_scaling_group, self.log,
+            "transid", self.group, object())
 
 
 class CalculateDeltaTestCase(SynchronousTestCase):
@@ -63,7 +172,8 @@ class CalculateDeltaTestCase(SynchronousTestCase):
         Only care about the active and pending values, so generate a whole
         :class:`GroupState` with other fake info
         """
-        return GroupState(1, 1, "test", active, pending, None, {}, False)
+        return GroupState(1, 1, "test", active, pending, None, {}, False,
+                          ScalingGroupStatus.ACTIVE)
 
     def test_positive_change_within_min_max(self):
         """
@@ -540,7 +650,8 @@ class CheckCooldownsTestCase(SynchronousTestCase):
         Only care about the group_touched and policy_touched values, so
         generate a whole :class:`GroupState` with other fake info
         """
-        return GroupState(1, 1, "test", {}, {}, group_touched, policy_touched, False)
+        return GroupState(1, 1, "test", {}, {}, group_touched, policy_touched,
+                          False, ScalingGroupStatus.ACTIVE)
 
     def test_check_cooldowns_global_cooldown_and_policy_cooldown_pass(self):
         """
@@ -750,10 +861,232 @@ class ObeyConfigChangeTestCase(SynchronousTestCase):
             webhook_id=None)
 
 
+class TriggerConvergenceDeletionTests(SynchronousTestCase):
+    """
+    Tests for `trigger_convergence_deletion`
+    """
+
+    def setUp(self):
+        """
+        Sample convergence starter
+        """
+        self.mock_tg = patch(
+            self, "otter.controller.trigger_convergence", autospec=True,
+            side_effect=intent_func("tg"))
+
+    def test_success(self):
+        group = util_mock_group("state", 'tid', 'gid')
+        upd = defer.Deferred()
+        group.update_status.return_value = upd
+        disp = SequenceDispatcher([
+            (BoundFields(mock.ANY,
+                         dict(tenant_id="tid", scaling_group_id="gid",
+                              transaction_id="transid")),
+             nested_sequence([
+                (("tg", "tid", "gid"), lambda i: "triggerred")
+             ]))
+        ])
+
+        d = controller.trigger_convergence_deletion(disp, group, "transid")
+
+        # First DELETING status is set
+        self.assertNoResult(d)
+        group.update_status.assert_called_once_with(
+            ScalingGroupStatus.DELETING)
+
+        # Then trigger_convergence
+        with disp.consume():
+            upd.callback(None)
+            self.assertEqual(self.successResultOf(d), 'triggerred')
+
+
+def sample_group_state():
+    """ GroupState object for test """
+    return GroupState('tid', 'gid', 'g', {}, {}, False, None, {},
+                      ScalingGroupStatus.ACTIVE)
+
+
+class DeleteGroupTests(SynchronousTestCase):
+    """
+    Tests for `delete_group`
+    """
+
+    def setUp(self):
+        """
+        Sample convergence starter
+        """
+        self.state = sample_group_state()
+        self.group = util_mock_group(self.state, 'tid', 'gid')
+        self.group.delete_group.return_value = defer.succeed(None)
+        self.log = object()
+        self.mock_tcd = patch(
+            self, 'otter.controller.trigger_convergence_deletion',
+            autospec=True)
+
+    def test_worker_tenant_force(self):
+        """
+        First empties and then deletes the group for worker tenant
+        """
+        egd = defer.Deferred()
+        mock_eg = patch(self, 'otter.controller.empty_group',
+                        return_value=egd)
+        d = controller.delete_group(
+            "disp", self.log, 'transid', self.group, True)
+
+        # First empty_group is called
+        self.assertNoResult(d)
+        mock_eg.assert_called_once_with(self.log, 'transid', self.group)
+
+        # Then delete_group
+        egd.callback(None)
+        self.assertIsNone(self.successResultOf(d))
+        self.group.delete_group.assert_called_once_with()
+
+        # converger is not called
+        self.assertFalse(self.mock_tcd.called)
+
+    def test_worker_tenant_no_force(self):
+        """
+        Calls group.delete_group() for worker tenant when deleting normally
+        """
+        d = controller.delete_group(
+            "disp", self.log, 'transid', self.group, False)
+        self.assertIsNone(self.successResultOf(d))
+        self.group.delete_group.assert_called_once_with()
+        # converger not called
+        self.assertFalse(self.mock_tcd.called)
+
+    def setup_conv(self):
+        set_config_data({'convergence-tenants': ['tid']})
+        self.addCleanup(set_config_data, {})
+        self.mock_tcd.return_value = defer.succeed('tcd')
+
+    def test_convergence_tenant_force(self):
+        """
+        Updates DELETED status for convergence tenant and starts convergence
+        """
+        self.setup_conv()
+        d = controller.delete_group(
+            "disp", self.log, 'transid', self.group, True)
+        self.assertEqual(self.successResultOf(d), 'tcd')
+        self.mock_tcd.assert_called_once_with("disp", self.group, 'transid')
+        # delete_group() or modify_state() not called
+        self.assertFalse(self.group.delete_group.called)
+        self.assertFalse(self.group.modify_state.called)
+
+    def test_convergence_tenant_no_force(self):
+        """
+        When deleting convergence group without force, `delete_group` triggers
+        convergence deletion only if desired=0. This desired check is done
+        under lock using `modify_state`
+        """
+        self.setup_conv()
+        self.group.pause_modify_state = True
+
+        d = controller.delete_group(
+            "disp", self.log, 'transid', self.group, False)
+
+        # trigger_convergence_deletion has not been called because
+        # modify_state is paused
+        self.assertNoResult(d)
+        self.assertTrue(self.group.modify_state.called)
+        self.mock_tcd.assert_called_once_with("disp", self.group, 'transid')
+        self.assertEqual(self.group.modify_state_values, [self.state])
+
+        # unpause modify_state and result is available
+        self.group.modify_state_pause_d.callback(None)
+        self.assertIsNone(self.successResultOf(d))
+
+        # delete_group() not called
+        self.assertFalse(self.group.delete_group.called)
+
+    def test_convergence_tenant_no_force_with_servers(self):
+        """
+        When deleting convergence group without force, `delete_group` raises
+        `GroupNotEmptyError` if desired > 0. This desired check is done
+        under lock using `modify_state`
+        """
+        self.setup_conv()
+        self.state.desired = 1
+        self.group.pause_modify_state = True
+
+        d = controller.delete_group(
+            "disp", self.log, 'transid', self.group, False)
+
+        # trigger_convergence_deletion has not been called because
+        # modify_state is paused
+        self.assertNoResult(d)
+        self.assertTrue(self.group.modify_state.called)
+        # Nothing returned from modifier since it raised error
+        self.assertEqual(self.group.modify_state_values, [])
+
+        # trigger_convergence_deletion is not called
+        self.assertFalse(self.mock_tcd.called)
+
+        # unpause modify_state
+        self.group.modify_state_pause_d.callback(None)
+        self.failureResultOf(d, GroupNotEmptyError)
+
+        # delete_group() not called
+        self.assertFalse(self.group.delete_group.called)
+
+
+class EmptyGroupTests(SynchronousTestCase):
+    """
+    Tests for `empty_group`
+    """
+
+    def setUp(self):
+        """
+        Mock relevant controller methods.
+        """
+        self.mock_occ = patch(self, 'otter.controller.obey_config_change')
+        self.log = mock_log()
+        self.state = sample_group_state()
+        self.group = util_mock_group(self.state, 'tid', 'gid')
+
+    def test_updates_modifies(self):
+        """
+        updates group config with 0 min/max and calls `obey_config_change`
+        """
+        self.group.view_manifest.return_value = defer.succeed(
+            {'groupConfiguration':
+                {'name': 'group1', 'minEntities': '10', 'maxEntities': '1000'},
+             'launchConfiguration':
+                {'this': 'is_a_launch_config'},
+             'id': 'one'})
+        self.group.update_config.return_value = defer.succeed(None)
+        self.mock_occ.return_value = defer.succeed(None)
+
+        d = controller.empty_group(self.log, 'transid', self.group)
+
+        self.assertIsNone(self.successResultOf(d))
+        expected_config = {'maxEntities': 0,
+                           'minEntities': 0,
+                           'name': 'group1'}
+        self.group.view_manifest.assert_called_once_with(with_policies=False)
+        self.group.update_config.assert_called_once_with(expected_config)
+        self.mock_occ.assert_called_once_with(
+            self.log, "transid", expected_config, self.group,
+            self.state, launch_config={'this': 'is_a_launch_config'})
+
+    def test_no_group(self):
+        """
+        Raises `NoSuchScalingGroupError` if group does not exist
+        """
+        self.group.view_manifest.return_value = defer.fail(
+            NoSuchScalingGroupError('tid', 'gid'))
+        d = controller.empty_group(self.log, 'tid', self.group)
+        self.failureResultOf(d, NoSuchScalingGroupError)
+        # group config is not updated nor its state modified
+        self.assertFalse(self.group.update_config.called)
+        self.assertFalse(self.group.modify_state.called)
+
+
 def mock_controller_utilities(test_case):
     """
-    Mock out the following functions in the controller module, in order to simplify
-    testing of scaling up and down.
+    Mock out the following functions in the controller module, in order
+    to simplify testing of scaling up and down.
 
         - check_cooldowns (returns True)
         - calculate_delta (return 1)
@@ -810,7 +1143,10 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
         """
         self.mocks = mock_controller_utilities(self)
         self.mock_log = mock.MagicMock()
-        self.mock_state = mock_group_state()
+        self.mock_state = GroupState(
+            "tid", "gid", "g", {"a": "a", "b": "b", "c": "c"},
+            {"d": "d", "e": "e"}, None, {}, False, ScalingGroupStatus.ACTIVE,
+            desired=5, now=mock.Mock(return_value="now"))
         self.group = mock_group()
 
     def test_maybe_execute_scaling_policy_no_such_policy(self):
@@ -831,6 +1167,21 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
 
         self.assertEqual(len(self.group.view_config.mock_calls), 0)
         self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
+
+    def test_group_paused(self):
+        """
+        Raises `GroupPausedError` if group is paused and does not do anything
+        else
+        """
+        self.mock_state.paused = True
+        self.assertRaises(
+            controller.GroupPausedError,
+            controller.maybe_execute_scaling_policy,
+            self.mock_log, 'transaction', self.group, self.mock_state, 'pol1')
+        # Nothing else is called
+        self.assertFalse(self.group.view_config.called)
+        self.assertFalse(self.group.view_launch_config.called)
+        self.assertEqual(self.mock_state.policy_touched, {})
 
     def test_execute_launch_config_success_on_positive_delta(self):
         """
@@ -866,7 +1217,7 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
             self.mocks['calculate_delta'].return_value)
 
         # state should have been updated
-        self.mock_state.mark_executed.assert_called_once_with('pol1')
+        self.assertEqual(self.mock_state.policy_touched["pol1"], "now")
 
     def test_execute_launch_config_failure_on_positive_delta(self):
         """
@@ -900,7 +1251,7 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
             self.mocks['calculate_delta'].return_value)
 
         # state should not have been updated
-        self.assertEqual(self.mock_state.mark_executed.call_count, 0)
+        self.assertEqual(self.mock_state.policy_touched, {})
 
     def test_maybe_execute_scaling_policy_cooldown_failure(self):
         """
@@ -924,7 +1275,7 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
         self.assertEqual(self.mocks['execute_launch_config'].call_count, 0)
 
         # state should not have been updated
-        self.assertEqual(self.mock_state.mark_executed.call_count, 0)
+        self.assertEqual(self.mock_state.policy_touched, {})
 
     def test_maybe_execute_scaling_policy_zero_delta(self):
         """
@@ -974,7 +1325,7 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
             len(self.mocks['execute_launch_config'].mock_calls), 0)
 
         # state should have been updated
-        self.mock_state.mark_executed.assert_called_once_with('pol1')
+        self.assertEqual(self.mock_state.policy_touched["pol1"], "now")
 
     def test_audit_log_events_logged_on_positive_delta(self):
         """
@@ -987,11 +1338,12 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
                                                     'pol1')
         self.assertEqual(self.successResultOf(d), self.mock_state)
         log.msg.assert_called_with(
-            'Starting {convergence_delta} new servers to satisfy desired capacity',
-            scaling_group_id=self.group.uuid, event_type="convergence.scale_up",
-            convergence_delta=5, desired_capacity=5, pending_capacity=2,
-            active_capacity=3, audit_log=True, policy_id=None,
-            webhook_id=None)
+            ('Starting {convergence_delta} new servers to satisfy '
+             'desired capacity'),
+            scaling_group_id=self.group.uuid,
+            event_type="convergence.scale_up", convergence_delta=5,
+            desired_capacity=5, pending_capacity=2, current_capacity=3,
+            audit_log=True, policy_id=None, webhook_id=None)
 
     def test_audit_log_events_logged_on_negative_delta(self):
         """
@@ -1005,9 +1357,10 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
         self.assertEqual(self.successResultOf(d), self.mock_state)
         log.msg.assert_called_with(
             'Deleting 5 servers to satisfy desired capacity',
-            scaling_group_id=self.group.uuid, event_type="convergence.scale_down",
+            scaling_group_id=self.group.uuid,
+            event_type="convergence.scale_down",
             convergence_delta=-5, desired_capacity=5, pending_capacity=2,
-            active_capacity=3, audit_log=True, policy_id=None,
+            current_capacity=3, audit_log=True, policy_id=None,
             webhook_id=None)
 
 
@@ -1116,58 +1469,129 @@ class ConvergeTestCase(SynchronousTestCase):
 
     def test_real_convergence_nonzero_delta(self):
         """
-        When a tenant is configured to for convergence, if the delta is
-        non-zero, the Convergence service's ``converge`` method is invoked and
-        a Deferred that fires with `None` is returned.
+        When a tenant is configured for convergence, the state.desired is
+        updated with new desired and state is returned
         """
         log = mock_log()
         state = GroupState('tenant', 'group', "test", [], [], None, {},
-                           False)
+                           False, ScalingGroupStatus.ACTIVE)
         group_config = {'maxEntities': 100, 'minEntities': 0}
         policy = {'change': 5}
         config_data = {'convergence-tenants': ['tenant']}
-
-        start_convergence = self.cvg_starter_mock.start_convergence
-        start_convergence.return_value = defer.succeed("ignored")
 
         result = controller.converge(log, 'txn-id', group_config, self.group,
                                      state, 'launch', policy,
                                      config_value=config_data.get)
         self.assertEqual(self.successResultOf(result), state)
-        start_convergence.assert_called_once_with(log, 'tenant', 'group')
+        self.assertEqual(state.desired, 5)
 
         # And execute_launch_config is _not_ called
         self.assertFalse(self.mocks['execute_launch_config'].called)
 
     def test_real_convergence_zero_delta(self):
         """
-        When a tenant is configured for convergence, if the delta is zero, the
-        ConvergenceStarter service's ``start_convergence`` method is still
-        invoked.
+        When a tenant is configured for convergence, if the delta is zero,
+        state.desired is not udpated and None is returned synchronously
         """
         log = mock_log()
         state = GroupState('tenant', 'group-id', "test", [], [], None, {},
-                           False)
+                           False, ScalingGroupStatus.ACTIVE)
         group_config = {'maxEntities': 100, 'minEntities': 0}
         policy = {'change': 0}
         config_data = {'convergence-tenants': ['tenant']}
 
-        start_convergence = self.cvg_starter_mock.start_convergence
-        start_convergence.return_value = defer.succeed("ignored")
-
         result = controller.converge(log, 'txn-id', group_config, self.group,
                                      state, 'launch', policy,
                                      config_value=config_data.get)
-        self.assertIs(self.successResultOf(result), state)
-        start_convergence.assert_called_once_with(log, 'tenant', 'group')
+        self.assertIsNone(result)
+        self.assertEqual(state.desired, 0)
 
         # And execute_launch_config is _not_ called
         self.assertFalse(self.mocks['execute_launch_config'].called)
 
 
+class ModifyAndTriggerTests(SynchronousTestCase):
+    """
+    Tests for :func:`modify_and_trigger`
+    """
+
+    def setUp(self):
+        self.group = util_mock_group("state", "t", "g")
+        set_config_data({"convergence-tenants": ["t"]})
+        self.addCleanup(set_config_data, None)
+        self.mock_tg = patch(self, "otter.controller.trigger_convergence",
+                             side_effect=intent_func("tg"))
+        self.logargs = {"a": "b"}
+        self.disp = SequenceDispatcher([
+            (BoundFields(mock.ANY, self.logargs),
+             nested_sequence([(("tg", "t", "g"), noop)]))
+        ])
+
+    def modify(self, group, state):
+        return "newstate"
+
+    def test_convergence_tenant(self):
+        """
+        Calls group.modify_state() and triggers convergence after that
+        for convergence enabled tenants
+        """
+        self.group.pause_modify_state = True
+        d = controller.modify_and_trigger(
+            self.disp, self.group, self.logargs, self.modify)
+        # modify state is called
+        self.assertNoResult(d)
+        self.assertEqual(self.group.modify_state_values[-1], "newstate")
+        # but convergence is not yet triggered
+        self.assertFalse(self.disp.consumed())
+        # It is triggered after modify_state completes
+        self.group.modify_state_pause_d.callback(None)
+        self.assertIsNone(self.successResultOf(d))
+        self.assertTrue(self.disp.consumed())
+
+    def test_worker_tenant(self):
+        """
+        Only calls group.modify_state() for worker tenants. Does not trigger
+        convergence
+        """
+        set_config_data(None)
+        d = controller.modify_and_trigger(
+            self.disp, self.group, self.logargs, self.modify)
+        self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.group.modify_state_values[-1], "newstate")
+        self.assertFalse(self.disp.consumed())
+
+    def test_error(self):
+        """
+        Does not trigger convergence if group.modify_state() errors
+        """
+        d = controller.modify_and_trigger(
+            self.disp, self.group, {}, lambda *a: raise_(ValueError("a")))
+        self.failureResultOf(d, ValueError)
+        self.assertEqual(self.group.modify_state_values, [])
+        self.assertFalse(self.disp.consumed())
+
+    def test_error_skips_cannotexecutepolicy(self):
+        """
+        triggers convergence if group.modify_state() errors with
+        CannotExecutePolicyError
+        """
+        ce = controller.CannotExecutePolicyError("t", "g", "p", "w")
+        d = controller.modify_and_trigger(
+            self.disp, self.group, self.logargs, lambda *a: raise_(ce))
+        self.failureResultOf(d, controller.CannotExecutePolicyError)
+        self.assertTrue(self.disp.consumed())
+
+
+_should_retry_params = ShouldDelayAndRetry(
+    can_retry=retry_times(3),
+    next_interval=exponential_backoff_interval(2))
+
+
 class ConvergenceRemoveServerTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.controller.convergence_remove_server_from_group`
+    Tests for :func:`otter.controller.convergence_remove_server_from_group`,
+    :func:`otter.controller.perform_convergence_remove_from_group`, and
+    :func:`otter.controller.remove_server_from_group`
     """
     def setUp(self):
         """
@@ -1183,6 +1607,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                                 group_touched=None,
                                 policy_touched=None,
                                 paused=None,
+                                status=ScalingGroupStatus.ACTIVE,
                                 desired=1)
         self.group = iMock(IScalingGroup, tenant_id='tenant_id',
                            uuid='group_id')
@@ -1212,28 +1637,32 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             self.assertEqual(getattr(state1, attribute),
                              getattr(state2, attribute))
 
-    def _remove(self, replace, purge, dispatcher):
-        # Retry intents can't really be compared if the effect inside
-        # has callbacks, so just unpack and assert something about the retry
-        # params, and perform the wrapped effect.
-        expected_retry_params = ShouldDelayAndRetry(
-            can_retry=retry_times(3),
-            next_interval=exponential_backoff_interval(2))
+    def _tenant_retry(self, intent, performer, logged_response=True):
+        """
+        Return a :class:`SequenceDispatcher` tuple such that a TenantScope
+        is wrapped over a Retry which is wrapped over the given intent.
+        """
+        seq = [(intent, performer)]
+        if logged_response:
+            seq.append((Log(mock.ANY, mock.ANY), lambda i: None))
 
-        @sync_performer
-        def handle_retry(_disp, retry_intent):
-            self.assertEqual(retry_intent.should_retry, expected_retry_params)
-            return sync_perform(_disp, retry_intent.effect)
+        return (
+            TenantScope(mock.ANY, self.group.tenant_id),
+            nested_sequence([
+                (Retry(effect=mock.ANY, should_retry=_should_retry_params),
+                 nested_sequence(seq))
+            ])
+        )
 
-        full_dispatcher = ComposedDispatcher([
-            test_dispatcher(),
-            TypeDispatcher({Retry: handle_retry}),
-            dispatcher])
-
+    def _remove(self, replace, purge, seq_dispatcher):
         eff = controller.convergence_remove_server_from_group(
-            self.log, self.trans_id, self.group, self.state, 'server_id',
-            replace, purge)
-        return sync_perform(full_dispatcher, eff)
+            self.log, self.trans_id, 'server_id', replace, purge,
+            self.group, self.state)
+
+        with seq_dispatcher.consume():
+            return sync_perform(
+                ComposedDispatcher([test_dispatcher(), seq_dispatcher]),
+                eff)
 
     def test_no_such_server_replace_true(self):
         """
@@ -1241,13 +1670,14 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         :class:`ServerNotFoundError` is raised.  No additional checking
         for config is needed because replace is set True.
         """
-        dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
+        seq_dispatcher = SequenceDispatcher([
+            self._tenant_retry(
+                get_server_details('server_id').intent,
                 lambda _: raise_(NoSuchServerError(server_id=u'server_id')))
         ])
+
         self.assertRaises(
-            ServerNotFoundError, self._remove, True, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+            ServerNotFoundError, self._remove, True, False, seq_dispatcher)
 
     def test_server_not_autoscale_server_replace_true(self):
         """
@@ -1257,13 +1687,14 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         replace is set True.
         """
         self.server_details['server'].pop('metadata')
-        dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details)
+        seq_dispatcher = SequenceDispatcher([
+            self._tenant_retry(
+                get_server_details('server_id').intent,
+                lambda _: (StubResponse(200, {}), self.server_details))
         ])
+
         self.assertRaises(
-            ServerNotFoundError, self._remove, True, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+            ServerNotFoundError, self._remove, True, False, seq_dispatcher)
 
     def test_server_in_wrong_group_replace_true(self):
         """
@@ -1276,13 +1707,14 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
             'rax:auto_scaling_group_id': 'other_group_id'
         }
 
-        dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details)
+        seq_dispatcher = SequenceDispatcher([
+            self._tenant_retry(
+                get_server_details('server_id').intent,
+                lambda _: (StubResponse(200, {}), self.server_details))
         ])
+
         self.assertRaises(
-            ServerNotFoundError, self._remove, True, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+            ServerNotFoundError, self._remove, True, False, seq_dispatcher)
 
     def test_server_in_group_cannot_scale_down(self):
         """
@@ -1292,16 +1724,17 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         """
         self.state.desired = 1
         self.group_manifest_info['groupConfiguration']['minEntities'] = 1
-        dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details),
+
+        seq_dispatcher = SequenceDispatcher([
+            self._tenant_retry(
+                get_server_details('server_id').intent,
+                lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
-                lambda _: self.group_manifest_info)
+                lambda _: (self.group, self.group_manifest_info))
         ])
         self.assertRaises(
             CannotDeleteServerBelowMinError, self._remove, False, False,
-            dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+            seq_dispatcher)
 
     def test_server_not_in_group_cannot_scale_down(self):
         """
@@ -1311,15 +1744,16 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         self.server_details['server'].pop('metadata')
         self.state.desired = 1
         self.group_manifest_info['groupConfiguration']['minEntities'] = 1
-        dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details),
+
+        seq_dispatcher = SequenceDispatcher([
+            self._tenant_retry(
+                get_server_details('server_id').intent,
+                lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
-                lambda _: self.group_manifest_info)
+                lambda _: (self.group, self.group_manifest_info))
         ])
         self.assertRaises(
-            ServerNotFoundError, self._remove, False, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+            ServerNotFoundError, self._remove, False, False, seq_dispatcher)
 
     def test_checks_pass_replace_true_purge_success(self):
         """
@@ -1328,15 +1762,16 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         effect is a success, and returns same state the function was called
         with.
         """
-        dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details),
-            (set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
-                lambda _: None)
+        seq_dispatcher = SequenceDispatcher([
+            self._tenant_retry(
+                get_server_details('server_id').intent,
+                lambda _: (StubResponse(200, {}), self.server_details)),
+            self._tenant_retry(
+                set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
+                lambda _: (StubResponse(200, {}), None))
         ])
-        result = self._remove(True, True, dispatcher)
+        result = self._remove(True, True, seq_dispatcher)
         self.assertEqual(result, self.state)
-        self.assertEqual(dispatcher.sequence, [])
 
     def test_checks_pass_replace_false_purge_success(self):
         """
@@ -1346,18 +1781,19 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         was called with, with the desired value decremented.
         """
         old_desired = self.state.desired = 2
-        dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details),
+        seq_dispatcher = SequenceDispatcher([
+            self._tenant_retry(
+                get_server_details('server_id').intent,
+                lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
-                lambda _: self.group_manifest_info),
-            (set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
-                lambda _: None)
+                lambda _: (self.group, self.group_manifest_info)),
+            self._tenant_retry(
+                set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
+                lambda _: (StubResponse(200, {}), None))
         ])
-        result = self._remove(False, True, dispatcher)
+        result = self._remove(False, True, seq_dispatcher)
         self.assert_states_equivalent_except_desired(result, self.state)
         self.assertEqual(result.desired, old_desired - 1)
-        self.assertEqual(dispatcher.sequence, [])
 
     def test_checks_pass_replace_true_purge_failure(self):
         """
@@ -1365,14 +1801,15 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         to the server's metadata.  If this fails, then the failure is
         propagated and the state is not returned.
         """
-        dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details),
-            (set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
+        seq_dispatcher = SequenceDispatcher([
+            self._tenant_retry(
+                get_server_details('server_id').intent,
+                lambda _: (StubResponse(200, {}), self.server_details)),
+            self._tenant_retry(
+                set_nova_metadata_item('server_id', *DRAINING_METADATA).intent,
                 lambda _: raise_(ValueError('oops!')))
         ])
-        self.assertRaises(ValueError, self._remove, True, True, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+        self.assertRaises(ValueError, self._remove, True, True, seq_dispatcher)
 
     def test_checks_pass_replace_true_no_purge_success(self):
         """
@@ -1381,42 +1818,46 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         then the whole effect is a success, and returns same state the function
         was called with.
         """
-        dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details),
-            (EvictServerFromScalingGroup(log=self.log,
-                                         transaction_id=self.trans_id,
-                                         scaling_group=self.group,
-                                         server_id='server_id'),
-                lambda _: None)
+        seq_dispatcher = SequenceDispatcher([
+            self._tenant_retry(
+                get_server_details('server_id').intent,
+                lambda _: (StubResponse(200, {}), self.server_details)),
+            self._tenant_retry(
+                EvictServerFromScalingGroup(log=self.log,
+                                            transaction_id=self.trans_id,
+                                            scaling_group=self.group,
+                                            server_id='server_id'),
+                lambda _: (StubResponse(200, {}), None),
+                logged_response=False)
         ])
-        result = self._remove(True, False, dispatcher)
+        result = self._remove(True, False, seq_dispatcher)
         self.assertEqual(result, self.state)
-        self.assertEqual(dispatcher.sequence, [])
 
     def test_checks_pass_replace_false_no_purge_success(self):
         """
-        If all the checks pass, and purge is true and replace is false, then
+        If all the checks pass, and purge is false and replace is false, then
         "DRAINING" is added to the server's metadata.  If this is successful,
         then the whole effect is a success, and returns the state the function
         was called with, with the desired value decremented.
         """
         old_desired = self.state.desired = 2
-        dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details),
+        seq_dispatcher = SequenceDispatcher([
+            self._tenant_retry(
+                get_server_details('server_id').intent,
+                lambda _: (StubResponse(200, {}), self.server_details)),
             (GetScalingGroupInfo(tenant_id='tenant_id', group_id='group_id'),
-                lambda _: self.group_manifest_info),
-            (EvictServerFromScalingGroup(log=self.log,
-                                         transaction_id=self.trans_id,
-                                         scaling_group=self.group,
-                                         server_id='server_id'),
-                lambda _: None)
+                lambda _: (self.group, self.group_manifest_info)),
+            self._tenant_retry(
+                EvictServerFromScalingGroup(log=self.log,
+                                            transaction_id=self.trans_id,
+                                            scaling_group=self.group,
+                                            server_id='server_id'),
+                lambda _: (StubResponse(200, {}), None),
+                logged_response=False)
         ])
-        result = self._remove(False, False, dispatcher)
+        result = self._remove(False, False, seq_dispatcher)
         self.assert_states_equivalent_except_desired(result, self.state)
         self.assertEqual(result.desired, old_desired - 1)
-        self.assertEqual(dispatcher.sequence, [])
 
     def test_checks_pass_replace_true_no_purge_failure(self):
         """
@@ -1424,14 +1865,74 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         to the server's metadata.  If this fails, then the failure is
         propagated and the state is not returned.
         """
-        dispatcher = SequenceDispatcher([
-            (get_server_details('server_id').intent,
-                lambda _: self.server_details),
-            (EvictServerFromScalingGroup(log=self.log,
-                                         transaction_id=self.trans_id,
-                                         scaling_group=self.group,
-                                         server_id='server_id'),
+        seq_dispatcher = SequenceDispatcher([
+            self._tenant_retry(
+                get_server_details('server_id').intent,
+                lambda _: (StubResponse(200, {}), self.server_details)),
+            self._tenant_retry(
+                EvictServerFromScalingGroup(log=self.log,
+                                            transaction_id=self.trans_id,
+                                            scaling_group=self.group,
+                                            server_id='server_id'),
                 lambda _: raise_(ValueError('oops')))
         ])
-        self.assertRaises(ValueError, self._remove, True, False, dispatcher)
-        self.assertEqual(dispatcher.sequence, [])
+        self.assertRaises(ValueError, self._remove, True, False,
+                          seq_dispatcher)
+
+    def test_non_convergence_uses_supervisor_remove(self):
+        """
+        If the tenant is not convergence-enabled, the controller's
+        :func:`remove_server_from_group` calls the supervisor's
+        :func:`remove_server_from_group` function with the same arguments.
+        """
+        supervisor_remove = patch(
+            self, 'otter.controller.worker_remove_server_from_group',
+            return_value=defer.succeed('worker success'))
+
+        d = controller.remove_server_from_group(
+            "disp", self.log, self.trans_id, 'server_id', False, False,
+            self.group, self.state,
+            config_value={'convergence-tenants': []}.get)
+
+        self.assertEqual(self.successResultOf(d), 'worker success')
+
+        supervisor_remove.assert_called_once_with(
+            self.log, self.trans_id, 'server_id', False, False,
+            self.group, self.state)
+
+    @mock.patch('otter.controller.convergence_remove_server_from_group',
+                autospec=True, side_effect=intent_func("crsfg"))
+    @mock.patch('otter.controller.trigger_convergence',
+                side_effect=intent_func("tg"))
+    def test_convergence_uses_convergence_remove(self, mock_tg, mock_crsfg):
+        """
+        If the tenant is convergence-enabled, the controller's
+        :func:`remove_server_from_group` calls
+        :func:`perform_convergence_remove_from_group` with a dispatcher that
+        can handle :class:`EvictServerFromScalingGroup`.
+
+        Then, a convergence cycle is kicked off, and whatever state that
+        :func:`convergence_remove_server_from_group` returned is propagated as
+        the return value.
+        """
+        new_state = assoc_obj(self.state, desired=self.state.desired - 1)
+        disp = SequenceDispatcher([
+            (BoundFields(mock.ANY, dict(tenant_id="tenant_id",
+                                        scaling_group_id="group_id",
+                                        server_id="server_id",
+                                        transaction_id=self.trans_id)),
+             nested_sequence([
+                (("crsfg", self.log, self.trans_id, "server_id", False, False,
+                  self.group, self.state), lambda i: new_state),
+                (("tg", "tenant_id", "group_id"), lambda i: "triggered")
+             ]))
+        ])
+
+        d = controller.remove_server_from_group(
+            disp, self.log, self.trans_id, 'server_id', False, False,
+            self.group, self.state,
+            config_value={'convergence-tenants': [self.group.tenant_id]}.get)
+
+        with disp.consume():
+            result = self.successResultOf(d)
+            self.assertIs(result, new_state)

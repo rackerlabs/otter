@@ -4,6 +4,7 @@ from kazoo.recipe.partitioner import PartitionState
 
 import mock
 
+from twisted.internet.defer import Deferred
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -130,6 +131,38 @@ class PartitionerTests(SynchronousTestCase):
         self.clock.advance(10)
         self.assertEqual(self.buckets_received, [[2, 3], [2, 3], [2, 3]])
 
+    def test_got_buckets_return(self):
+        """
+        `got_buckets` return value is propogated to timerservice that ensures
+        that the service stops after returned deferred is fired
+        """
+        self.kz_partitioner.acquired = True
+        self.kz_partitioner.__iter__.return_value = [2, 3]
+        self.buckets_got = None
+        d = Deferred()
+
+        def got_buckets(_buckets):
+            self.buckets_got = _buckets
+            return d
+
+        partitioner = Partitioner(
+            self.kz_client, 10, self.path, self.buckets, self.time_boundary,
+            self.log, got_buckets, clock=self.clock)
+        partitioner.startService()
+        self.log.msg.assert_called_once_with(
+            'Got buckets {buckets}',
+            buckets=[2, 3], old_buckets=[], path=self.path,
+            otter_msg_type='partition-acquired')
+        self.assertEqual(self.buckets_got, [2, 3])
+        self.clock.advance(10)
+        # Stopping service does not complete even after advancing clock
+        # since got_buckets deferred has not fired yet
+        sd = partitioner.stopService()
+        self.assertNoResult(sd)
+        # Service stops after deferred is fired
+        d.callback(None)
+        self.successResultOf(sd)
+
     def test_no_log_spam(self):
         """Bucket changes are not logged when the buckets don't change."""
         self.kz_partitioner.acquired = True
@@ -167,7 +200,7 @@ class PartitionerTests(SynchronousTestCase):
         self.partitioner.startService()
         d = self.partitioner.stopService()
         self.assertFalse(self.kz_partitioner.finish.called)
-        self.assertIsNone(d)
+        self.successResultOf(d)
 
     def test_stop_service_acquired(self):
         """
@@ -176,7 +209,8 @@ class PartitionerTests(SynchronousTestCase):
         self.kz_partitioner.acquired = True
         self.partitioner.startService()
         d = self.partitioner.stopService()
-        self.assertIs(self.kz_partitioner.finish.return_value, d)
+        self.assertIs(self.successResultOf(d),
+                      self.kz_partitioner.finish.return_value)
 
     def test_stop_service_stops_polling(self):
         """

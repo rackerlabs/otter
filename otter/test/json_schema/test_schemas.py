@@ -196,27 +196,28 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
         optionally a type.  RCv3 needs the type but not the port.
         The type needs to be valid.
         """
-        base = {
-            "type": "launch_server",
-            "args": {
-                "server": {}
-            }
-        }
+        base = group_examples.launch_server_config()[0]
         invalids = [
             {'loadBalancerId': '', 'port': 80},
             {'loadBalancerId': 3, 'port': '80'},
             {'loadBalancerId': 3, 'type': 'CloudLoadBalancer'},
             {'loadBalancerId': 3, 'port': '80', 'type': 'blah blah'},
             {'loadBalancerId': 3, 'type': 'RackConnectV3'},
-            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2', 'type': 'CloudLoadBalancer'},
-            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2', 'type': 'RackConnectV3',
-             'port': 80},
+            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2',
+             'type': 'CloudLoadBalancer'},
+            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2',
+             'type': 'RackConnectV3', 'port': 80},
             {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'},
-            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2', 'type': ''},
+            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2',
+             'type': ''},
+            {'loadBalancerId': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2',
+             'type': None},
+            {'loadBalancerId': '112345', 'type': '', 'port': 80},
+            {'loadBalancerId': '112345', 'type': None, 'port': 80},
         ]
         for invalid in invalids:
             base["args"]["loadBalancers"] = [invalid]
-            # the type fails ot valdiate because of 'not of type'
+            # the type fails ot validiate because of 'not of type'
             self.assertRaisesRegexp(ValidationError, 'not of type', validate,
                                     base, group_schemas.launch_server)
             # because the type schema fails to validate, the config schema
@@ -229,14 +230,9 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
         If more than 5 load balancers are provided, the launch config fails to
         validate.
         """
-        invalid = {
-            "type": "launch_server",
-            "args": {
-                "server": {},
-                "loadBalancers": [{'loadBalancerId': i, 'port': 80}
-                                  for i in range(6)]
-            }
-        }
+        invalid = group_examples.launch_server_config()[0]
+        invalid['args']["loadBalancers"] = [{'loadBalancerId': i, 'port': 80}
+                                            for i in range(6)]
 
         # the type fails ot valdiate because the load balancer list is too long
         self.assertRaisesRegexp(ValidationError, 'is too long',
@@ -251,16 +247,11 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
         If the same load balancer config appears twice, the launch config
         fails to validate.
         """
-        invalid = {
-            "type": "launch_server",
-            "args": {
-                "server": {},
-                "loadBalancers": [
-                    {'loadBalancerId': 1, 'port': 80},
-                    {'loadBalancerId': 1, 'port': 80}
-                ]
-            }
-        }
+        invalid = group_examples.launch_server_config()[0]
+        invalid['args']["loadBalancers"] = [
+            {'loadBalancerId': 1, 'port': 80},
+            {'loadBalancerId': 1, 'port': 80}
+        ]
         # the type fails ot valdiate because of the load balancers are not
         # unique
         self.assertRaisesRegexp(ValidationError, 'non-unique elements',
@@ -275,10 +266,11 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
         If random attributes to args are provided, the launch config fails to
         validate
         """
+        server = group_examples.launch_server_config()[0]['args']['server']
         invalid = {
             "type": "launch_server",
             "args": {
-                "server": {},
+                "server": server,
                 "hat": "top"
             }
         }

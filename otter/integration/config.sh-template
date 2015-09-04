@@ -1,18 +1,19 @@
 #!/bin/sh
 #
 # To run the integration tests, you'll need to have various environment
-# settings established.
+# settings established. The defaults in this file are set to run against
+# Mimic, so you should just need to "source config.sh-template" before
+# running the trial tests.
 
-# This is the username used to authenticate against Identity.
+# These are the credentials used to authenticate against Identity.
+# Mimic will accept any username/password.
 export AS_USERNAME=joe_user
-
-# This is the password used to authenticate against Identity.
 export AS_PASSWORD=joes_password
 
-# This is the Identity V2 API endpoint.
-export AS_IDENTITY=https://identity.api.rackspacecloud.com/v2.0
+# This is the public Identity V2 API endpoint.
+# export AS_IDENTITY=https://identity.api.rackspacecloud.com/v2.0
 # To run agains mimic, use the following default endpoint:
-# export AS_IDENTITY=http://localhost:8900/identity/v2.0
+export AS_IDENTITY=http://localhost:8900/identity/v2.0
 
 # When creating servers, use this flavor.
 export AS_FLAVOR_REF=2
@@ -21,7 +22,43 @@ export AS_FLAVOR_REF=2
 export AS_IMAGE_REF=cca73d10-8953-4949-a2f2-1e5444a4130d
 
 # When creating servers, use this region.  Beware; this is case sensitive.
-export AS_REGION=IAD
 # Mimic defaults to using ORD as the region
-#export AS_REGION=ORD
+export AS_REGION=ORD
 
+# This is the test tenant ID that is enabled for convergence in otter.
+export AS_CONVERGENCE_TENANT=000000
+
+# Use this to set the verbosity of the convergence tests.
+# If this is not defined, it will be assumed to be zero.
+#export AS_VERBOSITY=3
+
+# Adjust this if your Openstack implementation registers your autoscaling
+# service under a different key in the service catalog.
+export AS_AUTOSCALE_SC_KEY=autoscale
+
+# When testing locally, Mimic won't have (enabled) its own support for the
+# Autoscale API.  This URL provides the endpoint for the locally running
+# instance of Autoscale.  The {0} is important, for it signifies the current
+# tenant ID.
+export AS_AUTOSCALE_LOCAL_URL=http://localhost:9000/v1.0/{0}
+
+# Adjust this if your Openstack implementation registers your cloud computing
+# service under a different key in the service catalog.
+export AS_NOVA_SC_KEY=cloudServersOpenStack
+
+# Adjust this if your your cloud load balancer service is registered under a
+# different key in the service catalog.
+export AS_CLB_SC_KEY=cloudLoadBalancers
+
+# Comment this out if you aren't running tests against Mimic.
+export AS_USING_MIMIC=true
+
+# The number of seconds to wait for servers to build. When using mimic this
+# can be very low (like 30 seconds). Comment this out to use the normal
+# production value (which is much, much higher than 30 seconds).
+export AS_BUILD_TIMEOUT_SECONDS=30
+
+# This is a test tenant that is enabled for convergence in Otter.  This will
+# only be used for testing against mimic, to test otter reaction to auth
+# errors.  A random username and password will be generated for it.
+export AS_CONVERGENCE_TENANT_FOR_AUTH_ERRORS=000010

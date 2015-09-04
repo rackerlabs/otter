@@ -3,14 +3,17 @@ Mixins and utilities to be used for testing.
 """
 import json
 import os
+import sys
 from functools import partial, wraps
 from inspect import getargspec
+from operator import attrgetter
 
 from effect import (
-    ComposedDispatcher, ParallelEffects, TypeDispatcher,
-    base_dispatcher, sync_performer)
+    ComposedDispatcher, Constant, Effect, ParallelEffects, TypeDispatcher,
+    base_dispatcher)
 from effect.async import perform_parallel_async
 from effect.testing import (
+    perform_sequence,
     resolve_effect as eff_resolve_effect,
     resolve_stubs as eff_resolve_stubs)
 
@@ -22,22 +25,26 @@ from pyrsistent import freeze, pmap
 
 from testtools.matchers import MatchesException, Mismatch
 
+from toolz.functoolz import compose
+
 import treq
 
 from twisted.application.service import Service
 from twisted.internet import defer
 from twisted.internet.defer import Deferred, maybeDeferred, succeed
 from twisted.python.failure import Failure
+from twisted.web.http_headers import Headers
 
 from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
 
-from otter.cloud_client import concretize_service_request
-from otter.log.bound import BoundLog
-from otter.models.interface import IScalingGroup
+from otter.convergence.model import NovaServer
+from otter.log.bound import BoundLog, bound_log_kwargs
+from otter.models.interface import IScalingGroup, IScalingGroupServersCache
 from otter.supervisor import ISupervisor
 from otter.util.deferredutils import DeferredPool
-from otter.util.retry import Retry
+from otter.util.fp import set_in
+from otter.util.retry import Retry, ShouldDelayAndRetry, perform_retry
 
 
 class matches(object):
@@ -102,24 +109,13 @@ class IsBoundWith(object):
         """
         if not isinstance(log, BoundLog):
             return Mismatch('log is not a BoundLog')
-        # Collect kwargs
-        f = log.msg
-        kwargs_list = []
-        while True:
-            try:
-                kwargs_list.append(f.keywords)
-            except AttributeError:
-                break
-            else:
-                f = f.func
-        # combine them in order they were bound
-        kwargs = {}
-        [kwargs.update(kwa) for kwa in reversed(kwargs_list)]
-        # Compare and return accordingly
+        kwargs = bound_log_kwargs(log)
         if self.kwargs == kwargs:
             return None
         else:
-            return Mismatch('Expected kwargs {} but got {} instead'.format(self.kwargs, kwargs))
+            return Mismatch(
+                'Expected kwargs {} but got {} instead'.format(self.kwargs,
+                                                               kwargs))
 
 
 class Provides(object):
@@ -218,7 +214,7 @@ def iMock(*ifaces, **kwargs):
     for k, v in list(kwargs.iteritems()):
         result = k.split('.', 1)
         if result[0] in all_names:
-            attribute_kwargs = attribute_kwargs.set_in(result, v)
+            attribute_kwargs = set_in(attribute_kwargs, result, v)
             kwargs.pop(k)
 
     kwargs.pop('spec', None)
@@ -362,6 +358,15 @@ def mock_log(*args, **kwargs):
     return BoundLog(msg, err)
 
 
+class StubClientRequest(object):
+    """
+    A fake request object attached to a Twisted response object
+    """
+    method = "method"
+    absoluteURI = "original/request/URL"
+    headers = Headers({'x-otter-request-id': ['original-request-id']})
+
+
 class StubResponse(object):
     """
     A fake pre-built Twisted Web Response object.
@@ -369,6 +374,7 @@ class StubResponse(object):
     def __init__(self, code, headers, data=None):
         self.code = code
         self.headers = headers
+        self.request = StubClientRequest()
         # Data is not part of twisted response object
         self._data = data
 
@@ -391,6 +397,14 @@ def stub_pure_response(body, code=200, response_headers=None):
         body = json.dumps(body)
     if response_headers is None:
         response_headers = {}
+    return (StubResponse(code, response_headers), body)
+
+
+def stub_json_response(body, code=200, response_headers=None):
+    """
+    Return the type of two-tuple response that ServiceRequest returns when
+    json_response=True.
+    """
     return (StubResponse(code, response_headers), body)
 
 
@@ -568,7 +582,7 @@ class DummyException(Exception):
 
 
 @implementer(ISupervisor)
-class FakeSupervisor(object, Service):
+class FakeSupervisor(Service, object):
     """
     A fake supervisor that keeps track of calls made
     """
@@ -620,7 +634,7 @@ def mock_group(state, tenant_id='tenant', group_id='group'):
     group.pause_modify_state = False
     group.modify_state_values = []
 
-    def fake_modify_state(f, *args, **kwargs):
+    def fake_modify_state(f, modify_state_reason=None, *args, **kwargs):
         d = maybeDeferred(f, group, state, *args, **kwargs)
         d.addCallback(lambda r: group.modify_state_values.append(r))
         if group.pause_modify_state:
@@ -630,6 +644,7 @@ def mock_group(state, tenant_id='tenant', group_id='group'):
             return d
 
     group.modify_state.side_effect = fake_modify_state
+    group.log = mock_log()
     return group
 
 
@@ -689,11 +704,100 @@ def resolve_stubs(eff):
     return eff_resolve_stubs(base_dispatcher, eff)
 
 
-def test_dispatcher():
-    return ComposedDispatcher([
+def retry_sequence(expected_retry_intent, performers,
+                   fallback_dispatcher=None):
+    """
+    Return a two-tuple of ``(expected_retry_intent, Intent -> a)`` for use in
+    a :obj:`SequenceDispatcher`.  The Intent -> a function performs the
+    retried effect from the actual :obj:`Retry` intent over and over.
+
+    :param fallback_dispatcher: an optional dispatcher to compose onto the
+        sequence dispatcher.
+
+    Usage::
+
+        SequenceDispatcher([
+            retry_sequence(
+                Retry(
+                    effect=SomeEffect(),
+                    should_retry=ShouldDelayAndRetry(
+                        can_retry=retry_times(5),
+                        next_interval=repeating_interval(10))),
+                [fail_to_perform,
+                 fail_to_perform,
+                 perform_intent])
+        ])
+    """
+    def perform_retry_without_delay(actual_retry_intent):
+        should_retry = actual_retry_intent.should_retry
+        if isinstance(should_retry, ShouldDelayAndRetry):
+            def should_retry(exc_info):
+                exc_type, exc_value, exc_traceback = exc_info
+                failure = Failure(exc_value, exc_type, exc_traceback)
+                return Effect(Constant(
+                    actual_retry_intent.should_retry.can_retry(failure)))
+
+        new_retry_effect = Effect(Retry(
+            effect=actual_retry_intent.effect,
+            should_retry=should_retry))
+
+        _dispatchers = [TypeDispatcher({Retry: perform_retry}),
+                        base_dispatcher]
+        if fallback_dispatcher is not None:
+            _dispatchers.append(fallback_dispatcher)
+
+        seq = [(expected_retry_intent.effect.intent, performer)
+               for performer in performers]
+
+        return perform_sequence(seq, new_retry_effect,
+                                ComposedDispatcher(_dispatchers))
+
+    return (expected_retry_intent, perform_retry_without_delay)
+
+
+def nested_sequence(seq, get_effect=attrgetter('effect'),
+                    fallback_dispatcher=base_dispatcher):
+    """
+    Return a function of Intent -> a that performs an effect retrieved from the
+    intent (by accessing its `effect` attribute, by default) with the given
+    intent-sequence.
+
+    A demonstration is best::
+
+        SequenceDispatcher([
+            (BoundFields(effect=mock.ANY, fields={...}),
+             nested_sequence([(SomeIntent(), perform_some_intent)]))
+        ])
+
+    The point is that sometimes you have an intent that wraps another effect,
+    and you want to ensure that the nested effects follow some sequence in the
+    context of that wrapper intent.
+
+    `get_effect` defaults to attrgetter('effect'), so you can override it if
+    your intent stores its nested effect in a different attribute. Or, more
+    interestingly, if it's something other than a single effect, e.g. for
+    ParallelEffects see the :func:`parallel_nested_sequence` function.
+
+    :param seq: sequence of intents like :obj:`SequenceDispatcher` takes
+    :param get_effect: callable to get the inner effect from the wrapper
+        intent.
+    :param fallback_dispatcher: an optional dispatcher to compose onto the
+        sequence dispatcher.
+    """
+    return compose(
+        partial(perform_sequence, seq,
+                fallback_dispatcher=fallback_dispatcher),
+        get_effect)
+
+
+def test_dispatcher(disp=None):
+    disps = [
         base_dispatcher,
         TypeDispatcher({ParallelEffects: perform_parallel_async}),
-    ])
+    ]
+    if disp is not None:
+        disps.append(disp)
+    return ComposedDispatcher(disps)
 
 
 def defaults_by_name(fn):
@@ -729,62 +833,53 @@ def transform_eq(transformer, rhs):
     Return an object that can be compared to another object after transforming
     that other object.
 
+    The returned object will keep a log of equality checks done to it, and when
+    formatted as a string (with ``repr``), will show the history of transformed
+    objects and the ``rhs``.
+
     :param transformer: a function that takes the compared objects and returns
         a transformed version
     :param rhs: the actual data that should be compared with the result of
         transforming the compared object
     """
-    class Foo(object):
+    class TransformedEq(object):
+        def __init__(self):
+            self.comparisons = []
+
         def __eq__(self, other):
-            return transformer(other) == rhs
+            transformed = transformer(other)
+            self.comparisons.append(transformed)
+            return transformed == rhs
 
         def __ne__(self, other):
             return not self == other
 
-    return Foo()
+        def __repr__(self):
+            return "<TransformedEq comparisons=%r, operand=%r>" % (
+                self.comparisons, rhs)
+
+    return TransformedEq()
 
 
-def get_fake_service_request_performer(stub_response):
+def match_func(arg, result):
     """
-    For sanity's sake, attempt to fake performing a service request, including
-    predicate handlers, so we can also test the predicate handlers.
-
-    :param service_request: the :class:`ServiceRequest` to "perform"
-    :param stub_response: a tuple of (:class:`StubResponse`, string body),
-        supposedly the "response" of an http request
+    Return an object that compares equal to a function that, when given
+    ``arg``, returns ``result``.
     """
-    if not isinstance(stub_response, basestring):
-        try:
-            stub_response = (stub_response[0], json.dumps(stub_response[-1]))
-        except TypeError:
-            stub_response = (stub_response[0], str(stub_response[-1]))
-
-    @sync_performer
-    def the_performer(_, service_request_intent):
-        service_configs = mock.MagicMock()
-        service_configs.__getitem__.return_value = {
-            'name': 'service_name',
-            'region': 'region',
-            'url': 'http://url'
-        }
-        eff = concretize_service_request(
-            authenticator=mock.MagicMock(),
-            log=mock.MagicMock(),
-            service_configs=service_configs,
-            tenant_id='000000',
-            service_request=service_request_intent)
-
-        # "authenticate"
-        eff = resolve_effect(eff, ('token', []))
-        # make request
-        return resolve_effect(eff, stub_response)
-
-    return the_performer
+    return transform_eq(lambda f: f(arg), result)
 
 
 def raise_(e):
     """Raise the exception. Useful for lambdas."""
     raise e
+
+
+def raise_to_exc_info(e):
+    """Raise an exception, and get the exc_info that results."""
+    try:
+        raise e
+    except type(e):
+        return sys.exc_info()
 
 
 class TestStep(object):
@@ -794,3 +889,57 @@ class TestStep(object):
 
     def as_effect(self):
         return self.effect
+
+
+def noop(_):
+    """Ignore input and return None."""
+    pass
+
+
+def const(v):
+    """
+    Return function that takes an argument but always return given `v`.
+    Useful with `SequenceDispatcher`. For example,
+
+    >>> dt = datetime(1970, 1, 1)
+    >>> SequenceDispatcher([(Func(datetime.now), const(dt))])
+    """
+
+    return lambda i: v
+
+
+def intent_func(fname):
+    """
+    Return function that returns Effect of tuple of fname and its args. Useful
+    in writing tests that expect intent based on args
+    """
+    return lambda *a: Effect((fname,) + a)
+
+
+@implementer(IScalingGroupServersCache)
+class EffectServersCache(object):
+    """ IScalingGroupServersCache impl for testing """
+
+    def __init__(self, tid, gid):
+        self.tid = tid
+        self.gid = gid
+
+    def ids(self, s):
+        return "cache" + s + self.tid + self.gid
+
+    def get_servers(self, with_as_active):
+        return Effect((self.ids("gs"), with_as_active))
+
+    def insert_servers(self, time, servers, clear):
+        return Effect((self.ids("is"), time, servers, clear))
+
+    def delete_servers(self):
+        return Effect(self.ids("ds"))
+
+
+def server(id, state, created=0, image_id='image', flavor_id='flavor',
+           json=None, **kwargs):
+    """Convenience for creating a :obj:`NovaServer`."""
+    return NovaServer(id=id, state=state, created=created, image_id=image_id,
+                      flavor_id=flavor_id,
+                      json=json or pmap({'id': id}), **kwargs)

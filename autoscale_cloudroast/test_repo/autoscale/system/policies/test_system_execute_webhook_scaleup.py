@@ -23,7 +23,7 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
         self.group = self.create_group_response.entity
         self.resources.add(self.group, self.empty_scaling_group)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_execute_webhook_scale_up_change(self):
         """
         Create a scale up policy with change and execute its webhook
@@ -41,7 +41,7 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
             expected_servers=policy_up['change'] +
             self.group.groupConfiguration.minEntities)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_execute_webhook_scale_up_change_percent(self):
         """
         Execute a webhook for scale up policy with change percent.
@@ -61,7 +61,7 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=servers_from_scale_up)
 
-    @tags(speed='quick')
+    @tags(speed='quick', convergence='yes')
     def test_system_execute_webhook_scale_up_desired_capacity(self):
         """
         Execute a webhook for scale up policy with desired capacity.

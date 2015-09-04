@@ -10,7 +10,9 @@ import mock
 from testtools.matchers import (
     Contains,
     ContainsDict,
-    Equals)
+    Equals,
+    MatchesRegex
+)
 
 from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
@@ -19,14 +21,19 @@ from otter.log import audit
 from otter.log.bound import BoundLog
 from otter.log.formatters import (
     ErrorFormattingWrapper,
+    FanoutObserver,
     JSONObserverWrapper,
+    LogLevel,
     ObserverWrapper,
     PEP3101FormattingWrapper,
     StreamObserverWrapper,
     SystemFilterWrapper,
-    throttling_wrapper,
-    audit_log_formatter,
-    serialize_to_jsonable)
+    add_to_fanout,
+    cf_id_wrapper,
+    get_fanout,
+    serialize_to_jsonable,
+    set_fanout,
+    throttling_wrapper)
 from otter.test.utils import SameJSON, matches
 
 
@@ -298,6 +305,17 @@ class PEP3101FormattingWrapperTests(SynchronousTestCase):
         self.observer.assert_called_once_with({'why': 'Hello World',
                                                'name': 'World'})
 
+    def test_no_format_why_if_system_is_ignored(self):
+        """
+        PEP3101FormattingWrapper does not format the why argument to log.err
+        if the system is an ignored system.
+        """
+        self.wrapper({'why': 'Hello {name}', 'name': 'World',
+                      'system': 'kazoo'})
+        self.observer.assert_called_once_with({'why': 'Hello {name}',
+                                               'name': 'World',
+                                               'system': 'kazoo'})
+
     def test_format_message(self):
         """
         PEP3101FormattingWrapper formats the message.
@@ -306,6 +324,16 @@ class PEP3101FormattingWrapperTests(SynchronousTestCase):
         self.observer.assert_called_once_with(
             {'message': ('foo bar',), 'bar': 'bar'})
 
+    def test_no_format_message_if_system_is_ignored(self):
+        """
+        PEP3101FormattingWrapper does not format the message if the system is
+        an ignored system.
+        """
+        self.wrapper({'message': ('foo {bar}',), 'bar': 'bar',
+                      'system': 'kazoo'})
+        self.observer.assert_called_once_with(
+            {'message': ('foo {bar}',), 'bar': 'bar', 'system': 'kazoo'})
+
     def test_format_message_tuple(self):
         """
         PEP3101FormattingWrapper joins the message tuple before formatting.
@@ -313,6 +341,18 @@ class PEP3101FormattingWrapperTests(SynchronousTestCase):
         self.wrapper({'message': ('foo', 'bar', 'baz', '{bax}'), 'bax': 'bax'})
         self.observer.assert_called_once_with(
             {'message': ('foo bar baz bax',), 'bax': 'bax'})
+
+    def test_no_joins_no_format_message_tuple(self):
+        """
+        PEP3101FormattingWrapper neither joins nor formats the message tuple
+        if the system is an ignored system.
+        """
+        self.wrapper({'message': ('foo', 'bar', 'baz', '{bax}'),
+                      'bax': 'bax',
+                      'system': 'kazoo'})
+        self.observer.assert_called_once_with(
+            {'message': ('foo', 'bar', 'baz', '{bax}',), 'bax': 'bax',
+             'system': 'kazoo'})
 
     def test_formatting_failure(self):
         """
@@ -344,14 +384,14 @@ class ErrorFormatterTests(SynchronousTestCase):
 
     def test_no_failure(self):
         """
-        If event does not have failure, it sets level=6 and removes
-        all error fields
+        If event does not have failure, it sets level to LogLevel.INFO
+        and removes all error fields
         """
         self.wrapper({'isError': False, 'failure': 'f', 'why': 'w',
                       'foo': 'bar'})
         self.assertEqual(
             self._formatted_event(),
-            {'level': 6, 'message': ('',), 'foo': 'bar'})
+            {'level': LogLevel.INFO, 'message': ('',), 'foo': 'bar'})
 
     def test_failure_include_traceback_in_event_dict(self):
         """
@@ -379,13 +419,13 @@ class ErrorFormatterTests(SynchronousTestCase):
         self.observer.assert_called_once_with(
             matches(ContainsDict({'message': Equals(('uh oh',))})))
 
-    def test_isError_sets_level_3(self):
+    def test_isError_sets_level_error(self):
         """
-        The observer sets the level to 3 (syslog ERROR) when isError is true.
+        The observer sets the level to LogLevel.ERROR when isError is true.
         """
         self.wrapper({'failure': Failure(ValueError()), 'isError': True})
         self.observer.assert_called_once_with(
-            matches(ContainsDict({'level': Equals(3)})))
+            matches(ContainsDict({'level': Equals(LogLevel.ERROR)})))
 
     def test_isError_removes_error_fields(self):
         """
@@ -439,7 +479,7 @@ class ErrorFormatterTests(SynchronousTestCase):
                       'why': 'reason', 'failure': failure})
         self.assertEqual(
             self._formatted_event(),
-            {'message': ('mineyours',), 'level': 3,
+            {'message': ('mineyours',), 'level': LogLevel.ERROR,
              'traceback': failure.getTraceback(),
              'exception_type': 'ValueError'})
 
@@ -517,172 +557,6 @@ class ObserverWrapperTests(SynchronousTestCase):
         self.observer.assert_called_once_with(
             matches(ContainsDict({'line': Equals(10)})))
 
-    def test_generates_new_audit_log(self):
-        """
-        The observer generates two logs for an audit-loggable eventDict -
-        the audit log dictionary and a regular log (passes timestamp and
-        hostname too)
-        """
-        self.wrapper({'message': 'meh', 'audit_log': True, 'time': 1234.0})
-        self.observer.has_calls([
-            mock.call(matches(ContainsDict({'message': Equals('meh'),
-                                            'audit_log': Equals(True),
-                                            '@timestamp': Equals(1234),
-                                            'host': Equals('hostname')}))),
-            mock.call(matches(ContainsDict({
-                'short_message': Equals('meh'),
-                'audit_log_event_source': Equals(True)})))
-        ])
-
-
-class AuditLogFormatterTests(SynchronousTestCase):
-    """
-    Tests the audit log formatter
-    """
-    def test_filters_out_extraneous_fields(self):
-        """
-        audit log formatter filters extraneous fields out of the event dict
-        """
-        self.assertEquals(
-            audit_log_formatter({'message': ('Hello',), 'what': 'the'}, 0,
-                                'hostname'),
-            {
-                '@version': 1,
-                'message': 'Hello',
-                '@timestamp': 0,
-                'host': 'hostname',
-                'is_error': False
-            })
-
-    def test_always_includes_fault_dict_even_if_no_failure(self):
-        """
-        Even if it doesn't include a failure, if it's an error message a
-        fault dictionary will be specified.  is_error will also be True.
-        """
-        self.assertEquals(
-            audit_log_formatter({'message': ('meh',), 'isError': 'yes'}, 0,
-                                'hostname'),
-            {
-                '@version': 1,
-                'message': 'Failed: meh.',
-                '@timestamp': 0,
-                'is_error': True,
-                'host': 'hostname',
-                'fault': {'details': {}}
-            })
-
-    def test_error_formats_why_message(self):
-        """
-        The why message is formatted into the message if it's an error.
-        """
-        self.assertEquals(
-            audit_log_formatter({'message': ('meh',), 'isError': 'yes',
-                                 'why': 'is the sky blue'}, 0,
-                                'hostname'),
-            {
-                '@version': 1,
-                'message': 'Failed: meh. is the sky blue',
-                '@timestamp': 0,
-                'is_error': True,
-                'host': 'hostname',
-                'fault': {'details': {}}
-            })
-
-    def test_error_formats_Exception_message(self):
-        """
-        The error message is formatted into the fault dict if it's an error.
-        """
-        self.assertEquals(
-            audit_log_formatter({'message': ('meh',), 'isError': 'yes',
-                                 'failure': Failure(ValueError('boo'))}, 0,
-                                'hostname'),
-            {
-                '@version': 1,
-                'message': 'Failed: meh.',
-                '@timestamp': 0,
-                'is_error': True,
-                'host': 'hostname',
-                'fault': {'details': {}, 'message': 'boo'}
-            })
-
-    def test_error_keeps_fault_dictionary(self):
-        """
-        The fault dictionary, if included, is not clobbered by the failure
-        """
-        self.assertEquals(
-            audit_log_formatter({'message': ('meh',), 'isError': 'yes',
-                                 'fault': {'details': {'x': 'y'},
-                                           'message': '1'},
-                                 'failure': Failure(ValueError('boo'))}, 0,
-                                'hostname'),
-            {
-                '@version': 1,
-                'message': 'Failed: meh.',
-                '@timestamp': 0,
-                'is_error': True,
-                'host': 'hostname',
-                'fault': {
-                    'message': '1',
-                    'details': {'x': 'y'}
-                }
-            })
-
-    def test_error_updates_fault_details(self):
-        """
-        The details dictionary, if included, does not get clobbered by the
-        errors's details
-        """
-        exc = ValueError('boo')
-        exc.details = {'1': 2, '3': 5}
-        self.assertEquals(
-            audit_log_formatter({'message': ('meh',), 'isError': 'yes',
-                                 'fault': {'details': {'x': 'y'},
-                                           'message': '1'},
-                                 'failure': Failure(exc)}, 0, 'hostname'),
-            {
-                '@version': 1,
-                'message': 'Failed: meh.',
-                '@timestamp': 0,
-                'is_error': True,
-                'host': 'hostname',
-                'fault': {
-                    'message': '1',
-                    'details': {'x': 'y', '1': 2, '3': 5}
-                }
-            })
-
-    def test_error_pulls_some_fault_details_keys_into_main_log(self):
-        """
-        If audit log parameters are in the details dictionary,
-        they are removed.
-
-        If they are valid values, they are pulled out and put in the
-        main audit log, but without clobbering existing values in the
-        main audit log.
-        """
-        exc = ValueError('boo')
-        exc.details = {'1': 2, 'scaling_group_id': '5', 'tenant_id': '1',
-                       'fault': {}, 'policy_id': False}
-        self.assertEquals(
-            audit_log_formatter({'message': ('meh',), 'isError': 'yes',
-                                 'tenant_id': '5',
-                                 'fault': {'details': {'x': 'y'},
-                                           'message': '1'},
-                                 'failure': Failure(exc)}, 0, 'hostname'),
-            {
-                '@version': 1,
-                'message': 'Failed: meh.',
-                '@timestamp': 0,
-                'is_error': True,
-                'scaling_group_id': '5',
-                'tenant_id': '5',
-                'host': 'hostname',
-                'fault': {
-                    'message': '1',
-                    'details': {'x': 'y', '1': 2}
-                }
-            })
-
 
 class ThrottlingWrapperTests(SynchronousTestCase):
     """Tests for :obj:`ThrottlingWrapper`."""
@@ -722,3 +596,97 @@ class ThrottlingWrapperTests(SynchronousTestCase):
             logs,
             [{'message': ('Received Ping',), 'system': 'kazoo',
               'num_duplicate_throttled': 50}])
+
+
+class FanoutObserverTests(SynchronousTestCase):
+    """Tests for :obj:`FanoutObserver`"""
+
+    def test_fanout_single_observer(self):
+        """
+        Fanout observer successfully sends all events if it only has a single
+        subobserver.
+        """
+        messages = [{str(i): 'message'} for i in range(3)]
+        obs = []
+        fanout = FanoutObserver(obs.append)
+        for mess in messages:
+            fanout(mess.copy())
+        self.assertEqual(obs, messages)
+
+    def test_fanout_multiple_observers(self):
+        """
+        More observers can be added to the Fanout observer, which successfully
+        sends all new events to all the sub-observers in its list.
+        """
+        messages = [{str(i): 'message'} for i in range(3)]
+        obs1, obs2 = [], []
+        fanout = FanoutObserver(obs1.append)
+        fanout(messages[0].copy())
+        fanout.add_observer(obs2.append)
+        fanout(messages[1].copy())
+        fanout(messages[2].copy())
+        self.assertEqual(obs1, messages)
+        self.assertEqual(obs2, messages[1:])
+
+    def test_subobservers_do_not_affect_each_other(self):
+        """
+        A subobserver that mutates events will not affect other subobservers.
+        """
+        obs, obs_mutated = [], []
+
+        def mutate(event):
+            event.pop('delete_me', None)
+            event['added'] = 'added'
+            obs_mutated.append(event)
+
+        fanout = FanoutObserver(obs.append)
+        fanout.add_observer(mutate)
+        fanout({'only': 'message', 'delete_me': 'go'})
+
+        self.assertEqual(obs, [{'only': 'message', 'delete_me': 'go'}])
+        self.assertEqual(obs_mutated, [{'only': 'message', 'added': 'added'}])
+
+    def test_global_fanout(self):
+        """
+        Setting and getting and adding to the global fanout observer.
+        """
+        obs1, obs2 = [], []
+        self.assertEqual(get_fanout(), None)
+
+        # add_to_fanout when there is no fanout
+        add_to_fanout(obs1.append)
+        fanout = get_fanout()
+        self.assertEqual(fanout.subobservers, [obs1.append])
+
+        # add_to_fanout when there is already a fanout
+        add_to_fanout(obs2.append)
+        self.assertIs(get_fanout(), fanout)
+        self.assertEqual(fanout.subobservers, [obs1.append, obs2.append])
+
+        # set_fanout
+        set_fanout(None)
+        self.assertEqual(get_fanout(), None)
+
+
+class CFIDWrapperTests(SynchronousTestCase):
+    """
+    Tests for generating a CF ID as an observer/wrapper (:func:`cfid_wrapper`)
+    """
+    def test_add_cf_id_to_cloud_feeds_events(self):
+        """
+        CF event dictionaries have an ID added to them, non-CF events do not.
+        """
+        obs = []
+        id_observer = cf_id_wrapper(obs.append)
+        id_observer({'cloud_feed': True, 'this': 'is a cf event'})
+        id_observer({'this': 'is not a cf event'})
+
+        def hex_repeat(num):
+            return "[a-fA-F0-9]{{{num}}}".format(num=num)
+
+        uuid_regex = "-".join([hex_repeat(i) for i in (8, 4, 4, 4, 12)])
+        self.assertEqual(
+            obs,
+            [{'cloud_feed': True, 'this': 'is a cf event',
+              'cloud_feed_id': matches(MatchesRegex(uuid_regex))},
+             {'this': 'is not a cf event'}])

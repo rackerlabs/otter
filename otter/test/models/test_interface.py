@@ -11,7 +11,7 @@ from otter.json_schema import model_schemas, validate
 from otter.json_schema.group_schemas import launch_config
 from otter.models.interface import (
     GroupState, IScalingGroup, IScalingGroupCollection,
-    IScalingScheduleCollection)
+    IScalingScheduleCollection, ScalingGroupStatus)
 
 
 class GroupStateTestCase(SynchronousTestCase):
@@ -23,10 +23,11 @@ class GroupStateTestCase(SynchronousTestCase):
         repr(GroupState) returns something human readable
         """
         state = GroupState('tid', 'gid', 'name', {'1': {}}, {}, 'date', {},
-                           True, desired=5)
+                           True, ScalingGroupStatus.ACTIVE, desired=5)
         self.assertEqual(
             repr(state),
-            "GroupState(tid, gid, name, 5, {'1': {}}, {}, date, {}, True)")
+            "GroupState(tid, gid, name, 5, {'1': {}}, {}, date, {}, True, "
+            "<ScalingGroupStatus=ACTIVE>)")
 
     def test_default_desired_capacity_is_zero(self):
         """
@@ -34,7 +35,7 @@ class GroupStateTestCase(SynchronousTestCase):
         """
         self.assertEqual(
             GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date',
-                       {}, True).desired,
+                       {}, True, ScalingGroupStatus.ACTIVE).desired,
             0)
 
     def test_two_states_are_equal_if_all_vars_are_equal(self):
@@ -43,15 +44,18 @@ class GroupStateTestCase(SynchronousTestCase):
         equal
         """
         self.assertEqual(
-            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {}, True),
-            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {}, True,
+            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {},
+                       True, ScalingGroupStatus.ACTIVE),
+            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {},
+                       True, ScalingGroupStatus.ACTIVE,
                        now=lambda: 'meh'))
 
     def test_two_states_are_unequal_if_vars_different(self):
         """
         Two groups with any different parameters are unequal
         """
-        args = ('tid', 'gid', 'name', {}, {}, 'date', {}, True)
+        args = ('tid', 'gid', 'name', {}, {}, 'date', {}, True,
+                ScalingGroupStatus.ACTIVE)
 
         def perterb(args, index):
             copy = [arg for arg in args]
@@ -70,19 +74,23 @@ class GroupStateTestCase(SynchronousTestCase):
         """
         The classes of the two objects have to be the same.
         """
-        _GroupState = namedtuple('_GroupState',
-                                 ['tenant_id', 'group_id', 'group_name', 'active', 'pending',
-                                  'group_touched', 'policy_touched', 'paused'])
+        _GroupState = namedtuple(
+            '_GroupState',
+            ['tenant_id', 'group_id', 'group_name', 'active', 'pending',
+             'group_touched', 'policy_touched', 'paused', 'status'])
         self.assertNotEqual(
-            _GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {}, True),
-            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {}, True))
+            _GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {},
+                        True, ScalingGroupStatus.ACTIVE),
+            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {},
+                       True, ScalingGroupStatus.ACTIVE))
 
     def test_group_touched_is_min_if_None(self):
         """
         If a group_touched of None is provided, groupTouched is
         '0001-01-01T00:00:00Z'
         """
-        state = GroupState('tid', 'gid', '', {}, {}, None, {}, False)
+        state = GroupState('tid', 'gid', '', {}, {}, None, {}, False,
+                           ScalingGroupStatus.ACTIVE)
         self.assertEqual(state.group_touched, '0001-01-01T00:00:00Z')
 
     def test_add_job_success(self):
@@ -91,6 +99,7 @@ class GroupStateTestCase(SynchronousTestCase):
         the creation time.
         """
         state = GroupState('tid', 'gid', 'name', {}, {}, None, {}, True,
+                           ScalingGroupStatus.ACTIVE,
                            now=lambda: 'datetime')
         state.add_job('1')
         self.assertEqual(state.pending, {'1': {'created': 'datetime'}})
@@ -100,7 +109,8 @@ class GroupStateTestCase(SynchronousTestCase):
         If the job ID is in the pending list, ``add_job`` raises an
         AssertionError.
         """
-        state = GroupState('tid', 'gid', 'name', {}, {'1': {}}, None, {}, True)
+        state = GroupState('tid', 'gid', 'name', {}, {'1': {}}, None, {}, True,
+                           ScalingGroupStatus.ACTIVE)
         self.assertRaises(AssertionError, state.add_job, '1')
         self.assertEqual(state.pending, {'1': {}})
 
@@ -108,7 +118,8 @@ class GroupStateTestCase(SynchronousTestCase):
         """
         If the job ID is in the pending list, ``remove_job`` removes it.
         """
-        state = GroupState('tid', 'gid', 'name', {}, {'1': {}}, None, {}, True)
+        state = GroupState('tid', 'gid', 'name', {}, {'1': {}}, None, {}, True,
+                           ScalingGroupStatus.ACTIVE)
         state.remove_job('1')
         self.assertEqual(state.pending, {})
 
@@ -117,7 +128,8 @@ class GroupStateTestCase(SynchronousTestCase):
         If the job ID is not in the pending list, ``remove_job`` raises an
         AssertionError.
         """
-        state = GroupState('tid', 'gid', 'name', {}, {}, None, {}, True)
+        state = GroupState('tid', 'gid', 'name', {}, {}, None, {}, True,
+                           ScalingGroupStatus.ACTIVE)
         self.assertRaises(AssertionError, state.remove_job, '1')
         self.assertEqual(state.pending, {})
 
@@ -128,6 +140,7 @@ class GroupStateTestCase(SynchronousTestCase):
         does not already have it.
         """
         state = GroupState('tid', 'gid', 'name', {}, {}, None, {}, True,
+                           ScalingGroupStatus.ACTIVE,
                            now=lambda: 'datetime')
         state.add_active('1', {'stuff': 'here'})
         self.assertEqual(state.active,
@@ -139,6 +152,7 @@ class GroupStateTestCase(SynchronousTestCase):
         with server info, and does not change the server info's creation time.
         """
         state = GroupState('tid', 'gid', 'name', {}, {}, None, {}, True,
+                           ScalingGroupStatus.ACTIVE,
                            now=lambda: 'other_now')
         state.add_active('1', {'stuff': 'here', 'created': 'now'})
         self.assertEqual(state.active,
@@ -149,7 +163,8 @@ class GroupStateTestCase(SynchronousTestCase):
         If the server ID is in the active list, ``add_active`` raises an
         AssertionError.
         """
-        state = GroupState('tid', 'gid', 'name', {'1': {}}, {}, None, {}, True)
+        state = GroupState('tid', 'gid', 'name', {'1': {}}, {}, None, {}, True,
+                           ScalingGroupStatus.ACTIVE)
         self.assertRaises(AssertionError, state.add_active, '1', {'1': '2'})
         self.assertEqual(state.active, {'1': {}})
 
@@ -157,7 +172,8 @@ class GroupStateTestCase(SynchronousTestCase):
         """
         If the server ID is in the active list, ``remove_active`` removes it.
         """
-        state = GroupState('tid', 'gid', 'name', {'1': {}}, {}, None, {}, True)
+        state = GroupState('tid', 'gid', 'name', {'1': {}}, {}, None, {}, True,
+                           ScalingGroupStatus.ACTIVE)
         state.remove_active('1')
         self.assertEqual(state.active, {})
 
@@ -166,7 +182,8 @@ class GroupStateTestCase(SynchronousTestCase):
         If the server ID is not in the active list, ``remove_active`` raises an
         AssertionError.
         """
-        state = GroupState('tid', 'gid', 'name', {}, {}, None, {}, True)
+        state = GroupState('tid', 'gid', 'name', {}, {}, None, {}, True,
+                           ScalingGroupStatus.ACTIVE)
         self.assertRaises(AssertionError, state.remove_active, '1')
         self.assertEqual(state.active, {})
 
@@ -176,7 +193,8 @@ class GroupStateTestCase(SynchronousTestCase):
         same time.
         """
         t = ['0']
-        state = GroupState('tid', 'gid', 'name', {}, {}, 'date', {}, True, now=t.pop)
+        state = GroupState('tid', 'gid', 'name', {}, {}, 'date', {}, True,
+                           ScalingGroupStatus.ACTIVE, now=t.pop)
         state.mark_executed('pid')
         self.assertEqual(state.group_touched, '0')
         self.assertEqual(state.policy_touched, {'pid': '0'})
@@ -189,7 +207,8 @@ class GroupStateTestCase(SynchronousTestCase):
         state = GroupState('tid', 'gid', 'name',
                            {str(i): {} for i in range(5)},
                            {str(i): {} for i in range(6)},
-                           'date', {}, True, now='0')
+                           'date', {}, True, ScalingGroupStatus.ACTIVE,
+                           now='0')
         self.assertEqual(state.get_capacity(), {
             'desired_capacity': 11,
             'pending_capacity': 6,

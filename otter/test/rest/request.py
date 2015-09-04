@@ -292,11 +292,14 @@ class RestAPITestMixin(RequestTestMixin):
         # mock out modify state
         self.mock_state = mock.MagicMock(spec=[])  # so nothing can call it
 
-        def _mock_modify_state(modifier, *args, **kwargs):
-            return defer.maybeDeferred(modifier, self.mock_group, self.mock_state, *args, **kwargs)
+        def _mock_modify_state(modifier, modify_state_reason=None,
+                               *args, **kwargs):
+            return defer.maybeDeferred(
+                modifier, self.mock_group, self.mock_state, *args, **kwargs)
 
         self.mock_group.modify_state.side_effect = _mock_modify_state
-        self.root = Otter(self.mock_store, 'ord').app.resource()
+        self.otter = Otter(self.mock_store, 'ord')
+        self.root = self.otter.app.resource()
 
         # set pagination limits as it'll be used by all rest interfaces
         set_config_data({'limits': {'pagination': 100}, 'url_root': ''})
@@ -308,6 +311,25 @@ class RestAPITestMixin(RequestTestMixin):
         """
         for method in self.invalid_methods:
             self.assert_status_code(405, method=method)
+
+
+def setup_mod_and_trigger(testcase):
+    """
+    Mock `modify_and_trigger` function by calling internal modifier
+
+    :param testcase: test case that is expected to have mocked controller
+        as `mock_controller` attr
+    """
+
+    testcase.otter.dispatcher = "disp"
+
+    def mod_and_trigger(disp, group, la, mod, modify_state_reason=None,
+                        *args, **kwargs):
+        testcase.assertEqual(disp, "disp")
+        return defer.maybeDeferred(
+            mod, testcase.mock_group, testcase.mock_state, *args, **kwargs)
+
+    testcase.mock_controller.modify_and_trigger.side_effect = mod_and_trigger
 
 
 class AdminRestAPITestMixin(RequestTestMixin):

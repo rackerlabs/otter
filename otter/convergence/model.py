@@ -5,9 +5,16 @@ representation across the different phases of convergence.
 import json
 import re
 
+import attr
+from attr.validators import instance_of
+
 from characteristic import Attribute, attributes
 
-from pyrsistent import PSet, freeze, pmap, pset, pvector
+from pyrsistent import PMap, PSet, freeze, pmap, pset, pvector, thaw
+
+from six import string_types
+
+from sumtypes import constructor, sumtype
 
 from toolz.dicttoolz import get_in
 from toolz.itertoolz import groupby
@@ -16,6 +23,7 @@ from twisted.python.constants import NamedConstant, Names
 
 from zope.interface import Attribute as IAttribute, Interface, implementer
 
+from otter.util.fp import set_in
 from otter.util.timestamp import timestamp_to_epoch
 
 
@@ -112,6 +120,14 @@ class StepResult(Names):
     """
 
 
+@sumtype
+class ErrorReason(object):
+    """A reason for a step to be in a RETRY or FAILURE state."""
+    Exception = constructor('exc_info')
+    String = constructor(reason=attr.ib(validator=instance_of((unicode, str))))
+    Structured = constructor('structure')
+
+
 def get_service_metadata(service_name, metadata):
     """
     Obtain all the metadata associated with a particular service from Nova
@@ -130,7 +146,8 @@ def get_service_metadata(service_name, metadata):
             m = key_pattern.match(k)
             if m:
                 subkeys = m.groupdict()['subkeys']
-                as_metadata = as_metadata.set_in(
+                as_metadata = set_in(
+                    as_metadata,
                     [sk for sk in subkeys.split(':') if sk],
                     v)
     return as_metadata
@@ -175,18 +192,22 @@ def _lbs_from_metadata(metadata):
         except (ValueError, KeyError, TypeError):
             pass
 
+    desired_lbs.extend([
+        RCv3Description(lb_id=lb_id) for lb_id in lbs.get('RackConnectV3', {})
+    ])
+
     return pset(desired_lbs)
 
 
-@attributes(['id', 'state', 'created', 'image_id', 'flavor_id',
-             # because type(pvector()) is pvectorc.PVector,
-             # which != pyrsistent.PVector
-             Attribute('links', default_factory=pvector,
-                       instance_of=type(pvector())),
-             Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
-             Attribute('servicenet_address',
-                       default_value='',
-                       instance_of=basestring)])
+def _validate_state(_1, _2, state):
+    """
+    Assert that a state is in ServerState
+    """
+    if state not in ServerState.iterconstants():
+        raise AssertionError("{0} is not a ServerState".format(state))
+
+
+@attr.s(repr=False)
 class NovaServer(object):
     """
     Information about a server that was retrieved from Nova.
@@ -201,14 +222,24 @@ class NovaServer(object):
         the server is on the ServiceNet network
     :ivar str image_id: The ID of the image the server was launched with
     :ivar str flavor_id: The ID of the flavor the server was launched with
-
     :ivar PSet desired_lbs: An immutable mapping of load balancer IDs to lists
         of :class:`CLBDescription` instances.
+    :var dict json: JSON dict received from Nova from which this server
+        is created
     """
-
-    def __init__(self):
-        assert self.state in ServerState.iterconstants(), \
-            "%r is not a ServerState" % (self.state,)
+    id = attr.ib()
+    state = attr.ib(validator=_validate_state)
+    created = attr.ib()
+    image_id = attr.ib()
+    flavor_id = attr.ib()
+    # type(pvector()) is pvectorc.PVector, which != pyrsistent.PVector
+    links = attr.ib(default=attr.Factory(pvector),
+                    validator=instance_of(type(pvector())))
+    desired_lbs = attr.ib(default=attr.Factory(pset),
+                          validator=instance_of(PSet))
+    servicenet_address = attr.ib(default='',
+                                 validator=instance_of(string_types))
+    json = attr.ib(default=attr.Factory(pmap), validator=instance_of(PMap))
 
     @classmethod
     def from_server_details_json(cls, server_json):
@@ -224,6 +255,8 @@ class NovaServer(object):
         :return: :obj:`NovaServer` instance
         """
         server_state = ServerState.lookupByName(server_json['status'])
+        if server_json.get("OS-EXT-STS:task_state", "") == "deleting":
+            server_state = ServerState.DELETED
         metadata = server_json.get('metadata', {})
 
         if (server_state in (ServerState.ACTIVE, ServerState.BUILD) and
@@ -238,7 +271,28 @@ class NovaServer(object):
             flavor_id=server_json['flavor']['id'],
             links=freeze(server_json['links']),
             desired_lbs=_lbs_from_metadata(metadata),
-            servicenet_address=_servicenet_address(server_json))
+            servicenet_address=_servicenet_address(server_json),
+            json=freeze(server_json))
+
+    def __repr__(self):
+        """
+        Make the repr a little more friendly - and with less redundant/unused
+        information.
+        """
+        kvpairs = []
+        # this gives us an ordered list
+        for a in attr.fields(self.__class__):
+            value = thaw(getattr(self, a.name))
+            if a.name == "json":
+                value = {k: v for k, v in value.items() if k in
+                         ('status', 'metadata', 'updated', 'name',
+                          'OS-EXT-STS:task_state')}
+            kvpairs.append("{0}={1}".format(a.name, repr(value)))
+        return "<{0}({1})>".format(self.__class__.__name__, ", ".join(kvpairs))
+
+    def __str__(self):
+        """Return the repr"""
+        return repr(self)
 
 
 def group_id_from_metadata(metadata):
@@ -259,9 +313,6 @@ def generate_metadata(group_id, lb_descriptions):
     Generate autoscale-specific Nova server metadata given the group ID and
     an iterable of :class:`ILBDescription` providers.
 
-    NOTE: Currently this ignores RCv3 settings and draining timeout
-    settings, since they haven't been implemented yet.
-
     :return: a metadata `dict` containing the group ID and LB information
     """
     metadata = {
@@ -277,6 +328,8 @@ def generate_metadata(group_id, lb_descriptions):
             key = 'rax:autoscale:lb:CloudLoadBalancer:{0}'.format(lb_id)
             metadata[key] = json.dumps([
                 {'port': desc.port} for desc in descs])
+        elif desc_type == RCv3Description:
+            metadata['rax:autoscale:lb:RackConnectV3:{0}'.format(lb_id)] = ""
 
     return metadata
 
@@ -476,6 +529,22 @@ class CLBNode(object):
         See :func:`ILBNode.is_active`.
         """
         return self.description.condition != CLBNodeCondition.DISABLED
+
+    @classmethod
+    def from_node_json(cls, lb_id, json):
+        """
+        Create an instance of this class based on node JSON data from the CLB
+        API.
+        """
+        return cls(
+            node_id=str(json['id']),
+            address=json['address'],
+            description=CLBDescription(
+                lb_id=str(lb_id),
+                port=json['port'],
+                weight=json.get('weight', 1),
+                condition=CLBNodeCondition.lookupByName(json['condition']),
+                type=CLBNodeType.lookupByName(json['type'])))
 
 
 @implementer(ILBDescription)

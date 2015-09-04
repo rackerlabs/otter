@@ -6,16 +6,23 @@ import json
 
 from functools import partial
 
-from twisted.internet import defer
+from twisted.internet.defer import gatherResults, succeed
+
+from txeffect import perform
 
 from otter import controller
+from otter.controller import GroupPausedError
 from otter.convergence.composition import tenant_is_enabled
+from otter.effect_dispatcher import get_working_cql_dispatcher
 from otter.json_schema.group_schemas import (
     MAX_ENTITIES,
     validate_launch_config_servicenet,
 )
 from otter.json_schema.rest_schemas import create_group_request
 from otter.log import log
+from otter.log.bound import bound_log_kwargs
+from otter.models.cass import CassScalingGroupServersCache
+from otter.models.interface import ScalingGroupStatus
 from otter.rest.bobby import get_bobby
 from otter.rest.configs import (
     OtterConfig,
@@ -34,7 +41,7 @@ from otter.rest.errors import InvalidMinEntities, exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.rest.policies import OtterPolicies, linkify_policy_list
 from otter.rest.webhooks import _format_webhook
-from otter.supervisor import get_supervisor, remove_server_from_group
+from otter.supervisor import get_supervisor
 from otter.util.config import config_value
 from otter.util.http import (
     get_autoscale_links,
@@ -45,35 +52,43 @@ from otter.util.http import (
 )
 
 
-def format_state_dict(state):
+def format_state_dict(state, active=None):
     """
     Takes a state returned by the model and reformats it to be returned as a
     response.
 
     :param state: a :class:`otter.models.interface.GroupState` object
+    :param dict active: Active servers used when provided
+        instead of state.active
 
     :return: a ``dict`` that looks like what should be respond by the API
         response when getting state
     """
-    if tenant_is_enabled(state.tenant_id, config_value):
+    if active is not None:
         desired = state.desired
-        pending = state.desired - len(state.active)
+        pending = state.desired - len(active)
     else:
         pending = len(state.pending)
         desired = len(state.active) + pending
-    return {
-        'activeCapacity': len(state.active),
+        active = state.active
+    state_json = {
+        'activeCapacity': len(active),
         'pendingCapacity': pending,
         'desiredCapacity': desired,
         'name': state.group_name,
         'paused': state.paused,
+        'status': state.status.name,
         'active': [
             {
                 'id': key,
                 'links': server_blob['links'],
-            } for key, server_blob in state.active.iteritems()
+            } for key, server_blob in active.iteritems()
         ]
     }
+    if state.status == ScalingGroupStatus.ERROR:
+        state_json['errors'] = [
+            {'message': reason} for reason in state.error_reasons]
+    return state_json
 
 
 def extract_bool_arg(request, key, default=False):
@@ -106,11 +121,12 @@ class OtterGroups(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id):
+    def __init__(self, store, tenant_id, dispatcher):
         self.log = log.bind(system='otter.rest.groups',
                             tenant_id=tenant_id)
         self.store = store
         self.tenant_id = tenant_id
+        self.dispatcher = dispatcher
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -173,20 +189,32 @@ class OtterGroups(object):
 
         """
 
-        def format_list(group_states):
+        def format_list(results):
+            group_states, actives = results
             groups = [{
                 'id': state.group_id,
                 'links': get_autoscale_links(state.tenant_id, state.group_id),
-                'state': format_state_dict(state)
-            } for state in group_states]
+                'state': format_state_dict(state, active)
+            } for state, active in zip(group_states, actives)]
             return {
                 "groups": groups,
                 "groups_links": get_groups_links(
                     groups, self.tenant_id, None, **paginate)
             }
 
+        def fetch_active_caches(group_states):
+            if not tenant_is_enabled(self.tenant_id, config_value):
+                return group_states, [None] * len(group_states)
+            d = gatherResults(
+                [get_active_cache(
+                    self.store.reactor, self.store.connection, self.tenant_id,
+                    state.group_id)
+                 for state in group_states])
+            return d.addCallback(lambda cache: (group_states, cache))
+
         deferred = self.store.list_scaling_group_states(
             self.log, self.tenant_id, **paginate)
+        deferred.addCallback(fetch_active_caches)
         deferred.addCallback(format_list)
         deferred.addCallback(json.dumps)
         return deferred
@@ -225,7 +253,6 @@ class OtterGroups(object):
                     "flavorRef": "2",
                     "OS-DCF:diskConfig": "AUTO",
                     "metadata": {
-                      "build_config": "core",
                       "meta_key_1": "meta_value_1",
                       "meta_key_2": "meta_value_2"
                     },
@@ -303,7 +330,6 @@ class OtterGroups(object):
                         }
                       ],
                       "metadata": {
-                        "build_config": "core",
                         "meta_key_1": "meta_value_1",
                         "meta_key_2": "meta_value_2"
                       }
@@ -385,9 +411,15 @@ class OtterGroups(object):
             launch = result['launchConfiguration']
             group = self.store.get_scaling_group(
                 self.log, self.tenant_id, group_id)
-            d = group.modify_state(partial(
-                controller.obey_config_change, self.log,
-                transaction_id(request), config, launch_config=launch))
+            log = self.log.bind(scaling_group_id=group_id)
+            d = controller.modify_and_trigger(
+                self.dispatcher,
+                group,
+                bound_log_kwargs(log),
+                partial(
+                    controller.obey_config_change, log,
+                    transaction_id(request), config, launch_config=launch),
+                modify_state_reason='create_new_scaling_group')
             return d.addCallback(lambda _: result)
 
         deferred.addCallback(_do_obey_config_change)
@@ -424,7 +456,18 @@ class OtterGroups(object):
         Routes requiring a specific group_id are delegated to
         OtterGroup.
         """
-        return OtterGroup(self.store, self.tenant_id, group_id).app.resource()
+        return OtterGroup(self.store, self.tenant_id,
+                          group_id, self.dispatcher).app.resource()
+
+
+def get_active_cache(reactor, connection, tenant_id, group_id):
+    """
+    Get active servers from servers cache table
+    """
+    eff = CassScalingGroupServersCache(tenant_id, group_id).get_servers(True)
+    disp = get_working_cql_dispatcher(reactor, connection)
+    d = perform(disp, eff)
+    return d.addCallback(lambda (servers, _): {s['id']: s for s in servers})
 
 
 class OtterGroup(object):
@@ -433,13 +476,28 @@ class OtterGroup(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, group_id):
+    def __init__(self, store, tenant_id, group_id, dispatcher):
         self.log = log.bind(system='otter.rest.group',
                             tenant_id=tenant_id,
                             scaling_group_id=group_id)
         self.store = store
         self.tenant_id = tenant_id
         self.group_id = group_id
+        self.dispatcher = dispatcher
+
+    def with_active_cache(self, get_func, *args, **kwargs):
+        """
+        Return result of `get_func` and active cache from servers table
+        if this is convergence enabled tenant
+        """
+        if tenant_is_enabled(self.tenant_id, config_value):
+            cache_d = get_active_cache(
+                self.store.reactor, self.store.connection, self.tenant_id,
+                self.group_id)
+        else:
+            cache_d = succeed(None)
+        return gatherResults([get_func(*args, **kwargs), cache_d],
+                             consumeErrors=True)
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -513,33 +571,37 @@ class OtterGroup(object):
             return ('webhooks' in _request.args and
                     _request.args['webhooks'][0].lower() == 'true')
 
-        def add_webhooks_links(policies, gid):
+        def add_webhooks_links(policies):
             for policy in policies:
                 webhook_list = [_format_webhook(webhook_model, self.tenant_id,
-                                                gid, policy['id'])
+                                                self.group_id, policy['id'])
                                 for webhook_model in policy['webhooks']]
                 policy['webhooks'] = webhook_list
                 policy['webhooks_links'] = get_webhooks_links(
                     webhook_list,
                     self.tenant_id,
-                    gid,
+                    self.group_id,
                     policy['id'],
                     rel='webhooks')
 
-        def openstack_formatting(data, uuid):
-            data["links"] = get_autoscale_links(self.tenant_id, uuid)
-            data["state"] = format_state_dict(data["state"])
-            linkify_policy_list(data["scalingPolicies"], self.tenant_id, uuid)
+        def openstack_formatting(results):
+            data, active = results
+            data["links"] = get_autoscale_links(self.tenant_id, self.group_id)
+            data["state"] = format_state_dict(data["state"], active)
+            linkify_policy_list(
+                data["scalingPolicies"], self.tenant_id, self.group_id)
             data['scalingPolicies_links'] = get_policies_links(
-                data['scalingPolicies'], self.tenant_id, uuid, rel='policies')
+                data['scalingPolicies'], self.tenant_id, self.group_id,
+                rel='policies')
             if with_webhooks(request):
-                add_webhooks_links(data["scalingPolicies"], uuid)
+                add_webhooks_links(data["scalingPolicies"])
             return {"group": data}
 
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.group_id)
-        deferred = group.view_manifest(with_webhooks=with_webhooks(request))
-        deferred.addCallback(openstack_formatting, group.uuid)
+        deferred = self.with_active_cache(
+            group.view_manifest, with_webhooks=with_webhooks(request))
+        deferred.addCallback(openstack_formatting)
         deferred.addCallback(json.dumps)
         return deferred
 
@@ -556,42 +618,9 @@ class OtterGroup(object):
         """
         group = self.store.get_scaling_group(self.log, self.tenant_id,
                                              self.group_id)
-        force = False
-        try:
-            force_arg = request.args.get('force')[0].lower()
-            if force_arg == 'true':
-                force = True
-            else:
-                return defer.fail(InvalidQueryArgument(
-                    'Invalid query argument for "limit"'))
-        except (IndexError, TypeError):
-            # There is no argument
-            pass
-        if force:
-            d = group.view_manifest(with_policies=False)
-
-            def update_config(group_info):
-                group_info['groupConfiguration']['minEntities'] = 0
-                group_info['groupConfiguration']['maxEntities'] = 0
-                du = group.update_config(group_info['groupConfiguration'])
-                return du.addCallback(lambda _: group_info)
-
-            d.addCallback(update_config)
-
-            def modify_state(group_info):
-                d = group.modify_state(
-                    partial(
-                        controller.obey_config_change,
-                        self.log,
-                        transaction_id(request),
-                        group_info['groupConfiguration'],
-                        launch_config=group_info['launchConfiguration']))
-                return d
-            d.addCallback(modify_state)
-
-            return d.addCallback(lambda _: group.delete_group())
-        else:
-            return group.delete_group()
+        force = extract_bool_arg(request, 'force', False)
+        return controller.delete_group(
+            self.dispatcher, log, transaction_id(request), group, force)
 
     @app.route('/state/', methods=['GET'])
     @with_transaction_id()
@@ -620,15 +649,41 @@ class OtterGroup(object):
                 }
             }
         """
-        def _format_and_stackify(state):
-            return {"group": format_state_dict(state)}
+        def _format_and_stackify(results):
+            state, active = results
+            return {"group": format_state_dict(state, active)}
 
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.group_id)
-        deferred = group.view_state()
+        deferred = self.with_active_cache(group.view_state)
         deferred.addCallback(_format_and_stackify)
         deferred.addCallback(json.dumps)
         return deferred
+
+    @app.route('/converge/', methods=['POST'])
+    @with_transaction_id()
+    @fails_with(exception_codes)
+    @succeeds_with(204)
+    def converge_scaling_group(self, request):
+        """
+        Trigger convergence on given scaling group
+        """
+
+        def is_group_paused(group, state):
+            if state.paused:
+                raise GroupPausedError(group.tenant_id, group.uuid, "converge")
+            return state
+
+        if tenant_is_enabled(self.tenant_id, config_value):
+            group = self.store.get_scaling_group(
+                self.log, self.tenant_id, self.group_id)
+            return controller.modify_and_trigger(
+                self.dispatcher,
+                group,
+                bound_log_kwargs(log),
+                is_group_paused)
+        else:
+            request.setResponseCode(404)
 
     @app.route('/pause/', methods=['POST'])
     @with_transaction_id()
@@ -643,7 +698,7 @@ class OtterGroup(object):
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.group_id)
         return controller.pause_scaling_group(
-            self.log, transaction_id(request), group)
+            self.log, transaction_id(request), group, self.dispatcher)
 
     @app.route('/resume/', methods=['POST'])
     @with_transaction_id()
@@ -658,14 +713,15 @@ class OtterGroup(object):
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.group_id)
         return controller.resume_scaling_group(
-            self.log, transaction_id(request), group)
+            self.log, transaction_id(request), group, self.dispatcher)
 
     @app.route('/servers/', branch=True)
     def servers(self, request):
         """
         servers/ route handling
         """
-        servers = OtterServers(self.store, self.tenant_id, self.group_id)
+        servers = OtterServers(self.store, self.tenant_id, self.group_id,
+                               self.dispatcher)
         return servers.app.resource()
 
     @app.route('/config/')
@@ -673,7 +729,8 @@ class OtterGroup(object):
         """
         config route handled by OtterConfig
         """
-        config = OtterConfig(self.store, self.tenant_id, self.group_id)
+        config = OtterConfig(self.store, self.tenant_id, self.group_id,
+                             self.dispatcher)
         return config.app.resource()
 
     @app.route('/launch/')
@@ -689,7 +746,8 @@ class OtterGroup(object):
         """
         policies routes handled by OtterPolicies
         """
-        policies = OtterPolicies(self.store, self.tenant_id, self.group_id)
+        policies = OtterPolicies(self.store, self.tenant_id, self.group_id,
+                                 self.dispatcher)
         return policies.app.resource()
 
 
@@ -699,13 +757,14 @@ class OtterServers(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, scaling_group_id):
+    def __init__(self, store, tenant_id, scaling_group_id, dispatcher):
         self.log = log.bind(system='otter.rest.group.servers',
                             tenant_id=tenant_id,
                             scaling_group_id=scaling_group_id)
         self.store = store
         self.tenant_id = tenant_id
         self.scaling_group_id = scaling_group_id
+        self.dispatcher = dispatcher
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -738,10 +797,16 @@ class OtterServers(object):
         """
         group = self.store.get_scaling_group(
             self.log, self.tenant_id, self.scaling_group_id)
-        d = group.modify_state(
-            partial(remove_server_from_group,
-                    self.log.bind(server_id=server_id),
+        log = self.log.bind(server_id=server_id)
+        d = controller.modify_and_trigger(
+            self.dispatcher,
+            group,
+            bound_log_kwargs(log),
+            partial(controller.remove_server_from_group,
+                    self.dispatcher,
+                    log,
                     transaction_id(request), server_id,
                     extract_bool_arg(request, 'replace', True),
-                    extract_bool_arg(request, 'purge', True)))
+                    extract_bool_arg(request, 'purge', True)),
+            modify_state_reason='delete_server')
         return d

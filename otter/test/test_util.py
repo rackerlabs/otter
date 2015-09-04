@@ -91,7 +91,8 @@ class HTTPUtilityTests(SynchronousTestCase):
         body, and HTTP headers, and will expose these in public attributes and
         have a reasonable string representation.
         """
-        e = APIError(404, "Not Found.", Headers({'header': ['value']}))
+        e = APIError(404, "Not Found.", Headers({'header': ['value']}),
+                     'GET', 'http://myurl.com')
 
         self.assertEqual(e.code, 404)
         self.assertEqual(e.body, "Not Found.")
@@ -99,22 +100,24 @@ class HTTPUtilityTests(SynchronousTestCase):
         self.assertEqual(
             str(e),
             ("API Error code=404, body='Not Found.', "
-             "headers=Headers({'header': ['value']})"))
+             "headers=Headers({'header': ['value']}) (GET http://myurl.com)"))
 
     def test_api_error_with_Nones(self):
         """
         An APIError will be instantiated with an HTTP Code, an HTTP response
         body, and HTTP headers, and will expose these in public attributes and
-        have a reasonable string representation even if the body and headers
-        are None.
+        have a reasonable string representation even if the body, headers,
+        method, and url are not provided.
         """
         e = APIError(404, None)
 
         self.assertEqual(e.code, 404)
         self.assertEqual(e.body, None)
         self.assertEqual(e.headers, None)
-        self.assertEqual(str(e),
-                         ("API Error code=404, body=None, headers=None"))
+        self.assertEqual(
+            str(e),
+            "API Error code=404, body=None, headers=None (no_method no_url)"
+        )
 
     def test_check_success(self):
         """
@@ -265,7 +268,7 @@ class UpstreamErrorTests(SynchronousTestCase):
         body = json.dumps({"computeFault": {"message": "b"}})
         apie = APIError(404, body, {})
         err = UpstreamError(Failure(apie), 'nova', 'add', 'xkcd.com')
-        self.assertEqual(str(err), 'nova error: 404 - b')
+        self.assertEqual(str(err), 'nova error: 404 - b (add)')
         self.assertEqual(err.details, {
             'system': 'nova', 'operation': 'add', 'url': 'xkcd.com',
             'message': 'b', 'code': 404, 'body': body, 'headers': {}})
@@ -277,7 +280,7 @@ class UpstreamErrorTests(SynchronousTestCase):
         body = json.dumps({"message": "b"})
         apie = APIError(403, body, {'h1': 2})
         err = UpstreamError(Failure(apie), 'clb', 'remove', 'xkcd.com')
-        self.assertEqual(str(err), 'clb error: 403 - b')
+        self.assertEqual(str(err), 'clb error: 403 - b (remove)')
         self.assertEqual(err.details, {
             'system': 'clb', 'operation': 'remove', 'url': 'xkcd.com',
             'message': 'b', 'code': 403, 'body': body, 'headers': {'h1': 2}})
@@ -289,30 +292,34 @@ class UpstreamErrorTests(SynchronousTestCase):
         body = json.dumps({"identityFault": {"message": "ba"}})
         apie = APIError(410, body, {})
         err = UpstreamError(Failure(apie), 'identity', 'stuff', 'xkcd.com')
-        self.assertEqual(str(err), 'identity error: 410 - ba')
+        self.assertEqual(str(err), 'identity error: 410 - ba (stuff)')
         self.assertEqual(err.details, {
             'system': 'identity', 'operation': 'stuff', 'url': 'xkcd.com',
             'message': 'ba', 'code': 410, 'body': body, 'headers': {}})
 
     def test_apierror_unparsed(self):
         """
-        Wraps APIError from identity and uses default string if unable to parses
-        error body
+        Wraps APIError from identity and uses default string if unable to
+        parse error body
         """
         body = json.dumps({"identityFault": {"m": "ba"}})
         apie = APIError(410, body, {})
         err = UpstreamError(Failure(apie), 'identity', 'stuff', 'xkcd.com')
-        self.assertEqual(str(err), 'identity error: 410 - Could not parse API error body')
+        self.assertEqual(
+            str(err),
+            'identity error: 410 - Could not parse API error body (stuff)')
         self.assertEqual(err.details, {
             'system': 'identity', 'operation': 'stuff', 'url': 'xkcd.com',
-            'message': 'Could not parse API error body', 'code': 410, 'body': body, 'headers': {}})
+            'message': 'Could not parse API error body', 'code': 410,
+            'body': body, 'headers': {}})
 
     def test_non_apierror(self):
         """
         Wraps any other error and has message and details accordingly
         """
-        err = UpstreamError(Failure(ValueError('heh')), 'identity', 'stuff', 'xkcd.com')
-        self.assertEqual(str(err), 'identity error: heh')
+        err = UpstreamError(Failure(ValueError('heh')), 'identity',
+                            'stuff', 'xkcd.com')
+        self.assertEqual(str(err), 'identity error: heh (stuff)')
         self.assertEqual(err.details, {
             'system': 'identity', 'operation': 'stuff', 'url': 'xkcd.com'})
 
@@ -412,6 +419,29 @@ class TimestampTests(SynchronousTestCase):
         self.assertEqual(
             timestamp.epoch_to_utctimestr(0), '1970-01-01T00:00:00Z')
 
+    def test_timestamp_to_epoch(self):
+        """
+        ``timestamp_to_epoch`` returns an epoch as a float with microseconds.
+        """
+        self.assertEqual(
+            timestamp.timestamp_to_epoch('1970-01-01T00:00:00Z'),
+            0.0)
+        self.assertEqual(
+            timestamp.timestamp_to_epoch('2015-05-01T04:51:12.078580Z'),
+            1430455872.078580)
+
+    def test_datetime_to_epoch(self):
+        """
+        `datetime_to_epoch` returns EPOCH seconds for given datetime
+        """
+        self.assertEqual(
+            timestamp.datetime_to_epoch(datetime(1970, 1, 1, 0, 0, 0)),
+            0.0)
+        self.assertEqual(
+            timestamp.datetime_to_epoch(
+                datetime(2015, 5, 1, 4, 51, 12, 78580)),
+            1430455872.078580)
+
 
 class ConfigTest(SynchronousTestCase):
     """
@@ -477,6 +507,12 @@ class WithLockTests(SynchronousTestCase):
 
         self.reactor = Clock()
         self.log = mock_log()
+        self.log_fields = {'lock': self.lock, 'locked_func': self.method}
+
+        # This is shared between multiple tests, and used in negative
+        # assertions. Centralizing the definition means that if the message
+        # changes the negative assertions will also be updated.
+        self.too_long_message = "Lock held for more than 120 seconds!"
 
     def test_acquire_release(self):
         """
@@ -484,22 +520,34 @@ class WithLockTests(SynchronousTestCase):
         """
         d = with_lock(self.reactor, self.lock, self.method, self.log)
         self.assertNoResult(d)
-        self.log.msg.assert_called_once_with('Starting lock acquisition')
-
+        self.log.msg.assert_called_once_with(
+            'Starting lock acquisition', lock_status='Acquiring',
+            **self.log_fields)
         self.reactor.advance(10)
         self.acquire_d.callback(None)
-        self.log.msg.assert_called_with('Lock acquisition in 10.0 seconds',
-                                        acquire_time=10.0)
+        self.log.msg.assert_called_with(
+            'Lock acquisition in 10.0 seconds',
+            lock_status='Acquired', acquire_time=10.0, **self.log_fields)
         self.method.assert_called_once_with()
         self.method_d.callback('result')
 
-        self.log.msg.assert_called_with('Starting lock release')
+        self.log.msg.assert_called_with(
+            'Starting lock release', lock_status='Releasing',
+            **self.log_fields)
         self.reactor.advance(3)
         self.release_d.callback(None)
-        self.log.msg.assert_called_with('Lock release in 3.0 seconds',
-                                        release_time=3.0)
+        self.log.msg.assert_called_with(
+            'Lock release in 3.0 seconds',
+            release_time=3.0, lock_status='Released', **self.log_fields)
 
         self.assertEqual(self.successResultOf(d), 'result')
+
+        # And since the release successfully happened, the "held too long" log
+        # message will _not_ be emitted
+        self.reactor.advance(120)
+        self.assertNotIn(
+            self.too_long_message,
+            (call[1][0] for call in self.log.msg.mock_calls))
 
     def test_acquire_release_no_log(self):
         """
@@ -524,11 +572,15 @@ class WithLockTests(SynchronousTestCase):
         """
         d = with_lock(self.reactor, self.lock, self.method, self.log)
         self.assertNoResult(d)
-        self.log.msg.assert_called_once_with('Starting lock acquisition')
+        self.log.msg.assert_called_once_with(
+            'Starting lock acquisition', lock_status='Acquiring',
+            **self.log_fields)
 
         self.reactor.advance(10)
         self.acquire_d.errback(ValueError(None))
-        self.log.msg.assert_called_with('Lock acquisition failed in 10.0 seconds')
+        self.log.msg.assert_called_with(
+            'Lock acquisition failed in 10.0 seconds', lock_status='Failed',
+            **self.log_fields)
         self.assertFalse(self.method.called)
         self.failureResultOf(d, ValueError)
 
@@ -541,20 +593,27 @@ class WithLockTests(SynchronousTestCase):
 
         d = with_lock(self.reactor, self.lock, self.method, self.log)
         self.assertNoResult(d)
-        self.log.msg.assert_called_once_with('Starting lock acquisition')
+        self.log.msg.assert_called_once_with(
+            'Starting lock acquisition', lock_status='Acquiring',
+            **self.log_fields)
 
         self.reactor.advance(10)
         self.acquire_d.callback(None)
         self.assertEqual(
             self.log.msg.mock_calls[-2:],
-            [mock.call('Lock acquisition in 10.0 seconds', acquire_time=10.0),
-             mock.call('Starting lock release')])
+            [mock.call('Lock acquisition in 10.0 seconds',
+                       acquire_time=10.0, lock_status='Acquired',
+                       **self.log_fields),
+             mock.call('Starting lock release', lock_status='Releasing',
+                       **self.log_fields)])
         self.method.assert_called_once_with()
 
         self.reactor.advance(3)
         self.release_d.callback(None)
         self.log.msg.assert_called_with('Lock release in 3.0 seconds',
-                                        release_time=3.0)
+                                        release_time=3.0,
+                                        lock_status='Released',
+                                        **self.log_fields)
 
         self.failureResultOf(d, ValueError)
 
@@ -565,12 +624,17 @@ class WithLockTests(SynchronousTestCase):
         d = with_lock(self.reactor, self.lock, self.method, self.log,
                       acquire_timeout=9)
         self.assertNoResult(d)
-        self.log.msg.assert_called_once_with('Starting lock acquisition')
+        self.log.msg.assert_called_once_with(
+            'Starting lock acquisition', lock_status='Acquiring',
+            **self.log_fields)
 
         self.reactor.advance(10)
         f = self.failureResultOf(d, TimedOutError)
-        self.assertEqual(f.value.message, 'Lock acquisition timed out after 9 seconds.')
-        self.log.msg.assert_called_with('Lock acquisition failed in 10.0 seconds')
+        self.assertEqual(f.value.message,
+                         'Lock acquisition timed out after 9 seconds.')
+        self.log.msg.assert_called_with(
+            'Lock acquisition failed in 10.0 seconds', lock_status='Failed',
+            **self.log_fields)
 
         self.assertFalse(self.method.called)
         self.assertFalse(self.lock.release.called)
@@ -589,7 +653,19 @@ class WithLockTests(SynchronousTestCase):
 
         self.reactor.advance(10)
         f = self.failureResultOf(d, TimedOutError)
-        self.assertEqual(f.value.message, 'Lock release timed out after 9 seconds.')
+        self.assertEqual(f.value.message,
+                         'Lock release timed out after 9 seconds.')
+
+    def test_held_too_long(self):
+        """When the lock is held for some time, a log message is emitted."""
+        d = with_lock(self.reactor, self.lock, self.method, self.log)
+        self.assertNoResult(d)
+        self.acquire_d.callback(None)
+        self.method.assert_called_once_with()
+        self.reactor.advance(120)
+        self.log.msg.assert_called_with(
+            self.too_long_message,
+            isError=True, lock_status='Acquired', **self.log_fields)
 
 
 class DelayTests(SynchronousTestCase):

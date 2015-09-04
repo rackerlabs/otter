@@ -6,9 +6,13 @@ import json
 
 from copy import deepcopy
 
+from datetime import datetime
+
 from jsonschema import ValidationError
 
 import mock
+
+from silverberg.client import CQLClient, ConsistencyLevel
 
 from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
@@ -27,6 +31,7 @@ from otter.models.interface import (
     GroupNotEmptyError,
     GroupState,
     NoSuchScalingGroupError,
+    ScalingGroupStatus,
 )
 from otter.rest import groups
 from otter.rest.bobby import set_bobby
@@ -37,7 +42,8 @@ from otter.supervisor import (
     ServerNotFoundError,
     set_supervisor,
 )
-from otter.test.rest.request import DummyException, RestAPITestMixin
+from otter.test.rest.request import (
+    DummyException, RestAPITestMixin, setup_mod_and_trigger)
 from otter.test.utils import IsBoundWith, matches, patch
 from otter.util.config import set_config_data
 from otter.worker.validate_config import InvalidLaunchConfiguration
@@ -51,7 +57,21 @@ class FormatterHelpers(SynchronousTestCase):
         """
         Patch url root
         """
-        patch(self, 'otter.util.http.get_url_root', return_value="")
+        set_config_data({'url_root': 'root'})
+        self.addCleanup(set_config_data, None)
+
+    def links(self, server_id):
+        return [
+            {'href': 'https://root/servers/{}'.format(server_id),
+             'rel': 'self'},
+            {'href': 'https://root/servers/{}'.format(server_id),
+             'rel': 'bookmark'}
+        ]
+
+    def format(self, state, active=None):
+        formatted = format_state_dict(state, active)
+        validate(formatted, rest_schemas.group_state['properties']['group'])
+        return formatted
 
     def test_format_state_dict_has_active_and_pending(self):
         """
@@ -64,14 +84,14 @@ class FormatterHelpers(SynchronousTestCase):
         active server links and ids.
         """
         active = {
-            '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
-            '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
-            '3': {'name': 'n3', 'links': ['links3'], 'created': 't'}}
+            '1': {'name': 'n1', 'links': self.links('1'), 'created': 't'},
+            '2': {'name': 'n2', 'links': self.links('2'), 'created': 't'},
+            '3': {'name': 'n3', 'links': self.links('3'), 'created': 't'}}
         pending = {
             'j1': {'created': 't'},
             'j2': {'created': 't'},
             'j3': {'created': 't'}}
-        translated = format_state_dict(
+        translated = self.format(
             GroupState(
                 '11111',
                 'one',
@@ -80,7 +100,8 @@ class FormatterHelpers(SynchronousTestCase):
                 pending,
                 None,
                 {},
-                True)
+                True,
+                ScalingGroupStatus.ACTIVE)
         )
 
         # sort so it can be compared
@@ -88,48 +109,69 @@ class FormatterHelpers(SynchronousTestCase):
 
         self.assertEqual(translated, {
             'active': [
-                {'id': '1', 'links': ['links1']},
-                {'id': '2', 'links': ['links2']},
-                {'id': '3', 'links': ['links3']}
+                {'id': '1', 'links': self.links('1')},
+                {'id': '2', 'links': self.links('2')},
+                {'id': '3', 'links': self.links('3')}
             ],
             'name': 'test',
             'activeCapacity': 3,
             'pendingCapacity': 3,
             'desiredCapacity': 6,
-            'paused': True
+            'paused': True,
+            'status': 'ACTIVE'
         })
 
-    @mock.patch('otter.rest.groups.config_value')
-    def test_format_state_dict_with_convergence(self, config_value):
+    def test_format_state_dict_with_active(self):
         """
-        When convergence is enabled for a tenant, the returned desiredCapacity
+        If active is passed then the returned desiredCapacity
         is based on the stored `desired` in the group state, and the pending
-        capacity is desired from the desired and active servers.
+        capacity is got from the desired and active list provided
         """
-        config_value.side_effect = {'convergence-tenants': ['11111']}.get
         active = {
-            '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
-            '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
-            '3': {'name': 'n3', 'links': ['links3'], 'created': 't'}}
+            '1': {'name': 'n1', 'links': self.links('1'), 'created': 't'},
+            '2': {'name': 'n2', 'links': self.links('2'), 'created': 't'},
+            '3': {'name': 'n3', 'links': self.links('3'), 'created': 't'}}
         state = GroupState(
             '11111',
             'one',
             'test',
-            active,
-            {},  # Ignored!
+            None,  # active ignored
+            None,  # pending Ignored!
             None,
             {},
             True,
+            ScalingGroupStatus.ACTIVE,
             desired=10)
-        result = format_state_dict(state)
+        result = self.format(state, active)
         self.assertEqual(result['desiredCapacity'], 10)
         self.assertEqual(result['pendingCapacity'], 7)
+        self.assertNotIn('errors', result)
 
-        # And a non-convergence tenant still gets old-style data
-        state.tenant_id = '11112'
-        result = format_state_dict(state)
-        self.assertEqual(result['desiredCapacity'], 3)
-        self.assertEqual(result['pendingCapacity'], 0)
+    def test_format_state_different_status(self):
+        """
+        When a group's status is something other than ACTIVE, it's reflected in
+        the output. "errors" is formatted as list of {"message": ..} dicts
+        """
+        active = {
+            '1': {'name': 'n1', 'links': self.links('1'), 'created': 't'},
+            '2': {'name': 'n2', 'links': self.links('2'), 'created': 't'},
+            '3': {'name': 'n3', 'links': self.links('3'), 'created': 't'}}
+        state = GroupState(
+            '11111',
+            'one',
+            'test',
+            None,  # active ignored
+            None,  # pending Ignored!
+            None,
+            {},
+            True,
+            ScalingGroupStatus.ERROR,
+            desired=10,
+            error_reasons=['wat', 'noo'])
+        result = self.format(state, active)
+        self.assertEqual(result['status'], 'ERROR')
+        self.assertEqual(
+            result['errors'], [{'message': 'wat'}, {'message': 'noo'}])
 
 
 class ExtractBoolArgTests(SynchronousTestCase):
@@ -184,6 +226,33 @@ class ExtractBoolArgTests(SynchronousTestCase):
              '"true" or "false". Defaults to "false" if not provided'))
 
 
+class GetActiveCacheTests(SynchronousTestCase):
+    """
+    Tests for :func:`get_active_cache`
+    """
+
+    def test_success(self):
+        """
+        Returns servers as dict keyed on id
+        """
+        connection = mock.Mock(spec=CQLClient)
+        dt = datetime(1970, 1, 1)
+        connection.execute.return_value = defer.succeed(
+            [{'server_blob': json.dumps({'id': 's1', 'links': 's1l'}),
+              'last_update': dt, 'server_as_active': True},
+             {'server_blob': json.dumps({'id': 's2', 'links': 's2l'}),
+              'last_update': dt, 'server_as_active': True}])
+
+        d = groups.get_active_cache('reactor', connection, 'tid', 'gid')
+        self.assertEqual(
+            self.successResultOf(d),
+            {'s1': {'id': 's1', 'links': 's1l'},
+             's2': {'id': 's2', 'links': 's2l'}})
+        connection.execute.assert_called_once_with(
+            mock.ANY, {"tenantId": "tid", "groupId": "gid"},
+            ConsistencyLevel.QUORUM)
+
+
 class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
     """
     Tests for ``/{tenantId}/groups/`` endpoints (create, list)
@@ -197,6 +266,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         super(AllGroupsEndpointTestCase, self).setUp()
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
+        setup_mod_and_trigger(self)
 
         # Patch supervisor
         self.supervisor = mock.Mock(spec=['validate_launch_config'])
@@ -274,8 +344,10 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         list of states that are all formatted
         """
         states = [
-            GroupState('11111', '2', '', {}, {}, None, {}, False),
-            GroupState('11111', '2', '', {}, {}, None, {}, False)
+            GroupState('11111', '2', '', {}, {}, None, {}, False,
+                       ScalingGroupStatus.ACTIVE),
+            GroupState('11111', '2', '', {}, {}, None, {}, False,
+                       ScalingGroupStatus.ACTIVE)
         ]
 
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(
@@ -285,7 +357,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_store.list_scaling_group_states.assert_called_once_with(
             mock.ANY, '11111', limit=100)
 
-        mock_format.assert_has_calls([mock.call(state) for state in states])
+        mock_format.assert_has_calls(
+            [mock.call(state, None) for state in states])
         self.assertEqual(len(mock_format.mock_calls), 2)
 
     @mock.patch('otter.rest.groups.get_autoscale_links',
@@ -296,7 +369,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         so long as format returns the right value
         """
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(
-            [GroupState('11111', '1', '', {}, {1: {}}, None, {}, False)]
+            [GroupState('11111', '1', '', {}, {1: {}}, None, {}, False,
+                        ScalingGroupStatus.ACTIVE)]
         )
 
         body = self.assert_status_code(200)
@@ -312,11 +386,39 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
                     'activeCapacity': 0,
                     'pendingCapacity': 1,
                     'desiredCapacity': 1,
-                    'paused': False
+                    'paused': False,
+                    'status': 'ACTIVE'
                 }
             }],
             "groups_links": []
         })
+
+    @mock.patch('otter.rest.groups.get_active_cache')
+    def test_list_group_convergence(self, mock_gac):
+        """
+        ``list_all_scaling_groups`` returns state that has active servers
+        taken from servers cache table
+        """
+        set_config_data({'convergence-tenants': ['11111'], 'url_root': 'root'})
+        self.addCleanup(set_config_data, None)
+
+        mock_gac.return_value = defer.succeed({'s1': {'links': 'l'}})
+        self.mock_store.connection = 'connection'
+        self.mock_store.reactor = 'reactor'
+
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed(
+            [GroupState('11111', 'one', '1', None, None, None, {}, False,
+                        ScalingGroupStatus.ACTIVE, desired=2)]
+        )
+
+        body = self.assert_status_code(200)
+        resp = json.loads(body)
+        self.assertEqual(resp['groups'][0]['state']['activeCapacity'], 1)
+        self.assertEqual(resp['groups'][0]['state']['pendingCapacity'], 1)
+        self.assertEqual(resp['groups'][0]['state']['active'],
+                         [{'id': 's1', 'links': 'l'}])
+        mock_gac.assert_called_once_with(
+            'reactor', 'connection', '11111', 'one')
 
     def test_list_group_passes_limit_query(self):
         """
@@ -356,7 +458,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         The "next" link should be formatted as link json with the rel 'next'
         """
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(
-            [GroupState('11111', 'one', 'test', {}, {}, None, {}, True)]
+            [GroupState('11111', 'one', 'test', {}, {}, None, {}, True,
+                        ScalingGroupStatus.ACTIVE)]
         )
         response_body = self.assert_status_code(
             200, endpoint="{0}?limit=1".format(self.endpoint))
@@ -377,7 +480,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'launchConfiguration': 'launch',
             'scalingPolicies': [],
             'id': '1',
-            'state': GroupState('11111', '2', '', {}, {}, None, {}, False)
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE)
         })
         self.assert_status_code(400, None, 'POST', '{')
         self.flushLoggedErrors(InvalidJsonError)
@@ -407,7 +511,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'launchConfiguration': 'launch',
             'scalingPolicies': [],
             'id': '1',
-            'state': GroupState('11111', '2', '', {}, {}, None, {}, False)
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE)
         })
         response_body = self.assert_status_code(400, None, 'POST', '{}')
         self.flushLoggedErrors(ValidationError)
@@ -454,7 +559,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'groupConfiguration': expected_config,
             'launchConfiguration': launch_examples()[0],
             'id': '1',
-            'state': GroupState('11111', '2', '', {}, {}, None, {}, False),
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE),
             'scalingPolicies': []
         }
 
@@ -481,7 +587,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         config = request_body['groupConfiguration']
         launch = request_body['launchConfiguration']
         policies = request_body.get('scalingPolicies', [])
-        state = GroupState('11111', '1', '', {}, {}, None, {}, False)
+        state = GroupState('11111', '1', '', {}, {}, None, {}, False,
+                           ScalingGroupStatus.ACTIVE)
 
         expected_config = config.copy()
         expected_config.setdefault('maxEntities', MAX_ENTITIES)
@@ -617,17 +724,23 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             manifest)
         self._test_successful_create(manifest)
 
-        self.mock_group.modify_state.assert_called_once_with(mock.ANY)
+        self.mock_controller.modify_and_trigger.assert_called_once_with(
+            "disp", self.mock_group,
+            dict(tenant_id="11111", scaling_group_id="1",
+                 transaction_id="transaction-id",
+                 system="otter.rest.groups.create_new_scaling_group"),
+            mock.ANY,
+            modify_state_reason='create_new_scaling_group')
         self.mock_controller.obey_config_change.assert_called_once_with(
             mock.ANY, "transaction-id", expected_config, self.mock_group,
             self.mock_state, launch_config=launch)
 
-    def test_create_group_propagates_modify_state_errors(self):
+    def test_create_group_propagates_modify_trigger_errors(self):
         """
-        If there is an error when modify state is called, even if the group
-        creation succeeds, a 500 is returned.
+        If there is an error when modify_and_trigger is called, even if the
+        group creation succeeds, a 500 is returned.
         """
-        self.mock_group.modify_state.side_effect = AssertionError
+        self.mock_controller.modify_and_trigger.side_effect = AssertionError
         config = config_examples()[0]
         launch = launch_examples()[0]
 
@@ -661,7 +774,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'groupConfiguration': config,
             'launchConfiguration': expected_launch,
             'id': '1',
-            'state': GroupState('11111', '2', '', {}, {}, None, {}, False),
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE),
             'scalingPolicies': []
         }
 
@@ -698,6 +812,7 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
         set_config_data({'url_root': ''})
         self.addCleanup(set_config_data, {})
+        setup_mod_and_trigger(self)
 
         # Patch supervisor
         supervisor = mock.Mock(spec=['validate_launch_config'])
@@ -740,7 +855,8 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'launchConfiguration': launch,
             'scalingPolicies': policies,
             'id': '1',
-            'state': GroupState('11111', '1', '', {}, {}, None, {}, False)
+            'state': GroupState('11111', '1', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE)
         }
 
         self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
@@ -768,6 +884,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         Set the uuid of the group to "one"
         """
         super(OneGroupTestCase, self).setUp()
+        self.mock_controller = patch(self, 'otter.rest.groups.controller')
+        setup_mod_and_trigger(self)
         self.mock_group.uuid = "one"
 
     def test_view_manifest_404(self):
@@ -797,7 +915,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         policies = [dict(id="5", **policy_examples()[0])]
         manifest = {
             'id': 'one',
-            'state': GroupState('11111', '1', '', {}, {}, None, {}, False),
+            'state': GroupState('11111', '1', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE),
             'scalingPolicies': policies
         }
         self.mock_group.view_manifest.return_value = defer.succeed(manifest)
@@ -816,7 +935,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             'groupConfiguration': config_examples()[0],
             'launchConfiguration': launch_examples()[0],
             'id': 'one',
-            'state': GroupState('11111', '1', '', {}, {}, None, {}, False),
+            'state': GroupState('11111', '1', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE),
             'scalingPolicies': [dict(id="5", **policy_examples()[0])]
         }
         self.mock_group.view_manifest.return_value = defer.succeed(manifest)
@@ -856,6 +976,39 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_group.view_manifest.assert_called_once_with(
             with_webhooks=False)
 
+    @mock.patch('otter.rest.groups.get_active_cache')
+    def test_view_manifest_convergence(self, mock_gac):
+        """
+        Viewing the manifest of group of convergence enabled tenant
+        returns state based on servers cache
+        """
+        set_config_data({'convergence-tenants': ['11111'], 'url_root': 'root'})
+        self.addCleanup(set_config_data, None)
+
+        manifest = {
+            'groupConfiguration': config_examples()[0],
+            'launchConfiguration': launch_examples()[0],
+            'id': 'one',
+            'state': GroupState('11111', 'one', 'g', None, None, None, {},
+                                False, ScalingGroupStatus.ACTIVE, desired=3),
+            'scalingPolicies': [dict(id="5", **policy_examples()[0])]
+        }
+        self.mock_group.view_manifest.return_value = defer.succeed(manifest)
+
+        self.mock_store.connection = 'connection'
+        self.mock_store.reactor = 'reactor'
+        mock_gac.return_value = defer.succeed({'s1': {'links': 's1l'}})
+
+        response_body = self.assert_status_code(200, method="GET")
+        resp = json.loads(response_body)
+
+        self.assertEqual(resp['group']['state']['pendingCapacity'], 2)
+        self.assertEqual(resp['group']['state']['activeCapacity'], 1)
+        self.assertEqual(resp['group']['state']['active'],
+                         [{'id': 's1', 'links': 's1l'}])
+        mock_gac.assert_called_once_with(
+            'reactor', 'connection', '11111', 'one')
+
     def test_view_manifest_with_webhooks(self):
         """
         `view_manifest` gives webhooks information in policies if query args
@@ -865,7 +1018,8 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             'groupConfiguration': config_examples()[0],
             'launchConfiguration': launch_examples()[0],
             'id': 'one',
-            'state': GroupState('11111', '1', '', {}, {}, None, {}, False),
+            'state': GroupState('11111', '1', '', {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE),
             'scalingPolicies': [dict(id="5", **policy_examples()[0]),
                                 dict(id="6", **policy_examples()[1])]
         }
@@ -942,105 +1096,41 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
 
     def test_group_delete(self):
         """
-        Deleting an existing group succeeds with a 204.
+        Deleting an existing group succeeds with a 204 by delegating it
+        to `controller.delete_group`
         """
-        self.mock_group.update_config.return_value = defer.succeed(None)
-        self.mock_group.delete_group.return_value = defer.succeed(None)
-
+        self.mock_controller.delete_group.return_value = defer.succeed(None)
         response_body = self.assert_status_code(204, method="DELETE")
         self.assertEqual(response_body, "")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
-        self.assertEqual(0, self.mock_group.update_config.call_count)
-        self.mock_group.delete_group.assert_called_once_with()
+        self.mock_controller.delete_group.assert_called_once_with(
+            "disp", mock.ANY, 'transaction-id', self.mock_group, False)
 
     def test_group_delete_force(self):
         """
-        Deleting a group with force sets min/max to zero and deletes it.
+        Force deleting a group will be delegated to
+        `controller.delete_group` with force argument as True
         """
-        self.mock_controller = patch(self, 'otter.rest.groups.controller')
-
-        self.mock_group.view_manifest.return_value = defer.succeed(
-            {'groupConfiguration':
-                {'name': 'group1', 'minEntities': '10', 'maxEntities': '1000'},
-             'launchConfiguration':
-                {'this': 'is_a_launch_config'},
-             'id': 'one'})
-        self.mock_group.delete_group.return_value = defer.succeed(None)
-        self.mock_group.update_config.return_value = defer.succeed(None)
-        self.mock_controller.obey_config_change.return_value = defer.succeed(
-            None)
-
+        self.mock_controller.delete_group.return_value = defer.succeed(None)
         self.assert_status_code(
             204, endpoint="{0}?force=true".format(self.endpoint),
             method="DELETE")
-
-        expected_config = {'maxEntities': 0,
-                           'minEntities': 0,
-                           'name': 'group1'}
-        self.mock_group.view_manifest.assert_called_once_with(
-            with_policies=False)
-        self.mock_group.update_config.assert_called_once_with(expected_config)
-        self.mock_controller.obey_config_change.assert_called_once_with(
-            mock.ANY, "transaction-id", expected_config, self.mock_group,
-            self.mock_state, launch_config={'this': 'is_a_launch_config'})
-        self.mock_group.delete_group.assert_called_once_with()
-
-    def test_group_delete_force_case_insensitive(self):
-        """
-        The 'true' specified in force is case insensitive.
-        """
-        self.mock_controller = patch(self, 'otter.rest.groups.controller')
-
-        self.mock_group.view_manifest.return_value = defer.succeed(
-            {'groupConfiguration': {'name': 'group1'},
-             'launchConfiguration': {'this': 'is_a_launch_config'},
-             'id': 'one'})
-        self.mock_group.delete_group.return_value = defer.succeed(None)
-        self.mock_group.update_config.return_value = defer.succeed(None)
-        self.mock_controller.obey_config_change.return_value = defer.succeed(
-            None)
-
-        self.assert_status_code(
-            204, endpoint="{0}?force=true".format(self.endpoint),
-            method="DELETE")
-
-        expected_config = {'maxEntities': 0,
-                           'minEntities': 0,
-                           'name': 'group1'}
-        self.mock_group.view_manifest.assert_called_once_with(
-            with_policies=False)
-        self.mock_group.update_config.assert_called_once_with(expected_config)
-        self.mock_controller.obey_config_change.assert_called_once_with(
-            mock.ANY, "transaction-id", expected_config, self.mock_group,
-            self.mock_state, launch_config={'this': 'is_a_launch_config'})
-        self.mock_group.delete_group.assert_called_once_with()
-
-    def test_group_delete_force_garbage_arg(self):
-        """
-        Providing an force argument other than 'true' causes an error.
-        """
-        self.mock_group.delete_group.return_value = defer.succeed(None)
-        self.mock_group.update_config.return_value = defer.succeed(None)
-
-        self.assert_status_code(
-            400, endpoint="{0}?force=blah".format(self.endpoint),
-            method="DELETE")
-
-        self.assertEqual(0, self.mock_group.update_config.call_count)
-        self.assertEqual(0, self.mock_group.delete_group.call_count)
+        self.mock_controller.delete_group.assert_called_once_with(
+            "disp", mock.ANY, "transaction-id", self.mock_group, True)
 
     def test_group_delete_404(self):
         """
         Deleting a non-existant group fails with a 404.
         """
-        self.mock_group.delete_group.return_value = defer.fail(
+        self.mock_controller.delete_group.return_value = defer.fail(
             NoSuchScalingGroupError('11111', '1'))
 
         response_body = self.assert_status_code(404, method="DELETE")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
-        self.mock_group.delete_group.assert_called_once_with()
+        self.mock_controller.delete_group.assert_called_once_with(
+            "disp", mock.ANY, "transaction-id", self.mock_group, False)
 
         resp = json.loads(response_body)
         self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
@@ -1050,17 +1140,54 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         Deleting a non-empty group fails with a 403.
         """
-        self.mock_group.delete_group.return_value = defer.fail(
+        self.mock_controller.delete_group.return_value = defer.fail(
             GroupNotEmptyError('11111', '1'))
 
         response_body = self.assert_status_code(403, method="DELETE")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
-        self.mock_group.delete_group.assert_called_once_with()
+        self.mock_controller.delete_group.assert_called_once_with(
+            "disp", mock.ANY, "transaction-id", self.mock_group, False)
 
         resp = json.loads(response_body)
         self.assertEqual(resp['error']['type'], 'GroupNotEmptyError')
         self.flushLoggedErrors(GroupNotEmptyError)
+
+    def test_group_converge_enabled_tenant(self):
+        """
+        Calling `../converge` on convergence enabled tenant triggers
+        convergence and returns Deferred with None after enabling it
+        """
+        set_config_data({'convergence-tenants': ['11111']})
+        self.addCleanup(set_config_data, {})
+        self.mock_state = GroupState(
+            '11111', 'one', '', {}, {}, None, {}, False,
+            ScalingGroupStatus.ACTIVE)
+        self.assert_status_code(
+            204, endpoint='{}converge'.format(self.endpoint),
+            method='POST')
+        self.assertTrue(self.mock_controller.modify_and_trigger.called)
+
+    def test_group_paused_converge(self):
+        """
+        Calling `../converge` on paused group will return 403 GroupPausedError
+        for convergence tenant
+        """
+        set_config_data({'convergence-tenants': ['11111']})
+        self.addCleanup(set_config_data, {})
+        self.mock_state = GroupState(
+            '11111', 'one', '', {}, {}, None, {}, True,  # group paused
+            ScalingGroupStatus.ACTIVE)
+        self.assert_status_code(
+            403, endpoint='{}converge'.format(self.endpoint), method='POST')
+        self.assertTrue(self.mock_controller.modify_and_trigger.called)
+
+    def test_group_converge_worker_tenant(self):
+        """
+        Calling `../converge` on non-convergence enabled tenant returns 404
+        """
+        self.assert_status_code(
+            404, endpoint='{}converge'.format(self.endpoint), method='POST')
 
 
 class GroupStateTestCase(RestAPITestMixin, SynchronousTestCase):
@@ -1122,7 +1249,31 @@ class GroupStateTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
         self.mock_group.view_state.assert_called_once_with()
-        mock_format.assert_called_once_with('group_state')
+        mock_format.assert_called_once_with('group_state', None)
+
+    @mock.patch('otter.rest.groups.get_active_cache',
+                return_value=defer.succeed({'s1': {'links': 'l'}}))
+    def test_view_state_convergence(self, mock_gac):
+        """
+        Viewing the state of an existant group that belongs to convergence
+        enabled tenant returns the active list from servers cache table
+        """
+        set_config_data({'convergence-tenants': ['11111'], 'url_root': 'root'})
+        self.addCleanup(set_config_data, None)
+
+        self.mock_group.view_state.return_value = defer.succeed(
+            GroupState("11111", "one", 'g', None, None, False, False, False,
+                       ScalingGroupStatus.ACTIVE, desired=4))
+        self.mock_store.connection = 'connection'
+        self.mock_store.reactor = 'reactor'
+        response_body = self.assert_status_code(200, method="GET")
+        resp = json.loads(response_body)
+
+        self.assertEqual(resp['group']['activeCapacity'], 1)
+        self.assertEqual(resp['group']['pendingCapacity'], 3)
+        self.assertEqual(resp['group']['active'], [{'id': 's1', 'links': 'l'}])
+        mock_gac.assert_called_once_with(
+            'reactor', 'connection', '11111', 'one')
 
 
 class GroupPauseTestCase(RestAPITestMixin, SynchronousTestCase):
@@ -1136,6 +1287,7 @@ class GroupPauseTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         Pausing should call the controller's ``pause_scaling_group`` function
         """
+        self.otter.dispatcher = "disp"
         mock_pause = patch(
             self, 'otter.rest.groups.controller.pause_scaling_group',
             return_value=defer.succeed(None))
@@ -1143,13 +1295,7 @@ class GroupPauseTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(response_body, "")
 
         mock_pause.assert_called_once_with(mock.ANY, 'transaction-id',
-                                           self.mock_group)
-
-    def test_pause_not_implemented(self):
-        """
-        Resume currently raises 501 not implemented
-        """
-        self.assert_status_code(501, method="POST")
+                                           self.mock_group, "disp")
 
 
 class GroupResumeTestCase(RestAPITestMixin, SynchronousTestCase):
@@ -1163,6 +1309,7 @@ class GroupResumeTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         Resume should call the controller's ``resume_scaling_group`` function
         """
+        self.otter.dispatcher = "disp"
         mock_resume = patch(
             self, 'otter.rest.groups.controller.resume_scaling_group',
             return_value=defer.succeed(None))
@@ -1170,13 +1317,7 @@ class GroupResumeTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assertEqual(response_body, "")
 
         mock_resume.assert_called_once_with(mock.ANY, 'transaction-id',
-                                            self.mock_group)
-
-    def test_resume_not_implemented(self):
-        """
-        Resume currently raises 501 not implemented
-        """
-        self.assert_status_code(501, method="POST")
+                                            self.mock_group, "disp")
 
 
 class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
@@ -1191,9 +1332,10 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         Mock remove_server_from_group
         """
         super(GroupServersTests, self).setUp()
-        self.mock_rsfg = patch(self,
-                               'otter.rest.groups.remove_server_from_group',
-                               return_value=None)
+        self.otter.dispatcher = "disp"
+        self.mock_rsfg = patch(
+            self, 'otter.rest.groups.controller.remove_server_from_group',
+            return_value=None)
         self.patch(groups, "extract_bool_arg", self._extract_bool_arg)
         self._replace = self._purge = True
 
@@ -1217,6 +1359,7 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         Asserts that the call to :func:`remove_server_from_group` is correct.
         """
         self.mock_rsfg.assert_called_once_with(
+            "disp",
             matches(IsBoundWith(system='otter.rest.groups.delete_server',
                                 tenant_id='11111',
                                 scaling_group_id='one',

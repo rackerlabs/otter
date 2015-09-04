@@ -21,6 +21,7 @@ from otter.convergence.model import (
     ILBDescription,
     ILBNode,
     NovaServer,
+    RCv3Description,
     ServerState,
     _private_ipv4_addresses,
     _servicenet_address,
@@ -230,6 +231,43 @@ class CLBNodeTests(SynchronousTestCase):
                        address='10.1.1.1', drained_at=0.0, connections=1)
         self.assertFalse(node.is_active())
 
+    def test_from_node_json_no_weight(self):
+        """
+        A node's JSON representation can be parsed to a :obj:`CLBNode` object
+        with a `CLBDescription`. When weight is not specified it defaults to 1.
+        """
+        node_json = {'id': 'node1', 'address': '1.2.3.4', 'port': 20,
+                     'condition': 'DRAINING', 'type': 'SECONDARY'}
+        node = CLBNode.from_node_json(123, node_json)
+        self.assertEqual(
+            node,
+            CLBNode(node_id='node1', address='1.2.3.4',
+                    connections=None, drained_at=0.0,
+                    description=CLBDescription(
+                        lb_id='123', port=20,
+                        weight=1,
+                        condition=CLBNodeCondition.DRAINING,
+                        type=CLBNodeType.SECONDARY)))
+
+    def test_from_node_json_with_weight(self):
+        """
+        A node's JSON representation can be parsed to a :obj:`CLBNode` object
+        with a `CLBDescription`. When weight is not specified it defaults to 1.
+        """
+        node_json = {'id': 'node1', 'address': '1.2.3.4', 'port': 20,
+                     'condition': 'DRAINING', 'type': 'SECONDARY',
+                     'weight': 50}
+        node = CLBNode.from_node_json(123, node_json)
+        self.assertEqual(
+            node,
+            CLBNode(node_id='node1', address='1.2.3.4',
+                    connections=None, drained_at=0.0,
+                    description=CLBDescription(
+                        lb_id='123', port=20,
+                        weight=50,
+                        condition=CLBNodeCondition.DRAINING,
+                        type=CLBNodeType.SECONDARY)))
+
 
 class ServiceMetadataTests(SynchronousTestCase):
     """
@@ -323,24 +361,29 @@ class AutoscaleMetadataTests(SynchronousTestCase):
         """
         lbs = [
             CLBDescription(port=80, lb_id='123'),
+            RCv3Description(lb_id='123'),
             CLBDescription(port=8080, lb_id='123'),
-            CLBDescription(port=80, lb_id='234')
+            CLBDescription(port=80, lb_id='234'),
+            RCv3Description(lb_id='3232'),
         ]
         expected = {
             'rax:autoscale:group:id': 'group_id',
             'rax:auto_scaling_group_id': 'group_id',
             'rax:autoscale:lb:CloudLoadBalancer:123': (
                 '[{"port": 80}, {"port": 8080}]'),
-            'rax:autoscale:lb:CloudLoadBalancer:234': '[{"port": 80}]'
+            'rax:autoscale:lb:CloudLoadBalancer:234': '[{"port": 80}]',
+            'rax:autoscale:lb:RackConnectV3:123': '',
+            'rax:autoscale:lb:RackConnectV3:3232': '',
         }
 
         self.assertEqual(generate_metadata('group_id', lbs),
                          expected)
 
 
-class ToNovaServerTests(SynchronousTestCase):
+class NovaServerTests(SynchronousTestCase):
     """
-    Tests for :func:`NovaServer.from_server_details_json`
+    Tests for :func:`NovaServer.from_server_details_json` and
+    ``repr(NovaServer)``.
     """
     def setUp(self):
         """
@@ -381,7 +424,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
                        servicenet_address='',
-                       links=freeze(self.links[0])))
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
 
     def test_without_private(self):
         """
@@ -396,7 +440,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
                        servicenet_address='',
-                       links=freeze(self.links[0])))
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
 
     def test_with_servicenet(self):
         """
@@ -410,7 +455,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        flavor_id='valid_flavor',
                        created=self.createds[1][1],
                        servicenet_address='10.0.0.1',
-                       links=freeze(self.links[1])))
+                       links=freeze(self.links[1]),
+                       json=freeze(self.servers[1])))
 
     def test_without_image_id(self):
         """
@@ -427,7 +473,8 @@ class ToNovaServerTests(SynchronousTestCase):
                            flavor_id='valid_flavor',
                            created=self.createds[0][1],
                            servicenet_address='',
-                           links=freeze(self.links[0])))
+                           links=freeze(self.links[0]),
+                           json=freeze(self.servers[0])))
         del self.servers[0]['image']
         self.assertEqual(
             NovaServer.from_server_details_json(self.servers[0]),
@@ -437,7 +484,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        flavor_id='valid_flavor',
                        created=self.createds[0][1],
                        servicenet_address='',
-                       links=freeze(self.links[0])))
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
 
     def test_with_lb_metadata(self):
         """
@@ -458,7 +506,9 @@ class ToNovaServerTests(SynchronousTestCase):
             # a dictionary instead of a list
             'rax:autoscale:lb:CloudLoadBalancer:4': '{"port": 80}',
             # not even valid json
-            'rax:autoscale:lb:CloudLoadBalancer:5': 'invalid json string'
+            'rax:autoscale:lb:CloudLoadBalancer:5': 'invalid json string',
+            # RCv3 with same LB id as CLB
+            'rax:autoscale:lb:RackConnectV3:1': ''
         }
         self.assertEqual(
             NovaServer.from_server_details_json(self.servers[0]),
@@ -469,15 +519,18 @@ class ToNovaServerTests(SynchronousTestCase):
                        created=self.createds[0][1],
                        desired_lbs=pset([
                            CLBDescription(lb_id='1', port=80),
-                           CLBDescription(lb_id='1', port=90)]),
+                           CLBDescription(lb_id='1', port=90),
+                           RCv3Description(lb_id='1')]),
                        servicenet_address='',
-                       links=freeze(self.links[0])))
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
 
     def test_lbs_from_metadata_ignores_unsupported_lb_types(self):
         """
         Creating from server json ignores unsupported LB types
         """
         self.servers[0]['metadata'] = {
+            "rax:autoscale:lb:1": '[{"port":80},{"port":90}]',
             "rax:autoscale:lb:RackConnect:{0}".format(uuid4()): None,
             "rax:autoscale:lb:Neutron:456": None
         }
@@ -490,7 +543,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        created=self.createds[0][1],
                        desired_lbs=pset(),
                        servicenet_address='',
-                       links=freeze(self.links[0])))
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
 
     def test_draining_from_metadata_trumps_active_build_nova_states(self):
         """
@@ -510,7 +564,8 @@ class ToNovaServerTests(SynchronousTestCase):
                            created=self.createds[0][1],
                            desired_lbs=pset(),
                            servicenet_address='',
-                           links=freeze(self.links[0])))
+                           links=freeze(self.links[0]),
+                           json=freeze(self.servers[0])))
 
     def test_draining_state_invalid_values(self):
         """
@@ -528,7 +583,8 @@ class ToNovaServerTests(SynchronousTestCase):
                        created=self.createds[0][1],
                        desired_lbs=pset(),
                        servicenet_address='',
-                       links=freeze(self.links[0])))
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
 
     def test_error_and_deleted_nova_state_trumps_draining_from_metadata(self):
         """
@@ -548,7 +604,56 @@ class ToNovaServerTests(SynchronousTestCase):
                            created=self.createds[0][1],
                            desired_lbs=pset(),
                            servicenet_address='',
-                           links=freeze(self.links[0])))
+                           links=freeze(self.links[0]),
+                           json=freeze(self.servers[0])))
+
+    def test_deleting_server(self):
+        """
+        A server whose "OS-EXT-STS:task_state" is "deleting" will be considered
+        as DELETED
+        """
+        self.servers[0]["OS-EXT-STS:task_state"] = "deleting"
+        self.assertEqual(
+            NovaServer.from_server_details_json(self.servers[0]),
+            NovaServer(id='a',
+                       state=ServerState.DELETED,
+                       image_id='valid_image',
+                       flavor_id='valid_flavor',
+                       created=self.createds[0][1],
+                       desired_lbs=pset(),
+                       servicenet_address='',
+                       links=freeze(self.links[0]),
+                       json=freeze(self.servers[0])))
+
+    def test_repr_nova(self):
+        """
+        The repr of a Nova server includes thawed data structures and shortened
+        JSON.
+        """
+        server_json = self.servers[0]
+        # add a bunch more fields
+        server_json.update({
+            'metadata': {'some': 'stuff'},
+            'OS-EXT-STS:task_state': None,
+            'updated': self.createds[0][0],
+            'user': '12345',
+            'hostId': '12356773526246'
+        })
+        server = NovaServer.from_server_details_json(server_json)
+        expected_json = {
+            'status': server_json['status'],
+            'OS-EXT-STS:task_state': None,
+            'updated': self.createds[0][0],
+            'metadata': {'some': 'stuff'}
+        }
+        self.assertEqual(
+            repr(server),
+            "<NovaServer(id={0}, state={1}, created={2}, image_id={3}, "
+            "flavor_id={4}, links={5}, desired_lbs={6}, "
+            "servicenet_address={7}, json={8})>".format(*[repr(i) for i in [
+                'a', ServerState.ACTIVE, float(self.createds[0][1]),
+                'valid_image', 'valid_flavor', self.links[0], set(), '',
+                expected_json]]))
 
 
 class IPAddressTests(SynchronousTestCase):

@@ -4,9 +4,10 @@ from characteristic import attributes
 
 from effect import Effect, TypeDispatcher, parallel, sync_performer
 from effect.do import do, do_return
-from effect.twisted import deferred_performer
 
 from kazoo.exceptions import NoNodeError, NodeExistsError
+
+from txeffect import deferred_performer
 
 from otter.util.deferredutils import catch_failure
 

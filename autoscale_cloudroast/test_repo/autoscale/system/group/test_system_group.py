@@ -190,7 +190,7 @@ class GroupFixture(AutoscaleFixture):
             'change'] + group.groupConfiguration.minEntities + policy['change']
         self.verify_group_state(group.id, total_servers)
 
-    @tags(speed='quick', convergence='error')
+    @tags(speed='quick', convergence='yes')
     def test_execute_policy_beyond_maxentities(self):
         """
         Scaling policy is executed when change + minentities > maxentities,
@@ -227,7 +227,7 @@ class GroupFixture(AutoscaleFixture):
         total_servers = maxentities + policy['change']
         self.verify_group_state(group.id, total_servers)
 
-    @tags(speed='quick', convergence='error')
+    @tags(speed='quick', convergence='yes')
     def test_execute_policy_beyond_maxentities_when_min_equals_max(self):
         """
         Scaling group with minentities = maxentities cannot execute scale up

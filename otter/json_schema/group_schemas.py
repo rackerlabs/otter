@@ -5,14 +5,17 @@ scaling group configuration, and policies.
 
 from copy import deepcopy
 from datetime import datetime
-import calendar
 
 from croniter import croniter
+
+from iso8601 import ParseError
+
+from jsonschema import ValidationError
+
 from toolz import get_in
 
-from otter.util.timestamp import from_timestamp
 from otter.json_schema import format_checker
-from jsonschema import ValidationError
+from otter.util.timestamp import timestamp_to_epoch
 
 # This is built using union types which may not be available in Draft 4
 # see: http://stackoverflow.com/questions/9029524/json-schema-specify-field-is-
@@ -114,7 +117,7 @@ _rcv3_lb = {
             "description": (
                 "What type of a load balancer is in use"),
             "required": True,
-            "oneOf": ["RackConnectV3"]
+            "pattern": "^RackConnectV3$"
         }
     },
     "additionalProperties": False
@@ -129,7 +132,7 @@ _clb_lb = {
         # Cloud load balancer id's are NOT uuid's, just ints.  But accept
         # strings also for backwards compatibility reasons.
         "loadBalancerId": {
-            "type": ["integer", "string"],
+            "type": ["integer", {"type": "string", "pattern": "^\S+$"}],
             "description": (
                 "The ID of the load balancer to which new "
                 "servers will be added."),
@@ -148,7 +151,7 @@ _clb_lb = {
             "description": (
                 "What type of a load balancer is in use"),
             "required": False,
-            "oneOf": ["CloudLoadBalancer"]
+            "pattern": "^CloudLoadBalancer$"
         }
     },
     "additionalProperties": False
@@ -342,21 +345,20 @@ def validate_launch_config_servicenet(lc):
 @format_checker.checks('date-time', raises=ValueError)
 def validate_datetime(dt_str):
     """
-    Validate date-time string in json. Return True if valid and raise ValueError if invalid
+    Validate date-time string in json. Return True if valid and raise
+    ValueError if invalid
     """
     if dt_str and dt_str[-1] != 'Z':
         raise ValueError('Expecting Zulu-format UTC time')
     try:
-        dt = from_timestamp(dt_str)
-    except:
-        # It is checking for any exception since from_timestamp throws
-        # TypeError instead of ParseError with certain invalid inputs like only date or time.
-        # This issue has been raised and tracked http://code.google.com/p/pyiso8601/issues/detail?id=8
-        # and http://code.google.com/p/pyiso8601/issues/detail?id=24
+        ep = timestamp_to_epoch(dt_str)
+    except ParseError:
         raise ValueError('Error parsing datetime str')
-    # Ensure time is in future
-    if datetime.utcfromtimestamp(calendar.timegm(dt.utctimetuple())) <= datetime.utcnow():
-        raise ValidationError('Invalid "{}" datetime: It must be in the future'.format(dt_str))
+    # Ensure time is in future - can't just parse into a datetime and compare
+    # because we cannot compare naive datetimes with timezone-aware datetimes
+    if datetime.utcfromtimestamp(ep) <= datetime.utcnow():
+        raise ValidationError(
+            'Invalid "{0}" datetime: It must be in the future'.format(dt_str))
     return True
 
 

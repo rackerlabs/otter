@@ -16,7 +16,6 @@ initiating a launch_server job.
 
 import json
 import re
-from copy import deepcopy
 from functools import partial
 from urllib import urlencode
 
@@ -31,6 +30,9 @@ from twisted.internet.task import deferLater
 from twisted.python.failure import Failure
 
 from otter.auth import public_endpoint_url
+from otter.convergence.composition import (
+    json_to_LBConfigs,
+    prepare_server_launch_config)
 from otter.convergence.model import _servicenet_address
 from otter.convergence.steps import UnexpectedServerStatus, set_server_name
 from otter.util import logging_treq as treq
@@ -547,62 +549,28 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
 
     :return dict: The prepared launch config.
     """
-    launch_config = deepcopy(launch_config)
-    server_config = launch_config['server']
+    launch_config = freeze(launch_config)
 
-    if 'metadata' not in server_config:
-        server_config['metadata'] = {}
+    lb_descriptions = json_to_LBConfigs(launch_config.get('loadBalancers', []))
 
-    server_config['metadata'].update(generate_server_metadata(
-        scaling_group_uuid, launch_config))
+    launch_config = prepare_server_launch_config(
+        scaling_group_uuid, launch_config, lb_descriptions)
 
     suffix = generate_server_name()
-    launch_config = thaw(set_server_name(freeze(launch_config), suffix))
+    launch_config = set_server_name(launch_config, suffix)
 
-    for lb_config in launch_config.get('loadBalancers', []):
-        if 'metadata' not in lb_config:
-            lb_config['metadata'] = {}
-        lb_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
-        lb_config['metadata']['rax:auto_scaling_server_name'] = (
-            launch_config['server']['name'])
-
-    return launch_config
-
-
-def generate_server_metadata(group_id, launch_config):
-    """
-    Given a scaling group ID and the launch config, generate the scaling-group
-    specific metadata that should be on the server.
-
-    :param str group_id: The ID of the scaling group
-    :param dict launch_config: The complete launch config args we want to build
-        the servers from
-
-    :return dict: The autoscaling-specific part of the metadata with which to
-        create a server of this particular autoscaling group
-    """
-    metadata = {'rax:auto_scaling_group_id': group_id}
-    lbs = launch_config.get('loadBalancers', [])
-
-    if lbs:
-        lbids = []
-        for lb_config in lbs:
-            config_without_lbid = lb_config.copy()
-            lb_id = config_without_lbid.pop('loadBalancerId')
-            lbids.append(lb_id)
-            metadata['rax:auto_scaling:lb:{0}'.format(lb_id)] = json.dumps(
-                config_without_lbid)
-
-        metadata['rax:auto_scaling_lbids'] = json.dumps(lbids)
-    return metadata
+    return thaw(launch_config)
 
 
 def _without_otter_metadata(metadata):
     """
-    Returns a copy of the metadata with all the otter-specific keys removed.
+    Return a copy of the metadata with all the otter-specific keys
+    removed.
     """
-    return {k: v for (k, v) in metadata.iteritems()
-            if not k.startswith("rax:auto_scaling")}
+    meta = {k: v for (k, v) in metadata.get('metadata', {}).iteritems()
+            if not (k.startswith("rax:auto_scaling") or
+                    k.startswith("rax:autoscale:"))}
+    return {'metadata': meta}
 
 
 def scrub_otter_metadata(log, auth_token, service_catalog, region, server_id,
@@ -812,7 +780,7 @@ def _remove_from_clb(log, endpoint, auth_token, loadbalancer_id, node_id, clock=
     return d
 
 
-def delete_server(log, request_bag, instance_details):
+def delete_server(log, request_bag, instance_details, clock=None):
     """
     Delete the server specified by instance_details.
 
@@ -853,7 +821,8 @@ def delete_server(log, request_bag, instance_details):
         server_endpoint = public_endpoint_url(request_bag.service_catalog,
                                               cloudServersOpenStack,
                                               request_bag.region)
-        return verified_delete(log, server_endpoint, request_bag, server_id)
+        return verified_delete(log, server_endpoint, request_bag, server_id,
+                               clock=clock)
 
     d.addCallback(when_removed_from_loadbalancers)
     return d
@@ -897,7 +866,12 @@ def _as_new_style_instance_details(maybe_old_style):
     return server_id, updated_lb_specs
 
 
-def delete_and_verify(log, server_endpoint, request_bag, server_id):
+# Allow only 1 delete server request at a time
+MAX_DELETE_SERVER = 1
+delete_server_sem = DeferredSemaphore(MAX_DELETE_SERVER)
+
+
+def delete_and_verify(log, server_endpoint, request_bag, server_id, clock):
     """
     Check the status of the server to see if it's actually been deleted.
     Succeeds only if it has been either deleted (404) or acknowledged by Nova
@@ -909,9 +883,13 @@ def delete_and_verify(log, server_endpoint, request_bag, server_id):
     """
     path = append_segments(server_endpoint, 'servers', server_id)
 
-    def delete(request_bag):
-        del_d = treq.delete(path, headers=headers(request_bag.auth_token),
-                            log=log)
+    def delete_with_delay(_bag):
+        d = treq.delete(path, headers=headers(_bag.auth_token), log=log)
+        # Add 0.4 seconds delay to allow 150 requests per minute
+        return d.addCallback(delay, clock, 0.4)
+
+    def delete(_bag):
+        del_d = delete_server_sem.run(delete_with_delay, _bag)
         del_d.addCallback(check_success, [404])
         del_d.addCallback(treq.content)
         return del_d.addErrback(verify, request_bag.auth_token)
@@ -970,7 +948,7 @@ def verified_delete(log,
 
     d = retry(
         partial(delete_and_verify, serv_log, server_endpoint, request_bag,
-                server_id),
+                server_id, clock),
         can_retry=retry_times(max_retries),
         next_interval=exponential_backoff_interval(exp_start),
         clock=clock)

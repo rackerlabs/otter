@@ -23,21 +23,27 @@ class GroupState(object):
         object represents
     :ivar bytes group_name: the name of the scaling group whose state this
         object represents
-    :ivar int desired: the desired capacity of the scaling group
     :ivar dict active: the mapping of active server ids and their info
     :ivar dict pending: the list of pending job ids and their info
-    :ivar bool paused: whether the scaling group is paused in scaling activities
+    :ivar bytes group_touched: timezone-aware ISO860 formatted timestamp
+        that represents when the last time any policy was executed
+        on the group. Could be None.
     :ivar dict policy_touched: dictionary mapping policy ids to the last time
-        they were executed, if ever.
-    :ivar bytes group_touched: timezone-aware timestamp that represents when the
-        last time any policy was executed on the group.  Could be None.
-    :ivar callable now: callable that returns a :class:`bytes` timestamp - used for
-        testing purposes.  Defaults to :func:`timestamp.now`
+        they were executed, if ever. The time is stored as ISO860 format str
+    :ivar bool paused: whether the scaling group is paused in
+        scaling activities
+    :ivar GroupStatus status: status of the group.
+    :ivar list error_reasons: List of string-based reasons why this group is in
+        ERROR. Not needed when group is ACTIVE
+    :ivar int desired: the desired capacity of the scaling group
+    :ivar callable now: callable that returns a :class:`bytes` timestamp
+        used for testing purposes. Defaults to :func:`timestamp.now`
 
     TODO: ``remove_active``, ``pause`` and ``resume`` ?
     """
-    def __init__(self, tenant_id, group_id, group_name, active, pending, group_touched,
-                 policy_touched, paused, desired=0, now=timestamp.now):
+    def __init__(self, tenant_id, group_id, group_name, active, pending,
+                 group_touched, policy_touched, paused, status,
+                 error_reasons=[], desired=0, now=timestamp.now):
         self.tenant_id = tenant_id
         self.group_id = group_id
         self.group_name = group_name
@@ -47,6 +53,8 @@ class GroupState(object):
         self.paused = paused
         self.policy_touched = policy_touched
         self.group_touched = group_touched
+        self.status = status
+        self.error_reasons = tuple(error_reasons)
 
         if self.group_touched is None:
             self.group_touched = timestamp.MIN
@@ -55,7 +63,7 @@ class GroupState(object):
 
         self._attributes = (
             'tenant_id', 'group_id', 'group_name', 'desired', 'active',
-            'pending', 'group_touched', 'policy_touched', 'paused')
+            'pending', 'group_touched', 'policy_touched', 'paused', 'status')
 
     def __eq__(self, other):
         """
@@ -355,6 +363,19 @@ class IScalingGroup(Interface):
             doesn't exist for this tenant id
         """
 
+    def update_error_reasons(reasons):
+        """
+        Updates the reasons why the group is in ERROR
+
+        :param list reasons: List of string reasons
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires
+            with None
+
+        :raises NoSuchScalingGroupError: if the scaling group id
+            doesn't exist for this tenant id
+        """
+
     def update_config(config):
         """
         Update the scaling group configuration paramaters based on the
@@ -609,92 +630,44 @@ class IScalingGroup(Interface):
         """
 
 
-class NoSuchServerIntentError(Exception):
+class IScalingGroupServersCache(Interface):
     """
-    Error to be raised when attempting operations on a server intent that does not
-    exist.
+    Cache of servers in scaling groups
     """
-    def __init__(self, tenant_id, group_id, server_id):
-        super(NoSuchServerIntentError, self).__init__(
-            "No such server {s} in group {g} for tenant {t}"
-            .format(t=tenant_id, g=group_id, s=server_id))
+    tenant_id = Attribute("Rackspace Tenant ID of the owner of this group.")
+    group_id = Attribute("UUID of the scaling group - immutable.")
 
-
-class IScalingGroupServerIntentsCollection(Interface):
-    """
-    Collection of servers intended to be there in a scaling group. Each server in the
-    this group should eventually match to a real server in Nova. All operations on this
-    model will not have any impact on real Nova servers. It is the caller's responsibility
-    to sync them (if needed).
-    """
-
-    def create_server_intent(log, status='pending'):
+    def get_servers(only_as_active):
         """
-        Create server intended to be there in scaling group
+        Return latest cache of servers in a group along with last time the
+        cache was updated.
 
-        :param :class:`BoundLog` log: A bound logger
-        :param str status: status of the server. one of 'pending' or 'active'
+        :param bool only_as_active: Should it return only otter active servers?
 
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
-                corresponding with :data:`otter.json_schema.model_schemas.server`
-        :raises NoSuchScalingGroupError: if this scaling group does not exist
+        :return: Effect of (servers, last update time) tuple where servers
+            is list of dict and last update time is datetime object. Will
+            return last_update time as None if cache is empty
+        :rtype: Effect
         """
 
-    def update_server_intent(log, server_intent_id, nova_id, status, lb_info):
+    def insert_servers(last_update, servers, clear_others):
         """
-        Update existing server intent information
+        Update the servers cache of the group with last update time
 
-        :param :class:`BoundLog` log: A bound logger
-        :param str server_intent_id: ID of server intent
-        :param str nova_id: Server ID of corresponding Nova instance
-        :param str status: server status. One of 'pending' or 'active'
-        :param `dict` lb_info: Load balancer information dict. This will be stored as JSON
+        :param datetime last_update: Update time of the cache
+        :param list servers: List of server dicts with optional "_is_as_active"
+            field with boolean value to represent if this server has become
+            active from autoscale's perpective. This field will be popped
+            before storing the blob
+        :param bool clear_others: Should any other cache from a different
+            update_time be deleted?
 
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises NoSuchScalingGroupError: if this scaling group does not exist
-        :raises NoSuchServerIntentError: if the server intent id does not exist
-        """
-
-    def list_server_intents(log, status=None, limit=100, marker=None):
-        """
-        List the server intents in the scaling group optionally filtered based on status
-
-        :param :class:`BoundLog` log: A bound logger
-        :param str status: server status. One of 'pending' or 'active'
-        :param int limit: Limit number of server intents to return
-        :param str marker: Marker from which to fetch servers
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with `list` of
-                server `dict` each corresponding with
-                :data:`otter.json_schema.model_schemas.server`
-
-        :raises NoSuchScalingGroupError: if this scaling group does not exist
+        :return: Effect of None
         """
 
-    def get_server_intent(log, server_intent_id):
+    def delete_servers():
         """
-        Get server intent from scaling group
-
-        :param :class:`BoundLog` log: A bound logger
-        :param str server_intent_id: ID of server intent being requested
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with
-                 server `dict` correspondgin with
-                :data:`otter.json_schema.model_schemas.server`
-
-        :raises NoSuchScalingGroupError: if this scaling group does not exist
-        :raises NoSuchServerIntentError: if the server intent id does not exist
-        """
-
-    def delete_server_intents(log, server_intent_ids):
-        """
-        Remove server intents from scaling group
-
-        :param :class:`BoundLog` log: A bound logger
-        :param list server_intent_ids: List of server intent IDs to be deleted
-
-        :raises NoSuchScalingGroupError: if this scaling group does not exist
+        Remove all servers of the group
         """
 
 
