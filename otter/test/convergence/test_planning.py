@@ -1128,3 +1128,38 @@ class DestinyTests(SynchronousTestCase):
         for st in ServerState.iterconstants():
             s = server('s1', state=st)
             self.assertIsNot(get_destiny(s), None)
+
+    def test_draining(self):
+        """
+        If the draining metadata is found, the destiny of the server will be
+        ``DRAIN``, when the server is in the ACTIVE or BUILD states.
+        """
+        for state in (ServerState.ACTIVE, ServerState.BUILD):
+            self.assertEqual(
+                get_destiny(server('s1', state=state,
+                                   metadata=dict([DRAINING_METADATA]))),
+                Destiny.DRAIN)
+
+    def test_draining_value_must_match(self):
+        """
+        The value of the draining metadata key must match in order for the
+        ``DRAIN`` destiny to be returned.
+        """
+        self.assertEqual(
+            get_destiny(server('s1', state=ServerState.ACTIVE,
+                               metadata={DRAINING_METADATA[0]: 'foo'})),
+            Destiny.CONSIDER_AVAILABLE)
+
+    def test_error_deleted_trumps_draining_metadata(self):
+        """
+        If a server is in ``ERROR`` or ``DELETED`` state, it will not get the
+        ``DRAIN`` destiny.
+        """
+        self.assertEqual(
+            get_destiny(server('s1', state=ServerState.ERROR,
+                               metadata=dict([DRAINING_METADATA]))),
+            Destiny.DELETE)
+        self.assertEqual(
+            get_destiny(server('s1', state=ServerState.DELETED,
+                               metadata=dict([DRAINING_METADATA]))),
+            Destiny.CLEANUP)
