@@ -23,7 +23,7 @@ from otter.cloud_client import (
     TenantScope,
     get_server_details,
     set_nova_metadata_item)
-from otter.convergence.model import DRAINING_METADATA
+from otter.convergence.planning import DRAINING_METADATA
 from otter.convergence.service import (
     get_convergence_starter, set_convergence_starter)
 from otter.log.intents import BoundFields, Log

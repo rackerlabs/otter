@@ -5,7 +5,7 @@ from collections import defaultdict
 from pyrsistent import pbag, pset
 
 from toolz.curried import filter
-from toolz.itertoolz import concat, groupby, mapcat
+from toolz.itertoolz import groupby, mapcat
 
 from twisted.python.constants import NamedConstant, Names
 
@@ -188,7 +188,7 @@ class Destiny(Names):
     WAIT = NamedConstant()
     """Waiting for the server to transition to active."""
 
-    DO_NOT_REPLACE = NamedConstant()
+    AVOID_REPLACING = NamedConstant()
     """
     Unavailable, still costing money, and not imminently transitioning to
     another state, but we want to leave it around anyway.
@@ -221,7 +221,7 @@ _DESTINY_TO_STATES = {
         ServerState.RESIZE,  # either transitions to ACTIVE or VERIFY_RESIZE
         ServerState.REVERT_RESIZE,
     ],
-    Destiny.DO_NOT_REPLACE: [
+    Destiny.AVOID_REPLACING: [
         ServerState.RESCUE,
         ServerState.VERIFY_RESIZE,
         ServerState.SUSPENDED,
@@ -237,14 +237,8 @@ _DESTINY_TO_STATES = {
         ServerState.UNKNOWN_TO_OTTER],
 }
 
-# Ensure we've covered all the server states
-for st in ServerState.iterconstants():
-    assert st in concat(_DESTINY_TO_STATES.values()), st
-# Ensure states only map to one destiny
-_all_destiny_states = list(concat(_DESTINY_TO_STATES.values()))
-assert len(_all_destiny_states) == len(set(_all_destiny_states))
 
-STATE_TO_DESTINY = {
+_STATE_TO_DESTINY = {
     state: destiny
     for destiny, states in _DESTINY_TO_STATES.iteritems()
     for state in states}
@@ -257,7 +251,7 @@ def get_destiny(server):
             metadata.get(DRAINING_METADATA[0]) == DRAINING_METADATA[1]):
         return Destiny.DRAIN
 
-    return STATE_TO_DESTINY.get(server.state)
+    return _STATE_TO_DESTINY.get(server.state)
 
 
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
@@ -302,14 +296,14 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
             len(servers_in_active) +
             len(waiting_for_build) +
             len(servers[Destiny.WAIT]) +
-            len(servers[Destiny.DO_NOT_REPLACE])))
+            len(servers[Destiny.AVOID_REPLACING])))
 
     # Scale down over capacity, starting with building, then WAIT, then
-    # DO_NOT_REPLACE, then active, preferring older.  Also, finish
+    # AVOID_REPLACING, then active, preferring older.  Also, finish
     # draining/deleting servers already in draining state
     servers_in_preferred_order = (
         servers_in_active +
-        servers[Destiny.DO_NOT_REPLACE] +
+        servers[Destiny.AVOID_REPLACING] +
         servers[Destiny.WAIT] +
         waiting_for_build)
     servers_to_delete = servers_in_preferred_order[desired_state.capacity:]

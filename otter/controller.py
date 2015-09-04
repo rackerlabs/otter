@@ -48,7 +48,8 @@ from otter.cloud_client import (
     get_server_details,
     set_nova_metadata_item)
 from otter.convergence.composition import tenant_is_enabled
-from otter.convergence.model import DRAINING_METADATA, group_id_from_metadata
+from otter.convergence.model import group_id_from_metadata
+from otter.convergence.planning import DRAINING_METADATA
 from otter.convergence.service import (
     delete_divergent_flag, mark_divergent, trigger_convergence)
 from otter.json_schema.group_schemas import MAX_ENTITIES
