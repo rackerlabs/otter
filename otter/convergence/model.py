@@ -69,22 +69,24 @@ class CLBNodeType(Names):
 class ServerState(Names):
     """
     Constants representing the state of a Nova cloud server.
-    """
 
+    Most of these constants correspond to Nova states of the same name.
+    """
     ACTIVE = NamedConstant()
-    """
-    Corresponds to Nova's ``ACTIVE`` state.
-    """
-
-    ERROR = NamedConstant()
-    """
-    Corresponds to Nova's ``ERROR`` state.
-    """
-
     BUILD = NamedConstant()
-    """
-    Corresponds to Nova's ``BUILD`` and ``BUILDING`` states.
-    """
+    DELETED = NamedConstant()
+    ERROR = NamedConstant()
+    HARD_REBOOT = NamedConstant()
+    MIGRATING = NamedConstant()
+    PASSWORD = NamedConstant()
+    REBUILD = NamedConstant()
+    RESCUE = NamedConstant()
+    RESIZE = NamedConstant()
+    REVERT_RESIZE = NamedConstant()
+    SHUTOFF = NamedConstant()
+    SUSPENDED = NamedConstant()
+    UNKNOWN = NamedConstant()
+    VERIFY_RESIZE = NamedConstant()
 
     DRAINING = NamedConstant()
     """"
@@ -93,9 +95,10 @@ class ServerState(Names):
     is basically functional, but that Autoscale would like to delete it.
     """
 
-    DELETED = NamedConstant()
+    UNKNOWN_TO_OTTER = NamedConstant()
     """
-    Corresponds to Nova's ``DELETED`` state.
+    Indicates that some state was returned by Nova that Otter doesn't know
+    about. The real state will be in `NovaServer.json`.
     """
 
 
@@ -254,7 +257,10 @@ class NovaServer(object):
 
         :return: :obj:`NovaServer` instance
         """
-        server_state = ServerState.lookupByName(server_json['status'])
+        try:
+            server_state = ServerState.lookupByName(server_json['status'])
+        except ValueError:
+            server_state = ServerState.UNKNOWN_TO_OTTER
         if server_json.get("OS-EXT-STS:task_state", "") == "deleting":
             server_state = ServerState.DELETED
         metadata = server_json.get('metadata', {})

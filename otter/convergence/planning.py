@@ -1,9 +1,13 @@
 """Code related to creating a plan for convergence."""
 
+from collections import defaultdict
+
 from pyrsistent import pbag, pset
 
 from toolz.curried import filter
-from toolz.itertoolz import mapcat
+from toolz.itertoolz import groupby, mapcat
+
+from twisted.python.constants import NamedConstant, Names
 
 from otter.convergence.model import (
     CLBDescription,
@@ -27,7 +31,7 @@ from otter.convergence.steps import (
     SetMetadataItemOnServer,
 )
 from otter.convergence.transforming import limit_steps_by_count, optimize_steps
-from otter.util.fp import partition_bool, partition_groups
+from otter.util.fp import partition_bool
 
 
 def _remove_from_lb_with_draining(timeout, nodes, now):
@@ -165,6 +169,85 @@ def _drain_and_delete(server, timeout, current_lb_nodes, now):
     return lb_draining_steps
 
 
+class Destiny(Names):
+    """
+    What otter will be doing with a server.
+    """
+
+    CONSIDER_AVAILABLE = NamedConstant()
+    """The server will count as "active"."""
+
+    WAIT_WITH_TIMEOUT = NamedConstant()
+    """
+    Waiting for the server to transition to active, and will delete it if it
+    doesn't transition in a given period.
+    """
+
+    WAIT = NamedConstant()
+    """Waiting for the server to transition to active."""
+
+    AVOID_REPLACING = NamedConstant()
+    """
+    Unavailable, still costing money, and not imminently transitioning to
+    another state, but we want to leave it around anyway.
+    """
+
+    DRAIN = NamedConstant()
+    """Delete this server after some period."""
+
+    DELETE = NamedConstant()
+    """Delete this server immediately."""
+
+    CLEANUP = NamedConstant()
+    """Clean up associated resources."""
+
+    IGNORE = NamedConstant()
+    """This server will not count as part of the group at all."""
+
+
+# Indicate which states are part of which destiny. It's feasible that things
+# other than states can determine the destiny, but so far this is the only way
+# we calculate it.
+_DESTINY_TO_STATES = {
+    Destiny.CONSIDER_AVAILABLE: [ServerState.ACTIVE],
+    Destiny.WAIT_WITH_TIMEOUT: [ServerState.BUILD],
+    Destiny.WAIT: [
+        ServerState.HARD_REBOOT,
+        ServerState.MIGRATING,
+        ServerState.PASSWORD,
+        ServerState.REBUILD,
+        ServerState.RESIZE,  # either transitions to ACTIVE or VERIFY_RESIZE
+        ServerState.REVERT_RESIZE,
+    ],
+    Destiny.AVOID_REPLACING: [
+        ServerState.RESCUE,
+        ServerState.VERIFY_RESIZE,
+        ServerState.SUSPENDED,
+        ],
+    Destiny.DRAIN: [ServerState.DRAINING],
+    Destiny.DELETE: [
+        # We could implement rebooting for `SHUTOFF` servers, but instead we'll
+        # just delete/replace them.
+        ServerState.SHUTOFF,
+        ServerState.ERROR],
+    Destiny.CLEANUP: [ServerState.DELETED],
+    Destiny.IGNORE: [
+        ServerState.UNKNOWN,
+        ServerState.UNKNOWN_TO_OTTER],
+}
+
+
+_STATE_TO_DESTINY = {
+    state: destiny
+    for destiny, states in _DESTINY_TO_STATES.iteritems()
+    for state in states}
+
+
+def get_destiny(server):
+    """Get the obj:`Destiny` of a server."""
+    return _STATE_TO_DESTINY.get(server.state)
+
+
 def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
              timeout=3600):
     """
@@ -188,20 +271,12 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     """
     newest_to_oldest = sorted(servers_with_cheese, key=lambda s: -s.created)
 
-    (servers_in_error,
-     servers_in_active,
-     servers_in_build,
-     draining_servers,
-     deleted_servers) = partition_groups(
-        lambda s: s.state, newest_to_oldest, [ServerState.ERROR,
-                                              ServerState.ACTIVE,
-                                              ServerState.BUILD,
-                                              ServerState.DRAINING,
-                                              ServerState.DELETED])
+    servers = defaultdict(lambda: [], groupby(get_destiny, newest_to_oldest))
+    servers_in_active = servers[Destiny.CONSIDER_AVAILABLE]
 
     building_too_long, waiting_for_build = partition_bool(
         lambda server: now - server.created >= timeout,
-        servers_in_build)
+        servers[Destiny.WAIT_WITH_TIMEOUT])
 
     create_server = CreateServer(server_config=desired_state.server_config)
 
@@ -210,14 +285,21 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                             for server in building_too_long]
 
     # create servers
-    create_steps = [create_server] * (desired_state.capacity
-                                      - (len(servers_in_active)
-                                         + len(waiting_for_build)))
+    create_steps = [create_server] * (
+        desired_state.capacity - (
+            len(servers_in_active) +
+            len(waiting_for_build) +
+            len(servers[Destiny.WAIT]) +
+            len(servers[Destiny.AVOID_REPLACING])))
 
-    # Scale down over capacity, starting with building, then active,
-    # preferring older.  Also, finish draining/deleting servers already in
-    # draining state
-    servers_in_preferred_order = servers_in_active + waiting_for_build
+    # Scale down over capacity, starting with building, then WAIT, then
+    # AVOID_REPLACING, then active, preferring older.  Also, finish
+    # draining/deleting servers already in draining state
+    servers_in_preferred_order = (
+        servers_in_active +
+        servers[Destiny.AVOID_REPLACING] +
+        servers[Destiny.WAIT] +
+        waiting_for_build)
     servers_to_delete = servers_in_preferred_order[desired_state.capacity:]
 
     def drain_and_delete_a_server(server):
@@ -228,18 +310,18 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
             now)
 
     scale_down_steps = list(mapcat(drain_and_delete_a_server,
-                                   servers_to_delete + draining_servers))
+                                   servers_to_delete + servers[Destiny.DRAIN]))
 
     # delete all servers in error - draining does not need to be
     # handled because servers in error presumably are not serving
     # traffic anyway
-    delete_error_steps = [
-        DeleteServer(server_id=server.id) for server in servers_in_error]
+    delete_error_steps = [DeleteServer(server_id=server.id)
+                          for server in servers[Destiny.DELETE]]
 
     # clean up all the load balancers from deleted and errored servers
     cleanup_errored_and_deleted_steps = [
         remove_node_from_lb(lb_node)
-        for server in servers_in_error + deleted_servers
+        for server in servers[Destiny.DELETE] + servers[Destiny.CLEANUP]
         for lb_node in load_balancer_contents if lb_node.matches(server)]
 
     # converge all the servers that remain to their desired load balancer state
@@ -253,11 +335,12 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
             [node for node in load_balancer_contents if node.matches(server)])
         ]
 
-    # if there are any building servers left, also return a ConvergeLater step.
+    # Converge again if we expect state transitions on any servers
     converge_later = []
-    if any((s not in servers_to_delete for s in waiting_for_build)):
+    if any((s not in servers_to_delete
+            for s in waiting_for_build + servers[Destiny.WAIT])):
         converge_later = [
-            ConvergeLater(reasons=[ErrorReason.String('building servers')])]
+            ConvergeLater(reasons=[ErrorReason.String('waiting for servers')])]
 
     return pbag(create_steps +
                 scale_down_steps +
