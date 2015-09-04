@@ -35,6 +35,9 @@ class PauseResumeTests(unittest.TestCase):
     Tests for `../groups/groupId/pause` and `../groups/groupId/resume` endpoint
     """
 
+    # Some of the tests do some extra waiting
+    timeout = 300
+
     def setUp(self):
         self.helper = TestHelper(self)
         self.rcs = TestResources()
