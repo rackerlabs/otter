@@ -77,8 +77,10 @@ def get_todays_tenants(tenants, today, last_tenants_len, last_date):
     if last_tenants_len is None:
         return tenants[:batch_size], batch_size, today
     days = (today - last_date).days
-    if days <= 0:
+    if days < 0:
         return tenants[:last_tenants_len], last_tenants_len, today
+    if days == 0:
+        return tenants[:last_tenants_len], last_tenants_len, last_date
     tenants = tenants[:last_tenants_len + batch_size]
     return tenants, len(tenants), today
 
