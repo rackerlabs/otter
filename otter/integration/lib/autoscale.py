@@ -464,6 +464,17 @@ class ScalingGroup(object):
             headers=headers(str(rcs.token)), pool=self.pool)
         return d.addCallback(check_success, [204])
 
+    @diagnose("AS", "Disown server")
+    def disown(self, rcs, server_id, purge=False, replace=False):
+        """
+        Disown a server from the autoscaling group.
+        """
+        d = self.treq.delete(
+            "{0}/servers/{1}".format(self._endpoint(rcs), server_id),
+            params={'replace': replace, 'purge': purge},
+            headers=headers(str(rcs.token)), pool=self.pool)
+        return d.addCallback(check_success, [202])
+
     @diagnose("AS", "Wait for scaling group state to reach a particular point")
     def wait_for_state(self, rcs, matcher, timeout=600, period=10, clock=None):
         """
