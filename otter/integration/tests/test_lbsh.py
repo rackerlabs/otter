@@ -358,6 +358,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             timeout=timeout_default
         )
 
+    @inlineCallbacks
     def test_convergence_heals_two_groups_on_same_clb_1(
             self, remove_from_clb=False):
         """
