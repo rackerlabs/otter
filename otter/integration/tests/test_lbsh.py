@@ -12,21 +12,23 @@ from testtools.matchers import (
     MatchesSetwise
 )
 
-from twisted.internet.defer import gatherResults, inlineCallbacks
+from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 
 from twisted.trial import unittest
 
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer,
     ContainsAllIPs,
+    ExcludesAllIPs,
     HasLength
 )
+from otter.integration.lib.nova import NovaServer
 from otter.integration.lib.resources import TestResources
 from otter.integration.lib.trial_tools import (
     TestHelper,
     get_identity,
     get_resource_mapping,
-    region
+    region,
 )
 
 timeout_default = 600
@@ -58,6 +60,40 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         )
 
     @inlineCallbacks
+    def create_another_clb(self):
+        """
+        Create another CLB and wait for it to become active.  It will not
+        be added to the helper.  This is used, for example, to create a CLB
+        that is not associated with an autoscaling group.
+        """
+        # Create another loadbalancer not to be used in autoscale
+        # The CLB will not be added to the helper, since when the helper
+        # creates a group, it automatically adds the clb
+        clb_other = CloudLoadBalancer(pool=self.helper.pool,
+                                      treq=self.helper.treq)
+        yield clb_other.start(self.rcs, self)
+        yield clb_other.wait_for_state(
+            self.rcs, "ACTIVE", timeout_default)
+        returnValue(clb_other)
+
+    @inlineCallbacks
+    def confirm_clb_nodecounts(self, clbs):
+        """
+        Confirm that the provided CLBs have no nodes.
+
+        :param list clbs: a `list` of `tuple` of (:obj:`CloudLoadBalancer`,
+            number of expected nodes)
+
+        :return: `list` of nodes in the same order as the CLBs given
+        """
+        nodes = yield gatherResults([
+            clb.wait_for_nodes(
+                self.rcs, HasLength(numnodes), timeout=timeout_default)
+            for clb, numnodes in clbs
+        ])
+        returnValue(nodes)
+
+    @inlineCallbacks
     def test_oob_deleted_clb_node(self):
         """
         If an autoscaled server is removed from the CLB out of band its
@@ -70,17 +106,13 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         5. Assert that the server is put back on the CLB.
         """
         clb = self.helper.clbs[0]
-
-        yield clb.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+        yield self.confirm_clb_nodecounts([(clb, 0)])
 
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
-        nodes = yield clb.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
-
-        the_node = nodes[0]
+        clbs_nodes = yield self.confirm_clb_nodecounts([(clb, 1)])
+        the_node = clbs_nodes[0][0]
 
         yield clb.delete_nodes(self.rcs, [the_node['id']])
 
@@ -106,30 +138,17 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         Assert: Server put back on LB1
         Assert: Server removed from LB2
         """
-        # Create another loadbalancer not to be used in autoscale
-        # The CLB will not be added to the helper, since when the helper
-        # creates a group, it automatically adds the clb
-        clb_other = CloudLoadBalancer(pool=self.helper.pool,
-                                      treq=self.helper.treq)
-
-        yield clb_other.start(self.rcs, self)
-        yield clb_other.wait_for_state(
-            self.rcs, "ACTIVE", timeout_default)
-
         clb_as = self.helper.clbs[0]
+        clb_other = yield self.create_another_clb()
 
-        yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
-        yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+        yield self.confirm_clb_nodecounts([(clb_as, 0), (clb_other, 0)])
 
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
-        nodes_as = yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
-        yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+        nodes = yield self.confirm_clb_nodecounts([(clb_as, 1),
+                                                   (clb_other, 0)])
+        nodes_as = nodes[0]
 
         the_node = nodes_as[0]
         node_info = {
@@ -141,11 +160,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         yield clb_as.delete_nodes(self.rcs, [the_node['id']])
         yield clb_other.add_nodes(self.rcs, [node_info])
-
-        yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
-        yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
+        yield self.confirm_clb_nodecounts([(clb_as, 0), (clb_other, 1)])
 
         yield group.trigger_convergence(self.rcs)
 
@@ -168,7 +183,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
     def test_oob_copy_node_to_oob_lb(self):
         """
         This is a slight variation of :func:`test_move_node_to_oob_lb`, with
-        the node being copied to the second load balancer instead of moved.
+        the node copied to the second load balancer instead of moved.
 
         Confirm that when convergence is triggered, nodes copied to
         non-autoscale loadbalancers are removed.
@@ -179,32 +194,17 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             - Assert: Server still on LB1
             - Assert: Server removed from LB2
         """
-        # Create another loadbalancer not to be used in autoscale
-        # The CLB will not be added to the helper, since when the helper
-        # creates a group, it automatically adds the clb
-        clb_other = CloudLoadBalancer(pool=self.helper.pool,
-                                      treq=self.helper.treq)
-
-        yield clb_other.start(self.rcs, self)
-        yield clb_other.wait_for_state(
-            self.rcs, "ACTIVE", timeout_default)
-
         clb_as = self.helper.clbs[0]
-
-        # Confirm both LBs are empty to start
-        yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
-        yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+        clb_other = yield self.create_another_clb()
+        yield self.confirm_clb_nodecounts([(clb_as, 0), (clb_other, 0)])
 
         group, _ = self.helper.create_group(min_entities=1)
         yield self.helper.start_group_and_wait(group, self.rcs)
 
         # One node should have been added to clb_as, none to clb_other
-        nodes_as = yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
-        yield clb_other.wait_for_nodes(
-            self.rcs, HasLength(0), timeout=timeout_default)
+        nodes = yield self.confirm_clb_nodecounts([(clb_as, 1),
+                                                   (clb_other, 0)])
+        nodes_as = nodes[0]
 
         the_node = nodes_as[0]
         node_info = {
@@ -357,3 +357,244 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             MatchesSetwise(Equals(nodes[0])),
             timeout=timeout_default
         )
+
+    def test_convergence_heals_two_groups_on_same_clb_1(
+            self, remove_from_clb=False):
+        """
+        Autoscale removes a server from a CLB if it's not supposed to be on
+        the CLB, not touching any other autoscale servers on the same CLB.
+
+        1. Create 2 AS groups on the same CLB, both with min 1 server,
+           each group mapped to different ports
+        2. Add group1's server to the CLB on group2's port without deleting
+           it from group1's port.
+        3. Converge both groups.
+        4. Group1's servers should be only on group1's port, and group2's
+           servers should only be on group2's port.
+        """
+        clb = self.helper.clbs[0]
+        group1, _ = self.helper.create_group(
+            min_entities=1, use_lbs=[clb.scaling_group_spec(80)])
+        group2, _ = self.helper.create_group(
+            min_entities=1, use_lbs=[clb.scaling_group_spec(8080)])
+
+        yield gatherResults([
+            self.helper.start_group_and_wait(group, self.rcs)
+            for group in (group1, group2)])
+
+        # assert that they're both on the CLB on the right ports
+        groups = yield gatherResults([
+            group.get_servicenet_ips(self.rcs) for group in (group1, group2)])
+        group1_ip, group2_ip = [g.values()[0] for g in groups]
+
+        expected_nodes = [
+            ContainsDict({'port': Equals(80),
+                          'address': Equals(group1_ip)}),
+            ContainsDict({'port': Equals(8080),
+                          'address': Equals(group1_ip)}),
+            ContainsDict({'port': Equals(8080),
+                          'address': Equals(group2_ip)})]
+
+        nodes = yield clb.wait_for_nodes(
+            self.rcs,
+            MatchesSetwise(expected_nodes[0], expected_nodes[2]),
+            timeout=timeout_default
+        )
+
+        # add/remove another node
+        perturb = [
+            clb.add_nodes(self.rcs, [{'address': group1_ip,
+                                      'port': 8080,
+                                      'condition': 'ENABLED',
+                                      'type': 'PRIMARY'}])
+        ]
+        if remove_from_clb:
+            perturb.append(
+                clb.delete_nodes(self.rcs,
+                                 [n['id'] for n in nodes
+                                  if n['address'] == group1_ip]))
+        yield gatherResults(perturb)
+
+        node_matchers = expected_nodes
+        if remove_from_clb:
+            node_matchers = expected_nodes[1:]
+        yield clb.wait_for_nodes(
+            self.rcs, MatchesSetwise(*node_matchers), timeout=timeout_default)
+
+        yield gatherResults([group.trigger_convergence(self.rcs)
+                             for group in (group1, group2)])
+
+        yield clb.wait_for_nodes(
+            self.rcs,
+            MatchesSetwise(expected_nodes[0], expected_nodes[2]),
+            timeout=timeout_default
+        )
+
+    def test_convergence_heals_two_groups_on_same_clb_2(self):
+        """
+        Autoscale puts a server back on the desired CLB, not touching any other
+        autoscale servers on the same CLB.
+
+        1. Create 2 AS groups on the same CLB, both with min 1 server,
+           each group mapped to different ports
+        2. Add group1's server to the CLB on group2's port and remove it from
+           group1's port.
+        3. Converge both groups.
+        4. Group1's servers should be only on group1's port, and group2's
+           servers should only be on group2's port.
+        """
+        return self.test_convergence_heals_two_groups_on_same_clb_1(True)
+
+    @inlineCallbacks
+    def _disown_change_and_converge(self, remove_from_clb=True):
+        """
+        Test helper for
+        :func:`test_changing_disowned_server_is_not_converged_1` and
+        :func:`test_changing_disowned_server_is_not_converged_2`.
+
+        Create an AS group with 2 servers, disowns 1 of them, perterbs the
+        CLBs they are on, and then triggers convergence.
+        """
+        clb_as = self.helper.clbs[0]
+        clb_other = yield self.create_another_clb()
+        yield self.confirm_clb_nodecounts([(clb_as, 0), (clb_other, 0)])
+
+        group, _ = self.helper.create_group()
+        yield self.helper.start_group_and_wait(group, self.rcs, desired=2)
+        ips = yield group.get_servicenet_ips(self.rcs)
+        disowned_server = ips.keys()[0]
+        remaining_server = ips.keys()[1]
+
+        yield group.disown(self.rcs, disowned_server)
+
+        # copy/move the untouched server to the other CLB
+        clb_manipulation = [
+            clb_other.add_nodes(
+                self.rcs,
+                [{'address': ip, 'port': 80, 'condition': 'ENABLED',
+                  'type': 'PRIMARY'} for ip in ips.values()])
+        ]
+        if remove_from_clb:
+            nodes = yield clb_as.list_nodes(self.rcs)
+            clb_manipulation.append(
+                clb_as.delete_nodes(
+                    self.rcs, [n['id'] for n in nodes['nodes']]))
+        yield gatherResults(clb_manipulation)
+
+        # trigger group
+        yield group.trigger_convergence(self.rcs)
+
+        # make sure the disowned server hasn't been deleted - this will
+        # execute before the group cleanup, since addCleanup is LIFO
+        s = NovaServer(id=disowned_server, pool=self.helper.pool,
+                       treq=self.helper.treq)
+        self.addCleanup(s.details, self.rcs)
+
+        returnValue((group, clb_as, clb_other, ips[disowned_server],
+                     ips[remaining_server]))
+
+    @inlineCallbacks
+    def test_changing_disowned_server_is_not_converged_1(
+            self, remove_from_clb=True):
+        """
+        Moving a disowned autoscale server to a different CLB and converging
+        will not move the disowned server back on its intended CLB.
+
+        1. Create an AS group with 2 servers.
+        2. Disown 1 server.
+        3. Move both servers to a different CLB.
+        4. Converge group.
+        6. Assert that the group's server is back on its CLB, and that the
+           disowned server's remains on the wrong CLB.
+        """
+        group, clb_as, clb_other, gone_ip, stay_ip = (
+            yield self._disown_change_and_converge())
+
+        yield gatherResults([
+            clb_as.wait_for_nodes(
+                self.rcs,
+                MatchesAll(
+                    ExcludesAllIPs([gone_ip]),
+                    ContainsAllIPs([stay_ip]),
+                    HasLength(1)
+                ),
+                timeout=timeout_default
+            ),
+            clb_other.wait_for_nodes(
+                self.rcs,
+                MatchesAll(
+                    ExcludesAllIPs([stay_ip]),
+                    ContainsAllIPs([gone_ip]),
+                    HasLength(1)
+                ),
+                timeout=timeout_default
+            ),
+            group.wait_for_state(
+                self.rcs,
+                MatchesAll(
+                    ContainsDict({
+                        'pendingCapacity': Equals(0),
+                        'desiredCapacity': Equals(1),
+                        'status': Equals('ACTIVE'),
+                        'active': HasLength(1)
+                    })
+                ),
+                timeout=timeout_default
+            ),
+
+        ])
+
+    @inlineCallbacks
+    def test_changing_disowned_server_is_not_converged_2(self):
+        """
+        Copying a disowned autoscale server to a different CLB and converging
+        will not move the disowned server back on its intended CLB.
+
+        1. Create an AS group with 2 servers.
+        2. Disown 1 server.
+        3. Place both servers on a different CLB in addition to the original
+           CLB.
+        4. Converge group.
+        6. Assert that the group's server is back on its CLB only, and that the
+           disowned server's remains on both CLBs.
+
+        This is slightly different than
+        :func:`test_changing_disowned_server_is_not_converged_1` in that it
+        does not remove the servers from their original CLB.  This tests
+        that autoscale will not remove disowned servers from the original
+        autoscale CLB.
+        """
+        group, clb_as, clb_other, gone_ip, stay_ip = (
+            yield self._disown_change_and_converge(False))
+
+        yield gatherResults([
+            clb_as.wait_for_nodes(
+                self.rcs,
+                MatchesAll(
+                    ContainsAllIPs([gone_ip, stay_ip]),
+                    HasLength(2)
+                ),
+                timeout=timeout_default
+            ),
+            clb_other.wait_for_nodes(
+                self.rcs,
+                MatchesAll(
+                    ExcludesAllIPs([stay_ip]),
+                    ContainsAllIPs([gone_ip]),
+                    HasLength(1)
+                ),
+                timeout=timeout_default
+            ),
+            group.wait_for_state(
+                self.rcs,
+                MatchesAll(
+                    ContainsDict({
+                        'pendingCapacity': Equals(0),
+                        'desiredCapacity': Equals(1),
+                        'status': Equals('ACTIVE'),
+                        'active': HasLength(1)
+                    })
+                ),
+                timeout=timeout_default
+            )
+        ])

@@ -102,6 +102,17 @@ class NovaServer(object):
             pool=self.pool
         ).addCallback(check_success, [200]).addCallback(self.treq.json_content)
 
+    @diagnose("nova", "Checking server's details")
+    def details(self, rcs):
+        """
+        Get a server's details.
+        """
+        return self.treq.get(
+            "{}/servers/{}".format(rcs.endpoints["nova"], self.id),
+            headers=headers(str(rcs.token)),
+            pool=self.pool
+        ).addCallback(check_success, [200]).addCallback(self.treq.json_content)
+
 
 @diagnose("nova", "Deleting one or more servers")
 def delete_servers(server_ids, rcs, pool, _treq=treq):

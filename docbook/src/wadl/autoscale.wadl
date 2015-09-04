@@ -186,9 +186,7 @@
             <param style="plain" name="launchConfiguration"
                 required="true" type="object"
                 path="$.launchConfiguration">
-                <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN">
-                    <para>A launch configuration.</para>
+                <wadl:doc xmlns="http://docbook.org/ns/docbook" xml:lang="EN">
                     <para>A launch configuration defines what to do
                         when a new server is created, including
                         information about the server image, the flavor
@@ -199,6 +197,15 @@
                         For more details, see <link xlink:href="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content/Configurations.html">
                             Launch configurations</link>.</para></wadl:doc>
             </param>
+            <param style="plain" name="args" required="true"
+                type="object" path="$.launchConfiguration.args">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The configuration used to create new servers in the scaling group.
+                        You must specify the <parameter>server</parameter> attribute, and can also specify the optional <parameter>loadBalancers</parameter> attribute. Most
+                        launch configurations have both a server and a
+                        cloud load balancer or RackConnectV3 load balancer pool configured.</para></wadl:doc>
+            </param>
+           
             <param style="plain" name="loadBalancers" required="false"
                 type="array"
                 path="$.launchConfiguration.args.loadBalancers">
@@ -233,13 +240,6 @@
                         for RackConnectV3 set the <emphasis>UUID as a string</emphasis>. 
                         NOTE that when using RackConnectV3, this value is supplied to you by Rackspace Support 
                         after they configure your load balancer pool. </para></wadl:doc>
-            </param>
-            <param style="plain" name="Type" required="true"
-                type="string"
-                path="$.launchConfiguration.args.loadBalancers.[*].type">
-                <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN"><para>Must be set to <parameter>"RackConnectV3"</parameter> if you are using RackConnectV3.</para>
-                <note>This parameter is NOT required if you are using cloud load balancers and not using RackConnectV3. </note></wadl:doc>
             </param>
             <param style="plain" name="server" required="true"
                 type="object" path="$.launchConfiguration.args.server">
@@ -283,12 +283,17 @@
                         server images, this value must always be
                         <parameter>MANUAL</parameter>. A non-Rackspace server
                         image would be one that you imported using a non-Rackspace server. For more information, see the
-                        <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/diskconfig_attribute.html">
-                            Disk Configuration Extension
-                        </link>documentation for Rackspace
+                        <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/diskconfig_attribute.html">Disk Configuration Extension</link> documentation for Rackspace
                         Cloud Servers.</para></wadl:doc>
             </param>
 
+            <param style="plain" name="personality" required="true"
+                type="Array"
+                path="$.launchConfiguration.args.server.personality">
+                <wadl:doc xmlns="http://docbook.org/ns/docbook"
+                    xml:lang="EN"><para>The file path and/or the content that you want to inject into a server image. 
+                        For more information, see the  <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html">Server personality</link> documentation for Rackspace Cloud Servers.</para></wadl:doc>
+            </param>
             <param style="plain" name="path" required="true"
                 type="string"
                 path="$.launchConfiguration.args.server.personality.[*].path">
@@ -313,14 +318,7 @@
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
                     xml:lang="EN"><para>The base64 encoded string of your create server template.</para></wadl:doc>
             </param>            
-            <param style="plain" name="args" required="true"
-                type="object" path="$.launchConfiguration.args">
-                <wadl:doc xmlns="http://docbook.org/ns/docbook"
-                    xml:lang="EN"><para>The configuration used to create new servers in the scaling group.
-                        You must specify the <parameter>server</parameter> attribute, and can also specify the optional <parameter>loadBalancers</parameter> attribute. Most
-                        launch configurations have both a server and a
-                        cloud load balancer or RackConnectV3 load balancer pool configured.</para></wadl:doc>
-            </param>
+           
             <param style="plain" name="type" required="true"
                 type="string" path="$.launchConfiguration.type">
                 <wadl:doc xmlns="http://docbook.org/ns/docbook"
@@ -1562,66 +1560,6 @@
 		<wadl:doc xmlns="http://docbook.org/ns/docbook">An array of scaling
                         policies.</wadl:doc>
 	      </param>
-	      <param style="plain"
-		     name="name"
-		     required="true"
-		     type="string"
-		     path="$.[*].name">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="args"
-		     required="false"
-		     type="object"
-		     path="$.[*].args">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="cron"
-		     required="false"
-		     type="string"
-		     path="$.[*].args.cron">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="at"
-		     required="false"
-		     type="string"
-		     path="$.[*].args.at">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="changePercent"
-		     required="false"
-		     type="number"
-		     path="$.[*].changePercent">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="cooldown"
-		     required="true"
-		     type="number"
-		     path="$.[*].cooldown">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="type"
-		     required="true"
-		     type="enum"
-		     path="$.[*].type">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
-	      </param>
-                <param style="plain"
-                    name="change"
-                    required="false"
-                    type="integer"
-                    path="$.[*].change">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
-                </param>
-                <param style="plain" name="name" required="true"
-                    type="string" path="$.[*].name">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook"></wadl:doc>
-                </param>
                 <param style="plain" name="args" required="false"
                     type="object" path="$.[*].args">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook"
