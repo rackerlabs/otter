@@ -211,7 +211,10 @@ class TestHelper(object):
             the server name prefix used for the scaling group.
         """
         if self.clbs:
-            kwargs['use_lbs'] = [clb.scaling_group_spec() for clb in self.clbs]
+            # allow us to override the CLB setup
+            kwargs.setdefault(
+                'use_lbs',
+                [clb.scaling_group_spec() for clb in self.clbs])
 
         kwargs.setdefault("image_ref", image_ref)
         kwargs.setdefault("flavor_ref", flavor_ref)
