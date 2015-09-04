@@ -361,18 +361,21 @@ class StepAsEffectTests(SynchronousTestCase):
                 [(eff.intent, lambda i: raise_(exception))],
                 eff)
 
-    def test_change_load_balancer_node(self):
-        """
-        :obj:`ChangeCLBNode.as_effect` produces a request for
-        modifying a load balancer node.
-        """
+    def _change_node_eff(self):
         change_node = ChangeCLBNode(
             lb_id='abc123',
             node_id='node1',
             condition=CLBNodeCondition.DRAINING,
             weight=50,
             type=CLBNodeType.PRIMARY)
-        eff = change_node.as_effect()
+        return change_node.as_effect()
+
+    def test_change_load_balancer_node(self):
+        """
+        :obj:`ChangeCLBNode.as_effect` produces a request for
+        modifying a load balancer node.
+        """
+        eff = self._change_node_eff()
         retry_result = (
             StepResult.RETRY,
             [ErrorReason.String(
@@ -380,6 +383,10 @@ class StepAsEffectTests(SynchronousTestCase):
                 'active cache')])
         seq = [(eff.intent, lambda i: (StubResponse(202, {}), {}))]
         self.assertEqual(perform_sequence(seq, eff), retry_result)
+
+    def test_change_clb_node_terminal_errors(self):
+        """Some errors during :obj:`ChangeCLBNode` make convergence fail."""
+        eff = self._change_node_eff()
         terminal = (NoSuchCLBNodeError(lb_id=u'abc123', node_id=u'node1'),
                     CLBNotFoundError(lb_id=u'abc123'),
                     CLBNotActiveError(lb_id=u'abc123'),
@@ -390,6 +397,9 @@ class StepAsEffectTests(SynchronousTestCase):
                                  eff),
                 (StepResult.FAILURE, [ANY]))
 
+    def test_change_clb_node_nonterminal_errors(self):
+        """Some errors during :obj:`ChangeCLBNode` make convergence retry."""
+        eff = self._change_node_eff()
         nonterminal = (APIError(code=500, body="", headers={}),
                        CLBRateLimitError(lb_id=u'abc123'))
         for exception in nonterminal:
