@@ -17,7 +17,6 @@ from zope.interface import Interface, implementer
 
 from otter.cloud_client import (
     CLBNodeLimitError,
-    CLBNotActiveError,
     CLBNotFoundError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
@@ -326,8 +325,7 @@ class ChangeCLBNode(object):
             success=lambda _: (StepResult.RETRY, [ErrorReason.String(
                 'must re-gather after CLB change in order to update the '
                 'active cache')]),
-            error=_failure_reporter(CLBNotFoundError, NoSuchCLBNodeError,
-                                    CLBNotActiveError))
+            error=_failure_reporter(CLBNotFoundError, NoSuchCLBNodeError))
 
 
 def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):

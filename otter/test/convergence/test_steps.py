@@ -389,7 +389,6 @@ class StepAsEffectTests(SynchronousTestCase):
         eff = self._change_node_eff()
         terminal = (NoSuchCLBNodeError(lb_id=u'abc123', node_id=u'node1'),
                     CLBNotFoundError(lb_id=u'abc123'),
-                    CLBNotActiveError(lb_id=u'abc123'),
                     APIError(code=400, body="", headers={}))
         for exception in terminal:
             self.assertEqual(
@@ -401,6 +400,7 @@ class StepAsEffectTests(SynchronousTestCase):
         """Some errors during :obj:`ChangeCLBNode` make convergence retry."""
         eff = self._change_node_eff()
         nonterminal = (APIError(code=500, body="", headers={}),
+                       CLBNotActiveError(lb_id=u'abc123'),
                        CLBRateLimitError(lb_id=u'abc123'))
         for exception in nonterminal:
             self.assertEqual(
