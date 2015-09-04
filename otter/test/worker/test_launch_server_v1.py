@@ -2144,10 +2144,10 @@ class MetadataScrubbingTests(SynchronousTestCase):
         keys and correctly keeps other keys.
         """
         samples = [
-            ({}, {}),
-            (sample_otter_metadata, {}),
-            (merge(sample_otter_metadata, sample_user_metadata),
-             sample_user_metadata)
+            ({'metadata': {}}, {'metadata': {}}),
+            ({'metadata': sample_otter_metadata}, {'metadata': {}}),
+            ({'metadata': merge(sample_otter_metadata, sample_user_metadata)},
+             {'metadata': sample_user_metadata})
         ]
 
         for metadata, expected_scrubbed_metadata in samples:
@@ -2167,11 +2167,13 @@ class MetadataScrubbingTests(SynchronousTestCase):
         treq = StubTreq2([(("GET", expected_url,
                             {"headers": expected_headers(),
                              "data": None}),
-                           (200, json.dumps(merge(sample_otter_metadata,
-                                                  sample_user_metadata)))),
+                           (200, json.dumps({
+                               'metadata': merge(sample_otter_metadata,
+                                                 sample_user_metadata)}))),
                           (("PUT", expected_url,
                             {"headers": expected_headers(),
-                             "data": json.dumps(sample_user_metadata)}),
+                             "data": json.dumps({
+                                 'metadata': sample_user_metadata})}),
                            (200, ""))])
 
         d = scrub_otter_metadata(log=log,

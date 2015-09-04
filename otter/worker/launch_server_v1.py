@@ -567,9 +567,10 @@ def _without_otter_metadata(metadata):
     Return a copy of the metadata with all the otter-specific keys
     removed.
     """
-    return {k: v for (k, v) in metadata.iteritems()
+    meta = {k: v for (k, v) in metadata.get('metadata', {}).iteritems()
             if not (k.startswith("rax:auto_scaling") or
                     k.startswith("rax:autoscale:"))}
+    return {'metadata': meta}
 
 
 def scrub_otter_metadata(log, auth_token, service_catalog, region, server_id,
