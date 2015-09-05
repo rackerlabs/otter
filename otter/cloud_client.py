@@ -575,7 +575,7 @@ def add_clb_nodes(lb_id, nodes):
         log_success_response('request-add-clb-nodes', identity))
 
 
-def change_clb_node(lb_id, node_id, condition, weight):
+def change_clb_node(lb_id, node_id, condition, weight, _type="PRIMARY"):
     """
     Generate effect to change a node on a load balancer.
 
@@ -584,9 +584,7 @@ def change_clb_node(lb_id, node_id, condition, weight):
     :param str condition: The condition to change to: one of "ENABLED",
         "DRAINING", or "DISABLED"
     :param int weight: The weight to change to.
-
-    Note: this does not support "type" yet, since it doesn't make sense to add
-    autoscaled servers as secondary.
+    :param str _type: The type to change the CLB node to.
 
     :return: :class:`ServiceRequest` effect
 
@@ -597,7 +595,8 @@ def change_clb_node(lb_id, node_id, condition, weight):
         ServiceType.CLOUD_LOAD_BALANCERS,
         'PUT',
         append_segments('loadbalancers', lb_id, 'nodes', node_id),
-        data={'condition': condition, 'weight': weight},
+        data={'node': {
+            'condition': condition, 'weight': weight, 'type': _type}},
         success_pred=has_code(202))
 
     @_only_json_api_errors

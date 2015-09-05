@@ -672,13 +672,14 @@ class CLBClientTests(SynchronousTestCase):
         Parse the common CLB errors, and :class:`NoSuchCLBNodeError`.
         """
         eff = change_clb_node(lb_id=self.lb_id, node_id='1234',
-                              condition="DRAINING", weight=50)
+                              condition="DRAINING", weight=50,
+                              _type='SECONDARY')
         expected = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'PUT',
             'loadbalancers/{0}/nodes/1234'.format(self.lb_id),
-            data={'condition': 'DRAINING',
-                  'weight': 50},
+            data={'node': {'condition': 'DRAINING',
+                           'weight': 50, 'type': 'SECONDARY'}},
             success_pred=has_code(202))
 
         # success
@@ -705,6 +706,27 @@ class CLBClientTests(SynchronousTestCase):
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)
+
+    def test_change_clb_node_default_type(self):
+        """
+        Produce a request for modifying a node on a load balancer with the
+        default type, which returns a successful result on 202.
+        """
+        eff = change_clb_node(lb_id=self.lb_id, node_id='1234',
+                              condition="DRAINING", weight=50)
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'PUT',
+            'loadbalancers/{0}/nodes/1234'.format(self.lb_id),
+            data={'node': {'condition': 'DRAINING',
+                           'weight': 50, 'type': 'PRIMARY'}},
+            success_pred=has_code(202))
+
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(stub_pure_response('', 202)))])
+        self.assertEqual(sync_perform(dispatcher, eff),
+                         stub_pure_response(None, 202))
 
     def test_add_clb_nodes(self):
         """
