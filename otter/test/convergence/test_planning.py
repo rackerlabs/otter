@@ -499,6 +499,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
     """
     clb_desc = CLBDescription(lb_id='1', port=80)
     rcv3_desc = RCv3Description(lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')
+    clstep = ConvergeLater(reasons=[ErrorReason.String('draining servers')])
 
     def test_building_servers_are_deleted(self):
         """
@@ -612,7 +613,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         If the server already in draining state is waiting for the draining
         timeout on some load balancers, and no further load balancers can be
-        removed, nothing is done to it.
+        removed, nothing is done to it and ConvergeLater is returned
         """
         self.assertEqual(
             converge(
@@ -628,7 +629,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                                  condition=CLBNodeCondition.DRAINING),
                              drained_at=1.0, connections=1)]),
                 2),
-            pbag([]))
+            pbag([self.clstep]))
 
     def test_draining_server_waiting_for_timeout_some_lbs_removed(self):
         """
@@ -667,7 +668,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             pbag([
                 RemoveNodesFromCLB(lb_id='9', node_ids=s('2')),
                 BulkRemoveFromRCv3(lb_node_pairs=s(
-                    (self.rcv3_desc.lb_id, 'abc')))
+                    (self.rcv3_desc.lb_id, 'abc'))),
+                self.clstep
             ]))
 
     def test_active_server_is_drained_if_not_all_lbs_can_be_removed(self):
@@ -726,7 +728,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             pbag([
                 SetMetadataItemOnServer(server_id='abc',
                                         key=DRAINING_METADATA[0],
-                                        value=DRAINING_METADATA[1])
+                                        value=DRAINING_METADATA[1]),
+                self.clstep
             ]))
 
     def test_draining_server_has_all_enabled_lb_set_to_draining(self):
