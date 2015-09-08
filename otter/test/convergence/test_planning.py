@@ -11,13 +11,13 @@ from otter.convergence.model import (
     CLBNode,
     CLBNodeCondition,
     CLBNodeType,
-    DRAINING_METADATA,
     DesiredGroupState,
     ErrorReason,
     RCv3Description,
     RCv3Node,
     ServerState)
-from otter.convergence.planning import Destiny, converge, get_destiny, plan
+from otter.convergence.planning import (
+    DRAINING_METADATA, Destiny, converge, get_destiny, plan)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -551,7 +551,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set(),
                 0),
@@ -589,7 +590,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
@@ -616,7 +618,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
@@ -639,7 +642,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=2.0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc,
                                           other_clb_desc))]),
@@ -741,7 +745,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
@@ -1123,3 +1128,38 @@ class DestinyTests(SynchronousTestCase):
         for st in ServerState.iterconstants():
             s = server('s1', state=st)
             self.assertIsNot(get_destiny(s), None)
+
+    def test_draining(self):
+        """
+        If the draining metadata is found, the destiny of the server will be
+        ``DRAIN``, when the server is in the ACTIVE or BUILD states.
+        """
+        for state in (ServerState.ACTIVE, ServerState.BUILD):
+            self.assertEqual(
+                get_destiny(server('s1', state=state,
+                                   metadata=dict([DRAINING_METADATA]))),
+                Destiny.DRAIN)
+
+    def test_draining_value_must_match(self):
+        """
+        The value of the draining metadata key must match in order for the
+        ``DRAIN`` destiny to be returned.
+        """
+        self.assertEqual(
+            get_destiny(server('s1', state=ServerState.ACTIVE,
+                               metadata={DRAINING_METADATA[0]: 'foo'})),
+            Destiny.CONSIDER_AVAILABLE)
+
+    def test_error_deleted_trumps_draining_metadata(self):
+        """
+        If a server is in ``ERROR`` or ``DELETED`` state, it will not get the
+        ``DRAIN`` destiny.
+        """
+        self.assertEqual(
+            get_destiny(server('s1', state=ServerState.ERROR,
+                               metadata=dict([DRAINING_METADATA]))),
+            Destiny.DELETE)
+        self.assertEqual(
+            get_destiny(server('s1', state=ServerState.DELETED,
+                               metadata=dict([DRAINING_METADATA]))),
+            Destiny.CLEANUP)

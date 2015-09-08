@@ -13,7 +13,6 @@ from otter.convergence.model import (
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
-    DRAINING_METADATA,
     ErrorReason,
     IDrainable,
     RCv3Description,
@@ -32,6 +31,9 @@ from otter.convergence.steps import (
 )
 from otter.convergence.transforming import limit_steps_by_count, optimize_steps
 from otter.util.fp import partition_bool
+
+
+DRAINING_METADATA = ('rax:autoscale:server:state', 'DRAINING')
 
 
 def _remove_from_lb_with_draining(timeout, nodes, now):
@@ -160,7 +162,7 @@ def _drain_and_delete(server, timeout, current_lb_nodes, now):
         return lb_draining_steps + [DeleteServer(server_id=server.id)]
 
     # if the server is not already in draining state, put it into draining
-    if server.state != ServerState.DRAINING:
+    if get_destiny(server) != Destiny.DRAIN:
         return lb_draining_steps + [
             SetMetadataItemOnServer(server_id=server.id,
                                     key=DRAINING_METADATA[0],
@@ -224,7 +226,6 @@ _DESTINY_TO_STATES = {
         ServerState.VERIFY_RESIZE,
         ServerState.SUSPENDED,
         ],
-    Destiny.DRAIN: [ServerState.DRAINING],
     Destiny.DELETE: [
         # We could implement rebooting for `SHUTOFF` servers, but instead we'll
         # just delete/replace them.
@@ -245,6 +246,11 @@ _STATE_TO_DESTINY = {
 
 def get_destiny(server):
     """Get the obj:`Destiny` of a server."""
+    metadata = server.json.get('metadata', {})
+    if (server.state in (ServerState.ACTIVE, ServerState.BUILD) and
+            metadata.get(DRAINING_METADATA[0]) == DRAINING_METADATA[1]):
+        return Destiny.DRAIN
+
     return _STATE_TO_DESTINY.get(server.state)
 
 

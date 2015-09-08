@@ -938,8 +938,11 @@ class EffectServersCache(object):
 
 
 def server(id, state, created=0, image_id='image', flavor_id='flavor',
-           json=None, **kwargs):
+           json=None, metadata=pmap(), **kwargs):
     """Convenience for creating a :obj:`NovaServer`."""
+    json = json or pmap({'id': id})
+    if metadata:
+        json = json.set('metadata', pmap(metadata))
     return NovaServer(id=id, state=state, created=created, image_id=image_id,
                       flavor_id=flavor_id,
-                      json=json or pmap({'id': id}), **kwargs)
+                      json=json, **kwargs)
