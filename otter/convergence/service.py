@@ -119,7 +119,7 @@ from otter.convergence.logging import log_steps
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
-from otter.log.intents import err, msg, with_log
+from otter.log.intents import err, msg, msg_with_time, with_log
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, UpdateGroupErrorReasons,
     UpdateGroupStatus, UpdateServersCache)
@@ -262,9 +262,12 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
     # Gather data
+    yield msg("beg-exec-convergence")
     now_dt = yield Effect(Func(datetime.utcnow))
-    all_data = yield convergence_exec_data(tenant_id, group_id, now_dt,
-                                           get_all_convergence_data)
+    all_data = yield msg_with_time(
+        "get-conv-exec-data",
+        convergence_exec_data(tenant_id, group_id, now_dt,
+                              get_all_convergence_data))
     (scaling_group, group_state, desired_group_state,
      servers, lb_nodes) = all_data
 
