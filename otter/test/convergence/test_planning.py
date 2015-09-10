@@ -822,7 +822,10 @@ class ConvergeTests(SynchronousTestCase):
                 0),
             pbag([
                 ConvergeLater(
-                    reasons=[ErrorReason.String('waiting for servers')])]))
+                    reasons=[ErrorReason.String(
+                        'waiting for temporarily unavailable server to become '
+                        'ACTIVE')],
+                    limited=True)]))
 
     def test_count_AVOID_REPLACING_as_meeting_capacity(self):
         """
@@ -996,7 +999,11 @@ class ConvergeTests(SynchronousTestCase):
                 # If we're waiting for some other servers we need to also
                 # expect a ConvergeLater
                 also = [ConvergeLater(reasons=[
-                    ErrorReason.String('waiting for servers')])]
+                    ErrorReason.String(
+                        'waiting for temporarily unavailable server to become '
+                        'ACTIVE')],
+                    limited=True)]
+
             self.assertEqual(
                 converge(
                     DesiredGroupState(server_config={}, capacity=2),

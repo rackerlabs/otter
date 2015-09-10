@@ -187,7 +187,8 @@ def _execute_steps(steps):
     if len(steps) > 0:
         results = yield steps_to_effect(steps)
 
-        severity = [StepResult.FAILURE, StepResult.RETRY, StepResult.SUCCESS]
+        severity = [StepResult.FAILURE, StepResult.RETRY,
+                    StepResult.LIMITED_RETRY, StepResult.SUCCESS]
         priority = sorted(results,
                           key=lambda (status, reasons): severity.index(status))
         worst_status = priority[0][0]
@@ -309,8 +310,8 @@ def convergence_succeeded(scaling_group, group_state, servers, now):
     yield Effect(
         UpdateServersCache(
             scaling_group.tenant_id, scaling_group.uuid, now,
-            [merge(thaw(s.json), {"_is_as_active": True})
-                for s in servers if s.state != ServerState.DELETED]))
+            [thaw(s.json.set("_is_as_active", True))
+             for s in servers if s.state != ServerState.DELETED]))
     yield do_return(ScalingGroupStatus.ACTIVE)
 
 
