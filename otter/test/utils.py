@@ -38,7 +38,7 @@ from twisted.web.http_headers import Headers
 from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
 
-from otter.convergence.model import NovaServer
+from otter.convergence.model import NovaServer, ServerState
 from otter.log.bound import BoundLog, bound_log_kwargs
 from otter.models.interface import IScalingGroup, IScalingGroupServersCache
 from otter.supervisor import ISupervisor
@@ -940,7 +940,12 @@ class EffectServersCache(object):
 def server(id, state, created=0, image_id='image', flavor_id='flavor',
            json=None, metadata=pmap(), **kwargs):
     """Convenience for creating a :obj:`NovaServer`."""
-    json = json or pmap({'id': id})
+    json = pmap(json) or pmap({'id': id, 'status': state.name})
+    if state is ServerState.UNKNOWN_TO_OTTER:
+        json = json.set('status', 'blargho')
+    elif state is ServerState.DELETED:
+        json = json.set('status', 'ACTIVE')
+        json = json.set('OS-EXT-STS:task_state', 'deleting')
     if metadata:
         json = json.set('metadata', pmap(metadata))
     return NovaServer(id=id, state=state, created=created, image_id=image_id,

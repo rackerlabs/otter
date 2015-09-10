@@ -16,7 +16,7 @@ from kazoo.recipe.partitioner import PartitionState
 
 import mock
 
-from pyrsistent import freeze, pbag, pmap, pset, s
+from pyrsistent import freeze, pbag, pmap, pset, s, thaw
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
@@ -771,7 +771,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                    links=freeze([{'href': 'link2', 'rel': 'self'}]))
         )
         self.state_active = {}
-        self.cache = [{'id': 'a'}, {'id': 'b'}]
+        self.cache = [thaw(self.servers[0].json), thaw(self.servers[1].json)]
         self.gsgi = GetScalingGroupInfo(tenant_id='tenant-id',
                                         group_id='group-id')
         self.manifest = {  # Many details elided!
@@ -811,9 +811,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (Log('execute-convergence', mock.ANY), noop),
             (Log('execute-convergence-results',
                  {'results': [], 'worst_status': 'SUCCESS'}), noop),
-            (UpdateServersCache("tenant-id", "group-id", self.now,
-                                [{"id": "a", "_is_as_active": True},
-                                 {"id": "b", "_is_as_active": True}]), noop)
+            (UpdateServersCache(
+                "tenant-id", "group-id", self.now,
+                [thaw(self.servers[0].json.set('_is_as_active', True)),
+                 thaw(self.servers[1].json.set("_is_as_active", True))]),
+             noop)
         ]
         self.state_active = {
             'a': {'id': 'a', 'links': [{'href': 'link1', 'rel': 'self'}]},
@@ -866,13 +868,15 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                'reasons': []}],
                   'worst_status': 'SUCCESS'}), noop),
             # Note that servers arg is non-deleted servers
-            (UpdateServersCache("tenant-id", "group-id", self.now,
-                                [{"id": "a", "_is_as_active": True},
-                                 {"id": "b", "_is_as_active": True}]), noop)
+            (UpdateServersCache(
+                "tenant-id", "group-id", self.now,
+                [thaw(self.servers[0].json.set("_is_as_active", True)),
+                 thaw(self.servers[1].json.set("_is_as_active", True))]),
+             noop)
         ]
 
         # all the servers updated in cache in beginning
-        self.cache.append({'id': 'c'})
+        self.cache.append(thaw(deleted.json))
 
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
@@ -1139,9 +1143,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (Log('group-status-active',
                  dict(cloud_feed=True, status='ACTIVE')),
              noop),
-            (UpdateServersCache("tenant-id", "group-id", self.now,
-                                [{"id": "a", "_is_as_active": True},
-                                 {"id": "b", "_is_as_active": True}]), noop)
+            (UpdateServersCache(
+                "tenant-id", "group-id", self.now,
+                [thaw(self.servers[0].json.set('_is_as_active', True)),
+                 thaw(self.servers[1].json.set('_is_as_active', True))]),
+             noop),
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
@@ -1165,9 +1171,11 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (Log('group-status-active',
                  dict(cloud_feed=True, status='ACTIVE')),
              noop),
-            (UpdateServersCache("tenant-id", "group-id", self.now,
-                                [{"id": "a", "_is_as_active": True},
-                                 {"id": "b", "_is_as_active": True}]), noop)
+            (UpdateServersCache(
+                "tenant-id", "group-id", self.now,
+                [thaw(self.servers[0].json.set("_is_as_active", True)),
+                 thaw(self.servers[1].json.set("_is_as_active", True))]),
+             noop)
         ]
         self.state_active = {
             'a': {'id': 'a', 'links': [{'href': 'link1', 'rel': 'self'}]},
