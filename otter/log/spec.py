@@ -102,7 +102,7 @@ msg_types = {
     # event -> [(event, format_str)]
     "add-server-clb": ("Adding {server_id} with IP address {ip_address} "
                        "to CLB {clb_id}"),
-    "beg-exec-convergence": "Beginning to execute convergence",
+    "beginning-convergence": "Beginning to execute convergence",
     "converge-all-groups": "Attempting to converge all dirty groups",
     "converge-all-groups-error": "Error while converging all groups",
     "converge-divergent-flag-disappeared":
@@ -116,7 +116,7 @@ msg_types = {
     "execute-convergence": split_execute_convergence,
     "execute-convergence-results": (
         "Got result of {worst_status} after executing convergence"),
-    "get-conv-exec-data": (
+    "gather-convergence-data": (
         "Convergence gathering completed in {seconds_taken} seconds"),
     "launch-servers": "Launching {num_servers} servers",
     "mark-clean-failure": "Failed to mark group {scaling_group_id} clean",

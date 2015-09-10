@@ -262,10 +262,10 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
     # Gather data
-    yield msg("beg-exec-convergence")
+    yield msg("beginning-convergence")
     now_dt = yield Effect(Func(datetime.utcnow))
     all_data = yield msg_with_time(
-        "get-conv-exec-data",
+        "gather-convergence-data",
         convergence_exec_data(tenant_id, group_id, now_dt,
                               get_all_convergence_data))
     (scaling_group, group_state, desired_group_state,
