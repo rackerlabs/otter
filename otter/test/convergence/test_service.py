@@ -796,9 +796,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                  noop)
             )
         return [
-            (Log("beg-exec-convergence", {}), noop),
+            (Log("begin-convergence", {}), noop),
             (Func(datetime.utcnow), lambda i: self.now),
-            (MsgWithTime("get-conv-exec-data", mock.ANY),
+            (MsgWithTime("gather-convergence-data", mock.ANY),
              nested_sequence(exec_seq))
         ]
 
@@ -894,9 +894,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """
         # Perform the GetScalingGroupInfo by raising an exception
         sequence = [
-            (Log("beg-exec-convergence", {}), noop),
+            (Log("begin-convergence", {}), noop),
             (Func(datetime.utcnow), lambda i: self.now),
-            (MsgWithTime("get-conv-exec-data", mock.ANY),
+            (MsgWithTime("gather-convergence-data", mock.ANY),
              nested_sequence([
                 parallel_sequence([
                     [(self.gsgi, lambda i: raise_(RuntimeError('foo')))],
