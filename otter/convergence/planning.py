@@ -84,7 +84,11 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
 
     changes = [drain_lb_node(node=node) for node in to_drain]
 
-    return removes + changes
+    retry = (
+        [ConvergeLater(reasons=[ErrorReason.String('draining servers')])]
+        if in_drain else [])
+
+    return removes + changes + retry
 
 
 def _converge_lb_state(server, current_lb_nodes):
