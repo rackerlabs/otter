@@ -152,3 +152,42 @@ def get_log_dispatcher(log, fields):
         LogErr: partial(perform_logging, log, fields, log_err),
         GetFields: sync_performer(lambda d, i: fields),
     })
+
+
+@attr.s
+class MsgWithTime(object):
+    """
+    Intent to log message with time taken to complete a given effect
+    """
+    msg = attr.ib()
+    effect = attr.ib()
+
+
+def msg_with_time(msg, eff):
+    """
+    Return Effect of MsgWithTime
+    """
+    return Effect(MsgWithTime(msg, eff))
+
+
+@sync_performer
+def perform_msg_time(reactor, disp, intent):
+    """
+    Perform `MsgWithTime` intent
+    """
+    start = reactor.seconds()
+
+    def log_msg_time(result):
+        meff = msg(intent.msg, seconds_taken=(reactor.seconds() - start))
+        return meff.on(lambda _: result)
+
+    return intent.effect.on(log_msg_time)
+
+
+def get_msg_time_dispatcher(reactor):
+    """
+    Return dispatcher with performer of MsgWithTime in it
+    """
+    return TypeDispatcher({
+        MsgWithTime: partial(perform_msg_time, reactor)
+    })

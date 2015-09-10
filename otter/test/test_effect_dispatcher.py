@@ -11,7 +11,7 @@ from otter.effect_dispatcher import (
     get_full_dispatcher,
     get_legacy_dispatcher,
     get_simple_dispatcher)
-from otter.log.intents import BoundFields, Log, LogErr
+from otter.log.intents import BoundFields, Log, LogErr, MsgWithTime
 from otter.models.cass import CQLQueryExecute
 from otter.models.intents import GetScalingGroupInfo
 from otter.util.pure_http import Request
@@ -46,6 +46,7 @@ def full_intents():
                                     scaling_group='scaling_group',
                                     server_id='server_id'),
         Log('msg', {}), LogErr('f', 'msg', {}), BoundFields(Effect(None), {}),
+        MsgWithTime('msg', Effect(None)),
         CQLQueryExecute(query='q', params={}, consistency_level=7)
     ]
 

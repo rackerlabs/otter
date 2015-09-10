@@ -37,7 +37,7 @@ from otter.convergence.service import (
     non_concurrently,
     trigger_convergence)
 from otter.convergence.steps import CreateServer
-from otter.log.intents import BoundFields, Log, LogErr
+from otter.log.intents import BoundFields, Log, LogErr, MsgWithTime
 from otter.models.intents import (
     DeleteGroup,
     GetScalingGroupInfo,
@@ -781,16 +781,25 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.gsgi_result = (self.group, self.manifest)
         self.now = datetime(1970, 1, 1)
 
-    def get_seq(self):
-        return [
-            (Func(datetime.utcnow), lambda i: self.now),
+    def get_seq(self, with_cache=True):
+        exec_seq = [
             parallel_sequence([
                 [(self.gsgi, lambda i: self.gsgi_result)],
                 [(("gacd", self.tenant_id, self.group_id, self.now),
-                  lambda i: (self.servers, ()))]
-            ]),
-            (UpdateServersCache(
-                self.tenant_id, self.group_id, self.now, self.cache), noop)
+                 lambda i: (self.servers, ()))]
+            ])
+        ]
+        if with_cache:
+            exec_seq.append(
+                (UpdateServersCache(
+                    self.tenant_id, self.group_id, self.now, self.cache),
+                 noop)
+            )
+        return [
+            (Log("begin-convergence", {}), noop),
+            (Func(datetime.utcnow), lambda i: self.now),
+            (MsgWithTime("gather-convergence-data", mock.ANY),
+             nested_sequence(exec_seq))
         ]
 
     def _invoke(self, plan=None):
@@ -885,8 +894,15 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         """
         # Perform the GetScalingGroupInfo by raising an exception
         sequence = [
+            (Log("begin-convergence", {}), noop),
             (Func(datetime.utcnow), lambda i: self.now),
-            (self.gsgi, lambda i: raise_(RuntimeError('foo')))
+            (MsgWithTime("gather-convergence-data", mock.ANY),
+             nested_sequence([
+                parallel_sequence([
+                    [(self.gsgi, lambda i: raise_(RuntimeError('foo')))],
+                    [("anything", noop)]
+                ])
+             ]))
         ]
 
         # And make sure that exception isn't wrapped in FirstError.
@@ -988,7 +1004,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                          group_id=self.group_id), noop))
         self.assertEqual(
             # skipping cache update intents returned in get_seq()
-            perform_sequence(self.get_seq()[:-1] + sequence,
+            perform_sequence(self.get_seq(False) + sequence,
                              self._invoke(_plan)),
             (step_result, group_status))
         # desired capacity was changed to 0
