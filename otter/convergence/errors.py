@@ -8,9 +8,11 @@ from toolz.functoolz import identity
 
 from otter.cloud_client import (
     CLBDeletedError,
+    CLBNodeLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
-    NoSuchCLBError
+    NoSuchCLBError,
+    NoSuchCLBNodeError
 )
 from otter.convergence.model import ErrorReason
 from otter.log.formatters import serialize_to_jsonable
@@ -46,6 +48,18 @@ def _present_no_such_clb_error(exception):
 def _present_clb_deleted_error(exception):
     return "Cloud Load Balancer is currently being deleted: {0}".format(
         exception.lb_id)
+
+
+@_present_exception.register(NoSuchCLBNodeError)
+def _present_no_clb_node_error(exception):
+    return "Node {} of Cloud Load Balancer {} does not exist".format(
+        exception.node_id, exception.lb_id)
+
+
+@_present_exception.register(CLBNodeLimitError)
+def _present_clb_node_limit_error(exception):
+    return "Cannot create more than {} nodes in Cloud Load Balancer {}".format(
+        exception.node_limit, exception.lb_id)
 
 
 @_present_exception.register(CreateServerConfigurationError)

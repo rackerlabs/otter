@@ -508,7 +508,7 @@ class StepAsEffectTests(SynchronousTestCase):
         terminals = (CLBNotFoundError(lb_id=u"12345"),
                      CLBDeletedError(lb_id=u"12345"),
                      NoSuchCLBError(lb_id=u"12345"),
-                     CLBNodeLimitError(lb_id=u"12345"),
+                     CLBNodeLimitError(lb_id=u"12345", node_limit=25),
                      APIError(code=403, body="You're out of luck."),
                      APIError(code=422, body="Oh look another 422."))
         eff = self._add_one_node_to_clb()

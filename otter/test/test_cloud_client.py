@@ -779,7 +779,8 @@ class CLBClientTests(SynchronousTestCase):
             sync_perform(dispatcher, eff)
         self.assertEqual(
             cm.exception,
-            CLBNodeLimitError(msg, lb_id=six.text_type(self.lb_id)))
+            CLBNodeLimitError(msg, lb_id=six.text_type(self.lb_id),
+                              node_limit=25))
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)
