@@ -4,9 +4,11 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import (
     CLBDeletedError,
+    CLBNodeLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
-    NoSuchCLBError
+    NoSuchCLBError,
+    NoSuchCLBNodeError
 )
 from otter.convergence.errors import present_reasons, structure_reason
 from otter.convergence.model import ErrorReason
@@ -32,6 +34,10 @@ class PresentReasonsTests(SynchronousTestCase):
                 'Cloud Load Balancer does not exist: lbid1',
             CLBDeletedError(lb_id=u'lbid2'):
                 'Cloud Load Balancer is currently being deleted: lbid2',
+            NoSuchCLBNodeError(lb_id=u'lbid3', node_id=u'node1'):
+                "Node node1 of Cloud Load Balancer lbid3 does not exist",
+            CLBNodeLimitError(lb_id=u'lb2', node_limit=25):
+                "Cannot create more than 25 nodes in Cloud Load Balancer lb2",
             CreateServerConfigurationError("Your server is wrong"):
                 'Server launch configuration is invalid: Your server is wrong',
             CreateServerOverQuoteError("You are over quota"):
