@@ -383,7 +383,7 @@ _CLB_DUPLICATE_NODES_PATTERN = _regex(
     "Duplicate nodes detected. One or more nodes already configured "
     "on load\s*balancer")
 _CLB_NODE_LIMIT_PATTERN = _regex(
-    "Nodes must not exceed \d+ per load\s*balancer")
+    "Nodes must not exceed (\d+) per load\s*balancer")
 _CLB_NODE_REMOVED_PATTERN = _regex(
     "Node ids ((?:\d+,)*(?:\d+)) are not a part of your load\s*balancer")
 _CLB_OVER_LIMIT_PATTERN = _regex("OverLimit Retry\.{3}")
@@ -478,7 +478,8 @@ class CLBDuplicateNodesError(Exception):
     """
 
 
-@attributes([Attribute('lb_id', instance_of=six.text_type)])
+@attributes([Attribute('lb_id', instance_of=six.text_type),
+             Attribute("node_limit", instance_of=int)])
 class CLBNodeLimitError(Exception):
     """
     Error to be raised only when adding one or more nodes to a CLB: adding
@@ -565,14 +566,26 @@ def add_clb_nodes(lb_id, nodes):
     @_only_json_api_errors
     def _parse_known_errors(code, json_body):
         mappings = _expand_clb_matches(
-            [(422, _CLB_DUPLICATE_NODES_PATTERN, CLBDuplicateNodesError),
-             (413, _CLB_NODE_LIMIT_PATTERN, CLBNodeLimitError)],
+            [(422, _CLB_DUPLICATE_NODES_PATTERN, CLBDuplicateNodesError)],
             lb_id)
         _match_errors(mappings, code, json_body)
         _process_clb_api_error(code, json_body, lb_id)
+        process_nodelimit_error(code, json_body, lb_id)
 
     return eff.on(error=_parse_known_errors).on(
         log_success_response('request-add-clb-nodes', identity))
+
+
+def process_nodelimit_error(code, json_body, lb_id):
+    """
+    Parse error that causes CLBNodeLimitError along with limit and raise it
+    """
+    if code != 413:
+        return
+    match = _CLB_NODE_LIMIT_PATTERN.match(json_body.get("message", ""))
+    if match is not None:
+         limit = int(match.group(1))
+         raise CLBNodeLimitError(lb_id=six.text_type(lb_id), node_limit=limit)
 
 
 def change_clb_node(lb_id, node_id, condition, weight, _type="PRIMARY"):
