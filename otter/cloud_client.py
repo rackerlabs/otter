@@ -584,8 +584,8 @@ def process_nodelimit_error(code, json_body, lb_id):
         return
     match = _CLB_NODE_LIMIT_PATTERN.match(json_body.get("message", ""))
     if match is not None:
-         limit = int(match.group(1))
-         raise CLBNodeLimitError(lb_id=six.text_type(lb_id), node_limit=limit)
+        limit = int(match.group(1))
+        raise CLBNodeLimitError(lb_id=six.text_type(lb_id), node_limit=limit)
 
 
 def change_clb_node(lb_id, node_id, condition, weight, _type="PRIMARY"):
