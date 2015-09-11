@@ -102,7 +102,6 @@ from pyrsistent import thaw
 
 import six
 
-from toolz.dicttoolz import merge
 from toolz.functoolz import curry
 
 from twisted.application.service import MultiService
