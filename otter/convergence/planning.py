@@ -348,9 +348,15 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
     # Converge again if we expect state transitions on any servers
     converge_later = []
     if any((s not in servers_to_delete
-            for s in waiting_for_build + servers[Destiny.WAIT])):
+            for s in waiting_for_build)):
         converge_later = [
             ConvergeLater(reasons=[ErrorReason.String('waiting for servers')])]
+
+    if any((s not in servers_to_delete for s in servers[Destiny.WAIT])):
+        converge_later.append(
+            ConvergeLater(limited=True, reasons=[ErrorReason.String(
+                'waiting for temporarily unavailable server to become ACTIVE'
+            )]))
 
     return pbag(create_steps +
                 scale_down_steps +

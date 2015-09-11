@@ -3,6 +3,8 @@ import re
 
 from functools import partial
 
+import attr
+
 from characteristic import Attribute, attributes
 
 from effect import Constant, Effect, Func, catch
@@ -519,17 +521,21 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
 
 
 @implementer(IStep)
-@attributes(['reasons'], apply_with_init=False)
+@attr.s(init=False)
 class ConvergeLater(object):
     """
     Converge later in some time
     """
+    reasons = attr.ib()
+    limited = attr.ib()
 
-    def __init__(self, reasons):
+    def __init__(self, reasons, limited=False):
         self.reasons = freeze(reasons)
+        self.limited = limited
 
     def as_effect(self):
         """
         Return an effect that always results in retry
         """
-        return Effect(Constant((StepResult.RETRY, list(self.reasons))))
+        result = StepResult.LIMITED_RETRY if self.limited else StepResult.RETRY
+        return Effect(Constant((result, list(self.reasons))))

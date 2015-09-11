@@ -110,6 +110,14 @@ class StepResult(Names):
     Convergence should be retried later.
     """
 
+    LIMITED_RETRY = NamedConstant()
+    """
+    Converge should be retried, but only a limited number of times.
+
+    This is used when we're waiting for upstream resources to become available
+    but aren't certain that they ever will be.
+    """
+
     FAILURE = NamedConstant()
     """
     The step failed. Retrying convergence won't help.
