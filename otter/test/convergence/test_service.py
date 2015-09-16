@@ -165,9 +165,9 @@ class ConvergerTests(SynchronousTestCase):
         When buckets are allocated, the result of converge_all_groups is
         performed.
         """
-        def converge_all_groups(currently_converging, recent, _my_buckets,
-                                all_buckets, divergent_flags, build_timeout,
-                                interval):
+        def converge_all_groups(currently_converging, recent, waiting,
+                                _my_buckets, all_buckets,
+                                divergent_flags, build_timeout, interval):
             return Effect(
                 ('converge-all', currently_converging, _my_buckets,
                  all_buckets, divergent_flags, build_timeout, interval))
@@ -199,9 +199,9 @@ class ConvergerTests(SynchronousTestCase):
         Errors raised from performing the converge_all_groups effect are
         logged, and None is the ultimate result.
         """
-        def converge_all_groups(currently_converging, recent, _my_buckets,
-                                all_buckets, divergent_flags, build_timeout,
-                                interval):
+        def converge_all_groups(currently_converging, recent, waiting,
+                                _my_buckets, all_buckets,
+                                divergent_flags, build_timeout, interval):
             return Effect('converge-all')
 
         bound_sequence = [
@@ -251,9 +251,9 @@ class ConvergerTests(SynchronousTestCase):
         and the list of child nodes is passed on to
         :func:`converge_all_groups`.
         """
-        def converge_all_groups(currently_converging, recent, _my_buckets,
-                                all_buckets, divergent_flags, build_timeout,
-                                interval):
+        def converge_all_groups(currently_converging, recent, waiting,
+                                _my_buckets, all_buckets,
+                                divergent_flags, build_timeout, interval):
             return Effect(('converge-all-groups', divergent_flags))
 
         intents = [
@@ -294,13 +294,20 @@ class ConvergeOneGroupTests(SynchronousTestCase):
     def _execute_convergence(self, tenant_id, group_id, build_timeout):
         return Effect(('ec', tenant_id, group_id, build_timeout))
 
-    def _verify_sequence(self, sequence, converging=Reference(pset()),
-                         recent=Reference(pmap()), allow_refs=True):
+    def _verify_sequence(self, sequence, converging=None,
+                         recent=None, waiting=None, allow_refs=True):
         """
         Verify that sequence is executed
         """
+        if converging is None:
+            converging = Reference(pset())
+        if recent is None:
+            recent = Reference(pmap())
+        if waiting is None:
+            waiting = Reference(pmap())
         eff = converge_one_group(
-            converging, recent, self.tenant_id, self.group_id, self.version,
+            converging, recent, waiting,
+            self.tenant_id, self.group_id, self.version,
             3600, execute_convergence=self._execute_convergence)
         fb_dispatcher = _get_dispatcher() if allow_refs else base_dispatcher
         perform_sequence(sequence, eff, fallback_dispatcher=fb_dispatcher)
@@ -326,6 +333,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         """
         currently = Reference(pset())
         recently = Reference(pmap())
+        waiting = Reference(pmap())
         remove_from_currently = match_func(pset([self.group_id]), pset([]))
         sequence = [
             (ReadReference(currently), lambda i: pset()),
@@ -340,7 +348,8 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             (Log('mark-clean-success', {}), noop)
         ]
         eff = converge_one_group(
-            currently, recently, self.tenant_id, self.group_id, self.version,
+            currently, recently, waiting,
+            self.tenant_id, self.group_id, self.version,
             3600, execute_convergence=self._execute_convergence)
         perform_sequence(sequence, eff)
 
@@ -491,6 +500,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
     def setUp(self):
         self.currently_converging = Reference(pset())
         self.recently_converged = Reference(pmap())
+        self.waiting = Reference(pmap())
         self.my_buckets = [1, 6]
         self.all_buckets = range(10)
         self.group_infos = [
@@ -502,14 +512,15 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
     def _converge_all_groups(self, flags):
         return converge_all_groups(
-            self.currently_converging, self.recently_converged,
+            self.currently_converging, self.recently_converged, self.waiting,
             self.my_buckets, self.all_buckets,
             flags,
             3600,
             15,
             converge_one_group=self._converge_one_group)
 
-    def _converge_one_group(self, currently_converging, recently_converged,
+    def _converge_one_group(self,
+                            currently_converging, recently_converged, waiting,
                             tenant_id, group_id, version, build_timeout):
         return Effect(
             ('converge', tenant_id, group_id, version, build_timeout))
@@ -623,7 +634,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             1 / 0  # This should not be run
 
         result = converge_all_groups(
-            self.currently_converging, self.recently_converged,
+            self.currently_converging, self.recently_converged, self.waiting,
             self.my_buckets, self.all_buckets, [],
             3600, 15, converge_one_group=converge_one_group)
         self.assertEqual(sync_perform(_get_dispatcher(), result), None)

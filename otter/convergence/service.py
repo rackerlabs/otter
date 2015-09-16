@@ -493,7 +493,7 @@ def eff_finally(eff, after_eff):
 
 
 @do
-def converge_one_group(currently_converging, recently_converged,
+def converge_one_group(currently_converging, recently_converged, waiting,
                        tenant_id, group_id, version,
                        build_timeout, execute_convergence=execute_convergence):
     """
@@ -502,6 +502,7 @@ def converge_one_group(currently_converging, recently_converged,
 
     :param Reference currently_converging: pset of currently converging groups
     :param Reference recently_converged: pmap of recently converged groups
+    :param Reference waiting: pmap of waiting groups
     :param str tenant_id: the tenant ID of the group that is converging
     :param str group_id: the ID of the group that is converging
     :param version: version number of ZNode of the group's dirty flag
@@ -510,6 +511,8 @@ def converge_one_group(currently_converging, recently_converged,
     :param callable execute_convergence: like :func`execute_convergence`, to
         be used for test injection only
     """
+    clean_waiting = waiting.modify(
+        lambda group_iterations: group_iterations.remove(group_id) if group_id in group_iterations else None)
     mark_recently_converged = Effect(Func(time.time)).on(
         lambda time_done: recently_converged.modify(
             lambda rcg: rcg.set(group_id, time_done)))
@@ -524,6 +527,7 @@ def converge_one_group(currently_converging, recently_converged,
         return
     except NoSuchScalingGroupError:
         yield err(None, 'converge-fatal-error')
+        yield clean_waiting
         yield delete_divergent_flag(tenant_id, group_id, version)
         return
     except Exception:
@@ -531,6 +535,18 @@ def converge_one_group(currently_converging, recently_converged,
         # unexpected errors, so convergence will be retried.
         yield err(None, 'converge-non-fatal-error')
     else:
+        if result[0] is StepResult.LIMITED_RETRY:
+            # We allow further iterations to proceed as long as we haven't been
+            # waiting for a LIMITED_RETRY for 10 consecutive iterations.
+            if (yield waiting.read())[group_id] > 10:
+                yield clean_waiting
+                yield delete_divergent_flag(tenant_id, group_id, version)
+            else:
+                yield waiting.modify(
+                    lambda group_iterations:
+                        group_iterations.set(group_id, group_iterations[group_id] + 1))
+        else:
+            yield clean_waiting
         if result[0] in (StepResult.FAILURE, StepResult.SUCCESS):
             # In order to avoid doing extra work and reporting spurious errors,
             # if the group status is None it means the group has successfully
@@ -544,7 +560,8 @@ def converge_one_group(currently_converging, recently_converged,
 
 @do
 def converge_all_groups(
-        currently_converging, recently_converged, my_buckets, all_buckets,
+        currently_converging, recently_converged, waiting,
+        my_buckets, all_buckets,
         divergent_flags, build_timeout, interval,
         converge_one_group=converge_one_group):
     """
@@ -554,6 +571,8 @@ def converge_all_groups(
     :param Reference currently_converging: pset of currently converging groups
     :param Reference recently_converged: pmap of group ID to time last
         convergence finished
+    :param Reference waiting: pmap of group ID to number of iterations already
+        waited
     :param my_buckets: The buckets that should be checked for group IDs to
         converge on.
     :param all_buckets: The set of all buckets that can be checked for group
@@ -590,6 +609,7 @@ def converge_all_groups(
             yield msg('converge-divergent-flag-disappeared', znode=dirty_flag)
         else:
             eff = converge_one_group(currently_converging, recently_converged,
+                                     waiting,
                                      tenant_id, group_id,
                                      stat.version, build_timeout)
             result = yield Effect(TenantScope(eff, tenant_id))
@@ -686,16 +706,21 @@ class Converger(MultiService):
             buckets=self._buckets, log=self.log,
             got_buckets=self.buckets_acquired)
         self.partitioner.setServiceParent(self)
-        self.currently_converging = Reference(pset())
-        self.recently_converged = Reference(pmap())
         self.build_timeout = build_timeout
         self._converge_all_groups = converge_all_groups
         self.interval = interval
+
+        ## ephemeral mutable state
+        self.currently_converging = Reference(pset())
+        self.recently_converged = Reference(pmap())
+        # Groups we're waiting on temporarily, and may give up on.
+        self.waiting = Reference(pmap())  # {group_id: num_iterations_waited}
 
     def _converge_all(self, my_buckets, divergent_flags):
         """Run :func:`converge_all_groups` and log errors."""
         eff = self._converge_all_groups(
             self.currently_converging, self.recently_converged,
+            self.waiting,
             my_buckets, self._buckets, divergent_flags, self.build_timeout,
             self.interval)
         return eff.on(
