@@ -308,13 +308,15 @@ def clean_waiting(waiting, group_id):
     """
     Return an intent that matches a removal of the given group ID.
     """
-    return ModifyReference(
-        waiting,
-        # match both a removal of the given group *and* not removing the
-        # group if it's not there.
-        match_all([match_func(pmap({group_id: 5}), pmap()),
-                   match_func(pmap({"foobar": 1500}),
-                              pmap({"foobar": 1500}))]))
+    return (
+        ModifyReference(
+            waiting,
+            # match both a removal of the given group *and* not removing the
+            # group if it's not there.
+            match_all([match_func(pmap({group_id: 5}), pmap()),
+                       match_func(pmap({"foobar": 1500}),
+                                  pmap({"foobar": 1500}))])),
+        noop)
 
 
 class ConvergeOneGroupTests(SynchronousTestCase):
@@ -410,7 +412,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             (LogErr(CheckFailureValue(expected_error),
                     'converge-fatal-error', {}),
              noop),
-            (clean_waiting(waiting, self.group_id), noop),
+            clean_waiting(waiting, self.group_id),
         ] + self._clean_divergent()
         self._verify_sequence(sequence, waiting=waiting)
 
@@ -523,21 +525,20 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         ] + self._clean_divergent(version=-1)
         self._verify_sequence(sequence)
 
-    def _limited_retry_converge(self, currently, recently, waiting):
+    def _limited_retry_converge(self, currently, recently, waiting,
+                                worst=StepResult.LIMITED_RETRY):
         """
-        Return a sequence that simulates a convergence where the worst status
-        is LIMITED_RETRY.
+        Return a sequence that simulates a convergence.
         """
         return [
             (ReadReference(currently),
              dispatch(reference_dispatcher)),
             add_to_currently(currently, self.group_id),
             (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: (StepResult.LIMITED_RETRY, ScalingGroupStatus.ACTIVE)),
+             lambda i: (worst, ScalingGroupStatus.ACTIVE)),
             (Func(time.time), lambda i: 100),
             add_to_recently(recently, self.group_id, 100),
             remove_from_currently(currently, self.group_id),
-            (ReadReference(waiting), dispatch(reference_dispatcher)),
         ]
 
     def _get_state(self, current=pset(), recent=pmap(), waiting=pmap()):
@@ -555,9 +556,10 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         current, recent, waiting = self._get_state(
             waiting=pmap({self.group_id: 11}))
         sequence = concatv(
-            self._converge(current, recent, waiting),
-            [(Log('converge-limited-retry-too-long', {}), noop),
-             (clean_waiting(waiting, self.group_id), noop)],
+            self._limited_retry_converge(current, recent, waiting),
+            [(ReadReference(waiting), dispatch(reference_dispatcher)),
+             (Log('converge-limited-retry-too-long', {}), noop),
+             clean_waiting(waiting, self.group_id)],
             self._clean_divergent())
         self._verify_sequence(
             sequence,
@@ -573,8 +575,9 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         current, recent, waiting = self._get_state(
             waiting=pmap({self.group_id: 10}))
         sequence = concatv(
-            self._converge(current, recent, waiting),
-            [(ModifyReference(waiting, match_func(pmap({self.group_id: 10}),
+            self._limited_retry_converge(current, recent, waiting),
+            [(ReadReference(waiting), dispatch(reference_dispatcher)),
+             (ModifyReference(waiting, match_func(pmap({self.group_id: 10}),
                                                   pmap({self.group_id: 11}))),
               dispatch(reference_dispatcher))])
         # No "waiting" map cleanup!
@@ -584,11 +587,30 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             converging=current, recent=recent, waiting=waiting,
             allow_refs=False)
 
+    def test_limited_retry_resolved(self):
+        """
+        When we've been waiting for LIMITED_RETRY and then we're not waiting
+        for it any more, the ``waiting`` data is cleaned up.
+        """
+        current, recent, waiting = self._get_state(
+            waiting=pmap({self.group_id: 10}))
+        sequence = concatv(
+            self._limited_retry_converge(current, recent, waiting,
+                                         worst=StepResult.SUCCESS),
+            [clean_waiting(waiting, self.group_id)],
+            self._clean_divergent())
+        self._verify_sequence(
+            sequence,
+            converging=current, recent=recent, waiting=waiting,
+            allow_refs=False)
+
 
 def dispatch(dispatcher):
-    def doit(intent):
-        return sync_perform(dispatcher, Effect(intent))
-    return doit
+    """
+    Return a function that accepts an intent and performs it. Useful for using
+    with :func:`perform_sequence`.
+    """
+    return lambda intent: sync_perform(dispatcher, Effect(intent))
 
 
 class ConvergeAllGroupsTests(SynchronousTestCase):

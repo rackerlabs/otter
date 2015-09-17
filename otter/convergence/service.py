@@ -550,7 +550,6 @@ def converge_one_group(currently_converging, recently_converged, waiting,
                         group_iterations.set(
                             group_id, group_iterations[group_id] + 1))
         else:
-            # TEST THIS D
             yield clean_waiting
         if result[0] in (StepResult.FAILURE, StepResult.SUCCESS):
             # In order to avoid doing extra work and reporting spurious errors,
