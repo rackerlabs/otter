@@ -512,7 +512,9 @@ def converge_one_group(currently_converging, recently_converged, waiting,
         be used for test injection only
     """
     clean_waiting = waiting.modify(
-        lambda group_iterations: group_iterations.remove(group_id) if group_id in group_iterations else None)
+        lambda group_iterations:
+            group_iterations.remove(group_id)
+            if group_id in group_iterations else group_iterations)
     mark_recently_converged = Effect(Func(time.time)).on(
         lambda time_done: recently_converged.modify(
             lambda rcg: rcg.set(group_id, time_done)))
@@ -539,13 +541,17 @@ def converge_one_group(currently_converging, recently_converged, waiting,
             # We allow further iterations to proceed as long as we haven't been
             # waiting for a LIMITED_RETRY for 10 consecutive iterations.
             if (yield waiting.read())[group_id] > 10:
+                # TEST THIS B
+                yield msg('converge-limited-retry-too-long')
                 yield clean_waiting
                 yield delete_divergent_flag(tenant_id, group_id, version)
             else:
+                # TEST THIS C
                 yield waiting.modify(
                     lambda group_iterations:
                         group_iterations.set(group_id, group_iterations[group_id] + 1))
         else:
+            # TEST THIS D
             yield clean_waiting
         if result[0] in (StepResult.FAILURE, StepResult.SUCCESS):
             # In order to avoid doing extra work and reporting spurious errors,

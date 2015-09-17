@@ -52,6 +52,7 @@ from otter.test.utils import (
     CheckFailureValue, FakePartitioner,
     TestStep,
     intent_func,
+    match_all,
     match_func,
     mock_group, mock_log,
     nested_sequence,
@@ -312,6 +313,27 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         fb_dispatcher = _get_dispatcher() if allow_refs else base_dispatcher
         perform_sequence(sequence, eff, fallback_dispatcher=fb_dispatcher)
 
+    def _clean_waiting(self, waiting, group_id):
+        """
+        Return an intent that matches a removal of the given group ID.
+        """
+        return ModifyReference(
+            waiting,
+            # match both a removal of the given group *and* not removing the
+            # group if it's not there.
+            match_all([match_func(pmap({group_id: 5}), pmap()),
+                       match_func(pmap({"foobar": 1500}),
+                                  pmap({"foobar": 1500}))]))
+
+    def _clean_divergent(self, tenant='tenant-id', group='g1', version=None):
+        if version is None:
+            version = self.version
+        return [
+            (DeleteNode(path='/groups/divergent/%s_%s' % (tenant, group),
+                        version=version), noop),
+            (Log('mark-clean-success', {}), noop)
+        ]
+
     def test_success(self):
         """
         runs execute_convergence and returns None, then deletes the dirty flag.
@@ -319,10 +341,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
-            (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                        version=self.version), noop),
-            (Log('mark-clean-success', {}), noop)
-        ]
+        ] + self._clean_divergent()
         self._verify_sequence(sequence)
 
     def test_record_recently_converged(self):
@@ -343,10 +362,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             (Func(time.time), lambda i: 100),
             add_to_recently(recently, self.group_id, 100),
             (ModifyReference(currently, remove_from_currently), noop),
-            (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                        version=self.version), noop),
-            (Log('mark-clean-success', {}), noop)
-        ]
+        ] + self._clean_divergent()
         eff = converge_one_group(
             currently, recently, waiting,
             self.tenant_id, self.group_id, self.version,
@@ -365,6 +381,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         When the scaling group disappears, a fatal error is logged and the
         dirty flag is cleaned up.
         """
+        waiting = Reference(pmap())
         expected_error = NoSuchScalingGroupError(self.tenant_id, self.group_id)
         sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
@@ -372,11 +389,9 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             (LogErr(CheckFailureValue(expected_error),
                     'converge-fatal-error', {}),
              noop),
-            (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                        version=self.version), noop),
-            (Log('mark-clean-success', {}), noop)
-        ]
-        self._verify_sequence(sequence)
+            (self._clean_waiting(waiting, self.group_id), noop),
+        ] + self._clean_divergent()
+        self._verify_sequence(sequence, waiting=waiting)
 
     def test_unexpected_errors(self):
         """
@@ -472,10 +487,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.FAILURE, ScalingGroupStatus.ACTIVE)),
-            (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                        version=self.version), noop),
-            (Log('mark-clean-success', {}), noop)
-        ]
+        ] + self._clean_divergent()
         self._verify_sequence(sequence)
 
     def test_delete_flag_unconditionally_when_group_deleted(self):
@@ -487,11 +499,22 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         sequence = [
             (('ec', self.tenant_id, self.group_id, 3600),
              lambda i: (StepResult.SUCCESS, None)),
-            (DeleteNode(path='/groups/divergent/tenant-id_g1', version=-1),
-             noop),
-            (Log('mark-clean-success', {}), noop),
-        ]
+        ] + self._clean_divergent(version=-1)
         self._verify_sequence(sequence)
+
+    def test_limited_retry_too_long(self):
+        """
+        When we've been retrying too long waiting for only a LIMITED_RETRY
+        step, we'll give up and delete the divergent flag.
+        """
+        waiting = Reference(pmap({self.group_id: 11}))
+        sequence = [
+            (('ec', self.tenant_id, self.group_id, 3600),
+             lambda i: (StepResult.LIMITED_RETRY, ScalingGroupStatus.ACTIVE)),
+            (Log('converge-limited-retry-too-long', {}), noop),
+            (self._clean_waiting(waiting, self.group_id), noop),
+        ] + self._clean_divergent()
+        self._verify_sequence(sequence, waiting=waiting)
 
 
 class ConvergeAllGroupsTests(SynchronousTestCase):
