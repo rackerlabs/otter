@@ -741,19 +741,3 @@ class Converger(MultiService):
             # the return value is ignored, but we return this for testing
             eff = self._converge_all(my_buckets, children)
             return perform(self._dispatcher, self._with_conv_runid(eff))
-
-# We're using a global for now because it's difficult to thread a new parameter
-# all the way through the REST objects to the controller code, where this
-# service is used.
-_convergence_starter = None
-
-
-def get_convergence_starter():
-    """Return global :obj:`ConvergenceStarter` service"""
-    return _convergence_starter
-
-
-def set_convergence_starter(convergence_starter):
-    """Set global :obj:`ConvergenceStarter` service"""
-    global _convergence_starter
-    _convergence_starter = convergence_starter
