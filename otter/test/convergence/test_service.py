@@ -374,9 +374,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         *before* being removed from ``currently_converging``, to avoid race
         conditions.
         """
-        currently = Reference(pset())
-        recently = Reference(pmap())
-        waiting = Reference(pmap())
+        currently, recently, waiting = self._get_state()
         sequence = [
             (ReadReference(currently), lambda i: pset()),
             add_to_currently(currently, self.group_id),
@@ -384,7 +382,8 @@ class ConvergeOneGroupTests(SynchronousTestCase):
              lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (Func(time.time), lambda i: 100),
             add_to_recently(recently, self.group_id, 100),
-            remove_from_currently(currently, self.group_id)
+            remove_from_currently(currently, self.group_id),
+            clean_waiting(waiting, self.group_id),
         ] + self._clean_divergent()
         eff = converge_one_group(
             currently, recently, waiting,
