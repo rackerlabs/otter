@@ -541,12 +541,10 @@ def converge_one_group(currently_converging, recently_converged, waiting,
             # We allow further iterations to proceed as long as we haven't been
             # waiting for a LIMITED_RETRY for 10 consecutive iterations.
             if (yield waiting.read())[group_id] > 10:
-                # TEST THIS B
                 yield msg('converge-limited-retry-too-long')
                 yield clean_waiting
                 yield delete_divergent_flag(tenant_id, group_id, version)
             else:
-                # TEST THIS C
                 yield waiting.modify(
                     lambda group_iterations:
                         group_iterations.set(group_id, group_iterations[group_id] + 1))

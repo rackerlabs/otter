@@ -18,6 +18,8 @@ import mock
 
 from pyrsistent import freeze, pbag, pmap, pset, s, thaw
 
+from toolz.itertoolz import concatv
+
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -275,14 +277,30 @@ class ConvergerTests(SynchronousTestCase):
 def add_to_recently(recently, group_id, cvg_time):
     return (ModifyReference(recently,
                             match_func(pmap(), pmap({group_id: cvg_time}))),
-            noop)
+            dispatch(reference_dispatcher))
 
 
 def add_to_currently(currently, group_id):
     return (ModifyReference(currently,
                             match_func(pset(), pset([group_id]))),
-            noop)
+            dispatch(reference_dispatcher))
 
+def remove_from_currently(currently, group_id):
+    return (ModifyReference(currently,
+                            match_func(pset([group_id]), pset([]))),
+            dispatch(reference_dispatcher))
+
+def clean_waiting(waiting, group_id):
+    """
+    Return an intent that matches a removal of the given group ID.
+    """
+    return ModifyReference(
+        waiting,
+        # match both a removal of the given group *and* not removing the
+        # group if it's not there.
+        match_all([match_func(pmap({group_id: 5}), pmap()),
+                   match_func(pmap({"foobar": 1500}),
+                              pmap({"foobar": 1500}))]))
 
 class ConvergeOneGroupTests(SynchronousTestCase):
     """Tests for :func:`converge_one_group`."""
@@ -311,19 +329,8 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             self.tenant_id, self.group_id, self.version,
             3600, execute_convergence=self._execute_convergence)
         fb_dispatcher = _get_dispatcher() if allow_refs else base_dispatcher
-        perform_sequence(sequence, eff, fallback_dispatcher=fb_dispatcher)
-
-    def _clean_waiting(self, waiting, group_id):
-        """
-        Return an intent that matches a removal of the given group ID.
-        """
-        return ModifyReference(
-            waiting,
-            # match both a removal of the given group *and* not removing the
-            # group if it's not there.
-            match_all([match_func(pmap({group_id: 5}), pmap()),
-                       match_func(pmap({"foobar": 1500}),
-                                  pmap({"foobar": 1500}))]))
+        perform_sequence(
+            list(sequence), eff, fallback_dispatcher=fb_dispatcher)
 
     def _clean_divergent(self, tenant='tenant-id', group='g1', version=None):
         if version is None:
@@ -353,7 +360,6 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         currently = Reference(pset())
         recently = Reference(pmap())
         waiting = Reference(pmap())
-        remove_from_currently = match_func(pset([self.group_id]), pset([]))
         sequence = [
             (ReadReference(currently), lambda i: pset()),
             add_to_currently(currently, self.group_id),
@@ -361,7 +367,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
              lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
             (Func(time.time), lambda i: 100),
             add_to_recently(recently, self.group_id, 100),
-            (ModifyReference(currently, remove_from_currently), noop),
+            remove_from_currently(currently, self.group_id)
         ] + self._clean_divergent()
         eff = converge_one_group(
             currently, recently, waiting,
@@ -389,7 +395,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             (LogErr(CheckFailureValue(expected_error),
                     'converge-fatal-error', {}),
              noop),
-            (self._clean_waiting(waiting, self.group_id), noop),
+            (clean_waiting(waiting, self.group_id), noop),
         ] + self._clean_divergent()
         self._verify_sequence(sequence, waiting=waiting)
 
@@ -502,19 +508,58 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         ] + self._clean_divergent(version=-1)
         self._verify_sequence(sequence)
 
+    def _converge(self, currently, recently, waiting):
+        return [
+            (ReadReference(currently),
+             dispatch(reference_dispatcher)),
+            add_to_currently(currently, self.group_id),
+            (('ec', self.tenant_id, self.group_id, 3600),
+             lambda i: (StepResult.LIMITED_RETRY, ScalingGroupStatus.ACTIVE)),
+            (Func(time.time), lambda i: 100),
+            add_to_recently(recently, self.group_id, 100),
+            remove_from_currently(currently, self.group_id),
+            (ReadReference(waiting), dispatch(reference_dispatcher)),
+        ]
+
+    def _get_state(self, current=pset(), recent=pmap(), waiting=pmap()):
+        current_ref = Reference(current)
+        recent_ref = Reference(recent)
+        waiting_ref = Reference(waiting)
+        return current_ref, recent_ref, waiting_ref
+
     def test_limited_retry_too_long(self):
         """
         When we've been retrying too long waiting for only a LIMITED_RETRY
         step, we'll give up and delete the divergent flag.
         """
-        waiting = Reference(pmap({self.group_id: 11}))
-        sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: (StepResult.LIMITED_RETRY, ScalingGroupStatus.ACTIVE)),
-            (Log('converge-limited-retry-too-long', {}), noop),
-            (self._clean_waiting(waiting, self.group_id), noop),
-        ] + self._clean_divergent()
-        self._verify_sequence(sequence, waiting=waiting)
+        current, recent, waiting = self._get_state(
+            waiting=pmap({self.group_id: 11}))
+        sequence = concatv(
+            self._converge(current, recent, waiting),
+            [(Log('converge-limited-retry-too-long', {}), noop),
+             (clean_waiting(waiting, self.group_id), noop)],
+            self._clean_divergent())
+        self._verify_sequence(
+            sequence,
+            converging=current, recent=recent, waiting=waiting, allow_refs=False)
+
+    def test_limited_retry_keep_going(self):
+        current, recent, waiting = self._get_state(
+            waiting=pmap({self.group_id: 10}))
+        sequence = concatv(
+            self._converge(current, recent, waiting),
+            [(ModifyReference(waiting, match_func(pmap({self.group_id: 10}),
+                                                  pmap({self.group_id: 11}))),
+              dispatch(reference_dispatcher))])
+        self._verify_sequence(
+            sequence,
+            converging=current, recent=recent, waiting=waiting, allow_refs=False)
+
+
+def dispatch(dispatcher):
+    def doit(intent):
+        return sync_perform(dispatcher, Effect(intent))
+    return doit
 
 
 class ConvergeAllGroupsTests(SynchronousTestCase):
