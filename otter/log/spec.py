@@ -15,8 +15,11 @@ from otter.log.formatters import LoggingEncoder
 
 _json_len = compose(len, curry(json.dumps, cls=LoggingEncoder))
 
+# Maximum length of entire JSON-formatted event dictionary
+event_max_length = 50000
 
-def split_execute_convergence(event, max_length=50000):
+
+def split_execute_convergence(event, max_length=event_max_length):
     """
     Try to split execute-convergence event out into multiple events if there
     are too many CLB nodes, too many servers, or too many steps.
@@ -59,6 +62,33 @@ def split_execute_convergence(event, max_length=50000):
             break
 
     return events
+
+
+def split_list_servers(event, maxlength=event_max_length):
+    """
+    Split response_body in listing servers detail log such that each
+    each log's response_body is < maxlength. Since this event only has
+    response_body as large part it is fine to only have that < maxlength
+    since maxlength is generic guideline for length
+
+    :param dict event: Event to split
+    :param int maxlength: Event JSON max length
+
+    :return: List of (event, formatted message) tuples
+    """
+    message = "Listing server details succeeded"
+
+    _json = json.dumps(event["response_body"])
+    if len(_json) < maxlength:
+        event["response_body"] = _json
+        return [(event, message)]
+
+    def part_json(servers):
+        return json.dumps({"servers": servers})
+
+    parts = split(part_json, event["response_body"]["servers"], maxlength, len)
+    del event["response_body"]
+    return [(assoc(event, "response_body", part), message) for part in parts]
 
 
 @curry
@@ -134,7 +164,7 @@ msg_types = {
     # request response body logging
     "request-create-server": (
         "Request to create a server succeeded with response: {response_body}"),
-    "request-list-servers-details": "Request to list servers succeeded",
+    "request-list-servers-details": split_list_servers,
     "request-one-server-details": "Request for a server's details succeeded",
     "request-set-metadata-item": (
         "Request to set a metadata item for a server succeeded"),

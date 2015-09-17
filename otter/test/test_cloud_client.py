@@ -126,16 +126,17 @@ def service_request_eqf(stub_response):
     return resolve_service_request
 
 
-def log_intent(msg_type, body):
+def log_intent(msg_type, body, log_as_json=True):
     """
     Return a :obj:`Log` intent for the given mesasge type and body.
     """
+    body = json.dumps(body, sort_keys=True) if log_as_json else body
     return Log(
         msg_type,
         {'url': "original/request/URL",
          'method': 'method',
          'request_id': "original-request-id",
-         'response_body': json.dumps(body, sort_keys=True)}
+         'response_body': body}
     )
 
 
@@ -1241,7 +1242,7 @@ class NovaClientTests(SynchronousTestCase):
 
     def _list_server_details_log_intent(self, body):
         """Return a :obj:`Log` intent for listing server details."""
-        return log_intent('request-list-servers-details', body)
+        return log_intent('request-list-servers-details', body, False)
 
     def test_list_servers_details_page(self):
         """

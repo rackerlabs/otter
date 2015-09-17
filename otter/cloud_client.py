@@ -328,13 +328,15 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
 # ----- Logging responses -----
 
 
-def log_success_response(msg_type, response_body_filter):
+def log_success_response(msg_type, response_body_filter, log_as_json=True):
     """
     :param str msg_type: A string representing the message type of the log
         message
     :param callable response_body_filter: A callable that takes a the response
         body and returns a version of the body that should be logged - this
         should not mutate the original response body.
+    :param bool log_as_json: Should the body be logged as JSON string or
+        as dict?
     :return: a function that accepts success result from a `ServiceRequest` and
         log the response body.  This assumes a JSON response, which is a
         tuple of (response, response_content).  (non-JSON responses do not
@@ -345,13 +347,14 @@ def log_success_response(msg_type, response_body_filter):
         # So we can link it to any non-cloud_client logs
         request_id = resp.request.headers.getRawHeaders(
             'x-otter-request-id', [None])[0]
-
+        resp_body = (
+            json.dumps(response_body_filter(json_body), sort_keys=True)
+            if log_as_json else json_body)
         eff = msg_effect(
             msg_type,
             method=resp.request.method,
             url=resp.request.absoluteURI,
-            response_body=json.dumps(response_body_filter(json_body),
-                                     sort_keys=True),
+            response_body=resp_body,
             request_id=request_id)
         return eff.on(lambda _: result)
 
@@ -979,7 +982,8 @@ def list_servers_details_page(parameters=None):
             'GET', append_segments('servers', 'detail'),
             params=parameters)
         .on(error=_parse_known_errors)
-        .on(log_success_response('request-list-servers-details', identity))
+        .on(log_success_response('request-list-servers-details', identity,
+                                 log_as_json=False))
     )
 
 
