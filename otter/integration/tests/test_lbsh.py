@@ -9,6 +9,7 @@ from testtools.matchers import (
     Equals,
     MatchesAll,
     MatchesRegex,
+    MatchesListwise,
     MatchesSetwise
 )
 
@@ -16,6 +17,7 @@ from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 
 from twisted.trial import unittest
 
+from otter.integration.lib.autoscale import ScalingPolicy
 from otter.integration.lib.cloud_load_balancer import (
     CloudLoadBalancer,
     ContainsAllIPs,
@@ -599,3 +601,50 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
                 timeout=timeout_default
             )
         ])
+
+    @inlineCallbacks
+    def test_draining(self):
+        """
+        When draining timeout is provided in launch config, the server
+        is put in draining for that much time before removing it from CLB
+        """
+        # Create group with CLB and draining timeout
+        group, _ = self.helper.create_group(max_entities=5,
+                                            draining_timeout=30)
+        yield group.start(self.rcs, self)
+
+        # Execute policy to scale up and extract server IP
+        policy = ScalingPolicy(scale_by=1, scaling_group=group)
+        yield policy.start(self.rcs, self)
+        yield policy.execute(self.rcs)
+        yield group.wait_for_state(
+            self.rcs,
+            ContainsDict({"activeCapacity": Equals(1),
+                          "pendingCapacity": Equals(0),
+                          "desiredCapacity": Equals(1),
+                          "status": Equals("ACTIVE")}))
+        ip = (yield group.get_servicenet_ips(self.rcs)).values()[0]
+
+        # Scale down
+        policy = ScalingPolicy(scale_by=-1, scaling_group=group)
+        yield policy.start(self.rcs, self)
+        yield policy.execute(self.rcs)
+
+        # Corresponding CLB node should be draining
+        clb = self.helper.clbs[0]
+        yield clb.wait_for_nodes(
+            self.rcs,
+            MatchesListwise(
+                [ContainsDict({"address": Equals(ip),
+                               "condition": Equals("DRAINING")})]),
+            15,  # timeout
+            2)  # interval
+
+        # After 30s the node should be removed
+        yield clb.wait_for_nodes(self.rcs, HasLength(0), 35)
+        yield group.wait_for_state(
+            self.rcs,
+            ContainsDict({"activeCapacity": Equals(0),
+                          "pendingCapacity": Equals(0),
+                          "desiredCapacity": Equals(0),
+                          "status": Equals("ACTIVE")}))
