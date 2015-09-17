@@ -184,7 +184,7 @@ msg_types = {
     "convergence-create-servers":
         "Creating {num_servers} servers.",
     "convergence-delete-servers": split_cf_messages(
-        "Deleting {servers}", 'servers'),
+        "Deleting server(s) {servers}", 'servers'),
     "convergence-add-clb-nodes": split_cf_messages(
         "Adding IPs to CLB {lb_id}: {addresses}", 'addresses'),
     "convergence-remove-clb-nodes": split_cf_messages(
