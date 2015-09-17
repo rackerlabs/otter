@@ -275,20 +275,34 @@ class ConvergerTests(SynchronousTestCase):
 
 
 def add_to_recently(recently, group_id, cvg_time):
+    """
+    Return a sequence item that simulates adding a group to the 'recently
+    converged' map
+    """
     return (ModifyReference(recently,
                             match_func(pmap(), pmap({group_id: cvg_time}))),
             dispatch(reference_dispatcher))
 
 
 def add_to_currently(currently, group_id):
+    """
+    Return a sequence item that simulates adding a group to the 'currently
+    converging' set.
+    """
     return (ModifyReference(currently,
                             match_func(pset(), pset([group_id]))),
             dispatch(reference_dispatcher))
 
+
 def remove_from_currently(currently, group_id):
+    """
+    Return a sequence item that simulates removing a group from the 'currently
+    converging' set.
+    """
     return (ModifyReference(currently,
                             match_func(pset([group_id]), pset([]))),
             dispatch(reference_dispatcher))
+
 
 def clean_waiting(waiting, group_id):
     """
@@ -301,6 +315,7 @@ def clean_waiting(waiting, group_id):
         match_all([match_func(pmap({group_id: 5}), pmap()),
                    match_func(pmap({"foobar": 1500}),
                               pmap({"foobar": 1500}))]))
+
 
 class ConvergeOneGroupTests(SynchronousTestCase):
     """Tests for :func:`converge_one_group`."""
@@ -508,7 +523,11 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         ] + self._clean_divergent(version=-1)
         self._verify_sequence(sequence)
 
-    def _converge(self, currently, recently, waiting):
+    def _limited_retry_converge(self, currently, recently, waiting):
+        """
+        Return a sequence that simulates a convergence where the worst status
+        is LIMITED_RETRY.
+        """
         return [
             (ReadReference(currently),
              dispatch(reference_dispatcher)),
@@ -522,6 +541,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         ]
 
     def _get_state(self, current=pset(), recent=pmap(), waiting=pmap()):
+        """Get the mutable state common to converge_one_group."""
         current_ref = Reference(current)
         recent_ref = Reference(recent)
         waiting_ref = Reference(waiting)
@@ -541,9 +561,15 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             self._clean_divergent())
         self._verify_sequence(
             sequence,
-            converging=current, recent=recent, waiting=waiting, allow_refs=False)
+            converging=current, recent=recent, waiting=waiting,
+            allow_refs=False)
 
     def test_limited_retry_keep_going(self):
+        """
+        When we're only waiting for a LIMITED_RETRY step, we let convergence
+        happen again (by not cleaning up the divergent flag) if we haven't
+        waited long enough.
+        """
         current, recent, waiting = self._get_state(
             waiting=pmap({self.group_id: 10}))
         sequence = concatv(
@@ -551,9 +577,12 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             [(ModifyReference(waiting, match_func(pmap({self.group_id: 10}),
                                                   pmap({self.group_id: 11}))),
               dispatch(reference_dispatcher))])
+        # No "waiting" map cleanup!
+        # No divergent flag cleanup!
         self._verify_sequence(
             sequence,
-            converging=current, recent=recent, waiting=waiting, allow_refs=False)
+            converging=current, recent=recent, waiting=waiting,
+            allow_refs=False)
 
 
 def dispatch(dispatcher):

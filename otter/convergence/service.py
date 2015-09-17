@@ -547,7 +547,8 @@ def converge_one_group(currently_converging, recently_converged, waiting,
             else:
                 yield waiting.modify(
                     lambda group_iterations:
-                        group_iterations.set(group_id, group_iterations[group_id] + 1))
+                        group_iterations.set(
+                            group_id, group_iterations[group_id] + 1))
         else:
             # TEST THIS D
             yield clean_waiting
@@ -714,7 +715,7 @@ class Converger(MultiService):
         self._converge_all_groups = converge_all_groups
         self.interval = interval
 
-        ## ephemeral mutable state
+        # ephemeral mutable state
         self.currently_converging = Reference(pset())
         self.recently_converged = Reference(pmap())
         # Groups we're waiting on temporarily, and may give up on.
