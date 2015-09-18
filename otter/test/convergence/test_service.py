@@ -145,6 +145,7 @@ class ConvergerTests(SynchronousTestCase):
             self.log, dispatcher, self.num_buckets,
             self._pfactory, build_timeout=3600,
             interval=15,
+            limited_retry_iterations=23,
             converge_all_groups=converge_all_groups)
 
     def _pfactory(self, buckets, log, got_buckets):
@@ -170,10 +171,12 @@ class ConvergerTests(SynchronousTestCase):
         """
         def converge_all_groups(currently_converging, recent, waiting,
                                 _my_buckets, all_buckets,
-                                divergent_flags, build_timeout, interval):
+                                divergent_flags, build_timeout, interval,
+                                limited_retry_iterations):
             return Effect(
                 ('converge-all', currently_converging, _my_buckets,
-                 all_buckets, divergent_flags, build_timeout, interval))
+                 all_buckets, divergent_flags, build_timeout, interval,
+                 limited_retry_iterations))
 
         my_buckets = [0, 5]
         bound_sequence = [
@@ -186,7 +189,8 @@ class ConvergerTests(SynchronousTestCase):
                 range(self.num_buckets),
                 ['flag1', 'flag2'],
                 3600,
-                15),
+                15,
+                23),
                 lambda i: 'foo')
         ]
         sequence = self._log_sequence(bound_sequence)
@@ -204,7 +208,8 @@ class ConvergerTests(SynchronousTestCase):
         """
         def converge_all_groups(currently_converging, recent, waiting,
                                 _my_buckets, all_buckets,
-                                divergent_flags, build_timeout, interval):
+                                divergent_flags, build_timeout, interval,
+                                limited_retry_iterations):
             return Effect('converge-all')
 
         bound_sequence = [
@@ -256,7 +261,8 @@ class ConvergerTests(SynchronousTestCase):
         """
         def converge_all_groups(currently_converging, recent, waiting,
                                 _my_buckets, all_buckets,
-                                divergent_flags, build_timeout, interval):
+                                divergent_flags, build_timeout, interval,
+                                limited_retry_iterations):
             return Effect(('converge-all-groups', divergent_flags))
 
         intents = [
@@ -344,7 +350,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         eff = converge_one_group(
             converging, recent, waiting,
             self.tenant_id, self.group_id, self.version,
-            3600, execute_convergence=self._execute_convergence)
+            3600, 43, execute_convergence=self._execute_convergence)
         fb_dispatcher = _get_dispatcher() if allow_refs else base_dispatcher
         perform_sequence(
             list(sequence), eff, fallback_dispatcher=fb_dispatcher)
@@ -388,7 +394,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         eff = converge_one_group(
             currently, recently, waiting,
             self.tenant_id, self.group_id, self.version,
-            3600, execute_convergence=self._execute_convergence)
+            3600, 43, execute_convergence=self._execute_convergence)
         perform_sequence(sequence, eff)
 
     def test_non_concurrent(self):
@@ -553,7 +559,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         step, we'll give up and delete the divergent flag.
         """
         current, recent, waiting = self._get_state(
-            waiting=pmap({self.group_id: 11}))
+            waiting=pmap({self.group_id: 44}))
         sequence = concatv(
             self._limited_retry_converge(current, recent, waiting),
             [(ReadReference(waiting), dispatch(reference_dispatcher)),
@@ -572,12 +578,12 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         waited long enough.
         """
         current, recent, waiting = self._get_state(
-            waiting=pmap({self.group_id: 10}))
+            waiting=pmap({self.group_id: 43}))
         sequence = concatv(
             self._limited_retry_converge(current, recent, waiting),
             [(ReadReference(waiting), dispatch(reference_dispatcher)),
-             (ModifyReference(waiting, match_func(pmap({self.group_id: 10}),
-                                                  pmap({self.group_id: 11}))),
+             (ModifyReference(waiting, match_func(pmap({self.group_id: 43}),
+                                                  pmap({self.group_id: 44}))),
               dispatch(reference_dispatcher))])
         # No "waiting" map cleanup!
         # No divergent flag cleanup!
@@ -592,7 +598,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         for it any more, the ``waiting`` data is cleaned up.
         """
         current, recent, waiting = self._get_state(
-            waiting=pmap({self.group_id: 10}))
+            waiting=pmap({self.group_id: 44}))
         sequence = concatv(
             self._limited_retry_converge(current, recent, waiting,
                                          worst=StepResult.SUCCESS),
@@ -635,13 +641,16 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             flags,
             3600,
             15,
+            23,
             converge_one_group=self._converge_one_group)
 
     def _converge_one_group(self,
                             currently_converging, recently_converged, waiting,
-                            tenant_id, group_id, version, build_timeout):
+                            tenant_id, group_id, version, build_timeout,
+                            limited_retry_iterations):
         return Effect(
-            ('converge', tenant_id, group_id, version, build_timeout))
+            ('converge', tenant_id, group_id, version, build_timeout,
+             limited_retry_iterations))
 
     def _expect_group_converged(self, tenant_id, group_id):
         """
@@ -658,7 +667,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                  lambda i: ZNodeStatStub(version=5)),
                 (TenantScope(mock.ANY, tenant_id),
                  nested_sequence([
-                     (('converge', tenant_id, group_id, 5, 3600),
+                     (('converge', tenant_id, group_id, 5, 3600, 23),
                       lambda i: 'converged {}!'.format(group_id)),
                  ])),
             ]))
@@ -754,7 +763,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
         result = converge_all_groups(
             self.currently_converging, self.recently_converged, self.waiting,
             self.my_buckets, self.all_buckets, [],
-            3600, 15, converge_one_group=converge_one_group)
+            3600, 15, 23, converge_one_group=converge_one_group)
         self.assertEqual(sync_perform(_get_dispatcher(), result), None)
 
     def test_ignore_disappearing_divergent_flag(self):
