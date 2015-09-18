@@ -27,6 +27,9 @@ def present_reasons(reasons):
         def Exception(exc_info):
             return _present_exception(exc_info[1])
 
+        def UserMessage(message):
+            return message
+
         def _(_):
             return None
 

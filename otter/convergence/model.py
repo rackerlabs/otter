@@ -130,6 +130,7 @@ class ErrorReason(object):
     Exception = constructor('exc_info')
     String = constructor(reason=attr.ib(validator=instance_of((unicode, str))))
     Structured = constructor('structure')
+    UserMessage = constructor('message')
 
 
 def get_service_metadata(service_name, metadata):
