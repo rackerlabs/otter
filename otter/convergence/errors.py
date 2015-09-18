@@ -78,6 +78,12 @@ def _present_server_over_limit_error(exception):
 
 @match(ErrorReason)
 class structure_reason(object):
+    """
+    Get a structured representation of an ErrorReason, suitable for logging
+    with a structured logger.
+
+    :return: dict
+    """
     def Exception(exc_info):
         return {
             'exception': serialize_to_jsonable(exc_info[1]),
@@ -89,3 +95,6 @@ class structure_reason(object):
         return {'string': string}
 
     Structured = identity
+
+    def UserMessage(message):
+        return {'user-message': message}

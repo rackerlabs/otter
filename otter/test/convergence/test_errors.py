@@ -21,6 +21,10 @@ class PresentReasonsTests(SynchronousTestCase):
         """non-Exceptions are not presented."""
         self.assertEqual(present_reasons([ErrorReason.String('foo')]), [])
 
+    def test_present_user_message(self):
+        self.assertEqual(present_reasons([ErrorReason.UserMessage('foo bar')]),
+                         ['foo bar'])
+
     def test_present_arbitrary_exception(self):
         """Arbitrary exceptions are not presented."""
         exc_info = raise_to_exc_info(ZeroDivisionError())
@@ -65,7 +69,7 @@ class StructureReasonsTests(SynchronousTestCase):
         )
 
     def test_string(self):
-        """String values get wrapped in a dictionary.unwrapped."""
+        """String values get wrapped in a dictionary."""
         self.assertEqual(structure_reason(ErrorReason.String('foo')),
                          {'string': 'foo'})
 
@@ -74,3 +78,9 @@ class StructureReasonsTests(SynchronousTestCase):
         self.assertEqual(
             structure_reason(ErrorReason.Structured({'foo': 'bar'})),
             {'foo': 'bar'})
+
+    def test_user_message(self):
+        """User messages get wrapped in a dictionary."""
+        self.assertEqual(
+            structure_reason(ErrorReason.UserMessage('foo bar')),
+            {'user-message': 'foo bar'})
