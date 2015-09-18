@@ -553,6 +553,26 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         waiting_ref = Reference(waiting)
         return current_ref, recent_ref, waiting_ref
 
+    def test_limited_retry_starting(self):
+        """
+        When the worst status is LIMITED_RETRY, the group is added to the
+        `waiting` map with an initial value of 1, and the divergent
+        flag is not cleaned up.
+        """
+        current, recent, waiting = self._get_state()
+        sequence = concatv(
+            self._limited_retry_converge(current, recent, waiting),
+            [(ReadReference(waiting), dispatch(reference_dispatcher)),
+             (ModifyReference(waiting, match_func(pmap({}),
+                                                  pmap({self.group_id: 1}))),
+              dispatch(reference_dispatcher))])
+        # No "waiting" map cleanup!
+        # No divergent flag cleanup!
+        self._verify_sequence(
+            sequence,
+            converging=current, recent=recent, waiting=waiting,
+            allow_refs=False)
+
     def test_limited_retry_too_long(self):
         """
         When we've been retrying too long waiting for only a LIMITED_RETRY
