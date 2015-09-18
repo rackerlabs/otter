@@ -515,9 +515,8 @@ def converge_one_group(currently_converging, recently_converged, waiting,
         be used for test injection only
     """
     clean_waiting = waiting.modify(
-        lambda group_iterations:
-            group_iterations.remove(group_id)
-            if group_id in group_iterations else group_iterations)
+        lambda group_iterations: group_iterations.discard(group_id))
+
     mark_recently_converged = Effect(Func(time.time)).on(
         lambda time_done: recently_converged.modify(
             lambda rcg: rcg.set(group_id, time_done)))
