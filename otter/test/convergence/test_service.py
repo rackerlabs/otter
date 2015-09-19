@@ -18,8 +18,6 @@ import mock
 
 from pyrsistent import freeze, pbag, pmap, pset, s, thaw
 
-from toolz.itertoolz import concatv
-
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -38,7 +36,7 @@ from otter.convergence.service import (
     is_autoscale_active,
     non_concurrently,
     trigger_convergence)
-from otter.convergence.steps import CreateServer
+from otter.convergence.steps import ConvergeLater, CreateServer
 from otter.log.intents import BoundFields, Log, LogErr, MsgWithTime
 from otter.models.intents import (
     DeleteGroup,
@@ -381,7 +379,6 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         sequence = [
             self._expect_exec(StepResult.SUCCESS, ScalingGroupStatus.ACTIVE),
         ] + self._clean_divergent()
-        print "success sequence", sequence
         self._verify_sequence(sequence)
 
     def test_record_recently_converged(self):
@@ -838,7 +835,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         }
         self.gsgi_result = (self.group, self.manifest)
         self.now = datetime(1970, 1, 1)
-        self.waiting = Reference(pset())
+        self.waiting = Reference(pmap())
 
     def get_seq(self, with_cache=True):
         exec_seq = [
@@ -1274,81 +1271,115 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             perform_sequence(self.get_seq() + sequence, self._invoke()),
             (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
 
-    # def test_limited_retry_starting(self):
-    #     """
-    #     When the worst status is LIMITED_RETRY, the group is added to the
-    #     `waiting` map with an initial value of 1, and the divergent
-    #     flag is not cleaned up.
-    #     """
-    #     current, recent, waiting = self._get_state()
-    #     sequence = concatv(
-    #         self._limited_retry_converge(current, recent, waiting),
-    #         [(ReadReference(waiting), dispatch(reference_dispatcher)),
-    #          (ModifyReference(waiting, match_func(pmap({}),
-    #                                               pmap({self.group_id: 1}))),
-    #           dispatch(reference_dispatcher))])
-    #     # No "waiting" map cleanup!
-    #     # No divergent flag cleanup!
-    #     self._verify_sequence(
-    #         sequence,
-    #         converging=current, recent=recent, waiting=waiting,
-    #         allow_refs=False)
-    #
-    # def test_limited_retry_too_long(self):
-    #     """
-    #     When we've been retrying too long waiting for only a LIMITED_RETRY
-    #     step, we'll give up and delete the divergent flag.
-    #     """
-    #     current, recent, waiting = self._get_state(
-    #         waiting=pmap({self.group_id: 44}))
-    #     sequence = concatv(
-    #         self._limited_retry_converge(current, recent, waiting),
-    #         [(ReadReference(waiting), dispatch(reference_dispatcher)),
-    #          (Log('converge-limited-retry-too-long', {}), noop),
-    #          clean_waiting(waiting, self.group_id)],
-    #         self._clean_divergent())
-    #     self._verify_sequence(
-    #         sequence,
-    #         converging=current, recent=recent, waiting=waiting,
-    #         allow_refs=False)
-    #
-    # def test_limited_retry_keep_going(self):
-    #     """
-    #     When we're only waiting for a LIMITED_RETRY step, we let convergence
-    #     happen again (by not cleaning up the divergent flag) if we haven't
-    #     waited long enough.
-    #     """
-    #     current, recent, waiting = self._get_state(
-    #         waiting=pmap({self.group_id: 43}))
-    #     sequence = concatv(
-    #         self._limited_retry_converge(current, recent, waiting),
-    #         [(ReadReference(waiting), dispatch(reference_dispatcher)),
-    #          (ModifyReference(waiting, match_func(pmap({self.group_id: 43}),
-    #                                               pmap({self.group_id: 44}))),
-    #           dispatch(reference_dispatcher))])
-    #     # No "waiting" map cleanup!
-    #     # No divergent flag cleanup!
-    #     self._verify_sequence(
-    #         sequence,
-    #         converging=current, recent=recent, waiting=waiting,
-    #         allow_refs=False)
-    #
-    # def test_limited_retry_resolved(self):
-    #     """
-    #     When we've been waiting for LIMITED_RETRY and then we're not waiting
-    #     for it any more, the ``waiting`` data is cleaned up.
-    #     """
-    #     current, recent, waiting = self._get_state(
-    #         waiting=pmap({self.group_id: 44}))
-    #     sequence = concatv(
-    #         self._limited_retry_converge(current, recent, waiting,
-    #                                      worst=StepResult.SUCCESS),
-    #         [clean_waiting(waiting, self.group_id)],
-    #         self._clean_divergent())
-    #     self._verify_sequence(
-    #         sequence,
-    #         converging=current, recent=recent, waiting=waiting,
-    #         allow_refs=False)
+    def test_limited_retry_starting(self):
+        """
+        When the worst status is LIMITED_RETRY, the group is added to the
+        `waiting` map with an initial value of 1.
+        """
+        reasons = [ErrorReason.UserMessage('foo')]
+
+        def plan(*args, **kwargs):
+            return [ConvergeLater(reasons, limited=True)]
+
+        sequence = [
+            parallel_sequence([]),
+            (Log('execute-convergence', mock.ANY), noop),
+            parallel_sequence([[]]),  # Only "base" intents in here
+            (Log('execute-convergence-results', mock.ANY), noop),
+            (ReadReference(self.waiting), dispatch(reference_dispatcher)),
+            (ModifyReference(self.waiting,
+                             match_func(pmap({}), pmap({self.group_id: 1}))),
+             dispatch(reference_dispatcher)),
+        ]
+        # No "waiting" map cleanup!
+        self.assertEqual(
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
+            (StepResult.LIMITED_RETRY, ScalingGroupStatus.ACTIVE))
+
+    def test_limited_retry_too_long(self):
+        """
+        When we've been waiting too long for a LIMITED_RETRY step, we'll
+        give up and put the group into ERROR.
+        """
+        reasons = [ErrorReason.UserMessage('foo')]
+        self.waiting = Reference(pmap({self.group_id: 44}))
+
+        def plan(*args, **kwargs):
+            return [ConvergeLater(reasons, limited=True)]
+
+        sequence = [
+            parallel_sequence([]),
+            (Log('execute-convergence', mock.ANY), noop),
+            parallel_sequence([[]]),  # Only "base" intents in here
+            (Log('execute-convergence-results', mock.ANY), noop),
+            (ReadReference(self.waiting), dispatch(reference_dispatcher)),
+            (Log('converge-limited-retry-too-long', fields={}), noop),
+            clean_waiting(self.waiting, self.group_id),
+            (UpdateGroupStatus(scaling_group=self.group,
+                               status=ScalingGroupStatus.ERROR),
+             noop),
+            (Log('group-status-error',
+                 dict(isError=True, cloud_feed=True, status='ERROR',
+                      reasons=['foo'])),
+             noop),
+            (UpdateGroupErrorReasons(self.group, ['foo']), noop),
+        ]
+        self.assertEqual(
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
+            (StepResult.LIMITED_RETRY, ScalingGroupStatus.ERROR))
+
+    def test_limited_retry_keep_going(self):
+        """
+        When we're only waiting for a LIMITED_RETRY step, the counter in the
+        waiting map is increased and the group is left ACTIVE.
+        """
+        reasons = [ErrorReason.UserMessage('foo')]
+        self.waiting = Reference(pmap({self.group_id: 43}))
+
+        def plan(*args, **kwargs):
+            return [ConvergeLater(reasons, limited=True)]
+
+        sequence = [
+            parallel_sequence([]),
+            (Log('execute-convergence', mock.ANY), noop),
+            parallel_sequence([[]]),  # Only "base" intents in here
+            (Log('execute-convergence-results', mock.ANY), noop),
+            (ReadReference(self.waiting), dispatch(reference_dispatcher)),
+            (ModifyReference(self.waiting,
+                             match_func(pmap({self.group_id: 43}),
+                                        pmap({self.group_id: 44}))),
+             dispatch(reference_dispatcher)),
+        ]
+        self.assertEqual(
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
+            (StepResult.LIMITED_RETRY, ScalingGroupStatus.ACTIVE))
+
+    def test_limited_retry_resolved(self):
+        """
+        When we've been waiting for LIMITED_RETRY and then we're not waiting
+        for it any more, the ``waiting`` data is cleaned up.
+        """
+        def plan(*args, **kwargs):
+            return []
+
+        self.waiting = Reference(pmap({self.group_id: 43}))
+        sequence = [
+            parallel_sequence([]),
+            (Log('execute-convergence', mock.ANY), noop),
+            (Log('execute-convergence-results', mock.ANY), noop),
+            (ModifyReference(self.waiting,
+                             match_func(pmap({self.group_id: 43}),
+                                        pmap())),
+             dispatch(reference_dispatcher)),
+            (UpdateServersCache(
+                "tenant-id", "group-id", self.now,
+                [thaw(self.servers[0].json.set("_is_as_active", True)),
+                 thaw(self.servers[1].json.set("_is_as_active", True))]),
+             noop)
+        ]
+        self.assertEqual(
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
+            (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
 
 
 class IsAutoscaleActiveTests(SynchronousTestCase):
