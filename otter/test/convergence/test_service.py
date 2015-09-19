@@ -349,7 +349,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         return (self._exec_intent, lambda i: (worst_result, group_status))
 
     def _verify_sequence(self, sequence, converging=None,
-                         recent=None, waiting=None, allow_refs=True):
+                         recent=None, allow_refs=True):
         """
         Verify that sequence is executed
         """
@@ -357,10 +357,8 @@ class ConvergeOneGroupTests(SynchronousTestCase):
             converging = Reference(pset())
         if recent is None:
             recent = Reference(pmap())
-        if waiting is None:
-            waiting = self.waiting
         eff = converge_one_group(
-            converging, recent, waiting,
+            converging, recent, self.waiting,
             self.tenant_id, self.group_id, self.version,
             3600, 43, execute_convergence=self._execute_convergence)
         fb_dispatcher = _get_dispatcher() if allow_refs else base_dispatcher
@@ -883,6 +881,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (Log('execute-convergence', mock.ANY), noop),
             (Log('execute-convergence-results',
                  {'results': [], 'worst_status': 'SUCCESS'}), noop),
+            clean_waiting(self.waiting, self.group_id),
             (UpdateServersCache(
                 "tenant-id", "group-id", self.now,
                 [thaw(self.servers[0].json.set('_is_as_active', True)),
@@ -939,6 +938,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                'result': StepResult.SUCCESS,
                                'reasons': []}],
                   'worst_status': 'SUCCESS'}), noop),
+            clean_waiting(self.waiting, self.group_id),
             # Note that servers arg is non-deleted servers
             (UpdateServersCache(
                 "tenant-id", "group-id", self.now,
@@ -1016,7 +1016,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                          ErrorReason.Structured({'foo': 'bar'})]))]
             ]),
             (Log(msg='execute-convergence-results', fields=expected_fields),
-             noop)
+             noop),
+            clean_waiting(self.waiting, self.group_id),
         ]
 
         self.assertEqual(
@@ -1044,7 +1045,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             parallel_sequence([
                 [("create-server", lambda i: (StepResult.RETRY, []))]
             ]),
-            (Log(msg='execute-convergence-results', fields=mock.ANY), noop)
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
         ]
 
         self.assertEqual(
@@ -1065,6 +1067,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 [("step", lambda i: (step_result, []))]
             ]),
             (Log('execute-convergence-results', mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
         ]
         if with_delete:
             sequence.append((DeleteGroup(tenant_id=self.tenant_id,
@@ -1110,7 +1113,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 [("retry", lambda i: (StepResult.RETRY,
                                       [ErrorReason.String('mywish')]))],
             ]),
-            (Log('execute-convergence-results', mock.ANY), noop)
+            (Log('execute-convergence-results', mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
@@ -1150,6 +1154,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 [("success3", success)],
             ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ERROR),
              noop),
@@ -1185,6 +1190,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                      [ErrorReason.Exception(exc_info)]))]
             ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ERROR),
              noop),
@@ -1216,6 +1222,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 [("step", lambda i: (StepResult.SUCCESS, []))]
             ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ACTIVE),
              noop),
@@ -1244,6 +1251,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             parallel_sequence([]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ACTIVE),
              noop),

@@ -292,6 +292,10 @@ def execute_convergence(tenant_id, group_id, build_timeout,
               desired=desired_group_state)
     worst_status, reasons = yield _execute_steps(steps)
 
+    if worst_status != StepResult.LIMITED_RETRY:
+        # If we're not waiting any more, keeping track of the group
+        yield clean_waiting
+
     # Handle the status from execution
     group_status = group_state.status
     if worst_status == StepResult.SUCCESS:
@@ -311,8 +315,6 @@ def execute_convergence(tenant_id, group_id, build_timeout,
             yield waiting.modify(
                 lambda group_iterations:
                     group_iterations.set(group_id, current_iterations + 1))
-    else:
-        yield clean_waiting
 
     yield do_return((worst_status, group_status))
 
