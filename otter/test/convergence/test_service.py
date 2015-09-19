@@ -526,6 +526,16 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         ] + self._clean_divergent(version=-1)
         self._verify_sequence(sequence)
 
+    def test_delete_flag_on_group_error(self):
+        """
+        Any time the group is put into ERROR by ``execute_convergence``, the
+        divergent flag is deleted.
+        """
+        sequence = [
+            self._expect_exec(StepResult.SUCCESS, ScalingGroupStatus.ERROR),
+        ] + self._clean_divergent()
+        self._verify_sequence(sequence)
+
 
 def dispatch(dispatcher):
     """
