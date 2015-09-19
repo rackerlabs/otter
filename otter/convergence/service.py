@@ -240,8 +240,14 @@ def convergence_exec_data(tenant_id, group_id, now, get_all_convergence_data):
                      servers, lb_nodes))
 
 
+def _clean_waiting(waiting, group_id):
+    return waiting.modify(
+        lambda group_iterations: group_iterations.discard(group_id))
+
+
 @do
 def execute_convergence(tenant_id, group_id, build_timeout,
+                        waiting, limited_retry_iterations,
                         get_all_convergence_data=get_all_convergence_data,
                         plan=plan):
     """
@@ -252,6 +258,9 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     :param str group_id: the ID of the group to be converged
     :param number build_timeout: number of seconds to wait for servers to be in
         building before it's is timed out and deleted
+    :param Reference waiting: pmap of waiting groups
+    :param int limited_retry_iterations: number of iterations to wait for
+        LIMITED_RETRY steps
     :param callable get_all_convergence_data: like
         :func`get_all_convergence_data`, used for testing.
     :param callable plan: like :func:`plan`, to be used for test injection only
@@ -261,6 +270,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         deleted.
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
+    clean_waiting = _clean_waiting(waiting, group_id)
     # Gather data
     yield msg("begin-convergence")
     now_dt = yield Effect(Func(datetime.utcnow))
@@ -283,14 +293,28 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     worst_status, reasons = yield _execute_steps(steps)
 
     # Handle the status from execution
-    result_status = group_state.status
+    group_status = group_state.status
     if worst_status == StepResult.SUCCESS:
-        result_status = yield convergence_succeeded(
+        group_status = yield convergence_succeeded(
             scaling_group, group_state, servers, now_dt)
     elif worst_status == StepResult.FAILURE:
-        result_status = yield convergence_failed(scaling_group, reasons)
+        group_status = yield convergence_failed(scaling_group, reasons)
+    elif worst_status is StepResult.LIMITED_RETRY:
+        # We allow further iterations to proceed as long as we haven't been
+        # waiting for a LIMITED_RETRY for N consecutive iterations.
+        current_iterations = (yield waiting.read()).get(group_id, 0)
+        if current_iterations > limited_retry_iterations:
+            yield msg('converge-limited-retry-too-long')
+            yield clean_waiting
+            group_status = yield convergence_failed(scaling_group, reasons)
+        else:
+            yield waiting.modify(
+                lambda group_iterations:
+                    group_iterations.set(group_id, current_iterations + 1))
+    else:
+        yield clean_waiting
 
-    yield do_return((worst_status, result_status))
+    yield do_return((worst_status, group_status))
 
 
 @do
@@ -514,24 +538,23 @@ def converge_one_group(currently_converging, recently_converged, waiting,
     :param callable execute_convergence: like :func`execute_convergence`, to
         be used for test injection only
     """
-    clean_waiting = waiting.modify(
-        lambda group_iterations: group_iterations.discard(group_id))
-
     mark_recently_converged = Effect(Func(time.time)).on(
         lambda time_done: recently_converged.modify(
             lambda rcg: rcg.set(group_id, time_done)))
     cvg = eff_finally(
-        execute_convergence(tenant_id, group_id, build_timeout),
+        execute_convergence(tenant_id, group_id, build_timeout, waiting,
+                            limited_retry_iterations),
         mark_recently_converged)
 
     try:
-        result = yield non_concurrently(currently_converging, group_id, cvg)
+        worst_result, group_status = yield non_concurrently(
+            currently_converging, group_id, cvg)
     except ConcurrentError:
         # We don't need to spam the logs about this, it's to be expected
         return
     except NoSuchScalingGroupError:
         yield err(None, 'converge-fatal-error')
-        yield clean_waiting
+        yield _clean_waiting(waiting, group_id)
         yield delete_divergent_flag(tenant_id, group_id, version)
         return
     except Exception:
@@ -539,28 +562,16 @@ def converge_one_group(currently_converging, recently_converged, waiting,
         # unexpected errors, so convergence will be retried.
         yield err(None, 'converge-non-fatal-error')
     else:
-        if result[0] is StepResult.LIMITED_RETRY:
-            # We allow further iterations to proceed as long as we haven't been
-            # waiting for a LIMITED_RETRY for N consecutive iterations.
-            current_iterations = (yield waiting.read()).get(group_id, 0)
-            if current_iterations > limited_retry_iterations:
-                yield msg('converge-limited-retry-too-long')
-                yield clean_waiting
-                yield delete_divergent_flag(tenant_id, group_id, version)
-            else:
-                yield waiting.modify(
-                    lambda group_iterations:
-                        group_iterations.set(group_id, current_iterations + 1))
-        else:
-            yield clean_waiting
-        if result[0] in (StepResult.FAILURE, StepResult.SUCCESS):
+        if worst_result in (StepResult.FAILURE, StepResult.SUCCESS):
             # In order to avoid doing extra work and reporting spurious errors,
             # if the group status is None it means the group has successfully
             # been deleted by execute_convergence. And so we will
             # unconditionally delete the divergent flag to avoid any further
             # queued-up convergences that will imminently fail.
-            if result[1] is None:
+            if group_status is None:
                 version = -1
+            yield delete_divergent_flag(tenant_id, group_id, version)
+        elif group_status is ScalingGroupStatus.ERROR:
             yield delete_divergent_flag(tenant_id, group_id, version)
 
 

@@ -332,9 +332,21 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         self.tenant_id = 'tenant-id'
         self.group_id = 'g1'
         self.version = 5
+        self.waiting = Reference(pmap())
+        self._exec_intent = (
+            'ec', self.tenant_id, self.group_id, 3600, self.waiting, 43)
 
-    def _execute_convergence(self, tenant_id, group_id, build_timeout):
-        return Effect(('ec', tenant_id, group_id, build_timeout))
+    def _execute_convergence(self, tenant_id, group_id, build_timeout, waiting,
+                             limited_retry_iterations):
+        return Effect(('ec', tenant_id, group_id, build_timeout, waiting,
+                       limited_retry_iterations))
+
+    def _expect_exec(self, worst_result, group_status):
+        """
+        Return a sequence item that expects the execute_convergence effect,
+        and results in the given values.
+        """
+        return (self._exec_intent, lambda i: (worst_result, group_status))
 
     def _verify_sequence(self, sequence, converging=None,
                          recent=None, waiting=None, allow_refs=True):
@@ -346,7 +358,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         if recent is None:
             recent = Reference(pmap())
         if waiting is None:
-            waiting = Reference(pmap())
+            waiting = self.waiting
         eff = converge_one_group(
             converging, recent, waiting,
             self.tenant_id, self.group_id, self.version,
@@ -369,9 +381,9 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         runs execute_convergence and returns None, then deletes the dirty flag.
         """
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
+            self._expect_exec(StepResult.SUCCESS, ScalingGroupStatus.ACTIVE),
         ] + self._clean_divergent()
+        print "success sequence", sequence
         self._verify_sequence(sequence)
 
     def test_record_recently_converged(self):
@@ -380,19 +392,18 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         *before* being removed from ``currently_converging``, to avoid race
         conditions.
         """
-        currently, recently, waiting = self._get_state()
+        currently = Reference(pset())
+        recently = Reference(pmap())
         sequence = [
             (ReadReference(currently), lambda i: pset()),
             add_to_currently(currently, self.group_id),
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
+            self._expect_exec(StepResult.SUCCESS, ScalingGroupStatus.ACTIVE),
             (Func(time.time), lambda i: 100),
             add_to_recently(recently, self.group_id, 100),
             remove_from_currently(currently, self.group_id),
-            clean_waiting(waiting, self.group_id),
         ] + self._clean_divergent()
         eff = converge_one_group(
-            currently, recently, waiting,
+            currently, recently, self.waiting,
             self.tenant_id, self.group_id, self.version,
             3600, 43, execute_convergence=self._execute_convergence)
         perform_sequence(sequence, eff)
@@ -409,17 +420,14 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         When the scaling group disappears, a fatal error is logged and the
         dirty flag is cleaned up.
         """
-        waiting = Reference(pmap())
         expected_error = NoSuchScalingGroupError(self.tenant_id, self.group_id)
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: raise_(expected_error)),
+            (self._exec_intent, lambda i: raise_(expected_error)),
             (LogErr(CheckFailureValue(expected_error),
                     'converge-fatal-error', {}),
              noop),
-            clean_waiting(waiting, self.group_id),
         ] + self._clean_divergent()
-        self._verify_sequence(sequence, waiting=waiting)
+        self._verify_sequence(sequence)
 
     def test_unexpected_errors(self):
         """
@@ -432,8 +440,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         sequence = [
             (ReadReference(converging), lambda i: pset()),
             add_to_currently(converging, self.group_id),
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: raise_(expected_error)),
+            (self._exec_intent, lambda i: raise_(expected_error)),
             (Func(time.time), lambda i: 100),
             add_to_recently(recent, self.group_id, 100),
             (ModifyReference(converging,
@@ -453,8 +460,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         is logged and nothing else is cleaned up.
         """
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
+            self._expect_exec(StepResult.SUCCESS, ScalingGroupStatus.ACTIVE),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version),
              lambda i: raise_(BadVersionError())),
@@ -470,8 +476,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         else is cleaned up.
         """
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
+            self._expect_exec(StepResult.SUCCESS, ScalingGroupStatus.ACTIVE),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version),
              lambda i: raise_(NoNodeError())),
@@ -484,8 +489,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
     def test_delete_node_other_error(self):
         """When marking clean raises arbitrary errors, an error is logged."""
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
+            self._expect_exec(StepResult.SUCCESS, ScalingGroupStatus.ACTIVE),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version),
              lambda i: raise_(ZeroDivisionError())),
@@ -502,8 +506,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         deleted.
         """
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: (StepResult.RETRY, ScalingGroupStatus.ACTIVE))
+            self._expect_exec(StepResult.RETRY, ScalingGroupStatus.ACTIVE),
         ]
         self._verify_sequence(sequence)
 
@@ -513,8 +516,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         deleted.
         """
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: (StepResult.FAILURE, ScalingGroupStatus.ACTIVE)),
+            self._expect_exec(StepResult.FAILURE, ScalingGroupStatus.ACTIVE),
         ] + self._clean_divergent()
         self._verify_sequence(sequence)
 
@@ -525,109 +527,9 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         mismatched versions), because a re-converge would be fruitless.
         """
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: (StepResult.SUCCESS, None)),
+            self._expect_exec(StepResult.SUCCESS, None),
         ] + self._clean_divergent(version=-1)
         self._verify_sequence(sequence)
-
-    def _limited_retry_converge(self, currently, recently, waiting,
-                                worst=StepResult.LIMITED_RETRY):
-        """
-        Return a sequence that simulates a convergence.
-        """
-        return [
-            (ReadReference(currently),
-             dispatch(reference_dispatcher)),
-            add_to_currently(currently, self.group_id),
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: (worst, ScalingGroupStatus.ACTIVE)),
-            (Func(time.time), lambda i: 100),
-            add_to_recently(recently, self.group_id, 100),
-            remove_from_currently(currently, self.group_id),
-        ]
-
-    def _get_state(self, current=pset(), recent=pmap(), waiting=pmap()):
-        """Get the mutable state common to converge_one_group."""
-        current_ref = Reference(current)
-        recent_ref = Reference(recent)
-        waiting_ref = Reference(waiting)
-        return current_ref, recent_ref, waiting_ref
-
-    def test_limited_retry_starting(self):
-        """
-        When the worst status is LIMITED_RETRY, the group is added to the
-        `waiting` map with an initial value of 1, and the divergent
-        flag is not cleaned up.
-        """
-        current, recent, waiting = self._get_state()
-        sequence = concatv(
-            self._limited_retry_converge(current, recent, waiting),
-            [(ReadReference(waiting), dispatch(reference_dispatcher)),
-             (ModifyReference(waiting, match_func(pmap({}),
-                                                  pmap({self.group_id: 1}))),
-              dispatch(reference_dispatcher))])
-        # No "waiting" map cleanup!
-        # No divergent flag cleanup!
-        self._verify_sequence(
-            sequence,
-            converging=current, recent=recent, waiting=waiting,
-            allow_refs=False)
-
-    def test_limited_retry_too_long(self):
-        """
-        When we've been retrying too long waiting for only a LIMITED_RETRY
-        step, we'll give up and delete the divergent flag.
-        """
-        current, recent, waiting = self._get_state(
-            waiting=pmap({self.group_id: 44}))
-        sequence = concatv(
-            self._limited_retry_converge(current, recent, waiting),
-            [(ReadReference(waiting), dispatch(reference_dispatcher)),
-             (Log('converge-limited-retry-too-long', {}), noop),
-             clean_waiting(waiting, self.group_id)],
-            self._clean_divergent())
-        self._verify_sequence(
-            sequence,
-            converging=current, recent=recent, waiting=waiting,
-            allow_refs=False)
-
-    def test_limited_retry_keep_going(self):
-        """
-        When we're only waiting for a LIMITED_RETRY step, we let convergence
-        happen again (by not cleaning up the divergent flag) if we haven't
-        waited long enough.
-        """
-        current, recent, waiting = self._get_state(
-            waiting=pmap({self.group_id: 43}))
-        sequence = concatv(
-            self._limited_retry_converge(current, recent, waiting),
-            [(ReadReference(waiting), dispatch(reference_dispatcher)),
-             (ModifyReference(waiting, match_func(pmap({self.group_id: 43}),
-                                                  pmap({self.group_id: 44}))),
-              dispatch(reference_dispatcher))])
-        # No "waiting" map cleanup!
-        # No divergent flag cleanup!
-        self._verify_sequence(
-            sequence,
-            converging=current, recent=recent, waiting=waiting,
-            allow_refs=False)
-
-    def test_limited_retry_resolved(self):
-        """
-        When we've been waiting for LIMITED_RETRY and then we're not waiting
-        for it any more, the ``waiting`` data is cleaned up.
-        """
-        current, recent, waiting = self._get_state(
-            waiting=pmap({self.group_id: 44}))
-        sequence = concatv(
-            self._limited_retry_converge(current, recent, waiting,
-                                         worst=StepResult.SUCCESS),
-            [clean_waiting(waiting, self.group_id)],
-            self._clean_divergent())
-        self._verify_sequence(
-            sequence,
-            converging=current, recent=recent, waiting=waiting,
-            allow_refs=False)
 
 
 def dispatch(dispatcher):
@@ -938,6 +840,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         }
         self.gsgi_result = (self.group, self.manifest)
         self.now = datetime(1970, 1, 1)
+        self.waiting = Reference(pset())
 
     def get_seq(self, with_cache=True):
         exec_seq = [
@@ -964,6 +867,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         kwargs = {'plan': plan} if plan is not None else {}
         return execute_convergence(
             self.tenant_id, self.group_id, build_timeout=3600,
+            waiting=self.waiting,
+            limited_retry_iterations=43,
             get_all_convergence_data=intent_func("gacd"), **kwargs)
 
     def test_no_steps(self):
@@ -1360,6 +1265,82 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke()),
             (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
+
+    # def test_limited_retry_starting(self):
+    #     """
+    #     When the worst status is LIMITED_RETRY, the group is added to the
+    #     `waiting` map with an initial value of 1, and the divergent
+    #     flag is not cleaned up.
+    #     """
+    #     current, recent, waiting = self._get_state()
+    #     sequence = concatv(
+    #         self._limited_retry_converge(current, recent, waiting),
+    #         [(ReadReference(waiting), dispatch(reference_dispatcher)),
+    #          (ModifyReference(waiting, match_func(pmap({}),
+    #                                               pmap({self.group_id: 1}))),
+    #           dispatch(reference_dispatcher))])
+    #     # No "waiting" map cleanup!
+    #     # No divergent flag cleanup!
+    #     self._verify_sequence(
+    #         sequence,
+    #         converging=current, recent=recent, waiting=waiting,
+    #         allow_refs=False)
+    #
+    # def test_limited_retry_too_long(self):
+    #     """
+    #     When we've been retrying too long waiting for only a LIMITED_RETRY
+    #     step, we'll give up and delete the divergent flag.
+    #     """
+    #     current, recent, waiting = self._get_state(
+    #         waiting=pmap({self.group_id: 44}))
+    #     sequence = concatv(
+    #         self._limited_retry_converge(current, recent, waiting),
+    #         [(ReadReference(waiting), dispatch(reference_dispatcher)),
+    #          (Log('converge-limited-retry-too-long', {}), noop),
+    #          clean_waiting(waiting, self.group_id)],
+    #         self._clean_divergent())
+    #     self._verify_sequence(
+    #         sequence,
+    #         converging=current, recent=recent, waiting=waiting,
+    #         allow_refs=False)
+    #
+    # def test_limited_retry_keep_going(self):
+    #     """
+    #     When we're only waiting for a LIMITED_RETRY step, we let convergence
+    #     happen again (by not cleaning up the divergent flag) if we haven't
+    #     waited long enough.
+    #     """
+    #     current, recent, waiting = self._get_state(
+    #         waiting=pmap({self.group_id: 43}))
+    #     sequence = concatv(
+    #         self._limited_retry_converge(current, recent, waiting),
+    #         [(ReadReference(waiting), dispatch(reference_dispatcher)),
+    #          (ModifyReference(waiting, match_func(pmap({self.group_id: 43}),
+    #                                               pmap({self.group_id: 44}))),
+    #           dispatch(reference_dispatcher))])
+    #     # No "waiting" map cleanup!
+    #     # No divergent flag cleanup!
+    #     self._verify_sequence(
+    #         sequence,
+    #         converging=current, recent=recent, waiting=waiting,
+    #         allow_refs=False)
+    #
+    # def test_limited_retry_resolved(self):
+    #     """
+    #     When we've been waiting for LIMITED_RETRY and then we're not waiting
+    #     for it any more, the ``waiting`` data is cleaned up.
+    #     """
+    #     current, recent, waiting = self._get_state(
+    #         waiting=pmap({self.group_id: 44}))
+    #     sequence = concatv(
+    #         self._limited_retry_converge(current, recent, waiting,
+    #                                      worst=StepResult.SUCCESS),
+    #         [clean_waiting(waiting, self.group_id)],
+    #         self._clean_divergent())
+    #     self._verify_sequence(
+    #         sequence,
+    #         converging=current, recent=recent, waiting=waiting,
+    #         allow_refs=False)
 
 
 class IsAutoscaleActiveTests(SynchronousTestCase):

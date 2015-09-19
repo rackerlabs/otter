@@ -825,8 +825,8 @@ class ConvergeTests(SynchronousTestCase):
                 0),
             pbag([
                 ConvergeLater(
-                    reasons=[ErrorReason.String(
-                        'waiting for temporarily unavailable server to become '
+                    reasons=[ErrorReason.UserMessage(
+                        'Waiting for temporarily unavailable server to become '
                         'ACTIVE')],
                     limited=True)]))
 
@@ -1002,8 +1002,8 @@ class ConvergeTests(SynchronousTestCase):
                 # If we're waiting for some other servers we need to also
                 # expect a ConvergeLater
                 also = [ConvergeLater(reasons=[
-                    ErrorReason.String(
-                        'waiting for temporarily unavailable server to become '
+                    ErrorReason.UserMessage(
+                        'Waiting for temporarily unavailable server to become '
                         'ACTIVE')],
                     limited=True)]
 
