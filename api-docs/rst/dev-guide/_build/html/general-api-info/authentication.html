@@ -1,0 +1,454 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Authentication &mdash; Rackspace Developer Documentation 1 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="Rackspace Developer Documentation 1 documentation" href="../index.html" />
+    <link rel="up" title="General API information" href="index.html" />
+    <link rel="next" title="Service access endpoints" href="service-endpoints.html" />
+    <link rel="prev" title="General API information" href="index.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="service-endpoints.html" title="Service access endpoints"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="General API information"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">Rackspace Developer Documentation 1 documentation</a> &raquo;</li>
+          <li class="nav-item nav-item-1"><a href="index.html" accesskey="U">General API information</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="authentication">
+<span id="id1"></span><h1>Authentication<a class="headerlink" href="#authentication" title="Permalink to this headline">#</a></h1>
+<p>Every ReST request against a Rackspace Cloud service requires the inclusion of a specific authorization token, supplied by the <cite>X-Auth-Token</cite> HTTP header. Customers obtain this token by first using the Rackspace Cloud Identity service and supplying valid authentication credentials.</p>
+<div class="section" id="authentication-endpoint">
+<span id="auth-endpoint"></span><h2>Authentication endpoint<a class="headerlink" href="#authentication-endpoint" title="Permalink to this headline">#</a></h2>
+<p>The Rackspace Cloud Authentication Service serves as the entry point to all Rackspace Cloud APIs and is itself a ReSTful web service.</p>
+<p>Use the following endpoint to access the Cloud Identity service:</p>
+<p><code class="docutils literal"><span class="pre">https://identity.api.rackspacecloud.com/v2.0/</span></code></p>
+<p>Note that the v2.0 component in the URL indicates that you are using version 2.0 of the Cloud Authentication API.</p>
+</div>
+<div class="section" id="authenticating-by-using-token-based-authentication">
+<span id="auth-token"></span><h2>Authenticating by using token-based authentication<a class="headerlink" href="#authenticating-by-using-token-based-authentication" title="Permalink to this headline">#</a></h2>
+<p>Before you can make Rackspace Cloud API requests, you must
+first generate an authentication token. You provide this
+token in the <code class="docutils literal"><span class="pre">X-Auth-Token</span></code> header in each Rackspace Cloud API request.</p>
+<p>The examples below demonstrate how to use cURL to obtain the
+authentication token and your account number. You must provide both when
+making subsequent API requests.</p>
+<p>Remember to replace the placeholder names in the following
+authentication request examples with your information:</p>
+<ul>
+<li><p class="first"><em>yourUserName</em> — Your common Rackspace Cloud username, as supplied
+during registration.</p>
+</li>
+<li><p class="first"><em>yourApiKey</em> — Your API access key.</p>
+<p>You can obtain the key from the Rackspace <a class="reference external" href="http://mycloud.rackspace.com/">Cloud Control Panel</a> by selecting
+<strong>Account Settings</strong> from the <em>yourAccount</em> menu in the top-right
+corner of the window.</p>
+</li>
+</ul>
+<p>In the following examples, you submit the request against the Rackspace Cloud Identity
+service endpoint. If the request is successful, the authentication response returns the authentication token, service catalog, and user information as shown in the example <a class="reference internal" href="#common-dg-auth-response"><span>authentication response</span></a>. You can use this information to <a class="reference internal" href="#auth-submit-api-request"><span>submit an API request</span></a>.</p>
+<p id="common-dg-auth-request"><strong>Example: Authentication request, JSON</strong></p>
+<div class="code highlight-python"><div class="highlight"><pre>curl -s https://identity.api.rackspacecloud.com/v2.0/tokens -X &#39;POST&#39; \
+     -d &#39;{&quot;auth&quot;:{&quot;RAX-KSKEY:apiKeyCredentials&quot;:{&quot;username&quot;:&quot;yourUserName&quot;,
+        &quot;apiKey&quot;:&quot;yourApiKey&quot;}}}&#39; \
+     -H &quot;Content-Type:
+        application/json&quot;
+</pre></div>
+</div>
+<p><strong>Example: Authentication request, XML</strong></p>
+<div class="code highlight-python"><div class="highlight"><pre>POST /v2.0/tokens HTTP/1.1
+User-Agent: curl/7.21.0 (x86_64-pc-linux-gnu) libcurl/7.21.0 OpenSSL/0.9.8o zlib/1.2.3.4 libidn/1.15 libssh2/1.2.6
+Host: identity.api.rackspacecloud.com
+Accept: application/xml
+Content-Type: application/xml
+Content-Length: 88
+
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;auth&gt;
+   &lt;apiKeyCredentials
+       xmlns=&quot;http://docs.rackspace.com/identity/api/ext/RAX-KSKEY/v1.0&quot;
+       username=&quot;jsmith&quot; **&lt;1&gt;**
+       apiKey=&quot;aaaaa-bbbbb-ccccc-12345678&quot;/&gt; **&lt;2&gt;**
+&lt;/auth&gt;
+</pre></div>
+</div>
+<p id="common-dg-auth-response"><strong>Example: Authentication response, JSON</strong></p>
+<div class="code highlight-python"><div class="highlight"><pre><span class="p">{</span>
+    <span class="s">&quot;access&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s">&quot;serviceCatalog&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s">&quot;endpoints&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="s">&quot;internalURL&quot;</span><span class="p">:</span> <span class="s">&quot;https://snet-storage101.dfw1.clouddrive.com/v1/MossoCloudFS_530f8649-324c-499c-a075-2195854d52a7&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;publicURL&quot;</span><span class="p">:</span> <span class="s">&quot;https://storage101.dfw1.clouddrive.com/v1/MossoCloudFS_530f8649-324c-499c-a075-2195854d52a7&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;region&quot;</span><span class="p">:</span> <span class="s">&quot;DFW&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;tenantId&quot;</span><span class="p">:</span> <span class="s">&quot;MossoCloudFS_530f8649-324c-499c-a075-2195854d52a7&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="s">&quot;internalURL&quot;</span><span class="p">:</span> <span class="s">&quot;https://snet-storage101.ord1.clouddrive.com/v1/MossoCloudFS_530f8649-324c-499c-a075-2195854d52a7&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;publicURL&quot;</span><span class="p">:</span> <span class="s">&quot;https://storage101.ord1.clouddrive.com/v1/MossoCloudFS_530f8649-324c-499c-a075-2195854d52a7&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;region&quot;</span><span class="p">:</span> <span class="s">&quot;ORD&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;tenantId&quot;</span><span class="p">:</span> <span class="s">&quot;MossoCloudFS_530f8649-324c-499c-a075-2195854d52a7&quot;</span>
+                    <span class="p">}</span>
+                <span class="p">],</span>
+                <span class="s">&quot;name&quot;</span><span class="p">:</span> <span class="s">&quot;cloudFiles&quot;</span><span class="p">,</span>
+                <span class="s">&quot;type&quot;</span><span class="p">:</span> <span class="s">&quot;object-store&quot;</span>
+            <span class="p">},</span>
+            <span class="p">{</span>
+                <span class="s">&quot;endpoints&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="s">&quot;publicURL&quot;</span><span class="p">:</span> <span class="s">&quot;https://servers.api.rackspacecloud.com/v1.0/010101&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;tenantId&quot;</span><span class="p">:</span> <span class="s">&quot;010101&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;versionId&quot;</span><span class="p">:</span> <span class="s">&quot;1.0&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;versionInfo&quot;</span><span class="p">:</span> <span class="s">&quot;https://servers.api.rackspacecloud.com/v1.0&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;versionList&quot;</span><span class="p">:</span> <span class="s">&quot;https://servers.api.rackspacecloud.com/&quot;</span>
+                    <span class="p">}</span>
+                <span class="p">],</span>
+                <span class="s">&quot;name&quot;</span><span class="p">:</span> <span class="s">&quot;cloudServers&quot;</span><span class="p">,</span>
+                <span class="s">&quot;type&quot;</span><span class="p">:</span> <span class="s">&quot;compute&quot;</span>
+            <span class="p">},</span>
+            <span class="p">{</span>
+                <span class="s">&quot;endpoints&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="s">&quot;publicURL&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.servers.api.rackspacecloud.com/v2/010101&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;region&quot;</span><span class="p">:</span> <span class="s">&quot;DFW&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;tenantId&quot;</span><span class="p">:</span> <span class="s">&quot;010101&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;versionId&quot;</span><span class="p">:</span> <span class="s">&quot;2&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;versionInfo&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.servers.api.rackspacecloud.com/v2&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;versionList&quot;</span><span class="p">:</span> <span class="s">&quot;https://dfw.servers.api.rackspacecloud.com/&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="s">&quot;publicURL&quot;</span><span class="p">:</span> <span class="s">&quot;https://ord.servers.api.rackspacecloud.com/v2/010101&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;region&quot;</span><span class="p">:</span> <span class="s">&quot;ORD&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;tenantId&quot;</span><span class="p">:</span> <span class="s">&quot;010101&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;versionId&quot;</span><span class="p">:</span> <span class="s">&quot;2&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;versionInfo&quot;</span><span class="p">:</span> <span class="s">&quot;https://ord.servers.api.rackspacecloud.com/v2&quot;</span><span class="p">,</span>
+                        <span class="s">&quot;versionList&quot;</span><span class="p">:</span> <span class="s">&quot;https://ord.servers.api.rackspacecloud.com/&quot;</span>
+                    <span class="p">}</span>
+                <span class="p">],</span>
+                <span class="s">&quot;name&quot;</span><span class="p">:</span> <span class="s">&quot;cloudServersOpenStack&quot;</span><span class="p">,</span>
+                <span class="s">&quot;type&quot;</span><span class="p">:</span> <span class="s">&quot;compute&quot;</span>
+            <span class="p">}</span>
+        <span class="p">],</span>
+        <span class="s">&quot;token&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s">&quot;expires&quot;</span><span class="p">:</span> <span class="s">&quot;2012-09-14T15:11:57.585-05:00&quot;</span><span class="p">,</span>
+            <span class="s">&quot;id&quot;</span><span class="p">:</span> <span class="s">&quot;858fb4c2-bf15-4dac-917d-8ec750ae9baa&quot;</span><span class="p">,</span>
+            <span class="s">&quot;tenant&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s">&quot;id&quot;</span><span class="p">:</span> <span class="s">&quot;010101&quot;</span><span class="p">,</span>
+                <span class="s">&quot;name&quot;</span><span class="p">:</span> <span class="s">&quot;010101&quot;</span>
+            <span class="p">}</span>
+        <span class="p">},</span>
+        <span class="s">&quot;user&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s">&quot;RAX-AUTH:defaultRegion&quot;</span><span class="p">:</span> <span class="s">&quot;DFW&quot;</span><span class="p">,</span>
+            <span class="s">&quot;id&quot;</span><span class="p">:</span> <span class="s">&quot;170454&quot;</span><span class="p">,</span>
+            <span class="s">&quot;name&quot;</span><span class="p">:</span> <span class="s">&quot;MyRackspaceAcct&quot;</span><span class="p">,</span>
+            <span class="s">&quot;roles&quot;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span>
+                    <span class="s">&quot;description&quot;</span><span class="p">:</span> <span class="s">&quot;User Admin Role.&quot;</span><span class="p">,</span>
+                    <span class="s">&quot;id&quot;</span><span class="p">:</span> <span class="s">&quot;3&quot;</span><span class="p">,</span>
+                    <span class="s">&quot;name&quot;</span><span class="p">:</span> <span class="s">&quot;identity:user-admin&quot;</span>
+                <span class="p">}</span>
+            <span class="p">]</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Example: Authentication response, XML</strong></p>
+<div class="code highlight-python"><div class="highlight"><pre>HTTP/1.1 200 OK
+Content-Type: application/xml; charset=UTF-8
+Content-Length: 477
+Date: Thu, 12 Apr 2012 18:50:20 GMT
+
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; standalone=&quot;yes&quot;?&gt;
+&lt;access xmlns:os-ksadm=&quot;http://docs.openstack.org/identity/api/ext/OS-KSADM/v1.0&quot;
+  xmlns=&quot;http://docs.openstack.org/identity/api/v2.0&quot;
+  xmlns:rax-kskey=&quot;http://docs.rackspace.com/identity/api/ext/RAX-KSKEY/v1.0&quot;
+  xmlns:rax-ksqa=&quot;http://docs.rackspace.com/identity/api/ext/RAX-KSQA/v1.0&quot;
+  xmlns:common=&quot;http://docs.openstack.org/common/api/v1.0&quot;
+  xmlns:ksgrp=&quot;http://docs.rackspace.com/identity/api/ext/RAX-KSGRP/v1.0&quot;
+  xmlns:rax-kscatalog=&quot;http://docs.openstack.org/identity/api/ext/OS-KSCATALOG/v1.0&quot;
+  xmlns:atom=&quot;http://www.w3.org/2005/Atom&quot;&gt;
+  &lt;token id=&quot;vvvvvvvv-wwww-xxxx-yyyy-zzzzzzzzzzzz&quot; expires=&quot;2011-12-08T22:51:02.000-06:00&quot;/&gt;
+  &lt;user id=&quot;123456&quot; name=&quot;jsmith&quot; rax-auth:defaultRegion=&quot;DFW&quot;&gt;
+    &lt;roles&gt;
+      &lt;role id=&quot;identity:admin&quot; name=&quot;identity:admin&quot; description=&quot;Admin Role.&quot;/&gt;
+      &lt;role id=&quot;identity:default&quot; name=&quot;identity:default&quot; description=&quot;Default Role.&quot;/&gt;
+    &lt;/roles&gt;
+  &lt;/user&gt;
+  &lt;serviceCatalog&gt;
+    &lt;service type=&quot;rax:database&quot; name=&quot;cloudDatabases&quot;&gt;
+      &lt;endpoint region=&quot;DFW&quot; tenantId=&quot;1100111&quot; publicURL=&quot;https://dfw.databases.api.rackspacecloud.com/v1.0/1100111&quot;/&gt;
+      &lt;endpoint region=&quot;ORD&quot; tenantId=&quot;1100111&quot; publicURL=&quot;https://ord.databases.api.rackspacecloud.com/v1.0/1100111&quot;/&gt;
+    &lt;/service&gt;
+    &lt;service type=&quot;rax:load-balancer&quot; name=&quot;cloudLoadBalancers&quot;&gt;
+      &lt;endpoint region=&quot;DFW&quot; tenantId=&quot;1100111&quot; publicURL=&quot;https://dfw.loadbalancers.api.rackspacecloud.com/v1.0/1100111&quot;/&gt;
+      &lt;endpoint region=&quot;ORD&quot; tenantId=&quot;1100111&quot; publicURL=&quot;https://ord.loadbalancers.api.rackspacecloud.com/v1.0/1100111&quot;/&gt;
+    &lt;/service&gt;
+    &lt;service type=&quot;compute&quot; name=&quot;cloudServersOpenStack&quot;&gt;
+      &lt;endpoint region=&quot;DFW&quot; tenantId=&quot;1100111&quot;
+        publicURL=&quot;https://dfw.servers.api.rackspacecloud.com/v2/1100111&quot;&gt;
+        &lt;version id=&quot;2&quot; info=&quot;https://dfw.servers.api.rackspacecloud.com/v2/&quot;
+          list=&quot;https://dfw.servers.api.rackspacecloud.com/&quot; /&gt;
+      &lt;/endpoint&gt;
+      &lt;endpoint region=&quot;ORD&quot; tenantId=&quot;1100111&quot;
+        publicURL=&quot;https://ord.servers.api.rackspacecloud.com/v2/1100111&quot;&gt;
+        &lt;version id=&quot;2&quot; info=&quot;https://ord.servers.api.rackspacecloud.com/v2/&quot;
+          list=&quot;https://ord.servers.api.rackspacecloud.com/&quot; /&gt;
+      &lt;/endpoint&gt;
+    &lt;/service&gt;
+    &lt;service type=&quot;compute&quot; name=&quot;cloudServers&quot;&gt;
+      &lt;endpoint tenantId=&quot;1100111&quot;
+        publicURL=&quot;https://servers.api.rackspacecloud.com/v1.0/1100111&quot;&gt;
+        &lt;version id=&quot;1.0&quot;
+          info=&quot;https://servers.api.rackspacecloud.com/v1.0/&quot;
+          list=&quot;https://servers.api.rackspacecloud.com/&quot;/&gt;
+      &lt;/endpoint&gt;
+    &lt;/service&gt;
+    &lt;service type=&quot;object-store&quot; name=&quot;cloudFiles&quot;&gt;
+      &lt;endpoint region=&quot;DFW&quot;
+        tenantId=&quot;MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee&quot;
+        publicURL=&quot;https://storage101.dfw1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee&quot;
+        internalURL=&quot;https://snet-storage101.dfw1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee&quot;/&gt;
+      &lt;endpoint region=&quot;ORD&quot;
+        tenantId=&quot;MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee&quot;
+        publicURL=&quot;https://storage101.ord1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee&quot;
+        internalURL=&quot;https://snet-storage101.ord1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee&quot;/&gt;
+    &lt;/service&gt;
+    &lt;service type=&quot;rax:object-cdn&quot; name=&quot;cloudFilesCDN&quot;&gt;
+      &lt;endpoint region=&quot;DFW&quot;
+        tenantId=&quot;MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee&quot;
+        publicURL=&quot;https://cdn1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee&quot;/&gt;
+      &lt;endpoint region=&quot;ORD&quot;
+        tenantId=&quot;MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee&quot;
+        publicURL=&quot;https://cdn2.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee&quot;/&gt;
+    &lt;/service&gt;
+    &lt;service type=&quot;rax:dns&quot; name=&quot;cloudDNS&quot;&gt;
+      &lt;endpoint tenantId=&quot;1100111&quot;
+        publicURL=&quot;https://dns.api.rackspacecloud.com/v1.0/1100111&quot;/&gt;
+    &lt;/service&gt;
+  &lt;/serviceCatalog&gt;
+&lt;/access&gt;
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">For detailed information about the authentication request and response, see
+<a class="reference external" href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/Sample_Request_Response-d1e64.html">authentication request and response</a> in the <em>Cloud Identity Developer Guide</em>.</p>
+</div>
+</div>
+<div class="section" id="submit-api-request">
+<span id="auth-submit-api-request"></span><h2>Submit API request<a class="headerlink" href="#submit-api-request" title="Permalink to this headline">#</a></h2>
+<p>After you authenticate successfully, you can submit
+an API request for any service included in the service catalog.</p>
+<ol class="arabic">
+<li><p class="first">In the authentication response, copy the token <code class="docutils literal"><span class="pre">id</span></code> value from the
+token object and save it, or export it to an environment variable
+that can be supplied in the <code class="docutils literal"><span class="pre">X-Auth-Token</span></code> header required in each
+API request. In this example, the token value is
+<code class="docutils literal"><span class="pre">123abc5368901230076b12357897898</span></code>.</p>
+<div class="code highlight-python"><div class="highlight"><pre>&quot;token&quot;:
+      {
+        &quot;RAX-AUTH:authenticatedBy&quot;: [
+            &quot;APIKEY&quot;
+                ],
+        &quot;expires&quot;: &quot;2015-01-09T15:08:53.645-06:00&quot;,
+        &quot;id&quot;: &quot;123abc5368901230076b12357897898&quot;
+      }
+</pre></div>
+</div>
+</li>
+<li><p class="first">Find the endpoint URL for the service that you want to access.</p>
+<p>For example, the endpoint URL for Cloud Files is
+<code class="docutils literal"><span class="pre">https://storage101.ord1.clouddrive.com/v1/yourTenantID</span></code>.</p>
+</li>
+<li><p class="first">Submit an API request to the service endpoint that you identified.</p>
+<p>The following example shows a cURL request to retrieve a list of
+containers for a tenant by using the Cloud Files API.</p>
+<div class="code highlight-python"><div class="highlight"><pre>$ cURL -i -s \
+-X GET https://storage101.ord1.clouddrive.com/v1/MossoCloudFS_9c24e3db-52bf-4f26-8dc1-220871796e9f \
+-H &quot;X-Auth-Token: $AUTH_TOKEN&quot; \
+-H &quot;Content-type: application/json&quot;  --verbose | python -m json.tool
+</pre></div>
+</div>
+<p>If the authentication token is accepted, the Cloud Files service
+returns the following response if the authentication token is
+accepted.</p>
+<div class="code highlight-python"><div class="highlight"><pre>GET /v1/MossoCloudFS_9c24e3db-52bf-4f26-8dc1-220871796e9f HTTP/1.1
+User-Agent: curl/7.30.0
+Host: storage101.ord1.clouddrive.com
+Accept: */*
+X-Auth-Token: 69dc089d983f4729af29bec5a7dc6426
+Content-type: application/json
+
+ HTTP/1.1 200 OK
+ Content-Length: 22
+ X-Account-Object-Count: 0
+ X-Account-Storage-Policy-Policy-0-Bytes-Used: 0
+ X-Timestamp: 1345588196.72805
+ X-Account-Storage-Policy-Policy-0-Object-Count: 0
+ X-Account-Meta-Temp-Url-Key: e1f97840118eafc550d45dbd8e530c11
+ X-Account-Bytes-Used: 0
+ X-Account-Container-Count: 3
+ Content-Type: text/plain; charset=utf-8
+ Accept-Ranges: bytes
+ X-Trans-Id: tx1353de66dd9d49da84eda-00544799f4ord1
+ Date: Wed, 15 June 2015 11:50:12 GMT
+
+ metest
+ mytest
+ mytest2
+ * Connection #0 to host storage101.ord1.clouddrive.com left intact
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+<div class="section" id="manage-authentication-tokens">
+<span id="auth-manage"></span><h2>Manage authentication tokens<a class="headerlink" href="#manage-authentication-tokens" title="Permalink to this headline">#</a></h2>
+<p>Authentication tokens are valid for 24 hours by default. The expiration
+time stamp is included in the token object returned in the
+authentication response. Administrators and users can invalidate a token
+immediately by submitting a <strong>Revoke token</strong> API request to the Identity
+service endpoint.</p>
+<p>If you re-authenticate before the <code class="docutils literal"><span class="pre">token</span></code> expires, the Identity
+service returns the same token as long as it remains valid.</p>
+<p>When a token expires or becomes invalid, any API request submitted
+against Rackspace Cloud services returns a 401 error message. To regain
+access, submit another <strong>POST tokens</strong> request to the authentication
+endpoint.</p>
+<p><strong>Best practices</strong></p>
+<ul>
+<li><p class="first">Cache authentication tokens.</p>
+<p>By default, the Rackspace Cloud Identity service makes an
+authentication request before every API call.</p>
+<p>To speed up your API operations and reduce system load, store the
+authentication token in a secure cache or database so that the
+API can use the stored information, instead of having to
+re-authenticate for each API request. You can re-use the cached
+token value as long as it remains valid.</p>
+</li>
+<li><p class="first">Design applications to re-authenticate after receiving a
+<cite>401 Unauthorized</cite> response from a service endpoint, or use
+either of the following methods to get a new token before the
+existing token expires.</p>
+</li>
+<li><p class="first">Submit a <strong>POST tokens</strong> request within an hour of the token
+expiration to obtain a new token. Note that this behavior is a
+Rackspace customization of the OpenStack Identity (keystone)
+implementation.</p>
+</li>
+<li><p class="first">Submit a <strong>DELETE token</strong> request to revoke the existing
+token, and then followed by a <strong>POST tokens</strong> request to get a new token.</p>
+</li>
+<li><p class="first">To simplify authentication, credential, and token management, use an
+<a class="reference external" href="https://wiki.openstack.org/wiki/OpenStackClients">OpenStack command-line client application</a> or one of the <a class="reference external" href="https://developer.rackspace.com/sdks/">Rackspace SDKs</a>.</p>
+</li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Authentication</a><ul>
+<li><a class="reference internal" href="#authentication-endpoint">Authentication endpoint</a></li>
+<li><a class="reference internal" href="#authenticating-by-using-token-based-authentication">Authenticating by using token-based authentication</a></li>
+<li><a class="reference internal" href="#submit-api-request">Submit API request</a></li>
+<li><a class="reference internal" href="#manage-authentication-tokens">Manage authentication tokens</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="index.html"
+                        title="previous chapter">General API information</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="service-endpoints.html"
+                        title="next chapter">Service access endpoints</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/general-api-info/authentication.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2015, Rackspace.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.4</a>
+      
+      |
+      <a href="../_sources/general-api-info/authentication.txt"
+          rel="nofollow">Page source</a></li>
+    </div>
+
+    
+
+    
+  </body>
+</html>
