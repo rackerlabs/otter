@@ -484,8 +484,8 @@ class AutoscaleBehaviors(BaseBehavior):
             scale_down_factor = 0.25
             timeout = max(timeout * scale_down_factor, 1)
             interval_time = interval_time * scale_down_factor
-            # max out mimic waiting to 60 seconds, no matter what the timeout
-            timeout = min(timeout, 60)
+            # max out mimic waiting to 90 seconds, no matter what the timeout
+            timeout = min(timeout, 90)
 
         # retry uses millseconds, not seconds
         @retry(wait_fixed=interval_time * 1000, stop_max_delay=timeout * 1000)

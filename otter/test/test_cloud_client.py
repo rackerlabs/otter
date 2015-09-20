@@ -126,16 +126,17 @@ def service_request_eqf(stub_response):
     return resolve_service_request
 
 
-def log_intent(msg_type, body):
+def log_intent(msg_type, body, log_as_json=True):
     """
     Return a :obj:`Log` intent for the given mesasge type and body.
     """
+    body = json.dumps(body, sort_keys=True) if log_as_json else body
     return Log(
         msg_type,
         {'url': "original/request/URL",
          'method': 'method',
          'request_id': "original-request-id",
-         'response_body': json.dumps(body, sort_keys=True)}
+         'response_body': body}
     )
 
 
@@ -672,13 +673,14 @@ class CLBClientTests(SynchronousTestCase):
         Parse the common CLB errors, and :class:`NoSuchCLBNodeError`.
         """
         eff = change_clb_node(lb_id=self.lb_id, node_id='1234',
-                              condition="DRAINING", weight=50)
+                              condition="DRAINING", weight=50,
+                              _type='SECONDARY')
         expected = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'PUT',
             'loadbalancers/{0}/nodes/1234'.format(self.lb_id),
-            data={'condition': 'DRAINING',
-                  'weight': 50},
+            data={'node': {'condition': 'DRAINING',
+                           'weight': 50, 'type': 'SECONDARY'}},
             success_pred=has_code(202))
 
         # success
@@ -705,6 +707,27 @@ class CLBClientTests(SynchronousTestCase):
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)
+
+    def test_change_clb_node_default_type(self):
+        """
+        Produce a request for modifying a node on a load balancer with the
+        default type, which returns a successful result on 202.
+        """
+        eff = change_clb_node(lb_id=self.lb_id, node_id='1234',
+                              condition="DRAINING", weight=50)
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'PUT',
+            'loadbalancers/{0}/nodes/1234'.format(self.lb_id),
+            data={'node': {'condition': 'DRAINING',
+                           'weight': 50, 'type': 'PRIMARY'}},
+            success_pred=has_code(202))
+
+        dispatcher = EQFDispatcher([(
+            expected.intent,
+            service_request_eqf(stub_pure_response('', 202)))])
+        self.assertEqual(sync_perform(dispatcher, eff),
+                         stub_pure_response(None, 202))
 
     def test_add_clb_nodes(self):
         """
@@ -757,7 +780,8 @@ class CLBClientTests(SynchronousTestCase):
             sync_perform(dispatcher, eff)
         self.assertEqual(
             cm.exception,
-            CLBNodeLimitError(msg, lb_id=six.text_type(self.lb_id)))
+            CLBNodeLimitError(msg, lb_id=six.text_type(self.lb_id),
+                              node_limit=25))
 
         # all the common failures
         self.assert_parses_common_clb_errors(expected.intent, eff)
@@ -1218,7 +1242,7 @@ class NovaClientTests(SynchronousTestCase):
 
     def _list_server_details_log_intent(self, body):
         """Return a :obj:`Log` intent for listing server details."""
-        return log_intent('request-list-servers-details', body)
+        return log_intent('request-list-servers-details', body, False)
 
     def test_list_servers_details_page(self):
         """

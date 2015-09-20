@@ -15,7 +15,7 @@ from .auth import (
     perform_invalidate_token,
 )
 from .cloud_client import get_cloud_client_dispatcher
-from .log.intents import get_log_dispatcher
+from .log.intents import get_log_dispatcher, get_msg_time_dispatcher
 from .models.cass import get_cql_dispatcher
 from .models.intents import get_model_dispatcher
 from .util.pure_http import Request, perform_request
@@ -58,6 +58,7 @@ def get_full_dispatcher(reactor, authenticator, log, service_configs,
         get_model_dispatcher(log, store),
         get_eviction_dispatcher(supervisor),
         get_log_dispatcher(log, {}),
+        get_msg_time_dispatcher(reactor),
         get_cql_dispatcher(cass_client)
     ])
 

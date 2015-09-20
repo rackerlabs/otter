@@ -23,9 +23,7 @@ from otter.cloud_client import (
     TenantScope,
     get_server_details,
     set_nova_metadata_item)
-from otter.convergence.model import DRAINING_METADATA
-from otter.convergence.service import (
-    get_convergence_starter, set_convergence_starter)
+from otter.convergence.planning import DRAINING_METADATA
 from otter.log.intents import BoundFields, Log
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
 from otter.models.interface import (
@@ -1379,9 +1377,6 @@ class ConvergeTestCase(SynchronousTestCase):
         self.mock_log = mock.MagicMock()
         self.mock_state = mock_group_state()
         self.group = mock_group()
-        self.cvg_starter_mock = mock.Mock()
-        self.addCleanup(set_convergence_starter, get_convergence_starter())
-        set_convergence_starter(self.cvg_starter_mock)
 
     def test_no_change_returns_none(self):
         """
@@ -1411,9 +1406,6 @@ class ConvergeTestCase(SynchronousTestCase):
             bound_log, 'transaction', self.mock_state, 'launch', self.group, 5)
         bound_log.msg.assert_any_call('executing launch configs')
 
-        # And converger service is _not_ called
-        self.assertFalse(self.cvg_starter_mock.start_convergence.called)
-
     def test_scale_down_exec_scale_down(self):
         """
         Converge will invoke exec_scale_down when the delta is negative.
@@ -1429,8 +1421,6 @@ class ConvergeTestCase(SynchronousTestCase):
         self.mocks['exec_scale_down'].assert_called_once_with(
             bound_log, 'transaction', self.mock_state, self.group, 5)
         bound_log.msg.assert_any_call('scaling down')
-        # And converger service is _not_ called
-        self.assertFalse(self.cvg_starter_mock.start_convergence.called)
 
     def test_audit_log_scale_up(self):
         """

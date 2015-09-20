@@ -243,7 +243,16 @@ launch_server = {
                         "type": [_clb_lb, _rcv3_lb]
                     }
                 },
-
+                "draining_timeout": {
+                    "type": "number",
+                    "description": (
+                        "Number of seconds the server will be put in draining "
+                        "before removing it from load balancer. The load "
+                        "balancer can be CLB or RCv3"),
+                    "required": False,
+                    "minimum": 30,
+                    "maximum": 3600  # 1 hour
+                }
             },
             "additionalProperties": False
         }

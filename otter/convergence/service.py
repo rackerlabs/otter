@@ -102,7 +102,6 @@ from pyrsistent import thaw
 
 import six
 
-from toolz.dicttoolz import merge
 from toolz.functoolz import curry
 
 from twisted.application.service import MultiService
@@ -119,7 +118,7 @@ from otter.convergence.logging import log_steps
 from otter.convergence.model import ServerState, StepResult
 from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
-from otter.log.intents import err, msg, with_log
+from otter.log.intents import err, msg, msg_with_time, with_log
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, UpdateGroupErrorReasons,
     UpdateGroupStatus, UpdateServersCache)
@@ -187,7 +186,8 @@ def _execute_steps(steps):
     if len(steps) > 0:
         results = yield steps_to_effect(steps)
 
-        severity = [StepResult.FAILURE, StepResult.RETRY, StepResult.SUCCESS]
+        severity = [StepResult.FAILURE, StepResult.RETRY,
+                    StepResult.LIMITED_RETRY, StepResult.SUCCESS]
         priority = sorted(results,
                           key=lambda (status, reasons): severity.index(status))
         worst_status = priority[0][0]
@@ -262,9 +262,12 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
     # Gather data
+    yield msg("begin-convergence")
     now_dt = yield Effect(Func(datetime.utcnow))
-    all_data = yield convergence_exec_data(tenant_id, group_id, now_dt,
-                                           get_all_convergence_data)
+    all_data = yield msg_with_time(
+        "gather-convergence-data",
+        convergence_exec_data(tenant_id, group_id, now_dt,
+                              get_all_convergence_data))
     (scaling_group, group_state, desired_group_state,
      servers, lb_nodes) = all_data
 
@@ -309,8 +312,8 @@ def convergence_succeeded(scaling_group, group_state, servers, now):
     yield Effect(
         UpdateServersCache(
             scaling_group.tenant_id, scaling_group.uuid, now,
-            [merge(thaw(s.json), {"_is_as_active": True})
-                for s in servers if s.state != ServerState.DELETED]))
+            [thaw(s.json.set("_is_as_active", True))
+             for s in servers if s.state != ServerState.DELETED]))
     yield do_return(ScalingGroupStatus.ACTIVE)
 
 
@@ -738,19 +741,3 @@ class Converger(MultiService):
             # the return value is ignored, but we return this for testing
             eff = self._converge_all(my_buckets, children)
             return perform(self._dispatcher, self._with_conv_runid(eff))
-
-# We're using a global for now because it's difficult to thread a new parameter
-# all the way through the REST objects to the controller code, where this
-# service is used.
-_convergence_starter = None
-
-
-def get_convergence_starter():
-    """Return global :obj:`ConvergenceStarter` service"""
-    return _convergence_starter
-
-
-def set_convergence_starter(convergence_starter):
-    """Set global :obj:`ConvergenceStarter` service"""
-    global _convergence_starter
-    _convergence_starter = convergence_starter

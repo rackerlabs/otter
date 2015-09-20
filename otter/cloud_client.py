@@ -328,13 +328,15 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
 # ----- Logging responses -----
 
 
-def log_success_response(msg_type, response_body_filter):
+def log_success_response(msg_type, response_body_filter, log_as_json=True):
     """
     :param str msg_type: A string representing the message type of the log
         message
     :param callable response_body_filter: A callable that takes a the response
         body and returns a version of the body that should be logged - this
         should not mutate the original response body.
+    :param bool log_as_json: Should the body be logged as JSON string or
+        as dict?
     :return: a function that accepts success result from a `ServiceRequest` and
         log the response body.  This assumes a JSON response, which is a
         tuple of (response, response_content).  (non-JSON responses do not
@@ -345,13 +347,14 @@ def log_success_response(msg_type, response_body_filter):
         # So we can link it to any non-cloud_client logs
         request_id = resp.request.headers.getRawHeaders(
             'x-otter-request-id', [None])[0]
-
+        resp_body = (
+            json.dumps(response_body_filter(json_body), sort_keys=True)
+            if log_as_json else json_body)
         eff = msg_effect(
             msg_type,
             method=resp.request.method,
             url=resp.request.absoluteURI,
-            response_body=json.dumps(response_body_filter(json_body),
-                                     sort_keys=True),
+            response_body=resp_body,
             request_id=request_id)
         return eff.on(lambda _: result)
 
@@ -383,7 +386,7 @@ _CLB_DUPLICATE_NODES_PATTERN = _regex(
     "Duplicate nodes detected. One or more nodes already configured "
     "on load\s*balancer")
 _CLB_NODE_LIMIT_PATTERN = _regex(
-    "Nodes must not exceed \d+ per load\s*balancer")
+    "Nodes must not exceed (\d+) per load\s*balancer")
 _CLB_NODE_REMOVED_PATTERN = _regex(
     "Node ids ((?:\d+,)*(?:\d+)) are not a part of your load\s*balancer")
 _CLB_OVER_LIMIT_PATTERN = _regex("OverLimit Retry\.{3}")
@@ -478,7 +481,8 @@ class CLBDuplicateNodesError(Exception):
     """
 
 
-@attributes([Attribute('lb_id', instance_of=six.text_type)])
+@attributes([Attribute('lb_id', instance_of=six.text_type),
+             Attribute("node_limit", instance_of=int)])
 class CLBNodeLimitError(Exception):
     """
     Error to be raised only when adding one or more nodes to a CLB: adding
@@ -565,17 +569,29 @@ def add_clb_nodes(lb_id, nodes):
     @_only_json_api_errors
     def _parse_known_errors(code, json_body):
         mappings = _expand_clb_matches(
-            [(422, _CLB_DUPLICATE_NODES_PATTERN, CLBDuplicateNodesError),
-             (413, _CLB_NODE_LIMIT_PATTERN, CLBNodeLimitError)],
+            [(422, _CLB_DUPLICATE_NODES_PATTERN, CLBDuplicateNodesError)],
             lb_id)
         _match_errors(mappings, code, json_body)
         _process_clb_api_error(code, json_body, lb_id)
+        process_nodelimit_error(code, json_body, lb_id)
 
     return eff.on(error=_parse_known_errors).on(
         log_success_response('request-add-clb-nodes', identity))
 
 
-def change_clb_node(lb_id, node_id, condition, weight):
+def process_nodelimit_error(code, json_body, lb_id):
+    """
+    Parse error that causes CLBNodeLimitError along with limit and raise it
+    """
+    if code != 413:
+        return
+    match = _CLB_NODE_LIMIT_PATTERN.match(json_body.get("message", ""))
+    if match is not None:
+        limit = int(match.group(1))
+        raise CLBNodeLimitError(lb_id=six.text_type(lb_id), node_limit=limit)
+
+
+def change_clb_node(lb_id, node_id, condition, weight, _type="PRIMARY"):
     """
     Generate effect to change a node on a load balancer.
 
@@ -584,9 +600,7 @@ def change_clb_node(lb_id, node_id, condition, weight):
     :param str condition: The condition to change to: one of "ENABLED",
         "DRAINING", or "DISABLED"
     :param int weight: The weight to change to.
-
-    Note: this does not support "type" yet, since it doesn't make sense to add
-    autoscaled servers as secondary.
+    :param str _type: The type to change the CLB node to.
 
     :return: :class:`ServiceRequest` effect
 
@@ -597,7 +611,8 @@ def change_clb_node(lb_id, node_id, condition, weight):
         ServiceType.CLOUD_LOAD_BALANCERS,
         'PUT',
         append_segments('loadbalancers', lb_id, 'nodes', node_id),
-        data={'condition': condition, 'weight': weight},
+        data={'node': {
+            'condition': condition, 'weight': weight, 'type': _type}},
         success_pred=has_code(202))
 
     @_only_json_api_errors
@@ -967,7 +982,8 @@ def list_servers_details_page(parameters=None):
             'GET', append_segments('servers', 'detail'),
             params=parameters)
         .on(error=_parse_known_errors)
-        .on(log_success_response('request-list-servers-details', identity))
+        .on(log_success_response('request-list-servers-details', identity,
+                                 log_as_json=False))
     )
 
 

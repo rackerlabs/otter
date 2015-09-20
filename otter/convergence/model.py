@@ -69,33 +69,29 @@ class CLBNodeType(Names):
 class ServerState(Names):
     """
     Constants representing the state of a Nova cloud server.
-    """
 
+    Most of these constants correspond to Nova states of the same name.
+    """
     ACTIVE = NamedConstant()
-    """
-    Corresponds to Nova's ``ACTIVE`` state.
-    """
-
-    ERROR = NamedConstant()
-    """
-    Corresponds to Nova's ``ERROR`` state.
-    """
-
     BUILD = NamedConstant()
-    """
-    Corresponds to Nova's ``BUILD`` and ``BUILDING`` states.
-    """
-
-    DRAINING = NamedConstant()
-    """"
-    Autoscale is deleting the server.  This state is meant to supercede Nova's
-    ``BUILD`` and ``ACTIVE`` states, because this state means that the server
-    is basically functional, but that Autoscale would like to delete it.
-    """
-
     DELETED = NamedConstant()
+    ERROR = NamedConstant()
+    HARD_REBOOT = NamedConstant()
+    MIGRATING = NamedConstant()
+    PASSWORD = NamedConstant()
+    REBUILD = NamedConstant()
+    RESCUE = NamedConstant()
+    RESIZE = NamedConstant()
+    REVERT_RESIZE = NamedConstant()
+    SHUTOFF = NamedConstant()
+    SUSPENDED = NamedConstant()
+    UNKNOWN = NamedConstant()
+    VERIFY_RESIZE = NamedConstant()
+
+    UNKNOWN_TO_OTTER = NamedConstant()
     """
-    Corresponds to Nova's ``DELETED`` state.
+    Indicates that some state was returned by Nova that Otter doesn't know
+    about. The real state will be in `NovaServer.json`.
     """
 
 
@@ -112,6 +108,14 @@ class StepResult(Names):
     RETRY = NamedConstant()
     """
     Convergence should be retried later.
+    """
+
+    LIMITED_RETRY = NamedConstant()
+    """
+    Converge should be retried, but only a limited number of times.
+
+    This is used when we're waiting for upstream resources to become available
+    but aren't certain that they ever will be.
     """
 
     FAILURE = NamedConstant()
@@ -254,14 +258,13 @@ class NovaServer(object):
 
         :return: :obj:`NovaServer` instance
         """
-        server_state = ServerState.lookupByName(server_json['status'])
+        try:
+            server_state = ServerState.lookupByName(server_json['status'])
+        except ValueError:
+            server_state = ServerState.UNKNOWN_TO_OTTER
         if server_json.get("OS-EXT-STS:task_state", "") == "deleting":
             server_state = ServerState.DELETED
         metadata = server_json.get('metadata', {})
-
-        if (server_state in (ServerState.ACTIVE, ServerState.BUILD) and
-                metadata.get(DRAINING_METADATA[0]) == DRAINING_METADATA[1]):
-            server_state = ServerState.DRAINING
 
         return cls(
             id=server_json['id'],
@@ -332,9 +335,6 @@ def generate_metadata(group_id, lb_descriptions):
             metadata['rax:autoscale:lb:RackConnectV3:{0}'.format(lb_id)] = ""
 
     return metadata
-
-
-DRAINING_METADATA = ('rax:autoscale:server:state', 'DRAINING')
 
 
 @attributes(['server_config', 'capacity',

@@ -1,5 +1,7 @@
 """Tests for convergence planning."""
 
+from itertools import combinations
+
 from pyrsistent import b, pbag, pmap, pset, s
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -9,13 +11,13 @@ from otter.convergence.model import (
     CLBNode,
     CLBNodeCondition,
     CLBNodeType,
-    DRAINING_METADATA,
     DesiredGroupState,
     ErrorReason,
     RCv3Description,
     RCv3Node,
     ServerState)
-from otter.convergence.planning import converge, plan
+from otter.convergence.planning import (
+    DRAINING_METADATA, Destiny, converge, get_destiny, plan)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -497,6 +499,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
     """
     clb_desc = CLBDescription(lb_id='1', port=80)
     rcv3_desc = RCv3Description(lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')
+    clstep = ConvergeLater(reasons=[ErrorReason.String('draining servers')])
 
     def test_building_servers_are_deleted(self):
         """
@@ -549,7 +552,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set(),
                 0),
@@ -587,7 +591,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
@@ -608,13 +613,14 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         """
         If the server already in draining state is waiting for the draining
         timeout on some load balancers, and no further load balancers can be
-        removed, nothing is done to it.
+        removed, nothing is done to it and ConvergeLater is returned
         """
         self.assertEqual(
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
@@ -623,7 +629,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                                  condition=CLBNodeCondition.DRAINING),
                              drained_at=1.0, connections=1)]),
                 2),
-            pbag([]))
+            pbag([self.clstep]))
 
     def test_draining_server_waiting_for_timeout_some_lbs_removed(self):
         """
@@ -637,7 +643,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=2.0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc,
                                           other_clb_desc))]),
@@ -661,7 +668,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             pbag([
                 RemoveNodesFromCLB(lb_id='9', node_ids=s('2')),
                 BulkRemoveFromRCv3(lb_node_pairs=s(
-                    (self.rcv3_desc.lb_id, 'abc')))
+                    (self.rcv3_desc.lb_id, 'abc'))),
+                self.clstep
             ]))
 
     def test_active_server_is_drained_if_not_all_lbs_can_be_removed(self):
@@ -720,7 +728,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             pbag([
                 SetMetadataItemOnServer(server_id='abc',
                                         key=DRAINING_METADATA[0],
-                                        value=DRAINING_METADATA[1])
+                                        value=DRAINING_METADATA[1]),
+                self.clstep
             ]))
 
     def test_draining_server_has_all_enabled_lb_set_to_draining(self):
@@ -739,7 +748,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             converge(
                 DesiredGroupState(server_config={}, capacity=0,
                                   draining_timeout=10.0),
-                set([server('abc', state=ServerState.DRAINING,
+                set([server('abc', state=ServerState.ACTIVE,
+                            metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
@@ -800,7 +810,40 @@ class ConvergeTests(SynchronousTestCase):
                 0),
             pbag([
                 ConvergeLater(
-                    reasons=[ErrorReason.String('building servers')])]))
+                    reasons=[ErrorReason.String('waiting for servers')])]))
+
+    def test_count_waiting_as_meeting_capacity(self):
+        """
+        If a server's destiny is WAIT, we won't provision more servers to take
+        up the slack, but rather just wait for it to come back.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.HARD_REBOOT)]),
+                set(),
+                0),
+            pbag([
+                ConvergeLater(
+                    reasons=[ErrorReason.String(
+                        'waiting for temporarily unavailable server to become '
+                        'ACTIVE')],
+                    limited=True)]))
+
+    def test_count_AVOID_REPLACING_as_meeting_capacity(self):
+        """
+        If a server's destiny is AVOID_REPLACING, we won't provision more
+        servers to take up the slack, and just leave it there without causing
+        another convergence iteration, because servers in this status are only
+        transitioned to other states manually.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.RESCUE)]),
+                set(),
+                0),
+            pbag([]))
 
     def test_delete_nodes_in_error_state(self):
         """
@@ -815,6 +858,21 @@ class ConvergeTests(SynchronousTestCase):
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
+                CreateServer(server_config=pmap()),
+            ]))
+
+    def test_ignore_ignored(self):
+        """
+        If a server we created becomes IGNORED, we leave it be and reprovision
+        a server.
+        """
+        self.assertEqual(
+            converge(
+                DesiredGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.UNKNOWN_TO_OTTER)]),
+                set(),
+                0),
+            pbag([
                 CreateServer(server_config=pmap()),
             ]))
 
@@ -922,6 +980,42 @@ class ConvergeTests(SynchronousTestCase):
                 set(),
                 0),
             pbag([DeleteServer(server_id='def')]))
+
+    def test_scale_down_order(self):
+        """Preferred order of servers to delete when scaling down:
+
+        - WAIT_WITH_TIMEOUT
+        - WAIT
+        - AVOID_REPLACING
+        - CONSIDER_ACTIVE
+        """
+        order = (Destiny.WAIT_WITH_TIMEOUT, Destiny.WAIT,
+                 Destiny.AVOID_REPLACING, Destiny.CONSIDER_AVAILABLE)
+        examples = {Destiny.WAIT_WITH_TIMEOUT: ServerState.BUILD,
+                    Destiny.WAIT: ServerState.HARD_REBOOT,
+                    Destiny.AVOID_REPLACING: ServerState.RESCUE,
+                    Destiny.CONSIDER_AVAILABLE: ServerState.ACTIVE}
+        for combo in combinations(order, 2):
+            before, after = combo
+            also = []
+            if after == Destiny.WAIT:
+                # If we're waiting for some other servers we need to also
+                # expect a ConvergeLater
+                also = [ConvergeLater(reasons=[
+                    ErrorReason.String(
+                        'waiting for temporarily unavailable server to become '
+                        'ACTIVE')],
+                    limited=True)]
+
+            self.assertEqual(
+                converge(
+                    DesiredGroupState(server_config={}, capacity=2),
+                    set([server('abc', examples[after], created=0),
+                         server('def', examples[before], created=1),
+                         server('ghi', examples[after], created=2)]),
+                    set(),
+                    0),
+                pbag([DeleteServer(server_id='def')] + also))
 
     def test_timeout_building(self):
         """
@@ -1034,3 +1128,48 @@ class PlanTests(SynchronousTestCase):
                 DeleteServer(server_id='server1'),
                 CreateServer(server_config=pmap({}))
             ]))
+
+
+class DestinyTests(SynchronousTestCase):
+    """Tests for :func:`get_destiny`."""
+
+    def test_all_server_states_have_destinies(self):
+        """All server states have an associated destiny."""
+        for st in ServerState.iterconstants():
+            s = server('s1', state=st)
+            self.assertIsNot(get_destiny(s), None)
+
+    def test_draining(self):
+        """
+        If the draining metadata is found, the destiny of the server will be
+        ``DRAIN``, when the server is in the ACTIVE or BUILD states.
+        """
+        for state in (ServerState.ACTIVE, ServerState.BUILD):
+            self.assertEqual(
+                get_destiny(server('s1', state=state,
+                                   metadata=dict([DRAINING_METADATA]))),
+                Destiny.DRAIN)
+
+    def test_draining_value_must_match(self):
+        """
+        The value of the draining metadata key must match in order for the
+        ``DRAIN`` destiny to be returned.
+        """
+        self.assertEqual(
+            get_destiny(server('s1', state=ServerState.ACTIVE,
+                               metadata={DRAINING_METADATA[0]: 'foo'})),
+            Destiny.CONSIDER_AVAILABLE)
+
+    def test_error_deleted_trumps_draining_metadata(self):
+        """
+        If a server is in ``ERROR`` or ``DELETED`` state, it will not get the
+        ``DRAIN`` destiny.
+        """
+        self.assertEqual(
+            get_destiny(server('s1', state=ServerState.ERROR,
+                               metadata=dict([DRAINING_METADATA]))),
+            Destiny.DELETE)
+        self.assertEqual(
+            get_destiny(server('s1', state=ServerState.DELETED,
+                               metadata=dict([DRAINING_METADATA]))),
+            Destiny.CLEANUP)

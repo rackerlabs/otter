@@ -13,7 +13,8 @@ from otter.log.spec import (
     SpecificationObserverWrapper,
     get_validated_event,
     split_cf_messages,
-    split_execute_convergence
+    split_execute_convergence,
+    split_list_servers
 )
 from otter.test.utils import CheckFailureValue, raise_
 
@@ -328,3 +329,35 @@ class CFMessageSplitTests(SynchronousTestCase):
             [(assoc(event, 'x', '1'), message),
              (assoc(event, 'x', '2'), message),
              (assoc(event, 'x', '3'), message)])
+
+
+class SplitListServersTests(SynchronousTestCase):
+    """
+    tests for splitting list servers log
+    """
+
+    def test_small(self):
+        """
+        Events whose response_body len is maxlength will return only that event
+        unchanged
+        """
+        event = split_list_servers(
+            {"response_body": {"servers": ["small", "part"]}}, 100)
+        self.assertEqual(
+            event,
+            [({"response_body": '{"servers": ["small", "part"]}'},
+              "Listing server details succeeded")])
+
+    def test_split(self):
+        """
+        Events with response_body len > maxlength will be split into smaller
+        events
+        """
+        event = {"foo": "bar", "response_body": {"servers": range(10)}}
+        msg = "Listing server details succeeded"
+        self.assertEqual(
+            split_list_servers(event, len(json.dumps({"servers": range(5)}))),
+            [({"foo": "bar",
+               "response_body": '{"servers": [0, 1, 2, 3, 4]}'}, msg),
+             ({"foo": "bar",
+               "response_body": '{"servers": [5, 6, 7, 8, 9]}'}, msg)])

@@ -427,10 +427,11 @@ class GetTodaysTenants(SynchronousTestCase):
         """
         returns same tenants as last time if asked within same day
         """
-        last_date = self.today.replace(hour=13, minute=20)
+        today = self.today.replace(hour=13, minute=20)
+        last_date = self.today
         self.assertEqual(
-            get_todays_tenants(self.tenants, self.today, 3, last_date),
-            (self.tenants[:3], 3, self.today))
+            get_todays_tenants(self.tenants, today, 3, last_date),
+            (self.tenants[:3], 3, last_date))
 
     def test_next_day(self):
         """

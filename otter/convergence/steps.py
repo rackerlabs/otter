@@ -3,6 +3,8 @@ import re
 
 from functools import partial
 
+import attr
+
 from characteristic import Attribute, attributes
 
 from effect import Constant, Effect, Func, catch
@@ -22,6 +24,7 @@ from otter.cloud_client import (
     CreateServerOverQuoteError,
     NoSuchCLBNodeError,
     add_clb_nodes,
+    change_clb_node,
     create_server,
     has_code,
     remove_clb_nodes,
@@ -315,44 +318,16 @@ class ChangeCLBNode(object):
     An existing port mapping on a load balancer must have its condition,
     weight, or type modified.
     """
-
     def as_effect(self):
         """Produce a :obj:`Effect` to modify a load balancer node."""
-        handled_codes = _clb_check_change_node_handlers.keys()
-        eff = service_request(
-            ServiceType.CLOUD_LOAD_BALANCERS,
-            'PUT',
-            append_segments('loadbalancers', self.lb_id,
-                            'nodes', self.node_id),
-            data={'condition': self.condition.name,
-                  'weight': self.weight},
-            success_pred=has_code(*handled_codes))
-        return eff.on(partial(_clb_check_change_node, self))
-
-
-def _clb_check_change_node(step, result):
-    """
-    Check to what extent a :class:`ChangeCLBNode` response was successful.
-    """
-    response, body = result
-    handler = _clb_check_change_node_handlers[response.code]
-    return handler(step, result)
-
-
-def _clb_check_change_node_retry_on_404(step, result):
-    """
-    When updating a node results in a 404, convergence should be retried.
-    """
-    return StepResult.RETRY, [
-        ErrorReason.Structured({'reason': 'CLB node not found',
-                                'lb': step.lb_id,
-                                'node': step.node_id})]
-
-
-_clb_check_change_node_handlers = {
-    202: lambda _step, _result: (StepResult.SUCCESS, []),
-    404: _clb_check_change_node_retry_on_404
-}
+        eff = change_clb_node(self.lb_id, self.node_id, weight=self.weight,
+                              condition=self.condition.name,
+                              _type=self.type.name)
+        return eff.on(
+            success=lambda _: (StepResult.RETRY, [ErrorReason.String(
+                'must re-gather after CLB change in order to update the '
+                'active cache')]),
+            error=_failure_reporter(CLBNotFoundError, NoSuchCLBNodeError))
 
 
 def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
@@ -546,17 +521,21 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
 
 
 @implementer(IStep)
-@attributes(['reasons'], apply_with_init=False)
+@attr.s(init=False)
 class ConvergeLater(object):
     """
     Converge later in some time
     """
+    reasons = attr.ib()
+    limited = attr.ib()
 
-    def __init__(self, reasons):
+    def __init__(self, reasons, limited=False):
         self.reasons = freeze(reasons)
+        self.limited = limited
 
     def as_effect(self):
         """
         Return an effect that always results in retry
         """
-        return Effect(Constant((StepResult.RETRY, list(self.reasons))))
+        result = StepResult.LIMITED_RETRY if self.limited else StepResult.RETRY
+        return Effect(Constant((result, list(self.reasons))))

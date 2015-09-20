@@ -8,9 +8,11 @@ from effect import (
     Effect,
     base_dispatcher,
     sync_perform)
+from effect.testing import perform_sequence
 
 import mock
 
+from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.log import log as default_log
@@ -18,10 +20,13 @@ from otter.log.intents import (
     err,
     get_fields,
     get_log_dispatcher,
+    get_msg_time_dispatcher,
     merge_effectful_fields,
     msg,
+    msg_with_time,
     with_log)
-from otter.test.utils import CheckFailureValue, IsBoundWith, matches, mock_log
+from otter.test.utils import (
+    CheckFailureValue, IsBoundWith, matches, mock_log, raise_)
 
 
 class LogDispatcherTests(SynchronousTestCase):
@@ -213,3 +218,38 @@ class LogDispatcherTests(SynchronousTestCase):
         log = self.log.bind(f1='v2', passed_log=True)
         result = merge_effectful_fields(self.disp, log)
         self.assertEqual(result, matches(IsBoundWith(passed_log=True, f1='v')))
+
+
+class MsgWithTimeTests(SynchronousTestCase):
+    """
+    Tests for :obj:`MsgWithTime`
+    """
+
+    def setUp(self):
+        self.clock = Clock()
+        self.log = mock_log()
+        self.disp = ComposedDispatcher([
+            get_msg_time_dispatcher(self.clock),
+            get_log_dispatcher(self.log, {})
+        ])
+
+    def test_logs_msg(self):
+        """
+        Logs msg with time and returns result of internal effect
+        """
+        seq = [("internal", lambda i: self.clock.advance(3) or "result")]
+        self.assertEqual(
+            perform_sequence(
+                seq, msg_with_time("mt", Effect("internal")), self.disp),
+            "result")
+        self.log.msg.assert_called_once_with("mt", seconds_taken=3.0)
+
+    def test_ignores_errors(self):
+        """
+        Errors are not logged and are propogated
+        """
+        seq = [("internal", lambda i: raise_(ValueError("oops")))]
+        self.assertRaises(
+            ValueError, perform_sequence, seq,
+            msg_with_time("mt", Effect("internal")), self.disp)
+        self.assertFalse(self.log.msg.called)
