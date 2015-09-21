@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
-# Rackspace Developer Documentation documentation build configuration file, 
-  created by sphinx-quickstart on Thu Mar 6 14:14:55 2014.
+# Rackspace Developer Documentation documentation build configuration file,
+# created by sphinx-quickstart on Thu Mar 6 14:14:55 2014.
 #
 # This file is execfile()d with the current directory set to its
 # containing dir.
@@ -35,7 +35,6 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.extlinks'
 ]
-
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -100,8 +99,7 @@ exclude_patterns = ['_build', 'samples', 'api-operations/methods']
 pygments_style = 'sphinx'
 
 # Adding substitution values
-rst_epilog = 
-    """.. |product name| replace:: Rackspace Auto Scale"""
+rst_epilog = """.. |product name| replace:: Rackspace Auto Scale"""
 
 # External link library
 extlinks = {
