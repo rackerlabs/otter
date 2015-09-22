@@ -28,6 +28,7 @@ from otter.integration.lib.nova import NovaServer
 from otter.integration.lib.resources import TestResources
 from otter.integration.lib.trial_tools import (
     TestHelper,
+    convergence_interval,
     get_identity,
     get_resource_mapping,
     region,
@@ -641,7 +642,11 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             2)  # interval
 
         # After 30s the node should be removed
-        yield clb.wait_for_nodes(self.rcs, HasLength(0), 35)
+        # Extra 5s due to feed latency
+        # extra 2 convergence intervals assuming 35s pass at end of one cycle.
+        # Next cycle would remove node and wait for another for safety
+        yield clb.wait_for_nodes(self.rcs, HasLength(0),
+                                 30 + 5 + convergence_interval * 2)
         yield group.wait_for_state(
             self.rcs,
             ContainsDict({"activeCapacity": Equals(0),
