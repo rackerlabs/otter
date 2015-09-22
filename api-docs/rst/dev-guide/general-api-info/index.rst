@@ -13,7 +13,6 @@ between products and services.
    :maxdepth: 3
 
    authentication
-   service-endpoints
    contract-version
    request-response-types
    pagination

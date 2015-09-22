@@ -13,7 +13,7 @@ contribute to source code by using the `AutoScale github repository`_.
 - We welcome feedback, comments, and bug reports. Log into the Rackspace
   customer portal at https://feedback.rackspace.com/.
 
-- To learn about working with Rackspace services through APIs, visit the
+- To get information about other Rackspace Cloud service APIs, visit the
   `Rackspace API Documentation`_.
 
 - For background information and exercises, see the `Rackspace Auto

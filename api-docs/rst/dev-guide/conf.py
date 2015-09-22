@@ -18,12 +18,12 @@ import os
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-# sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('.'))
 
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-#needs_sphinx = '1.0'
+# needs_sphinx = '1.0'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
@@ -43,7 +43,7 @@ templates_path = ['_templates']
 source_suffix = '.rst'
 
 # The encoding of source files.
-#source_encoding = 'utf-8-sig'
+# source_encoding = 'utf-8-sig'
 
 # The master toctree document.
 master_doc = 'index'
@@ -72,7 +72,7 @@ release = '1'
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
-#today = ''
+# today = ''
 # Else, today_fmt is used as the format for a strftime call.
 # today_fmt = '%B %d, %Y'
 
@@ -85,7 +85,7 @@ exclude_patterns = ['_build', 'samples', 'api-operations/methods']
 # default_role = None
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
-#add_function_parentheses = True
+# add_function_parentheses = True
 
 # If true, the current module name will be prepended to all description
 # unit titles (such as .. function::).
@@ -112,19 +112,22 @@ extlinks = {
     'mycloud': ('https://mycloud.rackspace.com/%s', ''),
     'kc': ('http://www.rackspace.com/knowledge_center/%s', ''),
     'kc-article': ('http://www.rackspace.com/knowledge_center/article/%s', ''),
-    'kc-faq': ('http://www.rackspace.com/knowledge_center/frequently-asked-question/%s', ''),
-    'kc-product-faq': ('http://www.rackspace.com/knowledge_center/product-faq/%s', ''),
+    'kc-faq': ('http://www.rackspace.com/knowledge_center/'
+               'frequently-asked-question/%s', ''),
+    'kc-product-faq': ('http://www.rackspace.com/knowledge_center/'
+                       'product-faq/%s', ''),
     'os': ('http://www.openstack.org/%s', ''),
     'os-docs': ('http://docs.openstack.org/%s', ''),
     'os-wiki': ('http://wiki.openstack.org/%s', ''),
-    'git-repo': ('https://github.com/rackerlabs/docs-core-infra-user-guide/%s', ''),
+    'git-repo': ('https://github.com/rackerlabs/'
+                 'docs-core-infra-user-guide/%s', ''),
     'rackerlabs': ('https://github.com/rackerlabs/%s', ''),
     'rocket': ('https://objectrocket.com/%s', '')
 }
 
 
 # A list of ignored prefixes for module index sorting.
-#modindex_common_prefix = []
+# modindex_common_prefix = []
 
 # If true, keep warnings as "system message" paragraphs in the built documents.
 # keep_warnings = False
@@ -219,7 +222,7 @@ html_add_permalinks = '#'
 
 # -- Options for LaTeX output ---------------------------------------------
 
-latex_elements = {
+# latex_elements = {
 # The paper size ('letterpaper' or 'a4paper').
 # 'papersize': 'letterpaper',
 
@@ -228,47 +231,48 @@ latex_elements = {
 
 # Additional stuff for the LaTeX preamble.
 # 'preamble': '',
-}
+# }
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    ('index', 'RackspaceAutoScaleApiImagesDeveloperDoc.tex', 
-     'Rackspace Auto Scale API Developer Guide','Rackspace', 'manual'),
+    ('index', 'RackspaceAutoScaleApiImagesDeveloperDoc.tex',
+     'Rackspace Auto Scale API Developer Guide', 'Rackspace', 'manual')
 ]
 # The name of an image file (relative to this directory) to place at the top of
 # the title page.
-#latex_logo = None
+# latex_logo = None
 
 # For "manual" documents, if this is true, then toplevel headings are parts,
 # not chapters.
-#latex_use_parts = False
+# latex_use_parts = False
 
 # If true, show page references after internal links.
-#latex_show_pagerefs = False
+# latex_show_pagerefs = False
 
 # If true, show URL addresses after external links.
-#latex_show_urls = False
+# latex_show_urls = False
 
 # Documents to append as an appendix to all manuals.
-#latex_appendices = []
+# latex_appendices = []
 
 # If false, no module index is generated.
-#latex_domain_indices = True
+# latex_domain_indices = True
 
 
 # -- Options for manual page output ---------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
+
 man_pages = [
-    ('index', 'RackspaceAutoScaleApiDeveloperDoc', 
+    ('index', 'RackspaceAutoScaleApiDeveloperDoc',
      'Rackspace Auto Scale API Developer Guide', ['Rackspace'], 1)
 ]
 
 # If true, show URL addresses after external links.
-#man_show_urls = False
+# man_show_urls = False
 
 
 # -- Options for Texinfo output -------------------------------------------
@@ -277,10 +281,10 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    ('index', 'RackspaceAutoscaleDeveloperDoc', 
-     'Rackspace Cloud Auto Scale API Developer Guide','Rackspace', 
-     'RackspaceCloudAutoScaleDeveloperDoc', 
-     'Learn about using the REST API for the Rackspace Cloud Autoscale service.',
+    ('index', 'RackspaceAutoscaleDeveloperDoc',
+     'Rackspace Cloud Auto Scale API Developer Guide', 'Rackspace',
+     'RackspaceCloudAutoScaleDeveloperDoc',
+     'Learn about using the REST API for the Rackspace Cloud Autoscale',
      'Miscellaneous'),
 ]
 
@@ -288,7 +292,7 @@ texinfo_documents = [
 # texinfo_appendices = []
 
 # If false, no module index is generated.
-#texinfo_domain_indices = True
+# texinfo_domain_indices = True
 
 # How to display URL addresses: 'footnote', 'no', or 'inline'.
 # texinfo_show_urls = 'footnote'
