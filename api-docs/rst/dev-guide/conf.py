@@ -12,8 +12,16 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
 import os
+import sys
+
+# -- Custom options for PHP output ----------------------------------------
+
+from pygments.lexers.web import PhpLexer
+from sphinx.highlighting import lexers
+
+lexers['php'] = PhpLexer(startinline=True)
+
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -300,8 +308,3 @@ texinfo_documents = [
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 # texinfo_no_detailmenu = False
 
-# -- Custom options for PHP output ----------------------------------------
-
-from pygments.lexers.web import PhpLexer
-from sphinx.highlighting import lexers
-lexers['php'] = PhpLexer(startinline=True)
