@@ -18,4 +18,4 @@ You should also be familiar with the following technologies:
 
 
 .. _Rackspace Auto Scale service: http://www.rackspace.com/knowledge_center/article/rackspace-auto-scale-overview
-.. _Rackspace Cloud Account: https://developer.rackspace.com/signup/
+.. _Rackspace Cloud Account: https://cart.rackspace.com/cloud
