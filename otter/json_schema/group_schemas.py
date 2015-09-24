@@ -259,9 +259,59 @@ launch_server = {
     }
 }
 
+_stack_template_url = {
+    "type": "object",
+    "properties": {
+        "template_url": {
+            "type": "string"
+        }
+    }
+}
+
+_stack_template_inline = {
+    "type": "object",
+    "properties": {
+        "template": {
+            "type": "string"
+        }
+    }
+}
+
+stack = {
+    "type": [_stack_template_url, _stack_template_inline],
+    "properties": {
+        "parameters": {
+            "type": "object",
+            "required": False
+        }
+    }
+}
+
+launch_stack = {
+    "type": "object",
+    "description": ("'Launch Stack' launch configuration options.  This type "
+                    "of launch configuration will spin up a Heat stack "
+                    "directly with the provided arguments, and add the IP the "
+                    "stack outputs to one or more load balancers (if load "
+                    "balancer arguments are specified."),
+    "properties": {
+        "type": {
+            "enum": ["launch_stack"],
+        },
+        "args": {
+            "type": "object",
+            "properties": {
+                "stack": stack
+            },
+            "additionalProperties": False
+        }
+    },
+    "additionalProperties": False
+}
+
 # base launch config
 launch_config = {
-    "type": [launch_server],
+    "type": [launch_server, launch_stack],
     "properties": {
         "type": {
             "type": "string",
