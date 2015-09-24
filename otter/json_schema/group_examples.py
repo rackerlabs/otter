@@ -151,6 +151,92 @@ def launch_server_config():
     ]
 
 
+def launch_stack_config():
+    """
+    Return an array of valid launch config examples.
+    """
+    def get_stack_config(request_body):
+        """
+        Takes a stack create request body and returns a launch_stack config.
+        """
+        return {
+            "type": "launch_stack",
+            "args": {
+                "stack": request_body
+            }
+        }
+
+    json_template = {
+        "heat_template_version": "2015-04-30",
+        "resources": {
+            "rand": {"type": "OS::Heat::RandomString"}
+        }
+    }
+
+    yaml_template = "\n".join([
+        "heat_template_version: 2015-04-30",
+        "resources:",
+        "  rand:",
+        "    type: OS::Heat::RandomString"
+    ])
+
+    json_environment = {
+        "parameters": {
+            "foo": "bar"
+        },
+        "resource_registry": {
+            "Heat::Foo": "https://foo.bar/baz.yaml"
+        }
+    }
+
+    yaml_environment = "\n".join([
+        "parameters:",
+        "  foo: bar",
+        "resource_registry:",
+        "  Heat::Foo: https://foo.bar/baz.yaml"
+    ])
+
+    stack_req_bodies = {
+        "minimal_with_url": {
+            "template_url": "https://foo.bar/baz.template"
+        },
+        "mimimal_with_json_template": {
+            "template": json_template
+        },
+        "mimimal_with_yaml_template": {
+            "template": yaml_template
+        },
+        "all_options": {
+            "template": json_template,
+            "disable_rollback": True,
+            "environment": json_environment,
+            "files": {
+                "fileA.yaml": "A contents",
+                "file:///usr/fileB.template": "B contents",
+                "http://example.com/fileC.template": "C contents"
+            },
+            "parameters": {
+                "string": "foo",
+                "number": 3.14159,
+                "json": {"foo": "bar", "baz": "quux"},
+                "list": ["comma", "delimited", "list"],
+                "boolean": True
+            },
+            "timeout_mins": 60
+        },
+        "mimimal_with_json_environment": {
+            "template": yaml_template,
+            "environment": json_environment
+        },
+        "mimimal_with_yaml_environment": {
+            "template": yaml_template,
+            "environment": yaml_environment
+        },
+    }
+
+    return {k: get_stack_config(body) for k, body in stack_req_bodies.items()}
+
+
 def config():
     """
     Return an array of valid scaling group examples

@@ -496,6 +496,40 @@ class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
                                 validate, self.server, group_schemas.server)
 
 
+class StackLaunchConfigTestCase(SynchronousTestCase):
+    """Verify correctness of JSON schema for launch_stack launch configs."""
+    def setUp(self):
+        """Save a config to modify in tests"""
+        self.examples = group_examples.launch_stack_config()
+        self.stack_config = self.examples['all_options']['args']['stack']
+
+    def test_valid_examples_validate(self):
+        """The launch stack config examples all validate."""
+        for example in group_examples.launch_stack_config().values():
+            validate(example, group_schemas.launch_config)
+
+    def test_invalid_missing_template_and_template_url(self):
+        """The config must have either template or template_url defined."""
+        del self.stack_config['template']
+
+        self.assertRaises(ValidationError, validate,
+                          self.stack_config, group_schemas.stack)
+
+    def test_invalid_both_template_and_template_url(self):
+        """The config can't have both template and template_url defined."""
+        min_with_url = self.examples['minimal_with_url']['args']['stack']
+        self.stack_config['template_url'] = min_with_url['template_url']
+
+        self.assertRaises(ValidationError, validate,
+                          self.stack_config, group_schemas.stack)
+
+    def test_invalid_extra_property(self):
+        """The config should not allow additional properties."""
+        self.stack_config['foobarbaz'] = 'asdf'
+        self.assertRaises(ValidationError, validate,
+                          self.stack_config, group_schemas.stack)
+
+
 class ScalingPolicyTestCase(SynchronousTestCase):
     """
     Simple verification that the JSON schema for scaling policies is correct.
