@@ -1,4 +1,7 @@
-Api-methods:
+.._api-methods:
+
+API methods
+-----------
 
 .. toctree::
    :caption: API Reference

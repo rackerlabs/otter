@@ -5,9 +5,9 @@
 ======================
 
 This document is intended for software developers who are interested in
-developing applications by using the Rackspace Auto Scale API. To use the 
+developing applications by using the Rackspace Auto Scale API. To use the
 information provided here, you should have a general understanding of the
-`Rackspace Auto Scale service`_ and have a `Rackspace Cloud account`_ that has access to the service. 
+`Rackspace Auto Scale service`_ and have a `Rackspace Cloud account`_ that has access to the service.
 You should also be familiar with the following technologies:
 
 -  RESTful web services

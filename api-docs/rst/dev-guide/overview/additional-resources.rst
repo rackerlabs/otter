@@ -1,13 +1,13 @@
 
 .. _additional-resources:
 
-Additional resources 
+Additional resources
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Rackspace Auto Scale is an open-source project. You can see and
-contribute to source code by using the `AutoScale github repository`_.
+Rackspace Autoscale is an open-source project. You can see and
+contribute to source code by using the `Autoscale github repository`_.
 
-- For general information about Auto Scale, see the `Auto Scale FAQ`_ 
+- For general information about Autoscale, see the `Autoscale FAQ`_
   in the Rackspace Knowledge Center.
 
 - We welcome feedback, comments, and bug reports. Log into the Rackspace
@@ -16,21 +16,20 @@ contribute to source code by using the `AutoScale github repository`_.
 - To get information about other Rackspace Cloud service APIs, visit the
   `Rackspace API Documentation`_.
 
-- For background information and exercises, see the `Rackspace Auto
-  Scale Getting Started Guide Overview`_
+- For background information and exercises, see the `Rackspace Autoscale Getting Started Guide Overview`_
 
 - To learn about working with Rackspace services through the Rackspace
   Cloud Control Panel, visit the `Rackspace Knowledge Center`_.
 
 - To see the Auto Scale API operations in various common programming
-  languages, view the `Quick Start for AutoScale`_.
-  
+  languages, view the `Quickstart for Autoscale`_.
+
   Use the tabs at the top to see the different supported languages.
 
-.. _Auto Scale FAQ: http://www.rackspace.com/knowledge_center/product-faq/auto-scale
+.. _Autoscale FAQ: http://www.rackspace.com/knowledge_center/product-faq/auto-scale
 .. _Rackspace API Documentation: https://developer.rackspace.com/docs/
-.. _Rackspace Auto Scale Getting Started Guide Overview: http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstarted/content/Overview.html
+.. _Rackspace Autoscale Getting Started Guide Overview: http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstarted/content/Overview.html
 .. _Rackspace Knowledge Center: http://www.rackspace.com/knowledge_center/
-.. _api.rackspace.com: http://api.rackspace.com/ 
-.. _Quick Start for AutoScale: https://developer.rackspace.com/docs/auto-scale/getting-started/
-.. _AutoScale github repository: https://github.com/rackerlabs/otter
+.. _api.rackspace.com: http://api.rackspace.com/
+.. _Quickstart for Autoscale: https://developer.rackspace.com/docs/auto-scale/getting-started/
+.. _Autoscale github repository: https://github.com/rackerlabs/otter
