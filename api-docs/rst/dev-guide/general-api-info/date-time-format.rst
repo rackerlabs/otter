@@ -20,6 +20,8 @@ For example, the UTC-5 format for May 19, 2013 at 8:07:08 a.m. is
 .. code::
 
     2013-05-19T08:07:08-05:00
+    
+The following table shows the date and time format codes.
 
 **Table: Date and time format codes**
 
