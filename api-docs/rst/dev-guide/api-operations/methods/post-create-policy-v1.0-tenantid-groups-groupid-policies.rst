@@ -182,7 +182,7 @@ This table shows the body parameters for the request:
 |                    |             |parameter is not required for policies of  |
 |                    |             |type ``webhook``. This parameter must be   |
 |                    |             |set to either ``at`` or ``cron``, which    |
-|                    |             |are mutually exclusive.                        |
+|                    |             |are mutually exclusive.                    |
 +--------------------+-------------+-------------------------------------------+
 |[*].args.\ **cron** |String       |The time when the policy will be executed, |
 |                    |*(Optional)* |as a cron entry. For example, if this is   |

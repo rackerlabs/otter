@@ -20,7 +20,9 @@ The number of resources entities that are specified in ``minEntities`` and ``max
 You can specify custom metadata for your group configuration using the optional ``metadata`` parameter.
 
 .. note::
-Group metadata is stored within the Auto Scale API and can be queried. You can use the ``metadata`` parameter for customer automation, but it does not change any functionality in Auto Scale.
+
+      Group metadata is stored within the Auto Scale API and can be queried. You can use the ``metadata`` parameter for
+      customer automation, but it does not change any functionality in Autoscale.
 
 
 

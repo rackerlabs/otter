@@ -1,11 +1,7 @@
 .. _configurations-operations:
 
 Launch configurations
-~~~~~~~~~~~~~
-
-.. contents::
-   :depth: 1
-   :local:
+~~~~~~~~~~~~~~~~~~~~~
 
 The operations described in this section allow you to manage launch configurations.
 

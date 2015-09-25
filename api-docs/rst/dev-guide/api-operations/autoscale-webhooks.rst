@@ -1,11 +1,7 @@
 .. _webhooks-operations:
 
 Webhooks
-~~~~~~~~~~~~~
-
-.. contents::
-   :depth: 1
-   :local:
+~~~~~~~~
 
    The operations described in this section help you create and manage webhooks for a scaling policy.
 

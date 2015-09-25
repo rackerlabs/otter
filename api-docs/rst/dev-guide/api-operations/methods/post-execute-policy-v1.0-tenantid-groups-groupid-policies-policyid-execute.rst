@@ -2,7 +2,7 @@
 .. _post-execute-policy-v1.0-tenantid-groups-groupid-policies-policyid-execute:
 
 Execute policy
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^
 
 .. code::
 
@@ -37,9 +37,9 @@ This table shows the possible response codes for this operation:
 |400                       |ValidationError          |The request body had     |
 |                          |                         |valid JSON but with      |
 |                          |                         |unexpected properties or |
-|                          |                         |values in it. Note that  |                                                                                                |                          |                         |there can be many        |
-|                          |                         |combinations that cause  |
-|                          |                         |this error.              | 
+|                          |                         |values in it. There can  |
+|                          |                         |be many combinations that|
+|                          |                         |can cause this error.    |
 +--------------------------+-------------------------+-------------------------+
 |401                       |InvalidCredentials       |The X-Auth-Token the     |
 |                          |                         |user supplied is bad.    |
@@ -141,7 +141,3 @@ Response
 
 
 This operation does not return a response body.
-
-
-
-
