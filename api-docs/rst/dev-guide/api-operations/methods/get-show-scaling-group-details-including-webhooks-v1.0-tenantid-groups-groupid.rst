@@ -16,12 +16,8 @@ Details include the launch configuration, the scaling policies, and the policies
 The details appear in the response body in JSON format.
 
 .. note::
-The ``?webhooks=true`` parameter is required for this method.
 
-
-
-
-
+    The ``?webhooks=true`` parameter is required for this method.
 
 
 This table shows the possible response codes for this operation:
@@ -205,14 +201,9 @@ Response
        ],
        "scalingPolicies_links": [
          {
-           "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/", 
+           "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/",
            "rel": "policies"
          }
        ]
      }
    }
-   
-
-
-
-

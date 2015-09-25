@@ -1,11 +1,7 @@
 .. _scaling-policies-operations:
 
 Scaling policies
-~~~~~~~~~~~~~
-
-.. contents::
-   :depth: 1
-   :local:
+~~~~~~~~~~~~~~~~
 
    The operations described in this section help you create and manage scaling policies for a scaling group.
 

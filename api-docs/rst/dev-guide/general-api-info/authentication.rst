@@ -22,7 +22,7 @@ Note that the v2.0 component in the URL indicates that you are using version 2.0
 .. _auth-token:
 
 Authenticating by using token-based authentication
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Before you can make Rackspace Cloud API requests, you must
 first generate an authentication token. You provide this
 token in the ``X-Auth-Token`` header in each Rackspace Cloud API request.
@@ -249,7 +249,7 @@ service endpoint. If the request is successful, the authentication response retu
 .. _auth-submit-api-request:
 
 Submit an API request
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
 
 After you authenticate successfully, you can submit
 an API request for any service included in the service catalog.

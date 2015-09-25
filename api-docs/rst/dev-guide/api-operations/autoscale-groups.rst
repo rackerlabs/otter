@@ -1,11 +1,7 @@
 .. _scaling-groups-operations:
 
 Scaling groups
-~~~~~~~~~~~~~
-
-.. contents::
-   :depth: 1
-   :local:
+~~~~~~~~~~~~~~
 
    The operations described in this section help you create and manage scaling groups.
 

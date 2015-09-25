@@ -14,9 +14,9 @@ This operation updates an existing launch configuration for the specified scalin
 To change the launch configuration, specify the new configuration in the request body in JSON format. Configuration elements include from which image to create a server, which load balancers to join the server to, which networks to add the server to, and other metadata. If the update is successful, no response body is returned.
 
 .. note::
-   All Rackspace Auto Scale update (**PUT**) operations completely replace the configuration being updated. Empty values (for example, { } )in the update are accepted and overwrite previously specified parameters. New parameters can be specified. All create (**POST**) parameters, even optional ones, are required for the update operation. For more details, see :ref:`Launch configurations <launch-configurations>`__.
-   
-   
+   All Rackspace Auto Scale update (**PUT**) operations completely replace the configuration being updated. Empty values (for example, { } )in the update are accepted and overwrite previously specified parameters. New parameters can be specified. All create (**POST**) parameters, even optional ones, are required for the update operation. 
+
+
 
 
 
@@ -217,7 +217,7 @@ This table shows the body parameters for the request:
                "mykey":"myvalue"
             },
             "personality":[
-   
+
             ],
             "networks":[
                {
@@ -247,7 +247,3 @@ Response
 
 
 This operation does not return a response body.
-
-
-
-

@@ -1,11 +1,7 @@
 .. _executions-operations:
 
 Executions
-~~~~~~~~~~~~~
-
-.. contents::
-   :depth: 1
-   :local:
+~~~~~~~~~~
 
 The operations described in this section allow you to manage executions.
 
