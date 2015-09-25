@@ -1,9 +1,9 @@
 .. _rbac:
 
-Role based access control (RBAC)
+Role-based access control (RBAC)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Role Based Access Control (RBAC) restricts access to the capabilities of
+Role-based access control (RBAC) restricts access to the capabilities of
 Rackspace Cloud services, including the Cloud Rackspace Auto Scale API,
 to authorized users only. RBAC enables Rackspace Cloud customers to
 specify which account users of their Cloud account have access to which
@@ -37,14 +37,14 @@ how to perform the following tasks:
 
 -  `Delete roles from account users`_
 
-..  note:: 
-      The account owner (``identity:user-admin``) role cannot hold any additional roles because it 
+..  note::
+      The account owner (``identity:user-admin``) role cannot hold any additional roles because it
       already has full access to all capabilities.
-      
-      
-.. _Create account users: http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_addUser_v2.0_users_User_Calls.html      
-.. _Assign roles to account users: http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/PUT_addUserRole__v2.0_users__userId__OS-KSADM_roles__roleid__Role_Calls.html  
-.. _Delete roles from account users: http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/DELETE_deleteUserRole__v2.0_users__userId__OS-KSADM_roles__roleid__Role_Calls.html    
+
+
+.. _Create account users: http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_addUser_v2.0_users_User_Calls.html
+.. _Assign roles to account users: http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/PUT_addUserRole__v2.0_users__userId__OS-KSADM_roles__roleid__Role_Calls.html
+.. _Delete roles from account users: http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/DELETE_deleteUserRole__v2.0_users__userId__OS-KSADM_roles__roleid__Role_Calls.html
 
 
 .. _roles-available:
@@ -117,8 +117,8 @@ between user roles in the Control Panel are resolved.
 | roles: multiproduct **observer**| has only the mulitproduct| user has the **observer**  |
 | and Auto Scale **admin**        | **observer** role.       | role for other products.   |
 +---------------------------------+--------------------------+----------------------------+
-| User is assigned the following  |Appears that the user has | Yes, for all the products. |     
-| roles: multiproduct **admin**   |only the multiproduct     | The Auto Scale **observer**| 
+| User is assigned the following  |Appears that the user has | Yes, for all the products. |
+| roles: multiproduct **admin**   |only the multiproduct     | The Auto Scale **observer**|
 | and Auto Scale **observer**     |**admin** role.           | role is ignored.           |
 +---------------------------------+--------------------------+----------------------------+
 

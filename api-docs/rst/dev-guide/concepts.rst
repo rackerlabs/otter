@@ -1,66 +1,66 @@
 .. _concepts:
 
-Auto Scale concepts 
+Autoscale concepts
 --------------------
 
-To use the Auto Scale API effectively, you should understand several key concepts, 
+To use the Autoscale API effectively, you should understand several key concepts,
 discussed in this chapter.
- 
+
 
 .. _how-it-works:
 
-How AutoScale works
+How Autoscale works
 ~~~~~~~~~~~~~~~~~~~~~
 
-Rackspace Auto Scale is an API-based tool that automatically scales
+Rackspace Autoscale is an API-based tool that automatically scales
 resources in response to an increase or decrease in overall workload
 based on user-defined thresholds.
 
-Auto Scale is written in python and calls the Rackspace Cloud Servers,
-Rackspace Cloud Load Balancers, and Rackspace RackConnect V3 APIs. All
+Autoscale calls the Rackspace Cloud Servers,
+Rackspace Cloud Load Balancers, and Rackspace RackConnect v3 APIs. All
 Rackspace Cloud Server create server configuration parameters can be
-used with Auto Scale. For more information, see the following documentation:
+used with Autoscale. For more information, see the following documentation:
 
 -  `Rackspace Cloud Servers documentation`_
--  `public Auto Scale github documentation`_
--  `public Auto Scale github Wiki`_
+-  `public Autoscale github documentation`_
+-  `public Autoscale github Wiki`_
 
-Auto Scale functions by linking these services:
+Autoscale functions by linking these services:
 
 -  Rackspace Cloud Servers. Learn more at `Cloud Servers Getting Started Guide`_
 
 -  Load-balanced Cloud Servers. Learn more at `Load Balancers Getting Started Guide`_.
 
-You can set up a schedule for launching Auto Scale or define an event
+You can set up a schedule for launching Autoscale or define an event
 that triggers a webhook. You can also specify a minimum and maximum
 number of cloud servers for your scaling group, the amount of resources
 you want to increase or decrease, and policies based on percentage or
 real numbers.
 
-..  note:: 
-       -  Auto Scale does not configure any information within a server. You must configure your services 
-          to function when each server is started. We recommend automating your servers' startup processes 
+..  note::
+       -  Autoscale does not configure any information within a server. You must configure your services
+          to function when each server is started. We recommend automating your servers' startup processes
           with `Chef`_ or a similar tool.
 
-       - Auto Scale can use all Rackspace Cloud Server create server API
+       - Autoscale can use all Rackspace Cloud Server create server API
          parameters. For more details, see the `Create servers`_  documentation.
 
-.. _Cloud Servers Getting Started guide: http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/overview.html         
-.. _public Auto Scale github Wiki: https://github.com/rackerlabs/otter/wiki
-.. _public Auto Scale github documentation: https://github.com/rackerlabs/otter/tree/master/doc
-.. _Rackspace Cloud Servers documentation: http://docs.rackspace.com/ 
+.. _Cloud Servers Getting Started guide: http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/overview.html
+.. _public Autoscale github Wiki: https://github.com/rackerlabs/otter/wiki
+.. _public Autoscale github documentation: https://github.com/rackerlabs/otter/tree/master/doc
+.. _Rackspace Cloud Servers documentation: http://docs.rackspace.com/
 .. _Load Balancers Getting Started Guide: http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/DB_doc_change_history.html
-.. _Chef: http://www.opscode.com/chef/         
+.. _Chef: http://www.opscode.com/chef/
 .. _Create servers: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html
 
-         
+
 .. _scaling-groups:
 
 Scaling groups
 ~~~~~~~~~~~~~~
 
-The scaling group is at the heart of an Auto Scale deployment. The
-scaling group specifies the basic elements of the Auto Scale
+The scaling group is at the heart of an Autoscale deployment. The
+scaling group specifies the basic elements of the Autoscale
 configuration. It manages how many servers can participate in the
 scaling group. It also specifies information related to load balancers
 if your configuration uses a load balancer.
@@ -71,25 +71,25 @@ configurations and launch configurations.
 +----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Configuration        | Description                                                                                                                                                                                                                                                                                                           |
 +======================+=======================================================================================================================================================================================================================================================================================================================+
-| Group Configuration  | Outlines the basic elements of the Auto Scale configuration. The group configuration manages how many servers can participate in the scaling group. It sets a minimum and maximum limit for the number of entities that can be used in the scaling process. It also specifies information related to load balancers.  |
+| Group Configuration  | Outlines the basic elements of the Autoscale configuration. The group configuration manages how many servers can participate in the scaling group. It sets a minimum and maximum limit for the number of entities that can be used in the scaling process. It also specifies information related to load balancers.  |
 +----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Launch Configuration | Creates a blueprint for how new servers will be created. The launch configuration specifies what type of server image will be started on launch, what flavor the new server is, and which cloud load balancer or RackConnect v3 load balancer pool the new server connects to.                                        |
 |                      | Note: The launchConfiguration uses the admin user to scale up, usually the first admin user found on the tenant. Only that particular admin user's SSH key pair names can be used in the launchConfiguration.                                                                                                         |
 |                      | Note: The launchConfiguration update operation overwrites all launchConfiguration settings.                                                                                                                                                                                                                           |
-+----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+                                                                                                                                                                                                                                                                                                        
++----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
-The ``launchConfiguration`` specifies the launch type along with server and load balancer configuration for the components to start based on the sp. Most launch configurations have both a server and a load balancer (can be RackConnect v3) configured as shown in the `Launch configuration examples`_ .
+The launch configuration specifies the launch type along with server and load balancer configuration for the components to start. Most launch configurations have both a server and a load balancer (can be RackConnect v3) configured as shown in the `Launch configuration examples`_ .
 
 ``type``
      Set the type parameter to this value: ``launch_server``.
 
 ``args``
-        Specifies the configuration for server and load balancers. Most launch 
+        Specifies the configuration for server and load balancers. Most launch
         configurations have both a server and a
-        load balancer (can be RackConnect v3) configured.items to be configured: 
+        load balancer (can be RackConnect v3) configured. The following items can be configured:
 
         ``server``
-             Specifies configuration information for the Cloud server 
+             Specifies configuration information for the Cloud server
              image that will be created during the scaling process. If you are using Boot From
              Volume, the ``server`` args are where you specify your create server
              template. See :ref:`Server parameters <server-parameters>`.
@@ -98,29 +98,26 @@ The ``launchConfiguration`` specifies the launch type along with server and load
              Specifies the configuration information for the load balancer(s) used in
              the cloud server deployment, including a RackConnect v3 load balancer
              pool. For background information and an example configuration, see
-             `Cloud Bursting with RackConnect v3 <cloud-bursting>`. 
+             :ref:`Cloud Bursting with RackConnect v3 <cloud-bursting>`.
 
-             .. note:: 
-                You must include the ``ServiceNet`` network in your configuration 
+             .. note::
+                You must include the ``ServiceNet`` network in your configuration
                 if you use a load balancer so the load balancer can retrieve the IP address of new
                 servers. See :ref:`Load balancer parameters <load-balancers-parameters>`.
 
 
 .. _server-parameters:
-           
+
 Server parameters
 ^^^^^^^^^^^^^^^^^^^^
 
 Specifies configuration information for the Cloud server image that will
 be created during the scaling process. If you are using Boot From
-Volume, the ``server`` args are where you specify your create servertemplate.
+Volume, the ``server`` args are where you specify your create server template.
 
 The ``server`` group parameter specifies details about the server as
 described in the following table. Note the ``server`` arguments are
 directly passed to nova when creating a server.
-
-For more information see `Create Your Server with the nova
-Client`_.
 
 **Parameter name and description**
 
@@ -132,12 +129,12 @@ Client`_.
      within the limit of 255 characters.
 
 ``flavorRef``
-     Specifies the flavor id for the server, ``performance1-4`` for example. 
+     Specifies the flavor id for the server, ``performance1-4`` for example.
      A flavor is a resource configuration for a server. For details,
      see `Server flavors`_.
-    
+
 ``imageRef``
-     Specifies the ID of the Cloud Server image to start, 
+     Specifies the ID of the Cloud Server image to start,
      ``0d589460-f177-4b0f-81c1-8ab8903ac7d8`` for example.
 
 ``OS-DCF:diskConfig``
@@ -145,18 +142,18 @@ Client`_.
      ``AUTO`` or ``MANUAL``. For non-Rackspace server images, this value
      must always be ``MANUAL``. A non-Rackspace server image would be one
      that you imported using a non-Rackspace server. For more information,
-     see the `Disk Configuration`_  documentation for 
+     see the `Disk Configuration`_  documentation for
      Rackspace Cloud Servers.
 
 ``metadata``
     Optional. The maximum size of the metadata key and value is 255 bytes
     each. For details, see the `Server Metadata`_
     documentation for Rackspace Cloud Servers. You use this attribute to
-    `configure RackConnect v2 with Auto Scale Cloud
-    Bursting Using Auto Scale, RackConnect, and F5 Load Balancers`_.
+    `configure RackConnect v2 with Autoscale Cloud
+    Bursting Using Autoscale, RackConnect, and F5 Load Balancers`_.
 
-    You do NOT use this parameter to configure Auto Scale and RackConnect
-    v3, you use the ``loadBalancers`` parameter for that.
+    Do not use this parameter to configure Autoscale and RackConnect
+    v3, use the ``loadBalancers`` parameter instead.
 
 ``networks``
     Specifies the networks to which you want to attach the server. This
@@ -175,16 +172,15 @@ Client`_.
     Specifies the base64 encoded create server template that you use to Boot
     from Volume. For details, see the `Config-Drive Extension`_
     section of the *Next Generation Cloud Servers Developer Guide*. For more
-    information on Boot from Volume, see the developer blog 
+    information on Boot from Volume, see the developer blog
     `Using Cloud Init with Rackspace Cloud`_.
 
 
 
-.. _Create Your Server with the nova Client: http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/nova_create_server.html`
 .. _Server flavors: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/server_flavors.html
 .. _Disk Configuration: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/diskconfig_attribute.html
 .. _Server Metadata: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html
-.. _configure RackConnect v2 with Auto Scale Cloud Bursting Using Auto Scale, RackConnect, and F5 Load Balancers: http://www.rackspace.com/knowledge_center/article/cloud-bursting-using-auto-scale-rackconnect-and-f5-load-balancers
+.. _configure RackConnect v2 with Autoscale Cloud Bursting Using Autoscale, RackConnect, and F5 Load Balancers: http://www.rackspace.com/knowledge_center/article/cloud-bursting-using-auto-scale-rackconnect-and-f5-load-balancers
 .. _Server Personality: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html
 .. _Config-Drive Extension: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/config_drive_ext.html
 .. _Using Cloud Init with Rackspace Cloud: https://developer.rackspace.com/blog/using-cloud-init-with-rackspace-cloud/
@@ -212,25 +208,25 @@ servers.
     when the load balancer is created.
 
 ``port``
-    The server port for receiving traffic from the load balancer, often poirt 80. 
+    The server port for receiving traffic from the load balancer, often poirt 80.
 
-    .. note:: 
+    .. note::
     	  You can get information about your load balancer from the Control Panel
       	  or by using `List Load Balancer Details`_.
-      		
-      
- .. _List Load Balancer Details: http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/List_LB_Details.html     
 
-      
+
+ .. _List Load Balancer Details: http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/List_LB_Details.html
+
+
 .. _launch-config-examples:
 
 Launch configuration examples
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    
+
 The following example shows a launch configuration of type
 "launch\_server" for a cloud server and a load balancer:
 
- 
+
 **Example: Launch configuration**
 
 .. code::  sh
@@ -271,9 +267,9 @@ The following example shows a launch configuration of type
         },
         "type": "launch_server"
 
-                        
 
- 
+
+
 **Example: Launch configuration for boot from volume**
 
 .. code::  sh
@@ -309,16 +305,16 @@ The following example shows a launch configuration of type
         },
         "type": "launch_server"
 
-                            
 
-The "very long base64 encoded string"would provide your create server
+
+The "very long base64 encoded string goes here" is where you insert your create server
 template.
 
-Here is an example of a very simple create server template that you
+The following shows a very simple create server template that you
 could base64 encode. You can use this template to install the apache2 package
 and runs a shell command.
 
- 
+
 **Example: Create server template for RackConnect v3**
 
 .. code::  sh
@@ -353,23 +349,23 @@ and runs a shell command.
 
 Learn more
 ***********
-    
+
 See the following topics for information about configuring Cloud Servers through an API.
 
--   `Next Generation Cloud Servers Getting 
+-   `Next Generation Cloud Servers Getting
     Started Guide <http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/overview.html>`__
 
--   `Next Generation Cloud Servers Developer 
+-   `Next Generation Cloud Servers Developer
     Guide <http://docs.rackspace.com/servers/api/v2/cs-devguide/content/ch_api_operations.html>`__
 
--   `RackConnect v3 API <http://docs.rcv3.apiary.io/>`__
+-   `RackConnect v3 API <http://docs.rackspace.com/rackconnect/api/v3/rackconnect-devguide/content/Overview.html>`__
 
 See these topics for information about configuring Cloud Load Balancers through an API:
 
 -   `Rackspace Cloud Load Balancers Getting
     Started <http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/DB_pverview.html>`__
 
--   `Rackspace Cloud Load Balancers Developer 
+-   `Rackspace Cloud Load Balancers Developer
     Guide <http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/api_operations-d1e1354.html>`__
 
 .. _webhooks-and-capabilities:
@@ -377,7 +373,7 @@ See these topics for information about configuring Cloud Load Balancers through 
 Webhooks and capability URLs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Auto Scale uses webhooks to initiate scaling events. A webhook is an
+Autoscale uses webhooks to initiate scaling events. A webhook is an
 industry-standard protocol for sending events between systems; for Auto
 Scale, they are used to execute policies. A webhook consists of an HTTP
 callback that is triggered by some user-defined event, such as an alarm
@@ -390,75 +386,75 @@ payload in the POST body. You can send webhooks with a simple call in
 the library that you are using. You can also send them manually via
 cURL:
 
- 
+
 **Example: POST request to execute a webhook**
 
-.. code::  
+.. code::
 
     curl -v https://example.com/webhook -X POST -d "payload=payload"
 
-Auto Scale only supports anonymous webhooks. In regular webhooks, the
+Autoscale only supports anonymous webhooks. In regular webhooks, the
 {webhook\_version}/{webhook\_hash} is specified by URL. In anonymous
 webhooks, the URL is replaced with a hash that is known only to the
 issuer— because no authentication is needed, the webhook is considered
 "anonymous."
 
-Auto Scale uses Capability URLs in conjunction with webhooks. Capability
+Autoscale uses Capability URLs in conjunction with webhooks. Capability
 URLs are URLs that give authorization for a certain action or event. If
 you know the URL, you have access to it and you can use the URL to
 trigger a specific event. Capability URLs are usually long, and random,
 and cannot be guessed by a user.
 
-When a webhook is created, Auto Scale creates values for the
+When a webhook is created, Autoscale creates values for the
 ``capabilityVersion`` and ``capabilityHash`` parameters. These values
 are created per webhook, not per policy. When you create a webhook, you
 associate it with a policy. The response to the webhook creation request
 includes a single capability URL that is also, by inheritance,
 associated with the policy.
 
-The Auto Scale webhook architecture allows Auto Scale to be integrated
+The Autoscale webhook architecture allows Autoscale to be integrated
 with other systems, for example, monitoring systems. So, now you have
 this URL that will execute a specific policy and you can fire off that
-URL based on events happening outside of Auto Scale.
+URL based on events happening outside of Autoscale.
 
 To execute a capability URL, locate the URL in your webhook, and then
 submit a **POST** request against it, as shown in the following example:
 
- 
+
 **Example: POST request to execute a capability URL**
 
-.. code::  
+.. code::
 
        curl --include \
        --request POST \
        "https://ord.autoscale.api.rackspacecloud.com/v1.0/execute/1/be624bfb20f07baddc278cd978c1ddca56bdb29a1c7b70bbeb229fe0b862c134" -v
 
-                        
-                        
+
+
 Executing a capability URL or an anon`ymous webhook will always return a
 202, ``Accepted``, response code, even if the request fails because of
 an invalid configuration. This is done to prevent information leakage.
 
-..  note:: 
+..  note::
     To execute anonymous webhooks and capability URLs, no authentication is
     needed. You can use a capability URL to trigger multiple webhooks.
-    
-    
+
+
 .. _scaling-policies:
 
 Scaling policies
 ~~~~~~~~~~~~~~~~~~~
 
-Auto Scale uses policies to define the scaling activity that will take
+Autoscale uses policies to define the scaling activity that will take
 place, as well as when and how that scaling activity will take place.
 Scaling policies specify how to modify the scaling group and its
 behavior. You can specify multiple policies to manage a scaling group.
 
-You can create two kinds of Auto Scale policies:
+You can create two kinds of Autoscale policies:
 
--  Policies that trigger Auto Scale activities through a webhook.
+-  Policies that trigger Autoscale activities through a webhook.
 
--  Policies that trigger Auto Scale activities based on a schedule.
+-  Policies that trigger Autoscale activities based on a schedule.
 
 
 .. _webhook-based-policies:
@@ -469,11 +465,11 @@ Webhook-based policies
 You can define a scaling policy that is invoked by a webhook when a
 predefined event occurs.
 
-..  note:: 
+..  note::
     The ``change``, ``changePercent``, and ``desiredCapacity`` parameters
     are mutually exclusive. You can only set one of them per policy.
 
-To configure a webhook-based policy, you set the ``type``\ parameter to
+To configure a webhook-based policy, you set the ``type`` parameter to
 ``webhook`` and then specify the parameter values.
 
 
@@ -484,7 +480,7 @@ To configure a webhook-based policy, you set the ``type``\ parameter to
      implies that 1 server needs to be added. Use to change the number of
      servers to a specific number. If a positive number is used, servers are
      added; if a negative number is used, servers are removed.
-     
+
 ``changePercent``
      Specifies the change value in per cent. Use to change the percentage of
      servers relative to the current number of servers. If a positive number
@@ -493,19 +489,19 @@ To configure a webhook-based policy, you set the ``type``\ parameter to
      up. For example, if -X% of the current number of servers translates to
      -0.5 or -0.25 or -0.75 servers, the actual number of servers that
      will be shut down is 1.
-     
+
 ``desiredCapacity``
      Specifies the final capacity that is desired by the scale up event. Note
      that this value is always rounded up. Use to specify a number of servers
      for the policy to implement—by either adding or removing servers as
      needed.
-     
+
 The webhook object takes no ``args`` parameter.
 
-..  note:: 
+..  note::
     The ``change``, ``changePercent``, and ``desiredCapacity`` parameters
     are mutually exclusive. You can only set one of them per policy.
-    
+
 .. _schedule-based-policies:
 
 Schedule-based policies
@@ -513,7 +509,7 @@ Schedule-based policies
 
 You can define a scaling policy that is invoked by a preset schedule.
 
-..  note:: 
+..  note::
     The ``change``, ``changePercent``, and ``desiredCapacity`` parameters
     are mutually exclusive. You can only set one of them per policy.
 
@@ -551,15 +547,15 @@ time to invoke the policy in CRON format, as shown in the
 following example, which configures the policy to be invoked at 6 AM
 every day:
 
- 
+
 **Example: Schedule-based policy using cron**
 
-.. code::  
+.. code::
 
       [
         {
         "cooldown": 600,
-         "args": 
+         "args":
             {"cron": "0 6 * * *"
             },
          "type": "schedule",
@@ -572,10 +568,10 @@ To set the time at which the policy will be invoked directly, without
 Cron, use the "at" argument and specify the time using the format that
 is shown in the following example:
 
- 
+
 **Example: Schedule-based policy specifying direct time**
 
-.. code::  
+.. code::
 
     [
         {
@@ -596,17 +592,17 @@ Scaling by percentage
 
 You can define a policy that scales your server resources up and down by
 a predefined percentage. For example, you can define a policy to
-increase your resources by 20% if a certain predefined event occurs as illustrated in 
+increase your resources by 20% if a certain predefined event occurs as illustrated in
 the following figure.
 
-**Scale by percentage in response to webhook trigger event**
+**Scale by percentage in response to an event that triggers a webhook**
 
 .. image:: _images/scaleby-percentage.png
    :alt: Scaling by percentage example
-   
+
 
 .. _using-min-and-max-values:
-   
+
 Using the min and max values with policies
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -616,26 +612,26 @@ in the ``minEntities`` and ``maxEntities`` parameters under group
 configuration, and are invoked whenever you update your group
 configuration.
 
-.. Important:: 
+.. Important::
      If the number of resources that is specified in a policy differs from
      the amount that is specified under group configuration, the
      preconfigured values take precedence.
-     
+
 **Scale by percentage based on min and max values**
 
 .. image:: _images/min-and-max.png
    :alt: Scaling by percentage example
-   
-   
+
+
 .. _delete-resources:
 
 Deleting resources
 ^^^^^^^^^^^^^^^^^^^^^
 
-You can set a policy to specify when to delete resources, 
+You can set a policy to specify when to delete resources,
 and how many resources to delete.
 
-When deleting servers, Auto Scale follows these rules:
+When deleting servers, Autoscale follows these rules:
 
 -  If no new servers are in the process of being built, the oldest
    servers are deleted first.
@@ -656,7 +652,7 @@ The following diagram illustrates how the deletion process works.
 Cooldowns
 ~~~~~~~~~~~~
 
-Auto Scale supports a cooldown feature. A cooldown is a configured
+Autoscale supports a cooldown feature. A cooldown is a configured
 period of time that must pass between actions. Cooldowns only apply to
 webhook-based configurations. By configuring group cooldowns, you
 control how often a group can have a policy applied, which can help
@@ -675,7 +671,7 @@ Cooldowns work the following way:
    executed. For example, a policy cooldown can require at least six
    hours until any successive scale down policies are reactivated.
 
-..  note:: 
+..  note::
         Cooldown configuration is irrelevant for schedule-based configurations
         and the Group Cooldown and Policy Cooldown can both be set to 0 (null).
 
@@ -685,7 +681,7 @@ Cooldowns work the following way:
 Schedule-based configurations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can configure Auto Scale to be triggered based on a user-defined
+You can configure Autoscale to be triggered based on a user-defined
 schedule that is specified in one or more policies.
 
 This configuration option is helpful if you know that your Cloud Servers
@@ -706,23 +702,23 @@ operational state.
 Event-based configurations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can configure Auto Scale to be triggered through a webhook, based on
+You can configure Autoscale to be triggered through a webhook, based on
 a predefined alarm or threshold that has been previously set up in a
 monitoring service. Event-based configuration works the following way:
 
 #. In your monitoring service, you configure alarms that are triggered
    when a high utilization of resources occurs
 
-#. In Auto Scale, you configure a scaling group, scaling policies, and a
+#. In Autoscale, you configure a scaling group, scaling policies, and a
    webhook to be triggered when your monitoring service sets off an
    alarm for high utilization of resources.
 
-#. The webhook launches the Auto Scale service, which looks up the
+#. The webhook launches the Autoscale service, which looks up the
    policy that has been defined in accordance with the webhook. This
    policy determines the amount of cloud servers that need to be added
    or removed.
 
-..  note:: 
+..  note::
         Servers added through a webhook triggered by an external monitoring
         service will not be automatically monitored by the external monitoring
         service.
@@ -733,7 +729,7 @@ monitoring service. Event-based configuration works the following way:
 Cloud bursting with RackConnect v3
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can use Auto Scale with a hybrid, dedicated and cloud, solution to
+You can use Autoscale with a hybrid, dedicated and cloud, solution to
 "burst" into the cloud when extra servers are temporarily needed. To do
 this, you use RackConnect v3, a Rackspace solution that works with
 Rackspace cloud servers and creates a secure bridge between the
@@ -750,10 +746,10 @@ To get started with RackConnect v3 cloud bursting:
    ``loadBalancerId`` and use ``RackConnect v3`` for the ``type``. Do
    not set a value for ``port``.
 
- 
+
 **Example: RackConnect v3 launchConfiguration with two load balancer pools**
 
-.. code::  
+.. code::
 
        {
         "type": "launch_server",
@@ -782,7 +778,7 @@ To get started with RackConnect v3 cloud bursting:
         }
     }
 
-                            
+
 
 **Related information**
 

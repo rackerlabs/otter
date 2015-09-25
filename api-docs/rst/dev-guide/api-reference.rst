@@ -4,5 +4,5 @@
 **API Reference**
 ===================
 
-Learn about the available Cloud Images API resources and methods and see request and 
+Learn about the available Autoscale API resources and methods and see request and 
 response examples.

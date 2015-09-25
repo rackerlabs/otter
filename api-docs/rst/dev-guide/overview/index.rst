@@ -3,20 +3,20 @@
 About the Autoscale API
 -----------------------------
 
-The Rackspace Auto Scale API enables developers to interact with the 
-Rackspace Autoscale service through a simple Representational State 
-Transfer (REST) web service interface. 
+The Rackspace Autoscale API enables developers to interact with the
+Rackspace Autoscale service through a simple Representational State
+Transfer (REST) web service interface.
 
-You use the Auto Scale service to automatically scale 
+You use the Autoscale service to automatically scale
 resources in response to an increase or decrease in overall workload
 based on user-defined policies. You can set up a schedule for launching
 Auto Scale or define an event that is triggered by Cloud Monitoring. You
 can also specify a minimum and maximum number of cloud servers, the
 amount of resources that you want to increase or decrease, and the
-thresholds in Cloud Monitoring that trigger the scaling activities. 
+thresholds in Cloud Monitoring that trigger the scaling activities.
 
-To use Auto Scale through the API, you submit API requests to define a 
-scaling group consisting of cloud servers and cloud load balancers or 
+To use Autoscale through the API, you submit API requests to define a
+scaling group consisting of cloud servers and cloud load balancers or
 RackConnect v3. Then you define policies, either schedule-based or monitoring-based. For
 monitoring-based policies, you define cloud monitoring alerts to watch
 the group's activity, and you define scaling rules to change the scaling
@@ -29,7 +29,7 @@ growth is justified.
 
 .. toctree:: :hidden:
    :maxdepth: 3
-   
+
    Pricing and terms of service <pricing-and-service-level>
    additional-resources
    getting-help
