@@ -194,8 +194,7 @@ Load balancer parameters
 
 Load balancer parameters specify the configuration information for the load balancer(s) used in
 the cloud server deployment, including a RackConnect v3 load balancer
-pool. For background information and an example configuration, see
-:ref:`Cloud Bursting with RackConnect
+pool. For background information and an example configuration, see :ref:`Cloud Bursting with RackConnect
 v3 <cloud-bursting>`. Please note that you must
 include the ``ServiceNet`` network in your configuration if you use a
 load balancer so the load balancer can retrieve the IP address of new
