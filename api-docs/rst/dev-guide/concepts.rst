@@ -49,7 +49,7 @@ real numbers.
 .. _public Autoscale github Wiki: https://github.com/rackerlabs/otter/wiki
 .. _public Autoscale github documentation: https://github.com/rackerlabs/otter/tree/master/doc
 .. _Rackspace Cloud Servers documentation: http://docs.rackspace.com/
-.. _Load Balancers Getting Started Guide: http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/DB_doc_change_history.html
+.. _Load Balancers Getting Started Guide: http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/LB_Overview.html
 .. _Chef: http://www.opscode.com/chef/
 .. _Create servers: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html
 
@@ -97,8 +97,8 @@ The launch configuration specifies the launch type along with server and load ba
         ``loadbalancers``
              Specifies the configuration information for the load balancer(s) used in
              the cloud server deployment, including a RackConnect v3 load balancer
-             pool. For background information and an example configuration, see
-             :ref:`Cloud Bursting with RackConnect v3 <cloud-bursting>`.
+             pool. For background information and an example configuration, see :ref:`Cloud Bursting with RackConnect
+             v3 <cloud-bursting>`.
 
              .. note::
                 You must include the ``ServiceNet`` network in your configuration
@@ -195,8 +195,8 @@ Load balancer parameters
 Load balancer parameters specify the configuration information for the load balancer(s) used in
 the cloud server deployment, including a RackConnect v3 load balancer
 pool. For background information and an example configuration, see
-`Cloud Bursting with RackConnect
-v3 <auto_scale_core_concepts.html#RCv3>`__. Please note that you must
+:ref:`Cloud Bursting with RackConnect
+v3 <cloud-bursting>`. Please note that you must
 include the ``ServiceNet`` network in your configuration if you use a
 load balancer so the load balancer can retrieve the IP address of new
 servers.
@@ -363,10 +363,10 @@ See the following topics for information about configuring Cloud Servers through
 See these topics for information about configuring Cloud Load Balancers through an API:
 
 -   `Rackspace Cloud Load Balancers Getting
-    Started <http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/DB_pverview.html>`__
+    Started <http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/LB_Overview.html>`__
 
 -   `Rackspace Cloud Load Balancers Developer
-    Guide <http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/api_operations-d1e1354.html>`__
+    Guide <http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/Overview-d1e82.html>`__
 
 .. _webhooks-and-capabilities:
 

@@ -1,6 +1,6 @@
 .. _server-flavors:
 
-Server flavors 
+Server flavors
 ~~~~~~~~~~~~~~~
 
 When configuring a Cloud Server image through the Control Panel or the
@@ -15,15 +15,14 @@ For more information and details on flavors, see the `Server
 Flavors <http://docs.rackspace.com/servers/api/v2/cs-devguide/content/server_flavors.html>`__
 section in the *Rackspace Cloud Servers Developer's Guide*.
 
-..  note:: 
+..  note::
 
     - The Standard Instance flavors are being phased out. Do not use them when adding servers.
     - The Server flavor names have been recently modified:
         - Performance 1 flavors are now General Purpose v1 flavors
         - Performance 2 flavors are now I/O v1 flavors
 
-Use the `List
-Servers <http://docs.rackspace.com/servers/api/v2/cs-devguide/content/List_Flavors-d1e4188.html>`__
+Use the `List Flavors <http://docs.rackspace.com/servers/api/v2/cs-devguide/content/List_Flavors-d1e4188.html>`__
 operation, described in the *Rackspace Cloud Servers Developer's Guide*
 to get a list of all current servers.
 
@@ -92,6 +91,6 @@ to get a list of all current servers.
 +------------------+--------------------------+-------------+------------+-----------+-------+-------------+
 
 
-..  note:: 
+..  note::
     Auto Scale only supports Next Generation servers. No First Generation
     servers are supported.
