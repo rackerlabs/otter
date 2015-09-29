@@ -133,8 +133,8 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         current_state = GroupState(
-            servers=(self._create_servers(2, state=ServerState.ACTIVE)
-                     | self._create_servers(2, state=ServerState.BUILD)),
+            servers=(self._create_servers(2, state=ServerState.ACTIVE) |
+                     self._create_servers(2, state=ServerState.BUILD)),
             lb_connections=pset([])
         )
         desired_state = DesiredServerGroupState(
@@ -154,8 +154,8 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         current_state = GroupState(
-            servers=(self._create_servers(1, state=ServerState.ACTIVE)
-                     | self._create_servers(2, state=ServerState.ERROR)),
+            servers=(self._create_servers(1, state=ServerState.ACTIVE) |
+                     self._create_servers(2, state=ServerState.ERROR)),
             lb_connections=pset([])
         )
         desired_state = DesiredServerGroupState(
@@ -177,8 +177,8 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         current_state = GroupState(
-            servers=(self._create_servers(1, state=ServerState.ACTIVE)
-                     | self._create_servers(1, state=ServerState.ERROR)),
+            servers=(self._create_servers(1, state=ServerState.ACTIVE) |
+                     self._create_servers(1, state=ServerState.ERROR)),
             lb_connections=pset([])
         )
         desired_state = DesiredServerGroupState(
@@ -194,8 +194,8 @@ class MeasureProgressTests(SynchronousTestCase):
         Errored servers are removed; no progress is made.
         """
         previous_state = GroupState(
-            servers=(self._create_servers(1, state=ServerState.ACTIVE)
-                     | self._create_servers(2, state=ServerState.ERROR)),
+            servers=(self._create_servers(1, state=ServerState.ACTIVE) |
+                     self._create_servers(2, state=ServerState.ERROR)),
             lb_connections=pset([])
         )
         current_state = GroupState(
