@@ -806,7 +806,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                 {}, {}, None, {}, False,
                                 ScalingGroupStatus.ACTIVE, desired=2)
         self.group = mock_group(self.state, self.tenant_id, self.group_id)
-        self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
+        self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []},
+                   'type': 'launch_server'}
         self.desired_lbs = s(CLBDescription(lb_id='23', port=80))
         self.servers = (
             server('a', ServerState.ACTIVE, servicenet_address='10.0.0.1',
