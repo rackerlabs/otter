@@ -516,8 +516,9 @@ class ScalingGroup(object):
             response, group_state = result
             mismatch = matcher.match(group_state['group'])
             if mismatch:
-                msg("Waiting for desired group state.\nMismatch: {}"
-                    .format(mismatch.describe()))
+                msg("Waiting for group {} to reach desired group state.\n"
+                    "Mismatch: {}"
+                    .format(self.group_id, mismatch.describe()))
                 raise TransientRetryError(mismatch.describe())
             msg("Success: desired group state reached:\n{}\nmatches:\n{}"
                 .format(group_state['group'], matcher))
@@ -532,8 +533,8 @@ class ScalingGroup(object):
             next_interval=repeating_interval(period),
             clock=clock or reactor,
             deferred_description=(
-                "Waiting for scaling group to reach state {0}"
-                .format(str(matcher)))
+                "Waiting for group {} to reach state {}"
+                .format(self.group_id, str(matcher)))
         )
 
 HasActive = MatchesPredicateWithParams(
