@@ -77,7 +77,7 @@ class WaitForStateTestCase(SynchronousTestCase):
         """When wait_for_state completes before timeout, we expect our
         deferred to fire successfully.
         """
-
+        self.sg.group_id = 'abc'
         self.sg.get_scaling_group_state = self.get_scaling_group_state_happy
         self.threshold = 25
 
@@ -92,7 +92,7 @@ class WaitForStateTestCase(SynchronousTestCase):
         """When wait_for_state exceeds a maximum time threshold, we expect
         it to raise an exception.
         """
-
+        self.sg.group_id = 'abc'
         self.sg.get_scaling_group_state = self.get_scaling_group_state_timeout
 
         d = self.sg.wait_for_state(None, HasActive(2), clock=self.clock)
