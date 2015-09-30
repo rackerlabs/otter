@@ -42,7 +42,8 @@ def launch_server_config():
                         "loadBalancerId": 2200,
                         "port": 8081
                     }
-                ]
+                ],
+                "draining_timeout": 30
             }
         },
         {

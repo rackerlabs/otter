@@ -5,6 +5,7 @@ _trial_coverage
 .coverage
 dropin.cache
 htmldoc
+_build
 _builddoc
 .self.txt
 otter-deploy*

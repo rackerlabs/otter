@@ -387,7 +387,8 @@ class OtterRbacTests(AutoscaleFixture):
 
         # delete group
         self.resources.add(self.group.id, self.empty_scaling_group(self.group))
-        delete_group_response = user_client.delete_scaling_group(self.group.id)
+        delete_group_response = user_client.delete_scaling_group(
+            self.group.id, "true")
         self.assertEquals(
             delete_group_response.status_code, response_codes['upd-del'],
             msg='Delete group returned response code {0} on group '

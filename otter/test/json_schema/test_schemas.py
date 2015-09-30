@@ -336,6 +336,27 @@ class ServerLaunchConfigTestCase(SynchronousTestCase):
         self.assertRaises(ValidationError, validate, invalid,
                           group_schemas.launch_server)
 
+    def test_draining_nan(self):
+        """
+        Draining timeout must be a number
+        """
+        lc = deepcopy(group_examples.launch_server_config()[0])
+        lc["args"]["draining_timeout"] = "string"
+        self.assertRaises(ValidationError, validate, lc,
+                          group_schemas.launch_server)
+
+    def test_draining_minmax(self):
+        """
+        Draining timeout must be >= 30 and <= 3600
+        """
+        lc = deepcopy(group_examples.launch_server_config()[0])
+        lc["args"]["draining_timeout"] = 20
+        self.assertRaises(ValidationError, validate, lc,
+                          group_schemas.launch_server)
+        lc["args"]["draining_timeout"] = 3601
+        self.assertRaises(ValidationError, validate, lc,
+                          group_schemas.launch_server)
+
 
 class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
     """
