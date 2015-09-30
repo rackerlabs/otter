@@ -12,6 +12,7 @@ from otter.convergence.model import (
     CLBNodeCondition,
     CLBNodeType,
     DesiredServerGroupState,
+    DesiredStackGroupState,
     ErrorReason,
     RCv3Description,
     RCv3Node,
@@ -20,8 +21,10 @@ from otter.convergence.planning import (
     DRAINING_METADATA,
     Destiny,
     converge_launch_server,
+    converge_launch_stack,
     get_destiny,
-    plan_launch_server)
+    plan_launch_server,
+    plan_launch_stack)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -29,10 +32,12 @@ from otter.convergence.steps import (
     ChangeCLBNode,
     ConvergeLater,
     CreateServer,
+    CreateStack,
     DeleteServer,
+    DeleteStack,
     RemoveNodesFromCLB,
     SetMetadataItemOnServer)
-from otter.test.utils import server
+from otter.test.utils import server, stack
 
 
 def copy_clb_desc(clb_desc, condition=CLBNodeCondition.ENABLED, weight=1):
@@ -768,7 +773,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             ]))
 
 
-class ConvergeTests(SynchronousTestCase):
+class ConvergeLaunchServerTests(SynchronousTestCase):
     """
     Tests for :func:`converge_launch_server` that do not specifically cover
     load balancers, although some load balancer information may be included.
@@ -1085,7 +1090,7 @@ class ConvergeTests(SynchronousTestCase):
             ]))
 
 
-class PlanTests(SynchronousTestCase):
+class PlanLaunchServerTests(SynchronousTestCase):
     """Tests for :func:`plan_launch_server`."""
 
     def test_plan(self):
@@ -1134,6 +1139,77 @@ class PlanTests(SynchronousTestCase):
                 DeleteServer(server_id='server1'),
                 CreateServer(server_config=pmap({}))
             ]))
+
+
+class ConvergeLaunchStackTests(SynchronousTestCase):
+    """Tests for :func:`converge_launch_stack`."""
+
+    def test_do_nothing(self):
+        """A plan is returned with no steps."""
+        fake_config = {'foo': 'bar'}
+        cur_stacks = [stack('stack1'), stack('stack2')]
+        desired_state = DesiredStackGroupState(
+            stack_config=fake_config, capacity=2)
+
+        result = converge_launch_stack(
+            desired_state=desired_state,
+            stacks=set(cur_stacks),
+            now=0,
+            timeout=3600)
+
+        self.assertEqual(result, pbag([]))
+
+    def test_scale_up(self):
+        """A plan is returned with the correct number of create steps."""
+        fake_config = {'foo': 'bar'}
+        desired_state = DesiredStackGroupState(
+            stack_config=fake_config, capacity=7)
+
+        result = converge_launch_stack(
+            desired_state=desired_state,
+            stacks=set([stack('stack1'), stack('stack2')]),
+            now=0,
+            timeout=3600)
+
+        self.assertEqual(
+            result,
+            pbag([CreateStack(stack_config=pmap(fake_config))] * 5))
+
+    def test_scale_down(self):
+        """A plan is returned with the correct number of delete steps."""
+        fake_config = {'foo': 'bar'}
+        cur_stacks = [stack('stack1'), stack('stack2'), stack('stack3')]
+        desired_state = DesiredStackGroupState(
+            stack_config=fake_config, capacity=1)
+
+        result = converge_launch_stack(
+            desired_state=desired_state,
+            stacks=set(cur_stacks),
+            now=0,
+            timeout=3600)
+
+        self.assertEqual(len(result), 2)
+        self.assertTrue(all(isinstance(item, DeleteStack) for item in result))
+
+
+class PlanLaunchStackTests(SynchronousTestCase):
+    """Tests for :func:`plan_launch_stack`."""
+
+    def test_plan_launch_stack(self):
+        """A plan is returned with a limited number of steps."""
+        fake_config = {'foo': 'bar'}
+        desired_group_state = DesiredStackGroupState(
+            stack_config=fake_config, capacity=25)
+
+        result = plan_launch_stack(
+            desired_group_state=desired_group_state,
+            stacks=set([stack('stack1'), stack('stack2')]),
+            now=0,
+            build_timeout=3600)
+
+        self.assertEqual(
+            result,
+            pbag([CreateStack(stack_config=pmap(fake_config))] * 10))
 
 
 class DestinyTests(SynchronousTestCase):
