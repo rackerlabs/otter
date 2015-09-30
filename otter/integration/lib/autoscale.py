@@ -53,7 +53,7 @@ def extract_active_ids(group_status):
 def create_scaling_group_dict(
     image_ref=None, flavor_ref=None, min_entities=0, name=None,
     max_entities=25, use_lbs=None, server_name_prefix=None,
-    key_name=None
+    key_name=None, draining_timeout=None
 ):
     """This function returns a dictionary containing a scaling group's JSON
     payload.  Note: this function does NOT create a scaling group.
@@ -127,6 +127,9 @@ def create_scaling_group_dict(
 
     if key_name is not None:
         launch_config_args["server"]["key_name"] = key_name
+
+    if draining_timeout is not None:
+        launch_config_args["draining_timeout"] = draining_timeout
 
     return obj
 
