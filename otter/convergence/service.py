@@ -90,7 +90,7 @@ from datetime import datetime
 from functools import partial
 from hashlib import sha1
 
-from effect import Effect, FirstError, Func, parallel
+from effect import Constant, Effect, FirstError, Func, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
 
@@ -101,6 +101,8 @@ from pyrsistent import pmap, pset
 from pyrsistent import thaw
 
 import six
+
+from sumtypes import match
 
 from toolz.functoolz import curry
 
@@ -115,7 +117,8 @@ from otter.convergence.effecting import steps_to_effect
 from otter.convergence.errors import present_reasons, structure_reason
 from otter.convergence.gathering import get_all_convergence_data
 from otter.convergence.logging import log_steps
-from otter.convergence.model import ServerState, StepResult
+from otter.convergence.model import (
+    ConvergenceIterationStatus, ServerState, StepResult)
 from otter.convergence.planning import plan
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, msg_with_time, with_log
@@ -265,9 +268,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         :func`get_all_convergence_data`, used for testing.
     :param callable plan: like :func:`plan`, to be used for test injection only
 
-    :return: Effect of two-tuple of (most severe StepResult, group status).
-        When group status is None it means the group has been successfully
-        deleted.
+    :return: Effect of :obj:`ConvergenceIterationStatus`.
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
     clean_waiting = _clean_waiting(waiting, group_id)
@@ -297,12 +298,11 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         yield clean_waiting
 
     # Handle the status from execution
-    group_status = group_state.status
     if worst_status == StepResult.SUCCESS:
-        group_status = yield convergence_succeeded(
+        result = yield convergence_succeeded(
             scaling_group, group_state, servers, now_dt)
     elif worst_status == StepResult.FAILURE:
-        group_status = yield convergence_failed(scaling_group, reasons)
+        result = yield convergence_failed(scaling_group, reasons)
     elif worst_status is StepResult.LIMITED_RETRY:
         # We allow further iterations to proceed as long as we haven't been
         # waiting for a LIMITED_RETRY for N consecutive iterations.
@@ -310,13 +310,15 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         if current_iterations > limited_retry_iterations:
             yield msg('converge-limited-retry-too-long')
             yield clean_waiting
-            group_status = yield convergence_failed(scaling_group, reasons)
+            result = yield convergence_failed(scaling_group, reasons)
         else:
             yield waiting.modify(
                 lambda group_iterations:
                     group_iterations.set(group_id, current_iterations + 1))
-
-    yield do_return((worst_status, group_status))
+            result = ConvergenceIterationStatus.Continue()
+    else:
+        result = ConvergenceIterationStatus.Continue()
+    yield do_return(result)
 
 
 @do
@@ -328,7 +330,7 @@ def convergence_succeeded(scaling_group, group_state, servers, now):
         # servers have been deleted. Delete the group for real
         yield Effect(DeleteGroup(tenant_id=scaling_group.tenant_id,
                                  group_id=scaling_group.uuid))
-        yield do_return(None)
+        yield do_return(ConvergenceIterationStatus.GroupDeleted())
     elif group_state.status == ScalingGroupStatus.ERROR:
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
                                        status=ScalingGroupStatus.ACTIVE))
@@ -340,7 +342,7 @@ def convergence_succeeded(scaling_group, group_state, servers, now):
             scaling_group.tenant_id, scaling_group.uuid, now,
             [thaw(s.json.set("_is_as_active", True))
              for s in servers if s.state != ServerState.DELETED]))
-    yield do_return(ScalingGroupStatus.ACTIVE)
+    yield do_return(ConvergenceIterationStatus.Stop())
 
 
 @do
@@ -357,7 +359,7 @@ def convergence_failed(scaling_group, reasons):
         'group-status-error', status=ScalingGroupStatus.ERROR.name,
         reasons=presented_reasons)
     yield Effect(UpdateGroupErrorReasons(scaling_group, presented_reasons))
-    yield do_return(ScalingGroupStatus.ERROR)
+    yield do_return(ConvergenceIterationStatus.Stop())
 
 
 def format_dirty_flag(tenant_id, group_id):
@@ -549,8 +551,7 @@ def converge_one_group(currently_converging, recently_converged, waiting,
         mark_recently_converged)
 
     try:
-        worst_result, group_status = yield non_concurrently(
-            currently_converging, group_id, cvg)
+        result = yield non_concurrently(currently_converging, group_id, cvg)
     except ConcurrentError:
         # We don't need to spam the logs about this, it's to be expected
         return
@@ -564,17 +565,19 @@ def converge_one_group(currently_converging, recently_converged, waiting,
         # unexpected errors, so convergence will be retried.
         yield err(None, 'converge-non-fatal-error')
     else:
-        if worst_result in (StepResult.FAILURE, StepResult.SUCCESS):
-            # In order to avoid doing extra work and reporting spurious errors,
-            # if the group status is None it means the group has successfully
-            # been deleted by execute_convergence. And so we will
-            # unconditionally delete the divergent flag to avoid any further
-            # queued-up convergences that will imminently fail.
-            if group_status is None:
-                version = -1
-            yield delete_divergent_flag(tenant_id, group_id, version)
-        elif group_status is ScalingGroupStatus.ERROR:
-            yield delete_divergent_flag(tenant_id, group_id, version)
+        @match(ConvergenceIterationStatus)
+        class clean_up(object):
+            def Continue():
+                return Effect(Constant(None))
+
+            def Stop():
+                return delete_divergent_flag(tenant_id, group_id, version)
+
+            def GroupDeleted():
+                # Delete the divergent flag to avoid any queued-up convergences
+                # that will imminently fail.
+                return delete_divergent_flag(tenant_id, group_id, -1)
+        yield clean_up(result)
 
 
 @do

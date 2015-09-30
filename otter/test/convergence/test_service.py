@@ -25,7 +25,8 @@ from otter.cloud_client import NoSuchCLBError, TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_group_state
 from otter.convergence.model import (
-    CLBDescription, CLBNode, ErrorReason, ServerState, StepResult)
+    CLBDescription, CLBNode, ConvergenceIterationStatus, ErrorReason,
+    ServerState, StepResult)
 from otter.convergence.service import (
     ConcurrentError,
     ConvergenceStarter,
@@ -339,12 +340,12 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         return Effect(('ec', tenant_id, group_id, build_timeout, waiting,
                        limited_retry_iterations))
 
-    def _expect_exec(self, worst_result, group_status):
+    def _expect_exec(self, iter_status):
         """
         Return a sequence item that expects the execute_convergence effect,
         and results in the given values.
         """
-        return (self._exec_intent, lambda i: (worst_result, group_status))
+        return (self._exec_intent, lambda i: iter_status)
 
     def _verify_sequence(self, sequence, converging=None,
                          recent=None, allow_refs=True):
@@ -373,11 +374,9 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         ]
 
     def test_success(self):
-        """
-        runs execute_convergence and returns None, then deletes the dirty flag.
-        """
+        """When execute_convergence returns Stop, the dirty flag is deleted."""
         sequence = [
-            self._expect_exec(StepResult.SUCCESS, ScalingGroupStatus.ACTIVE),
+            self._expect_exec(ConvergenceIterationStatus.Stop()),
         ] + self._clean_divergent()
         self._verify_sequence(sequence)
 
@@ -392,7 +391,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         sequence = [
             (ReadReference(currently), lambda i: pset()),
             add_to_currently(currently, self.group_id),
-            self._expect_exec(StepResult.SUCCESS, ScalingGroupStatus.ACTIVE),
+            self._expect_exec(ConvergenceIterationStatus.Stop()),
             (Func(time.time), lambda i: 100),
             add_to_recently(recently, self.group_id, 100),
             remove_from_currently(currently, self.group_id),
@@ -455,7 +454,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         is logged and nothing else is cleaned up.
         """
         sequence = [
-            self._expect_exec(StepResult.SUCCESS, ScalingGroupStatus.ACTIVE),
+            self._expect_exec(ConvergenceIterationStatus.Stop()),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version),
              lambda i: raise_(BadVersionError())),
@@ -471,7 +470,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         else is cleaned up.
         """
         sequence = [
-            self._expect_exec(StepResult.SUCCESS, ScalingGroupStatus.ACTIVE),
+            self._expect_exec(ConvergenceIterationStatus.Stop()),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version),
              lambda i: raise_(NoNodeError())),
@@ -484,7 +483,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
     def test_delete_node_other_error(self):
         """When marking clean raises arbitrary errors, an error is logged."""
         sequence = [
-            self._expect_exec(StepResult.SUCCESS, ScalingGroupStatus.ACTIVE),
+            self._expect_exec(ConvergenceIterationStatus.Stop()),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version),
              lambda i: raise_(ZeroDivisionError())),
@@ -497,22 +496,12 @@ class ConvergeOneGroupTests(SynchronousTestCase):
 
     def test_retry(self):
         """
-        When execute_convergence returns RETRY, the divergent flag is not
+        When execute_convergence returns Continue, the divergent flag is not
         deleted.
         """
         sequence = [
-            self._expect_exec(StepResult.RETRY, ScalingGroupStatus.ACTIVE),
+            self._expect_exec(ConvergenceIterationStatus.Continue())
         ]
-        self._verify_sequence(sequence)
-
-    def test_failure(self):
-        """
-        When execute_convergence returns FAILURE, the divergent flag is
-        deleted.
-        """
-        sequence = [
-            self._expect_exec(StepResult.FAILURE, ScalingGroupStatus.ACTIVE),
-        ] + self._clean_divergent()
         self._verify_sequence(sequence)
 
     def test_delete_flag_unconditionally_when_group_deleted(self):
@@ -522,18 +511,11 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         mismatched versions), because a re-converge would be fruitless.
         """
         sequence = [
-            self._expect_exec(StepResult.SUCCESS, None),
-        ] + self._clean_divergent(version=-1)
-        self._verify_sequence(sequence)
-
-    def test_delete_flag_on_group_error(self):
-        """
-        Any time the group is put into ERROR by ``execute_convergence``, the
-        divergent flag is deleted.
-        """
-        sequence = [
-            self._expect_exec(StepResult.SUCCESS, ScalingGroupStatus.ERROR),
-        ] + self._clean_divergent()
+            self._expect_exec(ConvergenceIterationStatus.GroupDeleted()),
+            (DeleteNode(path='/groups/divergent/tenant-id_g1', version=-1),
+             noop),
+            (Log('mark-clean-success', {}), noop),
+        ]
         self._verify_sequence(sequence)
 
 
@@ -903,7 +885,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.cache[1]["_is_as_active"] = True
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke()),
-            (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
+            ConvergenceIterationStatus.Stop())
 
     def test_success(self):
         """
@@ -959,7 +941,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
-            (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
+            ConvergenceIterationStatus.Stop())
 
     def test_first_error_extraction(self):
         """
@@ -1029,7 +1011,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
-            (StepResult.RETRY, ScalingGroupStatus.ACTIVE))
+            ConvergenceIterationStatus.Continue())
 
     def test_log_steps(self):
         """The steps to be executed are logged to cloud feeds."""
@@ -1058,9 +1040,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
-            (StepResult.RETRY, ScalingGroupStatus.ACTIVE))
+            ConvergenceIterationStatus.Continue())
 
-    def _test_deleting_group(self, step_result, with_delete, group_status):
+    def _test_deleting_group(self, step_result, with_delete, exec_result):
 
         def _plan(dsg, *a, **kwargs):
             self.dsg = dsg
@@ -1083,7 +1065,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             # skipping cache update intents returned in get_seq()
             perform_sequence(self.get_seq(False) + sequence,
                              self._invoke(_plan)),
-            (step_result, group_status))
+            exec_result)
         # desired capacity was changed to 0
         self.assertEqual(self.dsg.capacity, 0)
 
@@ -1092,20 +1074,21 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         If group's status is DELETING, plan will be generated to delete
         all servers and group is deleted if the steps return SUCCESS
         """
-        self._test_deleting_group(StepResult.SUCCESS, True, None)
+        self._test_deleting_group(StepResult.SUCCESS, True,
+                                  ConvergenceIterationStatus.GroupDeleted())
 
     def test_deleting_group_retry(self):
         """
         If group's status is DELETING, plan will be generated to delete
         all servers and group is not deleted if the steps return RETRY
         """
-        self._test_deleting_group(
-            StepResult.RETRY, False, ScalingGroupStatus.DELETING)
+        self._test_deleting_group(StepResult.RETRY, False,
+                                  ConvergenceIterationStatus.Continue())
 
     def test_returns_retry(self):
         """
         If a step that results in RETRY is returned, and there are no FAILUREs,
-        then the ultimate result of executing convergence will be a RETRY.
+        then the ultimate result of executing convergence will be a Continue.
         """
         def plan(*args, **kwargs):
             return [
@@ -1125,12 +1108,12 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
-            (StepResult.RETRY, ScalingGroupStatus.ACTIVE))
+            ConvergenceIterationStatus.Continue())
 
     def test_returns_failure_set_error_state(self):
         """
         The group is put into ERROR state if any step returns FAILURE, and
-        FAILURE is the final result of convergence.
+        Stop is the final result of convergence.
         """
         exc_info = raise_to_exc_info(NoSuchCLBError(lb_id=u'nolb1'))
         exc_info2 = raise_to_exc_info(NoSuchCLBError(lb_id=u'nolb2'))
@@ -1177,7 +1160,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
-            (StepResult.FAILURE, ScalingGroupStatus.ERROR))
+            ConvergenceIterationStatus.Stop())
 
     def test_failure_unknown_reasons(self):
         """
@@ -1210,7 +1193,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
-            (StepResult.FAILURE, ScalingGroupStatus.ERROR))
+            ConvergenceIterationStatus.Stop())
 
     def test_reactivate_group_on_success_after_steps(self):
         """
@@ -1244,7 +1227,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
-            (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
+            ConvergenceIterationStatus.Stop())
 
     def test_reactivate_group_on_success_with_no_steps(self):
         """
@@ -1279,7 +1262,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.cache[1]["_is_as_active"] = True
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke()),
-            (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
+            ConvergenceIterationStatus.Stop())
 
     def test_limited_retry_starting(self):
         """
@@ -1304,7 +1287,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         # No "waiting" map cleanup!
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
-            (StepResult.LIMITED_RETRY, ScalingGroupStatus.ACTIVE))
+            ConvergenceIterationStatus.Continue())
 
     def test_limited_retry_too_long(self):
         """
@@ -1336,7 +1319,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
-            (StepResult.LIMITED_RETRY, ScalingGroupStatus.ERROR))
+            ConvergenceIterationStatus.Stop())
 
     def test_limited_retry_keep_going(self):
         """
@@ -1362,7 +1345,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
-            (StepResult.LIMITED_RETRY, ScalingGroupStatus.ACTIVE))
+            ConvergenceIterationStatus.Continue())
 
     def test_limited_retry_resolved(self):
         """
@@ -1389,7 +1372,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
-            (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE))
+            ConvergenceIterationStatus.Stop())
 
 
 class IsAutoscaleActiveTests(SynchronousTestCase):
