@@ -125,14 +125,6 @@ class StepResult(Names):
 
 
 @sumtype
-class ConvergenceIterationStatus(object):
-    """Result of a single convergence iteration."""
-    Stop = constructor()  # Stop converging. Dirty flag can be deleted
-    Continue = constructor()  # Continue converging. Don't delete flag.
-    GroupDeleted = constructor()  # Group disappeared; force-delete dirty flag.
-
-
-@sumtype
 class ErrorReason(object):
     """A reason for a step to be in a RETRY or FAILURE state."""
     Exception = constructor('exc_info')
