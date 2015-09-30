@@ -52,9 +52,6 @@ def get_desired_group_state(group_id, launch_config, desired):
     :param dict launch_config: Group's launch config as per
         :obj:`otter.json_schema.group_schemas.launch_config`
     :param int desired: Group's desired capacity
-
-    NOTE: Currently this ignores draining timeout settings, since it has
-    not been added to any schema yet.
     """
     lbs = freeze(launch_config['args'].get('loadBalancers', []))
     lbs = json_to_LBConfigs(lbs)
@@ -62,9 +59,11 @@ def get_desired_group_state(group_id, launch_config, desired):
         group_id,
         freeze({'server': launch_config['args']['server']}),
         lbs)
+    draining = float(launch_config["args"].get("draining_timeout", 0.0))
     desired_state = DesiredGroupState(
         server_config=server_lc,
-        capacity=desired, desired_lbs=lbs)
+        capacity=desired, desired_lbs=lbs,
+        draining_timeout=draining)
     return desired_state
 
 

@@ -68,7 +68,8 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                             'whatsit': 'invalid'},
                            {'loadBalancerId': 23, 'port': 90},
                            {'loadBalancerId': 23, 'type': 'RackConnectV3'},
-                           {'loadBalancerId': '12', 'type': 'RackConnectV3'}]}}
+                           {'loadBalancerId': '12', 'type': 'RackConnectV3'}],
+                       'draining_timeout': 35}}
 
         expected_server_config = {
             'server': {
@@ -95,13 +96,15 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                     CLBDescription(lb_id='23', port=80),
                     CLBDescription(lb_id='23', port=90),
                     RCv3Description(lb_id='23'),
-                    RCv3Description(lb_id='12')])))
+                    RCv3Description(lb_id='12')]),
+                draining_timeout=35.0))
         self.assert_server_config_hashable(state)
 
     def test_no_lbs(self):
         """
         When no loadBalancers are specified, the returned DesiredGroupState has
-        an empty mapping for desired_lbs.
+        an empty mapping for desired_lbs. If no draining_timeout is provided,
+        returned DesiredGroupState has draining_timeout as 0.0
         """
         server_config = {'name': 'test', 'flavorRef': 'f'}
         lc = {'args': {'server': server_config}}
@@ -119,7 +122,8 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
             DesiredGroupState(
                 server_config=expected_server_config,
                 capacity=2,
-                desired_lbs=pset()))
+                desired_lbs=pset(),
+                draining_timeout=0.0))
         self.assert_server_config_hashable(state)
 
 
