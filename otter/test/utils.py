@@ -869,6 +869,14 @@ def match_func(arg, result):
     return transform_eq(lambda f: f(arg), result)
 
 
+def match_all(things):
+    """
+    Return an object that compares equal to anything that compares equal to all
+    the given things.
+    """
+    return transform_eq(lambda o: [o]*len(things), things)
+
+
 def raise_(e):
     """Raise the exception. Useful for lambdas."""
     raise e

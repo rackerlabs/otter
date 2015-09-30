@@ -37,7 +37,7 @@ from otter.convergence.service import (
     is_autoscale_active,
     non_concurrently,
     trigger_convergence)
-from otter.convergence.steps import CreateServer
+from otter.convergence.steps import ConvergeLater, CreateServer
 from otter.log.intents import BoundFields, Log, LogErr, MsgWithTime
 from otter.models.intents import (
     DeleteGroup,
@@ -53,6 +53,7 @@ from otter.test.utils import (
     CheckFailureValue, FakePartitioner,
     TestStep,
     intent_func,
+    match_all,
     match_func,
     mock_group, mock_log,
     nested_sequence,
@@ -143,6 +144,7 @@ class ConvergerTests(SynchronousTestCase):
             self.log, dispatcher, self.num_buckets,
             self._pfactory, build_timeout=3600,
             interval=15,
+            limited_retry_iterations=23,
             converge_all_groups=converge_all_groups)
 
     def _pfactory(self, buckets, log, got_buckets):
@@ -166,12 +168,14 @@ class ConvergerTests(SynchronousTestCase):
         When buckets are allocated, the result of converge_all_groups is
         performed.
         """
-        def converge_all_groups(currently_converging, recent, _my_buckets,
-                                all_buckets, divergent_flags, build_timeout,
-                                interval):
+        def converge_all_groups(currently_converging, recent, waiting,
+                                _my_buckets, all_buckets,
+                                divergent_flags, build_timeout, interval,
+                                limited_retry_iterations):
             return Effect(
                 ('converge-all', currently_converging, _my_buckets,
-                 all_buckets, divergent_flags, build_timeout, interval))
+                 all_buckets, divergent_flags, build_timeout, interval,
+                 limited_retry_iterations))
 
         my_buckets = [0, 5]
         bound_sequence = [
@@ -184,7 +188,8 @@ class ConvergerTests(SynchronousTestCase):
                 range(self.num_buckets),
                 ['flag1', 'flag2'],
                 3600,
-                15),
+                15,
+                23),
                 lambda i: 'foo')
         ]
         sequence = self._log_sequence(bound_sequence)
@@ -200,9 +205,10 @@ class ConvergerTests(SynchronousTestCase):
         Errors raised from performing the converge_all_groups effect are
         logged, and None is the ultimate result.
         """
-        def converge_all_groups(currently_converging, recent, _my_buckets,
-                                all_buckets, divergent_flags, build_timeout,
-                                interval):
+        def converge_all_groups(currently_converging, recent, waiting,
+                                _my_buckets, all_buckets,
+                                divergent_flags, build_timeout, interval,
+                                limited_retry_iterations):
             return Effect('converge-all')
 
         bound_sequence = [
@@ -252,9 +258,10 @@ class ConvergerTests(SynchronousTestCase):
         and the list of child nodes is passed on to
         :func:`converge_all_groups`.
         """
-        def converge_all_groups(currently_converging, recent, _my_buckets,
-                                all_buckets, divergent_flags, build_timeout,
-                                interval):
+        def converge_all_groups(currently_converging, recent, waiting,
+                                _my_buckets, all_buckets,
+                                divergent_flags, build_timeout, interval,
+                                limited_retry_iterations):
             return Effect(('converge-all-groups', divergent_flags))
 
         intents = [
@@ -273,15 +280,48 @@ class ConvergerTests(SynchronousTestCase):
 
 
 def add_to_recently(recently, group_id, cvg_time):
+    """
+    Return a sequence item that simulates adding a group to the 'recently
+    converged' map
+    """
     return (ModifyReference(recently,
                             match_func(pmap(), pmap({group_id: cvg_time}))),
-            noop)
+            dispatch(reference_dispatcher))
 
 
 def add_to_currently(currently, group_id):
+    """
+    Return a sequence item that simulates adding a group to the 'currently
+    converging' set.
+    """
     return (ModifyReference(currently,
                             match_func(pset(), pset([group_id]))),
-            noop)
+            dispatch(reference_dispatcher))
+
+
+def remove_from_currently(currently, group_id):
+    """
+    Return a sequence item that simulates removing a group from the 'currently
+    converging' set.
+    """
+    return (ModifyReference(currently,
+                            match_func(pset([group_id]), pset([]))),
+            dispatch(reference_dispatcher))
+
+
+def clean_waiting(waiting, group_id):
+    """
+    Return an intent that matches a removal of the given group ID.
+    """
+    return (
+        ModifyReference(
+            waiting,
+            # match both a removal of the given group *and* not removing the
+            # group if it's not there.
+            match_all([match_func(pmap({group_id: 5}), pmap()),
+                       match_func(pmap({"foobar": 1500}),
+                                  pmap({"foobar": 1500}))])),
+        noop)
 
 
 class ConvergeOneGroupTests(SynchronousTestCase):
@@ -291,30 +331,53 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         self.tenant_id = 'tenant-id'
         self.group_id = 'g1'
         self.version = 5
+        self.waiting = Reference(pmap())
+        self._exec_intent = (
+            'ec', self.tenant_id, self.group_id, 3600, self.waiting, 43)
 
-    def _execute_convergence(self, tenant_id, group_id, build_timeout):
-        return Effect(('ec', tenant_id, group_id, build_timeout))
+    def _execute_convergence(self, tenant_id, group_id, build_timeout, waiting,
+                             limited_retry_iterations):
+        return Effect(('ec', tenant_id, group_id, build_timeout, waiting,
+                       limited_retry_iterations))
 
-    def _verify_sequence(self, sequence, converging=Reference(pset()),
-                         recent=Reference(pmap()), allow_refs=True):
+    def _expect_exec(self, iter_status):
+        """
+        Return a sequence item that expects the execute_convergence effect,
+        and results in the given values.
+        """
+        return (self._exec_intent, lambda i: iter_status)
+
+    def _verify_sequence(self, sequence, converging=None,
+                         recent=None, allow_refs=True):
         """
         Verify that sequence is executed
         """
+        if converging is None:
+            converging = Reference(pset())
+        if recent is None:
+            recent = Reference(pmap())
         eff = converge_one_group(
-            converging, recent, self.tenant_id, self.group_id, self.version,
-            3600, execute_convergence=self._execute_convergence)
+            converging, recent, self.waiting,
+            self.tenant_id, self.group_id, self.version,
+            3600, 43, execute_convergence=self._execute_convergence)
         fb_dispatcher = _get_dispatcher() if allow_refs else base_dispatcher
-        perform_sequence(sequence, eff, fallback_dispatcher=fb_dispatcher)
+        perform_sequence(
+            list(sequence), eff, fallback_dispatcher=fb_dispatcher)
+
+    def _clean_divergent(self, tenant='tenant-id', group='g1', version=None):
+        if version is None:
+            version = self.version
+        return [
+            (DeleteNode(path='/groups/divergent/%s_%s' % (tenant, group),
+                        version=version), noop),
+            (Log('mark-clean-success', {}), noop)
+        ]
 
     def test_success(self):
         """When execute_convergence returns Stop, the dirty flag is deleted."""
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: ConvergenceIterationStatus.Stop()),
-            (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                        version=self.version), noop),
-            (Log('mark-clean-success', {}), noop)
-        ]
+            self._expect_exec(ConvergenceIterationStatus.Stop()),
+        ] + self._clean_divergent()
         self._verify_sequence(sequence)
 
     def test_record_recently_converged(self):
@@ -325,22 +388,18 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         """
         currently = Reference(pset())
         recently = Reference(pmap())
-        remove_from_currently = match_func(pset([self.group_id]), pset([]))
         sequence = [
             (ReadReference(currently), lambda i: pset()),
             add_to_currently(currently, self.group_id),
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: ConvergenceIterationStatus.Stop()),
+            self._expect_exec(ConvergenceIterationStatus.Stop()),
             (Func(time.time), lambda i: 100),
             add_to_recently(recently, self.group_id, 100),
-            (ModifyReference(currently, remove_from_currently), noop),
-            (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                        version=self.version), noop),
-            (Log('mark-clean-success', {}), noop)
-        ]
+            remove_from_currently(currently, self.group_id),
+        ] + self._clean_divergent()
         eff = converge_one_group(
-            currently, recently, self.tenant_id, self.group_id, self.version,
-            3600, execute_convergence=self._execute_convergence)
+            currently, recently, self.waiting,
+            self.tenant_id, self.group_id, self.version,
+            3600, 43, execute_convergence=self._execute_convergence)
         perform_sequence(sequence, eff)
 
     def test_non_concurrent(self):
@@ -357,15 +416,11 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         """
         expected_error = NoSuchScalingGroupError(self.tenant_id, self.group_id)
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: raise_(expected_error)),
+            (self._exec_intent, lambda i: raise_(expected_error)),
             (LogErr(CheckFailureValue(expected_error),
                     'converge-fatal-error', {}),
              noop),
-            (DeleteNode(path='/groups/divergent/tenant-id_g1',
-                        version=self.version), noop),
-            (Log('mark-clean-success', {}), noop)
-        ]
+        ] + self._clean_divergent()
         self._verify_sequence(sequence)
 
     def test_unexpected_errors(self):
@@ -379,8 +434,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         sequence = [
             (ReadReference(converging), lambda i: pset()),
             add_to_currently(converging, self.group_id),
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: raise_(expected_error)),
+            (self._exec_intent, lambda i: raise_(expected_error)),
             (Func(time.time), lambda i: 100),
             add_to_recently(recent, self.group_id, 100),
             (ModifyReference(converging,
@@ -400,8 +454,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         is logged and nothing else is cleaned up.
         """
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: ConvergenceIterationStatus.Stop()),
+            self._expect_exec(ConvergenceIterationStatus.Stop()),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version),
              lambda i: raise_(BadVersionError())),
@@ -417,8 +470,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         else is cleaned up.
         """
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: ConvergenceIterationStatus.Stop()),
+            self._expect_exec(ConvergenceIterationStatus.Stop()),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version),
              lambda i: raise_(NoNodeError())),
@@ -431,8 +483,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
     def test_delete_node_other_error(self):
         """When marking clean raises arbitrary errors, an error is logged."""
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: ConvergenceIterationStatus.Stop()),
+            self._expect_exec(ConvergenceIterationStatus.Stop()),
             (DeleteNode(path='/groups/divergent/tenant-id_g1',
                         version=self.version),
              lambda i: raise_(ZeroDivisionError())),
@@ -449,8 +500,7 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         deleted.
         """
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: ConvergenceIterationStatus.Continue())
+            self._expect_exec(ConvergenceIterationStatus.Continue())
         ]
         self._verify_sequence(sequence)
 
@@ -461,13 +511,20 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         mismatched versions), because a re-converge would be fruitless.
         """
         sequence = [
-            (('ec', self.tenant_id, self.group_id, 3600),
-             lambda i: ConvergenceIterationStatus.GroupDeleted()),
+            self._expect_exec(ConvergenceIterationStatus.GroupDeleted()),
             (DeleteNode(path='/groups/divergent/tenant-id_g1', version=-1),
              noop),
             (Log('mark-clean-success', {}), noop),
         ]
         self._verify_sequence(sequence)
+
+
+def dispatch(dispatcher):
+    """
+    Return a function that accepts an intent and performs it. Useful for using
+    with :func:`perform_sequence`.
+    """
+    return lambda intent: sync_perform(dispatcher, Effect(intent))
 
 
 class ConvergeAllGroupsTests(SynchronousTestCase):
@@ -476,6 +533,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
     def setUp(self):
         self.currently_converging = Reference(pset())
         self.recently_converged = Reference(pmap())
+        self.waiting = Reference(pmap())
         self.my_buckets = [1, 6]
         self.all_buckets = range(10)
         self.group_infos = [
@@ -487,17 +545,21 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
 
     def _converge_all_groups(self, flags):
         return converge_all_groups(
-            self.currently_converging, self.recently_converged,
+            self.currently_converging, self.recently_converged, self.waiting,
             self.my_buckets, self.all_buckets,
             flags,
             3600,
             15,
+            23,
             converge_one_group=self._converge_one_group)
 
-    def _converge_one_group(self, currently_converging, recently_converged,
-                            tenant_id, group_id, version, build_timeout):
+    def _converge_one_group(self,
+                            currently_converging, recently_converged, waiting,
+                            tenant_id, group_id, version, build_timeout,
+                            limited_retry_iterations):
         return Effect(
-            ('converge', tenant_id, group_id, version, build_timeout))
+            ('converge', tenant_id, group_id, version, build_timeout,
+             limited_retry_iterations))
 
     def _expect_group_converged(self, tenant_id, group_id):
         """
@@ -514,7 +576,7 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
                  lambda i: ZNodeStatStub(version=5)),
                 (TenantScope(mock.ANY, tenant_id),
                  nested_sequence([
-                     (('converge', tenant_id, group_id, 5, 3600),
+                     (('converge', tenant_id, group_id, 5, 3600, 23),
                       lambda i: 'converged {}!'.format(group_id)),
                  ])),
             ]))
@@ -608,9 +670,9 @@ class ConvergeAllGroupsTests(SynchronousTestCase):
             1 / 0  # This should not be run
 
         result = converge_all_groups(
-            self.currently_converging, self.recently_converged,
+            self.currently_converging, self.recently_converged, self.waiting,
             self.my_buckets, self.all_buckets, [],
-            3600, 15, converge_one_group=converge_one_group)
+            3600, 15, 23, converge_one_group=converge_one_group)
         self.assertEqual(sync_perform(_get_dispatcher(), result), None)
 
     def test_ignore_disappearing_divergent_flag(self):
@@ -765,6 +827,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         }
         self.gsgi_result = (self.group, self.manifest)
         self.now = datetime(1970, 1, 1)
+        self.waiting = Reference(pmap())
 
     def get_seq(self, with_cache=True):
         exec_seq = [
@@ -791,6 +854,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         kwargs = {'plan': plan} if plan is not None else {}
         return execute_convergence(
             self.tenant_id, self.group_id, build_timeout=3600,
+            waiting=self.waiting,
+            limited_retry_iterations=43,
             get_all_convergence_data=intent_func("gacd"), **kwargs)
 
     def test_no_steps(self):
@@ -805,6 +870,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (Log('execute-convergence', mock.ANY), noop),
             (Log('execute-convergence-results',
                  {'results': [], 'worst_status': 'SUCCESS'}), noop),
+            clean_waiting(self.waiting, self.group_id),
             (UpdateServersCache(
                 "tenant-id", "group-id", self.now,
                 [thaw(self.servers[0].json.set('_is_as_active', True)),
@@ -861,6 +927,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                'result': StepResult.SUCCESS,
                                'reasons': []}],
                   'worst_status': 'SUCCESS'}), noop),
+            clean_waiting(self.waiting, self.group_id),
             # Note that servers arg is non-deleted servers
             (UpdateServersCache(
                 "tenant-id", "group-id", self.now,
@@ -938,7 +1005,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                          ErrorReason.Structured({'foo': 'bar'})]))]
             ]),
             (Log(msg='execute-convergence-results', fields=expected_fields),
-             noop)
+             noop),
+            clean_waiting(self.waiting, self.group_id),
         ]
 
         self.assertEqual(
@@ -966,7 +1034,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             parallel_sequence([
                 [("create-server", lambda i: (StepResult.RETRY, []))]
             ]),
-            (Log(msg='execute-convergence-results', fields=mock.ANY), noop)
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
         ]
 
         self.assertEqual(
@@ -987,6 +1056,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 [("step", lambda i: (step_result, []))]
             ]),
             (Log('execute-convergence-results', mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
         ]
         if with_delete:
             sequence.append((DeleteGroup(tenant_id=self.tenant_id,
@@ -1033,7 +1103,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 [("retry", lambda i: (StepResult.RETRY,
                                       [ErrorReason.String('mywish')]))],
             ]),
-            (Log('execute-convergence-results', mock.ANY), noop)
+            (Log('execute-convergence-results', mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
@@ -1073,6 +1144,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 [("success3", success)],
             ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ERROR),
              noop),
@@ -1108,6 +1180,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                      [ErrorReason.Exception(exc_info)]))]
             ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ERROR),
              noop),
@@ -1139,6 +1212,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                 [("step", lambda i: (StepResult.SUCCESS, []))]
             ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ACTIVE),
              noop),
@@ -1167,6 +1241,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             parallel_sequence([]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            clean_waiting(self.waiting, self.group_id),
             (UpdateGroupStatus(scaling_group=self.group,
                                status=ScalingGroupStatus.ACTIVE),
              noop),
@@ -1187,6 +1262,116 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.cache[1]["_is_as_active"] = True
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke()),
+            ConvergenceIterationStatus.Stop())
+
+    def test_limited_retry_starting(self):
+        """
+        When the worst status is LIMITED_RETRY, the group is added to the
+        `waiting` map with an initial value of 1.
+        """
+        reasons = [ErrorReason.UserMessage('foo')]
+
+        def plan(*args, **kwargs):
+            return [ConvergeLater(reasons, limited=True)]
+
+        sequence = [
+            parallel_sequence([]),
+            (Log('execute-convergence', mock.ANY), noop),
+            parallel_sequence([[]]),  # Only "base" intents in here
+            (Log('execute-convergence-results', mock.ANY), noop),
+            (ReadReference(self.waiting), dispatch(reference_dispatcher)),
+            (ModifyReference(self.waiting,
+                             match_func(pmap({}), pmap({self.group_id: 1}))),
+             dispatch(reference_dispatcher)),
+        ]
+        # No "waiting" map cleanup!
+        self.assertEqual(
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
+            ConvergenceIterationStatus.Continue())
+
+    def test_limited_retry_too_long(self):
+        """
+        When we've been waiting too long for a LIMITED_RETRY step, we'll
+        give up and put the group into ERROR.
+        """
+        reasons = [ErrorReason.UserMessage('foo')]
+        self.waiting = Reference(pmap({self.group_id: 44}))
+
+        def plan(*args, **kwargs):
+            return [ConvergeLater(reasons, limited=True)]
+
+        sequence = [
+            parallel_sequence([]),
+            (Log('execute-convergence', mock.ANY), noop),
+            parallel_sequence([[]]),  # Only "base" intents in here
+            (Log('execute-convergence-results', mock.ANY), noop),
+            (ReadReference(self.waiting), dispatch(reference_dispatcher)),
+            (Log('converge-limited-retry-too-long', fields={}), noop),
+            clean_waiting(self.waiting, self.group_id),
+            (UpdateGroupStatus(scaling_group=self.group,
+                               status=ScalingGroupStatus.ERROR),
+             noop),
+            (Log('group-status-error',
+                 dict(isError=True, cloud_feed=True, status='ERROR',
+                      reasons=['foo'])),
+             noop),
+            (UpdateGroupErrorReasons(self.group, ['foo']), noop),
+        ]
+        self.assertEqual(
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
+            ConvergenceIterationStatus.Stop())
+
+    def test_limited_retry_keep_going(self):
+        """
+        When we're only waiting for a LIMITED_RETRY step, the counter in the
+        waiting map is increased and the group is left ACTIVE.
+        """
+        reasons = [ErrorReason.UserMessage('foo')]
+        self.waiting = Reference(pmap({self.group_id: 43}))
+
+        def plan(*args, **kwargs):
+            return [ConvergeLater(reasons, limited=True)]
+
+        sequence = [
+            parallel_sequence([]),
+            (Log('execute-convergence', mock.ANY), noop),
+            parallel_sequence([[]]),  # Only "base" intents in here
+            (Log('execute-convergence-results', mock.ANY), noop),
+            (ReadReference(self.waiting), dispatch(reference_dispatcher)),
+            (ModifyReference(self.waiting,
+                             match_func(pmap({self.group_id: 43}),
+                                        pmap({self.group_id: 44}))),
+             dispatch(reference_dispatcher)),
+        ]
+        self.assertEqual(
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
+            ConvergenceIterationStatus.Continue())
+
+    def test_limited_retry_resolved(self):
+        """
+        When we've been waiting for LIMITED_RETRY and then we're not waiting
+        for it any more, the ``waiting`` data is cleaned up.
+        """
+        def plan(*args, **kwargs):
+            return []
+
+        self.waiting = Reference(pmap({self.group_id: 43}))
+        sequence = [
+            parallel_sequence([]),
+            (Log('execute-convergence', mock.ANY), noop),
+            (Log('execute-convergence-results', mock.ANY), noop),
+            (ModifyReference(self.waiting,
+                             match_func(pmap({self.group_id: 43}),
+                                        pmap())),
+             dispatch(reference_dispatcher)),
+            (UpdateServersCache(
+                "tenant-id", "group-id", self.now,
+                [thaw(self.servers[0].json.set("_is_as_active", True)),
+                 thaw(self.servers[1].json.set("_is_as_active", True))]),
+             noop)
+        ]
+        self.assertEqual(
+            perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             ConvergenceIterationStatus.Stop())
 
 

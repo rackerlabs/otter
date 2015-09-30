@@ -140,6 +140,9 @@ msg_types = {
         "This should be harmless.",
     "converge-fatal-error": (
         "Fatal error while converging group {scaling_group_id}."),
+    "converge-limited-retry-too-long": (
+        "Timed out while waiting for servers to go active; "
+        "putting group into ERROR state."),
     "converge-non-fatal-error": (
         "Non-fatal error while converging group {scaling_group_id}"),
     "delete-server": "Deleting {server_id} server",

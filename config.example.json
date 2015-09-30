@@ -63,7 +63,8 @@
     },
     "converger": {
         "build_timeout": 3600,
-        "interval": 30
+        "interval": 30,
+        "limited_retry_iterations": 10
     },
     "cloud_client": {
     	"throttling": {
