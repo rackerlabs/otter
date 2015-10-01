@@ -51,6 +51,7 @@ test_config = {
     'identity': identity_config,
     'cloudServersOpenStack': 'cloudServersOpenStack',
     'cloudLoadBalancers': 'cloudLoadBalancers',
+    'cloudOrchestration': 'cloudOrchestration',
     'rackconnect': 'rackconnect',
     'metrics': {'service': 'cloudMetricsIngest',
                 'region': 'IAD'},
