@@ -34,11 +34,14 @@ from otter.constants import ServiceType
 from otter.convergence.gathering import (
     extract_CLB_drained_at,
     get_all_launch_server_data,
+    get_all_launch_stack_data,
     get_all_scaling_group_servers,
     get_all_server_details,
+    get_all_stacks,
     get_clb_contents,
     get_rcv3_contents,
     get_scaling_group_servers,
+    get_scaling_group_stacks,
     mark_deleted_servers)
 from otter.convergence.model import (
     CLBDescription,
@@ -56,7 +59,8 @@ from otter.test.utils import (
     nested_sequence,
     patch,
     resolve_stubs,
-    server
+    server,
+    stack
 )
 from otter.util.fp import assoc_obj
 from otter.util.retry import (
@@ -701,3 +705,87 @@ class GetAllLaunchServerDataTests(SynchronousTestCase):
             get_rcv3_contents=_constant_as_eff((), []))
 
         self.assertEqual(resolve_stubs(eff), ([], []))
+
+
+class GetAllStacksTests(SynchronousTestCase):
+    """Tests for :func:`get_all_stacks`."""
+
+    def test_default(self):
+        """
+        Tests for passing no arguments.
+        """
+        svc_intent = service_request(ServiceType.CLOUD_ORCHESTRATION, 'GET',
+                                     'stacks', params={}).intent
+        self.assertEqual(get_all_stacks().intent, svc_intent)
+
+    def test_stack_tag(self):
+        """
+        Tests stack_tag being added to params.
+        """
+        tag = 'footag'
+        svc_intent = service_request(ServiceType.CLOUD_ORCHESTRATION, 'GET',
+                                     'stacks', params={'tags': tag}).intent
+        self.assertEqual(get_all_stacks(stack_tag=tag).intent,
+                         svc_intent)
+
+
+class GetScalingGroupStacksTests(SynchronousTestCase):
+    """Tests for :func:`get_scaling_group_stacks`."""
+
+    def test_normal_use(self):
+        """
+        Tests for stack_tag being used.
+        """
+        def fake_get_all_stacks(stack_tag):
+            return Effect(('all-stacks', stack_tag))
+
+        now = datetime(2015, 9, 30)
+        seq = [(('all-stacks', 'autoscale_gid'), lambda _: [])]
+        eff = get_scaling_group_stacks('tid', 'gid', now,
+                                       get_all_stacks=fake_get_all_stacks)
+
+        result = perform_sequence(seq, eff)
+        self.assertEqual(result, [])
+
+
+class GetAllLaunchStackDataTests(SynchronousTestCase):
+    """Tests for :func:`get_all_launch_stack_data`."""
+
+    def setUp(self):
+        """Save reused data."""
+        self.stacks = [
+            {'id': 'a', 'stack_name': 'aa', 'stack_status': 'CREATE_COMPLETE'},
+            {'id': 'b', 'stack_name': 'bb', 'stack_status': 'CREATE_COMPLETE'}
+        ]
+        self.now = datetime(2010, 10, 20, 03, 30, 00)
+
+    def test_success(self):
+        """
+        Tests HeatStack instances being returned from JSON.
+        """
+        expected_stacks = [
+            stack(id='a', name='aa', action='CREATE', status='COMPLETE'),
+            stack(id='b', name='bb', action='CREATE', status='COMPLETE')
+        ]
+        eff = get_all_launch_stack_data(
+            'tid',
+            'gid',
+            self.now,
+            get_scaling_group_stacks=_constant_as_eff(
+                ('tid', 'gid', self.now), self.stacks))
+
+        self.assertEqual(resolve_stubs(eff), (expected_stacks, None))
+
+    def test_no_group_stacks(self):
+        """
+        If there are no stacks in a group, get_all_launch_stack_data returns
+        an empty list.
+        """
+        eff = get_all_launch_stack_data(
+            'tid',
+            'gid',
+            self.now,
+            get_scaling_group_stacks=_constant_as_eff(
+                ('tid', 'gid', self.now), []))
+
+        self.assertEqual(resolve_stubs(eff), ([], None))
