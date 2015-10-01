@@ -14,6 +14,7 @@ class ServiceType(Names):
     RACKCONNECT_V3 = NamedConstant()
     CLOUD_METRICS_INGEST = NamedConstant()
     CLOUD_FEEDS = NamedConstant()
+    CLOUD_ORCHESTRATION = NamedConstant()
 
 
 def get_service_configs(config):
@@ -34,6 +35,10 @@ def get_service_configs(config):
         },
         ServiceType.CLOUD_LOAD_BALANCERS: {
             'name': config['cloudLoadBalancers'],
+            'region': config['region'],
+        },
+        ServiceType.CLOUD_ORCHESTRATION: {
+            'name': config['cloudOrchestration'],
             'region': config['region'],
         },
         ServiceType.RACKCONNECT_V3: {
