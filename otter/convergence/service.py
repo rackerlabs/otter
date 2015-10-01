@@ -112,14 +112,20 @@ from txeffect import exc_info_to_failure, perform
 
 from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
-from otter.convergence.composition import get_desired_server_group_state
+from otter.convergence.composition import (get_desired_server_group_state,
+                                           get_desired_stack_group_state)
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.errors import present_reasons, structure_reason
-from otter.convergence.gathering import get_all_launch_server_data
+from otter.convergence.gathering import (get_all_launch_server_data,
+                                         get_all_launch_stack_data)
 from otter.convergence.logging import log_steps
 from otter.convergence.model import (
-    ConvergenceIterationStatus, ServerState, StepResult)
-from otter.convergence.planning import plan_launch_server
+    ConvergenceIterationStatus,
+    DesiredServerGroupState,
+    DesiredStackGroupState,
+    ServerState,
+    StepResult)
+from otter.convergence.planning import plan_launch_server, plan_launch_stack
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, msg_with_time, with_log
 from otter.models.intents import (
@@ -214,8 +220,10 @@ def _execute_steps(steps):
 
 
 @do
-def convergence_exec_data(tenant_id, group_id, now,
-                          get_all_launch_server_data):
+def convergence_exec_data(
+        tenant_id, group_id, now,
+        get_all_launch_server_data=get_all_launch_server_data,
+        get_all_launch_stack_data=get_all_launch_stack_data):
     """
     Get data required while executing convergence
     """
@@ -227,21 +235,33 @@ def convergence_exec_data(tenant_id, group_id, now,
     group_state = manifest['state']
     launch_config = manifest['launchConfiguration']
 
-    gather_eff = get_all_launch_server_data(tenant_id, group_id, now)
+    if launch_config['type'] == 'launch_server':
+        gather_eff = get_all_launch_server_data(tenant_id, group_id, now)
+    elif launch_config['type'] == 'launch_stack':
+        gather_eff = get_all_launch_stack_data(tenant_id, group_id, now)
+    else:
+        raise NotImplementedError
 
-    (servers, lb_nodes) = yield gather_eff
+    (scaling_units, lb_nodes) = yield gather_eff
 
     if group_state.status == ScalingGroupStatus.DELETING:
         desired_capacity = 0
     else:
         desired_capacity = group_state.desired
-        yield update_cache(scaling_group, servers, lb_nodes, now)
 
-    desired_group_state = get_desired_server_group_state(
-        group_id, launch_config, desired_capacity)
+        # Skip launch_stack update_cache for now
+        if launch_config['type'] == 'launch_server':
+            yield update_cache(scaling_group, scaling_units, lb_nodes, now)
+
+    if launch_config['type'] == 'launch_server':
+        desired_group_state = get_desired_server_group_state(
+            group_id, launch_config, desired_capacity)
+    elif launch_config['type'] == 'launch_stack':
+        desired_group_state = get_desired_stack_group_state(
+            group_id, launch_config, desired_capacity)
 
     yield do_return((scaling_group, group_state, desired_group_state,
-                     servers, lb_nodes))
+                     scaling_units, lb_nodes))
 
 
 def _clean_waiting(waiting, group_id):
@@ -253,7 +273,9 @@ def _clean_waiting(waiting, group_id):
 def execute_convergence(tenant_id, group_id, build_timeout,
                         waiting, limited_retry_iterations,
                         get_all_launch_server_data=get_all_launch_server_data,
-                        plan_launch_server=plan_launch_server):
+                        get_all_launch_stack_data=get_all_launch_stack_data,
+                        plan_launch_server=plan_launch_server,
+                        plan_launch_stack=plan_launch_stack):
     """
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
@@ -280,13 +302,21 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         "gather-convergence-data",
         convergence_exec_data(
             tenant_id, group_id, now_dt,
-            get_all_launch_server_data=get_all_launch_server_data))
+            get_all_launch_server_data=get_all_launch_server_data,
+            get_all_launch_stack_data=get_all_launch_stack_data))
     (scaling_group, group_state, desired_group_state,
      servers, lb_nodes) = all_data
 
     # prepare plan
-    steps = plan_launch_server(desired_group_state, servers, lb_nodes,
-                               datetime_to_epoch(now_dt), build_timeout)
+    if isinstance(desired_group_state, DesiredServerGroupState):
+        steps = plan_launch_server(desired_group_state, servers, lb_nodes,
+                                   datetime_to_epoch(now_dt), build_timeout)
+    elif isinstance(desired_group_state, DesiredStackGroupState):
+        steps = plan_launch_stack(desired_group_state, servers,
+                                  datetime_to_epoch(now_dt), build_timeout)
+    else:
+        raise NotImplementedError
+
     yield log_steps(steps)
 
     # Execute plan
@@ -302,8 +332,17 @@ def execute_convergence(tenant_id, group_id, build_timeout,
 
     # Handle the status from execution
     if worst_status == StepResult.SUCCESS:
-        result = yield convergence_succeeded_servers(
-            scaling_group, group_state, servers, now_dt)
+        if isinstance(desired_group_state, DesiredServerGroupState):
+            result = yield convergence_succeeded_servers(
+                scaling_group, group_state, servers, now_dt)
+
+        elif isinstance(desired_group_state, DesiredStackGroupState):
+            result = yield convergence_succeeded_stacks(
+                scaling_group, group_state, servers, now_dt)
+
+        else:
+            raise NotImplementedError
+
     elif worst_status == StepResult.FAILURE:
         result = yield convergence_failed(scaling_group, reasons)
     elif worst_status is StepResult.LIMITED_RETRY:
@@ -346,6 +385,24 @@ def convergence_succeeded_servers(scaling_group, group_state, servers, now):
             [thaw(s.json.set("_is_as_active", True))
              for s in servers if s.state != ServerState.DELETED]))
     yield do_return(ConvergenceIterationStatus.Stop())
+
+
+@do
+def convergence_succeeded_stacks(scaling_group, group_state, stacks, now):
+    """
+    Handle convergence success
+    """
+    if group_state.status == ScalingGroupStatus.DELETING:
+        # servers have been deleted. Delete the group for real
+        yield Effect(DeleteGroup(tenant_id=scaling_group.tenant_id,
+                                 group_id=scaling_group.uuid))
+        yield do_return(None)
+    elif group_state.status == ScalingGroupStatus.ERROR:
+        yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
+                                       status=ScalingGroupStatus.ACTIVE))
+        yield cf_msg('group-status-active',
+                     status=ScalingGroupStatus.ACTIVE.name)
+    yield do_return(ScalingGroupStatus.ACTIVE)
 
 
 @do

@@ -25,7 +25,9 @@ from otter.convergence.steps import (
     ChangeCLBNode,
     ConvergeLater,
     CreateServer,
+    CreateStack,
     DeleteServer,
+    DeleteStack,
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
 )
@@ -367,6 +369,43 @@ def converge_launch_server(desired_state, servers_with_cheese,
                 converge_later)
 
 
+def converge_launch_stack(desired_state, stacks, now, timeout=3600):
+    """
+    Create steps that indicate how to transition from the state provided
+    by the given parameters to the :obj:`DesiredGroupState` described by
+    ``desired_state``.
+
+    :param DesiredGroupState desired_state: The desired group state.
+    :param set stack: a set of :obj:`HeatStack` instances.
+        This must only contain stacks that are being managed for the specified
+        group.
+    :param float now: number of seconds since the POSIX epoch indicating the
+        time at which the convergence was requested.
+    :param float timeout: Number of seconds after which we will delete a server
+        in BUILD.
+    :rtype: :obj:`pbag` of `IStep`
+
+    """
+    stacks_create_complete = list(stacks)
+
+    stacks_building = []
+
+    create_stack = CreateStack(stack_config=desired_state.stack_config)
+
+    good_stack_count = len(stacks_create_complete)
+
+    # create stacks
+    create_steps = [create_stack] * (desired_state.capacity - good_stack_count)
+
+    stacks_in_preferred_order = stacks_create_complete + stacks_building
+    stacks_to_delete = stacks_in_preferred_order[desired_state.capacity:]
+
+    scale_down_steps = list(map(DeleteStack, stacks_to_delete))
+
+    return pbag(create_steps +
+                scale_down_steps)
+
+
 def plan_launch_server(desired_group_state, servers, lb_nodes, now,
                        build_timeout):
     """
@@ -376,6 +415,13 @@ def plan_launch_server(desired_group_state, servers, lb_nodes, now,
     """
     steps = converge_launch_server(desired_group_state, servers, lb_nodes, now,
                                    timeout=build_timeout)
+    steps = limit_steps_by_count(steps)
+    return optimize_steps(steps)
+
+
+def plan_launch_stack(desired_group_state, stacks, now, build_timeout):
+    steps = converge_launch_stack(desired_group_state, stacks, now,
+                                  timeout=build_timeout)
     steps = limit_steps_by_count(steps)
     return optimize_steps(steps)
 

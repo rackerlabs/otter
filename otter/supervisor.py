@@ -219,17 +219,27 @@ class SupervisorService(Service, object):
         """
         Validate launch config for a tenant
         """
-        def when_authenticated((auth_token, service_catalog)):
-            log.msg('Validating launch server config')
-            return validate_config.validate_launch_server_config(
-                log,
-                self.region,
-                service_catalog,
-                auth_token,
-                launch_config['args'])
+        def do_validate(validation_method, auth_token, service_catalog):
+            return validation_method(log, self.region, service_catalog,
+                                     auth_token, launch_config['args'])
 
-        if launch_config['type'] != 'launch_server':
-            raise NotImplementedError('Validating launch config for launch_server only')
+        def validate_launch_server_config((auth_token, service_catalog)):
+            log.msg('Validating launch server config')
+            return do_validate(validate_config.validate_launch_server_config,
+                               auth_token, service_catalog)
+
+        def validate_launch_stack_config((auth_token, service_catalog)):
+            log.msg('Validating launch stack config')
+            return do_validate(validate_config.validate_launch_stack_config,
+                               auth_token, service_catalog)
+
+        if launch_config['type'] == 'launch_server':
+            when_authenticated = validate_launch_server_config
+        elif launch_config['type'] == 'launch_stack':
+            when_authenticated = validate_launch_stack_config
+        else:
+            raise NotImplementedError('Validating launch config for '
+                                      'launch_server or launch_stack only')
 
         log = log.bind(system='otter.supervisor.validate_launch_config',
                        tenant_id=tenant_id)

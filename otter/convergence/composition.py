@@ -9,8 +9,10 @@ from toolz.itertoolz import groupby
 from otter.convergence.model import (
     CLBDescription,
     DesiredServerGroupState,
+    DesiredStackGroupState,
     RCv3Description,
-    generate_metadata)
+    generate_metadata,
+    get_stack_tag_for_group)
 from otter.util.fp import set_in
 
 
@@ -67,6 +69,24 @@ def get_desired_server_group_state(group_id, launch_config, desired):
     return desired_state
 
 
+def get_desired_stack_group_state(group_id, launch_config, desired):
+    """
+    Create a :obj:`DesiredStackGroupState` from a group details.
+
+    :param str group_id: The group ID
+    :param dict launch_config: Group's launch_stack config as per
+        :obj:`otter.json_schema.group_schemas.launch_config`
+    :param int desired: Group's desired capacity
+    """
+
+    stack_lc = prepare_stack_launch_config(
+        group_id, freeze(launch_config['args']['stack']))
+
+    desired_state = DesiredStackGroupState(stack_config=stack_lc,
+                                           capacity=desired)
+    return desired_state
+
+
 def prepare_server_launch_config(group_id, server_config, lb_descriptions):
     """
     Prepare a server config (the server part of the Group's launch config)
@@ -84,3 +104,20 @@ def prepare_server_launch_config(group_id, server_config, lb_descriptions):
         generate_metadata(group_id, lb_descriptions))
 
     return set_in(server_config, ('server', 'metadata'), updated_metadata)
+
+
+def prepare_stack_launch_config(group_id, stack_config):
+    """
+    Prepare a stack config (the stack part of the Group's launch config)
+    with any necessary dynamic data.
+
+    :param str group_id: The group ID
+    :param PMap stack_config: The stack part of the Group's launch config,
+        as per :obj:`otter.json_schema.group_schemas.stack`.
+    """
+    # Set stack name and tag to the same thing
+    stack_config = set_in(stack_config, ('stack_name',),
+                          get_stack_tag_for_group(group_id))
+    stack_config = set_in(stack_config, ('tags',),
+                          get_stack_tag_for_group(group_id))
+    return stack_config

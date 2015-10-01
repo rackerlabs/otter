@@ -1,9 +1,10 @@
 """Steps for convergence."""
 import re
-
+import uuid
 from functools import partial
 
 import attr
+from attr.validators import instance_of
 
 from characteristic import Attribute, attributes
 
@@ -12,6 +13,8 @@ from effect import Constant, Effect, Func, catch
 from pyrsistent import PMap, PSet, freeze, pset, thaw
 
 import six
+
+from toolz.dicttoolz import get_in
 
 from twisted.python.constants import NamedConstant
 
@@ -26,12 +29,14 @@ from otter.cloud_client import (
     add_clb_nodes,
     change_clb_node,
     create_server,
+    create_stack,
+    delete_stack,
     has_code,
     remove_clb_nodes,
     service_request,
     set_nova_metadata_item)
 from otter.constants import ServiceType
-from otter.convergence.model import ErrorReason, StepResult
+from otter.convergence.model import ErrorReason, HeatStack, StepResult
 from otter.util.fp import set_in
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError, append_segments
@@ -71,6 +76,12 @@ def set_server_name(server_config_args, name_suffix):
     else:
         name = name_suffix
     return set_in(server_config_args, ('server', 'name'), name)
+
+
+def append_stack_uuid(stack_config):
+    name_key = ('stack_name',)
+    name = get_in(name_key, stack_config)
+    return set_in(stack_config, name_key, name + '_%s' % uuid.uuid4())
 
 
 def _ignore_errors(*ignored_err_types):
@@ -148,6 +159,26 @@ class CreateServer(object):
                                     CreateServerOverQuoteError))
 
 
+@implementer(IStep)
+@attr.s
+class CreateStack(object):
+    """
+    A stack must be created.
+
+    :ivar pmap stack_config: Heat launch configuration.
+
+    """
+    stack_config = attr.ib(validator=instance_of(PMap))
+
+    def as_effect(self):
+        """Produce a :obj:`Effect` to create a stack."""
+
+        stack_config = append_stack_uuid(self.stack_config)
+        eff = create_stack(thaw(stack_config))
+
+        return eff.on(_success_reporter('Waiting for stack to create'))
+
+
 class UnexpectedServerStatus(Exception):
     """
     An exception to be raised when a server is found in an unexpected state.
@@ -213,6 +244,29 @@ class DeleteServer(object):
         eff = retry_effect(
             delete_and_verify(self.server_id), can_retry=retry_times(3),
             next_interval=exponential_backoff_interval(2))
+
+        def report_success(result):
+            return StepResult.RETRY, [
+                ErrorReason.String(
+                    'must re-gather after deletion in order to update the '
+                    'active cache')]
+
+        return eff.on(success=report_success)
+
+
+@implementer(IStep)
+@attr.s
+class DeleteStack(object):
+    """
+    A stack must be deleted.
+    """
+
+    stack = attr.ib(validator=instance_of(HeatStack))
+
+    def as_effect(self):
+        """Produce a :obj:`Effect` to delete a stack."""
+
+        eff = delete_stack(stack_name=self.stack.name, stack_id=self.stack.id)
 
         def report_success(result):
             return StepResult.RETRY, [

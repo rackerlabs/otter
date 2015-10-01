@@ -2,10 +2,12 @@
 Contains code to validate launch config
 """
 
-from twisted.internet import defer
 import base64
-import re
 import itertools
+import json
+import re
+
+from twisted.internet import defer
 
 from otter.util import logging_treq as treq
 
@@ -108,6 +110,14 @@ def get_service_endpoint(service_catalog, region):
     return server_endpoint
 
 
+def get_heat_endpoint(service_catalog, region):
+    """
+    Get the service endpoint for cloud orchestration
+    """
+    cloudOrchestration = config_value('cloudOrchestration')
+    return public_endpoint_url(service_catalog, cloudOrchestration, region)
+
+
 def shorten(s, length):
     """
     Shorten `s` to `length` by appending it with "...". If `s` is small,
@@ -125,21 +135,14 @@ def shorten(s, length):
         return s
 
 
-def validate_launch_server_config(log, region, service_catalog, auth_token, launch_config):
+def validate_config(log, region, service_endpoint, auth_token, config_section,
+                    validate_functions):
     """
-    Validate launch_server type configuration
+    Validate properties of a configuration using validation functions
 
-    :returns: Deferred that is fired if configuration is valid and errback(ed) with
-              `InvalidLaunchConfiguration` if invalid
+    :returns: Deferred that is fired if configuration is valid and errback(ed)
+              with `InvalidLaunchConfiguration` if invalid
     """
-
-    server = launch_config['server']
-
-    validate_functions = [
-        (validate_image, 'imageRef'),
-        (validate_flavor, 'flavorRef'),
-        (validate_personality, 'personality')
-    ]
 
     def collect_errors(results):
         failures = [result for succeeded, result in results if not succeeded]
@@ -159,21 +162,51 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
             raise InvalidLaunchConfiguration(msg.format(prop_name=prop_name,
                                                         prop_value=prop_value))
 
-    service_endpoint = get_service_endpoint(service_catalog, region)
     deferreds = []
     for validate, prop_name in validate_functions:
-        prop_value = server.get(prop_name)
+        prop_value = config_section.get(prop_name)
         if prop_value:
             d = validate(log, auth_token, service_endpoint, prop_value)
             d.addErrback(raise_validation_error, prop_name, prop_value)
             deferreds.append(d)
 
-    return defer.DeferredList(deferreds, consumeErrors=True).addCallback(collect_errors)
+    return (defer.DeferredList(deferreds, consumeErrors=True)
+            .addCallback(collect_errors))
+
+
+def validate_launch_server_config(log, region, service_catalog, auth_token,
+                                  launch_config):
+    service_endpoint = get_service_endpoint(service_catalog, region)
+
+    validate_functions = [
+        (validate_image, 'imageRef'),
+        (validate_flavor, 'flavorRef'),
+        (validate_personality, 'personality')
+    ]
+
+    return validate_config(log, region, service_endpoint, auth_token,
+                           config_section=launch_config['server'],
+                           validate_functions=validate_functions)
+
+
+def validate_launch_stack_config(log, region, service_catalog, auth_token,
+                                 launch_config):
+    heat_endpoint = get_heat_endpoint(service_catalog, region)
+
+    validate_functions = [
+        (validate_template_inline, 'template'),
+        (validate_template_url, 'template_url')
+    ]
+
+    return validate_config(log, region, heat_endpoint, auth_token,
+                           config_section=launch_config['stack'],
+                           validate_functions=validate_functions)
 
 
 def validate_image(log, auth_token, server_endpoint, image_ref):
     """
-    Validate Image by getting the image information. It ensures that image is active
+    Validate Image by getting the image information. It ensures that image is
+    active.
     """
     url = append_segments(server_endpoint, 'images', image_ref)
     d = treq.get(url, headers=headers(auth_token), log=log)
@@ -246,4 +279,21 @@ def validate_personality(log, auth_token, server_endpoint, personality):
     d.addCallback(treq.json_content)
     d.addCallback(check_sizes)
 
+    return d
+
+
+def validate_template_inline(log, auth_token, heat_endpoint, template):
+    data = {"template": template}
+    return validate_template(log, auth_token, heat_endpoint, json.dumps(data))
+
+
+def validate_template_url(log, auth_token, heat_endpoint, template_url):
+    data = {"template_url": template_url}
+    return validate_template(log, auth_token, heat_endpoint, json.dumps(data))
+
+
+def validate_template(log, auth_token, heat_endpoint, data):
+    url = append_segments(heat_endpoint, 'validate')
+    d = treq.post(url, data, headers=headers(auth_token), log=log)
+    d.addCallback(check_success, [200])
     return d
