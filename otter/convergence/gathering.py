@@ -232,7 +232,7 @@ def get_rcv3_contents():
         error=catch(NoSuchEndpoint, lambda _: []))
 
 
-def get_all_convergence_data(
+def get_all_launch_server_data(
         tenant_id,
         group_id,
         now,
@@ -240,7 +240,7 @@ def get_all_convergence_data(
         get_clb_contents=get_clb_contents,
         get_rcv3_contents=get_rcv3_contents):
     """
-    Gather all data relevant for convergence w.r.t given time,
+    Gather all launch_server data relevant for convergence w.r.t given time,
     in parallel where possible.
 
     Returns an Effect of ([NovaServer], [LBNode]).

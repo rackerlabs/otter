@@ -23,7 +23,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import NoSuchCLBError, TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
-from otter.convergence.composition import get_desired_group_state
+from otter.convergence.composition import get_desired_server_group_state
 from otter.convergence.model import (
     CLBDescription, CLBNode, ConvergenceIterationStatus, ErrorReason,
     ServerState, StepResult)
@@ -851,12 +851,12 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
 
     def _invoke(self, plan=None):
-        kwargs = {'plan': plan} if plan is not None else {}
+        kwargs = {'plan_launch_server': plan} if plan is not None else {}
         return execute_convergence(
             self.tenant_id, self.group_id, build_timeout=3600,
             waiting=self.waiting,
             limited_retry_iterations=43,
-            get_all_convergence_data=intent_func("gacd"), **kwargs)
+            get_all_launch_server_data=intent_func("gacd"), **kwargs)
 
     def test_no_steps(self):
         """
@@ -892,7 +892,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         Executes the plan and returns SUCCESS when that's the most severe
         result.
         """
-        dgs = get_desired_group_state(self.group_id, self.lc, 2)
+        dgs = get_desired_server_group_state(self.group_id, self.lc, 2)
         deleted = server(
             'c', ServerState.DELETED, servicenet_address='10.0.0.3',
             desired_lbs=self.desired_lbs,

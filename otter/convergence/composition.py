@@ -8,7 +8,7 @@ from toolz.itertoolz import groupby
 
 from otter.convergence.model import (
     CLBDescription,
-    DesiredGroupState,
+    DesiredServerGroupState,
     RCv3Description,
     generate_metadata)
 from otter.util.fp import set_in
@@ -44,9 +44,9 @@ def json_to_LBConfigs(lbs_json):
     )
 
 
-def get_desired_group_state(group_id, launch_config, desired):
+def get_desired_server_group_state(group_id, launch_config, desired):
     """
-    Create a :obj:`DesiredGroupState` from a group details.
+    Create a :obj:`DesiredServerGroupState` from a group details.
 
     :param str group_id: The group ID
     :param dict launch_config: Group's launch config as per
@@ -60,7 +60,7 @@ def get_desired_group_state(group_id, launch_config, desired):
         freeze({'server': launch_config['args']['server']}),
         lbs)
     draining = float(launch_config["args"].get("draining_timeout", 0.0))
-    desired_state = DesiredGroupState(
+    desired_state = DesiredServerGroupState(
         server_config=server_lc,
         capacity=desired, desired_lbs=lbs,
         draining_timeout=draining)

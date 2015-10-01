@@ -11,13 +11,17 @@ from otter.convergence.model import (
     CLBNode,
     CLBNodeCondition,
     CLBNodeType,
-    DesiredGroupState,
+    DesiredServerGroupState,
     ErrorReason,
     RCv3Description,
     RCv3Node,
     ServerState)
 from otter.convergence.planning import (
-    DRAINING_METADATA, Destiny, converge, get_destiny, plan)
+    DRAINING_METADATA,
+    Destiny,
+    converge_launch_server,
+    get_destiny,
+    plan_launch_server)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -45,8 +49,9 @@ def copy_clb_desc(clb_desc, condition=CLBNodeCondition.ENABLED, weight=1):
 
 class RemoveFromLBWithDrainingTests(SynchronousTestCase):
     """
-    Tests for :func:`converge` with regards to draining a server on a load
-    balanacer and removing them from the load balancer when finished draining.
+    Tests for :func:`converge_launch_server` with regards to draining a server
+    on a load balanacer and removing them from the load balancer when finished
+    draining.
     (:func:`_remove_from_lb_with_draining`).
     """
     LB_STEPS = (AddNodesToCLB, RemoveNodesFromCLB, ChangeCLBNode,
@@ -57,22 +62,22 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
     def assert_converge_clb_steps(self, clb_descs, clb_nodes, clb_steps,
                                   draining_timeout, now):
         """
-        Run the converge function on the given a server with the given
+        Run the converge_launch_server function on a server with the given
         :class:`CLBDescription`s  and :class:`CLBNode`s, the given
         draining timeout, and the given time.
 
         Assert that the LB steps produced are equivalent to the given
         CLB steps.
 
-        Run the converge function again, this time with a default
+        Run the converge_launch_server function again, this time with a default
         :class:`RCv3Description` and a default :class:`RCv3Node` added, and
         assert that the LB steps produced are equivalent to the given
         CLB steps plus a RCv3 node removal, because RCv3 nodes are not
         drainable and are hence unaffected by timeouts.
         """
-        without_rcv3_steps = converge(
-            DesiredGroupState(server_config={}, capacity=0,
-                              draining_timeout=draining_timeout),
+        without_rcv3_steps = converge_launch_server(
+            DesiredServerGroupState(server_config={}, capacity=0,
+                                    draining_timeout=draining_timeout),
             s(server('abc',
                      ServerState.ACTIVE,
                      servicenet_address=self.address,
@@ -88,9 +93,9 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
         rcv3_step = BulkRemoveFromRCv3(
             lb_node_pairs=s(('e762e42a-8a4e-4ffb-be17-f9dc672729b2', 'abc')))
 
-        with_rcv3_steps = converge(
-            DesiredGroupState(server_config={}, capacity=0,
-                              draining_timeout=draining_timeout),
+        with_rcv3_steps = converge_launch_server(
+            DesiredServerGroupState(server_config={}, capacity=0,
+                                    draining_timeout=draining_timeout),
             s(server('abc',
                      ServerState.ACTIVE,
                      servicenet_address=self.address,
@@ -105,9 +110,9 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
 
     def _filter_only_lb_steps(self, steps):
         """
-        Converge may do other things to a server depending on its draining
-        state.  This suite of tests is only testing how it handles the load
-        balancer, so ignore steps that are not load-balancer related.
+        converge_launch_server may do other things to a server depending on its
+        draining state.  This suite of tests is only testing how it handles the
+        load balancer, so ignore steps that are not load-balancer related.
         """
         return pbag([step for step in steps if type(step) in self.LB_STEPS])
 
@@ -312,8 +317,8 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
 
 class ConvergeLBStateTests(SynchronousTestCase):
     """
-    Tests for :func:`converge` with regards to converging the load balancer
-    state on active servers.  (:func:`_converge_lb_state`)
+    Tests for :func:`converge_launch_server` with regards to converging the
+    load balancer state on active servers.  (:func:`_converge_lb_state`)
     """
     def test_add_to_lb(self):
         """
@@ -327,8 +332,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
             lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')
 
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(clb_desc, rcv3_desc))]),
@@ -359,8 +364,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
                    RCv3Node(node_id='234', cloud_server_id='abc',
                             description=rcv3_desc)]
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(clb_desc, rcv3_desc))]),
@@ -385,8 +390,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
                                 lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7'))]
 
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
                             desired_lbs=pset())]),
@@ -411,8 +416,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
                      description=rcv3_desc)]
 
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(clb_desc, rcv3_desc))]),
@@ -439,8 +444,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
         ]
 
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
                             desired_lbs=pset(descs))]),
@@ -473,8 +478,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
                     CLBDescription(lb_id='5', port=8081))
         current = []
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
                             desired_lbs=desired)]),
@@ -494,8 +499,9 @@ class ConvergeLBStateTests(SynchronousTestCase):
 
 class DrainAndDeleteServerTests(SynchronousTestCase):
     """
-    Tests for :func:`converge` having to do with deleting draining servers,
-    or servers that don't need to be drained. (:func:`_drain_and_delete`)
+    Tests for :func:`converge_launch_server` having to do with deleting
+    draining servers, or servers that don't need to be drained.
+    (:func:`_drain_and_delete`)
     """
     clb_desc = CLBDescription(lb_id='1', port=80)
     rcv3_desc = RCv3Description(lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')
@@ -508,9 +514,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         load balancers nodes drained, even if the timeout is greater than zero.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=0,
+                                        draining_timeout=10.0),
                 set([server('abc', state=ServerState.BUILD,
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
@@ -533,9 +539,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         It is not first put into draining state.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=0,
+                                        draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set(),
@@ -549,9 +555,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         metadata.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=0,
+                                        draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
                             metadata=dict([DRAINING_METADATA]),
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
@@ -566,8 +572,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         draining state.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=0),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=0),
                 set([server('abc', state=ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
@@ -589,8 +595,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         server can be deleted.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=0),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=0),
                 set([server('abc', state=ServerState.ACTIVE,
                             metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
@@ -616,9 +622,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         removed, nothing is done to it and ConvergeLater is returned
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=0,
+                                        draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
                             metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
@@ -640,9 +646,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         other_clb_desc = CLBDescription(lb_id='9', port=80)
 
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=2.0),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=0,
+                                        draining_timeout=2.0),
                 set([server('abc', state=ServerState.ACTIVE,
                             metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
@@ -679,9 +685,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         draining condition.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=0,
+                                        draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
@@ -713,9 +719,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         draining but setting the server metadata failed.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=0,
+                                        draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
@@ -745,9 +751,9 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
         Or if the server is set to be manually deleted via the API.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=0,
-                                  draining_timeout=10.0),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=0,
+                                        draining_timeout=10.0),
                 set([server('abc', state=ServerState.ACTIVE,
                             metadata=dict([DRAINING_METADATA]),
                             servicenet_address='1.1.1.1',
@@ -764,8 +770,8 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
 
 class ConvergeTests(SynchronousTestCase):
     """
-    Tests for :func:`converge` that do not specifically cover load balancers,
-    although some load balancer information may be included.
+    Tests for :func:`converge_launch_server` that do not specifically cover
+    load balancers, although some load balancer information may be included.
     """
 
     def test_converge_give_me_a_server(self):
@@ -774,8 +780,8 @@ class ConvergeTests(SynchronousTestCase):
         the desired capacity.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set(),
                 set(),
                 0),
@@ -787,8 +793,8 @@ class ConvergeTests(SynchronousTestCase):
         meet the desired capacity.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=2),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=2),
                 set(),
                 set(),
                 0),
@@ -803,8 +809,8 @@ class ConvergeTests(SynchronousTestCase):
         as a step if the building servers are not being deleted.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.BUILD)]),
                 set(),
                 0),
@@ -818,8 +824,8 @@ class ConvergeTests(SynchronousTestCase):
         up the slack, but rather just wait for it to come back.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.HARD_REBOOT)]),
                 set(),
                 0),
@@ -838,8 +844,8 @@ class ConvergeTests(SynchronousTestCase):
         transitioned to other states manually.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.RESCUE)]),
                 set(),
                 0),
@@ -851,8 +857,8 @@ class ConvergeTests(SynchronousTestCase):
         necessary, and replaced.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ERROR)]),
                 set(),
                 0),
@@ -867,8 +873,8 @@ class ConvergeTests(SynchronousTestCase):
         a server.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.UNKNOWN_TO_OTTER)]),
                 set(),
                 0),
@@ -884,8 +890,8 @@ class ConvergeTests(SynchronousTestCase):
         excluded from converging load balancer state.)
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ERROR,
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(CLBDescription(lb_id='5', port=80),
@@ -914,8 +920,8 @@ class ConvergeTests(SynchronousTestCase):
         referencing the server.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=0),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=0),
                 set([server('abc', ServerState.DELETED,
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(CLBDescription(lb_id='5', port=80),
@@ -942,8 +948,8 @@ class ConvergeTests(SynchronousTestCase):
         balancers, we do nothing.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=0),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=0),
                 set([server('abc', ServerState.DELETED,
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(CLBDescription(lb_id='5', port=80),
@@ -956,8 +962,8 @@ class ConvergeTests(SynchronousTestCase):
     def test_scale_down(self):
         """If we have more servers than desired, we delete the oldest."""
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ACTIVE, created=0),
                      server('def', ServerState.ACTIVE, created=1)]),
                 set(),
@@ -972,8 +978,8 @@ class ConvergeTests(SynchronousTestCase):
         deleted.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=2),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=2),
                 set([server('abc', ServerState.ACTIVE, created=0),
                      server('def', ServerState.BUILD, created=1),
                      server('ghi', ServerState.ACTIVE, created=2)]),
@@ -1008,8 +1014,8 @@ class ConvergeTests(SynchronousTestCase):
                     limited=True)]
 
             self.assertEqual(
-                converge(
-                    DesiredGroupState(server_config={}, capacity=2),
+                converge_launch_server(
+                    DesiredServerGroupState(server_config={}, capacity=2),
                     set([server('abc', examples[after], created=0),
                          server('def', examples[before], created=1),
                          server('ghi', examples[after], created=2)]),
@@ -1025,8 +1031,8 @@ class ConvergeTests(SynchronousTestCase):
         deleted.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=2),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=2),
                 set([server('slowpoke', ServerState.BUILD, created=0),
                      server('ok', ServerState.ACTIVE, created=0)]),
                 set(),
@@ -1043,8 +1049,8 @@ class ConvergeTests(SynchronousTestCase):
         server gets deleted.
         """
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=2),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=2),
                 set([server('slowpoke', ServerState.BUILD, created=0),
                      server('old-ok', ServerState.ACTIVE, created=0),
                      server('new-ok', ServerState.ACTIVE, created=3600)]),
@@ -1060,9 +1066,9 @@ class ConvergeTests(SynchronousTestCase):
         desc = CLBDescription(lb_id='5', port=80)
         desired_lbs = s(desc)
         self.assertEqual(
-            converge(
-                DesiredGroupState(server_config={}, capacity=1,
-                                  desired_lbs=desired_lbs),
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1,
+                                        desired_lbs=desired_lbs),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1', created=0,
                             desired_lbs=desired_lbs),
@@ -1080,16 +1086,16 @@ class ConvergeTests(SynchronousTestCase):
 
 
 class PlanTests(SynchronousTestCase):
-    """Tests for :func:`plan`."""
+    """Tests for :func:`plan_launch_server`."""
 
     def test_plan(self):
         """An optimized plan is returned. Steps are limited."""
         desc = CLBDescription(lb_id='5', port=80)
         desired_lbs = s(desc)
-        desired_group_state = DesiredGroupState(
+        desired_group_state = DesiredServerGroupState(
             server_config={}, capacity=20, desired_lbs=desired_lbs)
 
-        result = plan(
+        result = plan_launch_server(
             desired_group_state,
             set([server('server1', state=ServerState.ACTIVE,
                         servicenet_address='1.1.1.1',
@@ -1110,11 +1116,11 @@ class PlanTests(SynchronousTestCase):
                 )] + [CreateServer(server_config=pmap({}))] * 10))
 
     def test_build_timeout_propagated(self):
-        """The build timeout is propagated to converge."""
-        desired_group_state = DesiredGroupState(
+        """The build timeout is propagated to converge_launch_server."""
+        desired_group_state = DesiredServerGroupState(
             server_config={}, capacity=1, desired_lbs=s())
 
-        result = plan(
+        result = plan_launch_server(
             desired_group_state,
             set([server('server1', state=ServerState.BUILD,
                         servicenet_address='1.1.1.1', created=0)]),

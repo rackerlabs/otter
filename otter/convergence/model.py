@@ -350,9 +350,9 @@ def generate_metadata(group_id, lb_descriptions):
              Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
              Attribute('draining_timeout', default_value=0.0,
                        instance_of=float)])
-class DesiredGroupState(object):
+class DesiredServerGroupState(object):
     """
-    The desired state for a scaling group.
+    The desired state for a server scaling group.
 
     :ivar dict server_config: compute/nova part of the group launch config.
     :ivar int capacity: the number of desired servers within the group.

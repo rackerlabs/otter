@@ -7,12 +7,12 @@ from pyrsistent import pset
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence.composition import (
-    get_desired_group_state,
+    get_desired_server_group_state,
     json_to_LBConfigs,
     tenant_is_enabled)
 from otter.convergence.model import (
     CLBDescription,
-    DesiredGroupState,
+    DesiredServerGroupState,
     RCv3Description
 )
 
@@ -44,12 +44,13 @@ class JsonToLBConfigTests(SynchronousTestCase):
             ]))
 
 
-class GetDesiredGroupStateTests(SynchronousTestCase):
-    """Tests for :func:`get_desired_group_state`."""
+class GetDesiredServerGroupStateTests(SynchronousTestCase):
+    """Tests for :func:`get_desired_server_group_state`."""
 
     def assert_server_config_hashable(self, state):
         """
-        Assert that a :class:`DesiredGroupState` has a hashable server config.
+        Assert that a :class:`DesiredServerGroupState` has a hashable server
+        config.
         """
         try:
             hash(state.server_config)
@@ -58,7 +59,7 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
 
     def test_convert(self):
         """
-        An Otter launch config a :obj:`DesiredGroupState`, ignoring extra
+        An Otter launch config a :obj:`DesiredServerGroupState`, ignoring extra
         config information.
         """
         server_config = {'name': 'test', 'flavorRef': 'f'}
@@ -86,10 +87,10 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                 }
             }
         }
-        state = get_desired_group_state('uuid', lc, 2)
+        state = get_desired_server_group_state('uuid', lc, 2)
         self.assertEqual(
             state,
-            DesiredGroupState(
+            DesiredServerGroupState(
                 server_config=expected_server_config,
                 capacity=2,
                 desired_lbs=pset([
@@ -102,9 +103,10 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
 
     def test_no_lbs(self):
         """
-        When no loadBalancers are specified, the returned DesiredGroupState has
-        an empty mapping for desired_lbs. If no draining_timeout is provided,
-        returned DesiredGroupState has draining_timeout as 0.0
+        When no loadBalancers are specified, the returned
+        DesiredServerGroupState has an empty mapping for desired_lbs. If no
+        draining_timeout is provided, returned DesiredServerGroupState has
+        draining_timeout as 0.0
         """
         server_config = {'name': 'test', 'flavorRef': 'f'}
         lc = {'args': {'server': server_config}}
@@ -116,10 +118,10 @@ class GetDesiredGroupStateTests(SynchronousTestCase):
                 'metadata': {
                     'rax:auto_scaling_group_id': 'uuid',
                     'rax:autoscale:group:id': 'uuid'}}}
-        state = get_desired_group_state('uuid', lc, 2)
+        state = get_desired_server_group_state('uuid', lc, 2)
         self.assertEqual(
             state,
-            DesiredGroupState(
+            DesiredServerGroupState(
                 server_config=expected_server_config,
                 capacity=2,
                 desired_lbs=pset(),

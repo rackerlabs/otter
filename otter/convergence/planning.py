@@ -258,8 +258,8 @@ def get_destiny(server):
     return _STATE_TO_DESTINY.get(server.state)
 
 
-def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
-             timeout=3600):
+def converge_launch_server(desired_state, servers_with_cheese,
+                           load_balancer_contents, now, timeout=3600):
     """
     Create steps that indicate how to transition from the state provided
     by the given parameters to the :obj:`DesiredGroupState` described by
@@ -367,14 +367,15 @@ def converge(desired_state, servers_with_cheese, load_balancer_contents, now,
                 converge_later)
 
 
-def plan(desired_group_state, servers, lb_nodes, now, build_timeout):
+def plan_launch_server(desired_group_state, servers, lb_nodes, now,
+                       build_timeout):
     """
     Get an optimized convergence plan.
 
-    Takes the same arguments as :func:`converge`.
+    Takes the same arguments as :func:`converge_launch_server`.
     """
-    steps = converge(desired_group_state, servers, lb_nodes, now,
-                     timeout=build_timeout)
+    steps = converge_launch_server(desired_group_state, servers, lb_nodes, now,
+                                   timeout=build_timeout)
     steps = limit_steps_by_count(steps)
     return optimize_steps(steps)
 

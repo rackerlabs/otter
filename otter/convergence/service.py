@@ -112,14 +112,14 @@ from txeffect import exc_info_to_failure, perform
 
 from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
-from otter.convergence.composition import get_desired_group_state
+from otter.convergence.composition import get_desired_server_group_state
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.errors import present_reasons, structure_reason
-from otter.convergence.gathering import get_all_convergence_data
+from otter.convergence.gathering import get_all_launch_server_data
 from otter.convergence.logging import log_steps
 from otter.convergence.model import (
     ConvergenceIterationStatus, ServerState, StepResult)
-from otter.convergence.planning import plan
+from otter.convergence.planning import plan_launch_server
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, msg_with_time, with_log
 from otter.models.intents import (
@@ -214,13 +214,14 @@ def _execute_steps(steps):
 
 
 @do
-def convergence_exec_data(tenant_id, group_id, now, get_all_convergence_data):
+def convergence_exec_data(tenant_id, group_id, now,
+                          get_all_launch_server_data):
     """
     Get data required while executing convergence
     """
     sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
                                         group_id=group_id))
-    gather_eff = get_all_convergence_data(tenant_id, group_id, now)
+    gather_eff = get_all_launch_server_data(tenant_id, group_id, now)
     try:
         data = yield parallel([sg_eff, gather_eff])
     except FirstError as fe:
@@ -236,7 +237,7 @@ def convergence_exec_data(tenant_id, group_id, now, get_all_convergence_data):
         desired_capacity = group_state.desired
         yield update_cache(scaling_group, servers, lb_nodes, now)
 
-    desired_group_state = get_desired_group_state(
+    desired_group_state = get_desired_server_group_state(
         group_id, launch_config, desired_capacity)
 
     yield do_return((scaling_group, group_state, desired_group_state,
@@ -251,8 +252,8 @@ def _clean_waiting(waiting, group_id):
 @do
 def execute_convergence(tenant_id, group_id, build_timeout,
                         waiting, limited_retry_iterations,
-                        get_all_convergence_data=get_all_convergence_data,
-                        plan=plan):
+                        get_all_launch_server_data=get_all_launch_server_data,
+                        plan_launch_server=plan_launch_server):
     """
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
@@ -277,14 +278,15 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     now_dt = yield Effect(Func(datetime.utcnow))
     all_data = yield msg_with_time(
         "gather-convergence-data",
-        convergence_exec_data(tenant_id, group_id, now_dt,
-                              get_all_convergence_data))
+        convergence_exec_data(
+            tenant_id, group_id, now_dt,
+            get_all_launch_server_data=get_all_launch_server_data))
     (scaling_group, group_state, desired_group_state,
      servers, lb_nodes) = all_data
 
     # prepare plan
-    steps = plan(desired_group_state, servers, lb_nodes,
-                 datetime_to_epoch(now_dt), build_timeout)
+    steps = plan_launch_server(desired_group_state, servers, lb_nodes,
+                               datetime_to_epoch(now_dt), build_timeout)
     yield log_steps(steps)
 
     # Execute plan
@@ -300,7 +302,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
 
     # Handle the status from execution
     if worst_status == StepResult.SUCCESS:
-        result = yield convergence_succeeded(
+        result = yield convergence_succeeded_servers(
             scaling_group, group_state, servers, now_dt)
     elif worst_status == StepResult.FAILURE:
         result = yield convergence_failed(scaling_group, reasons)
@@ -323,7 +325,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
 
 
 @do
-def convergence_succeeded(scaling_group, group_state, servers, now):
+def convergence_succeeded_servers(scaling_group, group_state, servers, now):
     """
     Handle convergence success
     """
