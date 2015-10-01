@@ -1052,3 +1052,109 @@ def publish_to_cloudfeeds(event, log=None):
             'content-type': ['application/vnd.rackspace.atom+json']},
         data=event, log=log, success_pred=has_code(201),
         json_response=False)
+
+
+# ----- Cloud orchestration requests -----
+def list_stacks_all(parameters=None):
+    """
+    List Heat stacks.
+
+    :param dict parameters: Query parameters to include.
+
+    :return: List of stack details JSON.
+    """
+
+    # TODO Actually implement batch handling
+    eff = service_request(
+        ServiceType.CLOUD_ORCHESTRATION,
+        'GET', 'stacks',
+        success_pred=has_code(200),
+        reauth_codes=(401,),
+        params=parameters)
+
+    return (eff.on(log_success_response('request-list-stacks-all', identity))
+               .on(lambda (response, body): body['stacks']))
+
+
+def create_stack(stack_args):
+    """
+    Create a stack using Heat.
+
+    :param dict stack_args: The dictionary to pass to Heat specifying how the
+        stack should be built.
+
+    :return: JSON `dict`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_ORCHESTRATION,
+        'POST', 'stacks',
+        data=stack_args,
+        success_pred=has_code(201),
+        reauth_codes=(401,))
+
+    return (eff.on(log_success_response('request-create-stack', identity))
+               .on(lambda (response, body): body['stack']))
+
+
+def check_stack(stack_name, stack_id):
+    """
+    Check a stack using Heat.
+
+    :param string stack_name: The name of the stack.
+    :param string stack_id: The id of the stack.
+
+    :return: `None`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_ORCHESTRATION,
+        'POST', append_segments('stacks', stack_name, stack_id, 'actions'),
+        data={'check': None},
+        success_pred=has_code(201),
+        reauth_codes=(401,))
+
+    return (eff.on(log_success_response('request-check-stack', identity,
+                                        log_as_json=False))
+               .on(lambda _: None))
+
+
+def update_stack(stack_name, stack_id, stack_args):
+    """
+    Update a stack using Heat.
+
+    :param string stack_name: The name of the stack.
+    :param string stack_id: The id of the stack.
+    :param dict stack_args: The dictionary to pass to Heat specifying how the
+        stack should be updated.
+
+    :return: `None`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_ORCHESTRATION,
+        'PUT', append_segments('stacks', stack_name, stack_id),
+        data=stack_args,
+        success_pred=has_code(202),
+        reauth_codes=(401,))
+
+    return (eff.on(log_success_response('request-update-stack', identity,
+                                        log_as_json=False))
+               .on(lambda _: None))
+
+
+def delete_stack(stack_name, stack_id):
+    """
+    Delete a stack using Heat.
+
+    :param string stack_name: The name of the stack.
+    :param string stack_id: The id of the stack.
+
+    :return: `None`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_ORCHESTRATION,
+        'DELETE', append_segments('stacks', stack_name, stack_id),
+        success_pred=has_code(204),
+        reauth_codes=(401,))
+
+    return (eff.on(log_success_response('request-delete-stack', identity,
+                                        log_as_json=False))
+               .on(lambda _: None))
