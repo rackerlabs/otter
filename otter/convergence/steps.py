@@ -170,7 +170,7 @@ class CreateStack(object):
     """
     stack_config = attr.ib(validator=instance_of(PMap))
 
-    def as_effect(self):
+    def as_effect(self, append_stack_uuid=append_stack_uuid):
         """Produce a :obj:`Effect` to create a stack."""
 
         stack_config = append_stack_uuid(self.stack_config)
@@ -271,8 +271,8 @@ class DeleteStack(object):
         def report_success(result):
             return StepResult.RETRY, [
                 ErrorReason.String(
-                    'must re-gather after deletion in order to update the '
-                    'active cache')]
+                    'Must re-gather after stack deletion in order to update '
+                    'the active cache')]
 
         return eff.on(success=report_success)
 
