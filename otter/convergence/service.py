@@ -393,7 +393,7 @@ def convergence_succeeded_stacks(scaling_group, group_state, stacks, now):
     Handle convergence success
     """
     if group_state.status == ScalingGroupStatus.DELETING:
-        # servers have been deleted. Delete the group for real
+        # stacks have been deleted. Delete the group for real
         yield Effect(DeleteGroup(tenant_id=scaling_group.tenant_id,
                                  group_id=scaling_group.uuid))
         yield do_return(None)

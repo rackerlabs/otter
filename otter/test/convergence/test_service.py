@@ -1348,6 +1348,36 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             ConvergenceIterationStatus.Stop())
 
+    def test_launch_stack_config(self):
+        lc = {'args': {'stack': {'stack_name': 'foo'}},
+              'type': 'launch_stack'}
+
+        self.manifest = {
+            'state': self.state,
+            'launchConfiguration': lc,
+        }
+
+        self.gsgi_result = (self.group, self.manifest)
+
+        seq = [
+            parallel_sequence([]),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            (ModifyReference(self.waiting,
+                             match_func(pmap({self.group_id: 43}),
+                                        pmap())),
+             dispatch(reference_dispatcher)),
+        ]
+        eff = (
+            execute_convergence(
+                self.tenant_id, self.group_id, build_timeout=3600,
+                waiting=self.waiting,
+                limited_retry_iterations=43,
+                get_all_launch_stack_data=intent_func('gacd'),
+                plan_launch_server=None)
+        )
+        perform_sequence(self.get_seq(with_cache=False) + seq, eff)
+
 
 class IsAutoscaleActiveTests(SynchronousTestCase):
     """Tests for :func:`is_autoscale_active`."""
