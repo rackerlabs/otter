@@ -90,7 +90,7 @@ from datetime import datetime
 from functools import partial
 from hashlib import sha1
 
-from effect import Constant, Effect, FirstError, Func, parallel
+from effect import Constant, Effect, Func, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
 
@@ -221,15 +221,15 @@ def convergence_exec_data(tenant_id, group_id, now,
     """
     sg_eff = Effect(GetScalingGroupInfo(tenant_id=tenant_id,
                                         group_id=group_id))
-    gather_eff = get_all_launch_server_data(tenant_id, group_id, now)
-    try:
-        data = yield parallel([sg_eff, gather_eff])
-    except FirstError as fe:
-        six.reraise(*fe.exc_info)
-    [(scaling_group, manifest), (servers, lb_nodes)] = data
+
+    (scaling_group, manifest) = yield sg_eff
 
     group_state = manifest['state']
     launch_config = manifest['launchConfiguration']
+
+    gather_eff = get_all_launch_server_data(tenant_id, group_id, now)
+
+    (servers, lb_nodes) = yield gather_eff
 
     if group_state.status == ScalingGroupStatus.DELETING:
         desired_capacity = 0

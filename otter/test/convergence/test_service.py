@@ -60,7 +60,6 @@ from otter.test.utils import (
     noop,
     raise_,
     raise_to_exc_info,
-    test_dispatcher,
     transform_eq)
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
@@ -831,11 +830,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
     def get_seq(self, with_cache=True):
         exec_seq = [
-            parallel_sequence([
-                [(self.gsgi, lambda i: self.gsgi_result)],
-                [(("gacd", self.tenant_id, self.group_id, self.now),
-                 lambda i: (self.servers, ()))]
-            ])
+            (self.gsgi, lambda i: self.gsgi_result),
+            (("gacd", self.tenant_id, self.group_id, self.now),
+             lambda i: (self.servers, ()))
         ]
         if with_cache:
             exec_seq.append(
@@ -942,30 +939,6 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             ConvergenceIterationStatus.Stop())
-
-    def test_first_error_extraction(self):
-        """
-        If the GetScalingGroupInfo effect fails, its exception is raised
-        directly, without the FirstError wrapper.
-        """
-        # Perform the GetScalingGroupInfo by raising an exception
-        sequence = [
-            (Log("begin-convergence", {}), noop),
-            (Func(datetime.utcnow), lambda i: self.now),
-            (MsgWithTime("gather-convergence-data", mock.ANY),
-             nested_sequence([
-                parallel_sequence([
-                    [(self.gsgi, lambda i: raise_(RuntimeError('foo')))],
-                    [("anything", noop)]
-                ])
-             ]))
-        ]
-
-        # And make sure that exception isn't wrapped in FirstError.
-        e = self.assertRaises(
-            RuntimeError, perform_sequence, sequence, self._invoke(),
-            test_dispatcher())
-        self.assertEqual(str(e), 'foo')
 
     def test_log_reasons(self):
         """When a step doesn't succeed, useful information is logged."""
