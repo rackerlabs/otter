@@ -90,6 +90,8 @@ from datetime import datetime
 from functools import partial
 from hashlib import sha1
 
+import attr
+
 from effect import Constant, Effect, Func, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
@@ -130,6 +132,12 @@ from otter.util.timestamp import datetime_to_epoch
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 
+def get_executor(launch_config):
+    if launch_config['type'] == 'launch_server':
+        return LaunchServerExecutor()
+    raise NotImplementedError
+
+
 def server_to_json(server):
     """
     Convert a NovaServer to a dict representation suitable for returning to the
@@ -162,7 +170,7 @@ def is_autoscale_active(server, lb_nodes):
                              if node.matches(server)]))
 
 
-def update_cache(group, servers, lb_nodes, now, include_deleted=True):
+def update_servers_cache(group, servers, lb_nodes, now, include_deleted=True):
     """
     Updates the cache, adding servers, with a flag if autoscale is active on
     each one.
@@ -220,7 +228,7 @@ def _execute_steps(steps):
 
 @do
 def convergence_exec_data(tenant_id, group_id, now,
-                          get_all_launch_server_data):
+                          get_executor):
     """
     Get data required while executing convergence
     """
@@ -232,7 +240,9 @@ def convergence_exec_data(tenant_id, group_id, now,
     group_state = manifest['state']
     launch_config = manifest['launchConfiguration']
 
-    gather_eff = get_all_launch_server_data(tenant_id, group_id, now)
+    executor = get_executor(launch_config)
+
+    gather_eff = executor.gather(tenant_id, group_id, now)
 
     (servers, lb_nodes) = yield gather_eff
 
@@ -240,12 +250,12 @@ def convergence_exec_data(tenant_id, group_id, now,
         desired_capacity = 0
     else:
         desired_capacity = group_state.desired
-        yield update_cache(scaling_group, servers, lb_nodes, now)
+        yield executor.update_cache(scaling_group, servers, lb_nodes, now)
 
-    desired_group_state = get_desired_server_group_state(
+    desired_group_state = executor.get_desired_group_state(
         group_id, launch_config, desired_capacity)
 
-    yield do_return((scaling_group, group_state, desired_group_state,
+    yield do_return((executor, scaling_group, group_state, desired_group_state,
                      servers, lb_nodes))
 
 
@@ -257,8 +267,7 @@ def _clean_waiting(waiting, group_id):
 @do
 def execute_convergence(tenant_id, group_id, build_timeout,
                         waiting, limited_retry_iterations,
-                        get_all_launch_server_data=get_all_launch_server_data,
-                        plan_launch_server=plan_launch_server):
+                        get_executor=get_executor):
     """
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
@@ -285,13 +294,13 @@ def execute_convergence(tenant_id, group_id, build_timeout,
         "gather-convergence-data",
         convergence_exec_data(
             tenant_id, group_id, now_dt,
-            get_all_launch_server_data=get_all_launch_server_data))
-    (scaling_group, group_state, desired_group_state,
+            get_executor=get_executor))
+    (executor, scaling_group, group_state, desired_group_state,
      servers, lb_nodes) = all_data
 
     # prepare plan
-    steps = plan_launch_server(desired_group_state, servers, lb_nodes,
-                               datetime_to_epoch(now_dt), build_timeout)
+    steps = executor.plan(desired_group_state, servers, lb_nodes,
+                          datetime_to_epoch(now_dt), build_timeout)
     yield log_steps(steps)
 
     # Execute plan
@@ -307,8 +316,8 @@ def execute_convergence(tenant_id, group_id, build_timeout,
 
     # Handle the status from execution
     if worst_status == StepResult.SUCCESS:
-        result = yield convergence_succeeded_servers(
-            scaling_group, group_state, servers, lb_nodes, now_dt)
+        result = yield convergence_succeeded(
+            executor, scaling_group, group_state, servers, lb_nodes, now_dt)
     elif worst_status == StepResult.FAILURE:
         result = yield convergence_failed(scaling_group, reasons)
     elif worst_status is StepResult.LIMITED_RETRY:
@@ -330,8 +339,8 @@ def execute_convergence(tenant_id, group_id, build_timeout,
 
 
 @do
-def convergence_succeeded_servers(scaling_group, group_state, servers,
-                                  lb_nodes, now):
+def convergence_succeeded(executor, scaling_group, group_state, servers,
+                          lb_nodes, now):
     """
     Handle convergence success
     """
@@ -346,8 +355,8 @@ def convergence_succeeded_servers(scaling_group, group_state, servers,
         yield cf_msg('group-status-active',
                      status=ScalingGroupStatus.ACTIVE.name)
     # update servers cache with latest servers
-    yield update_cache(scaling_group, servers, lb_nodes, now,
-                       include_deleted=False)
+    yield executor.update_cache(scaling_group, servers, lb_nodes, now,
+                                include_deleted=False)
     yield do_return(ConvergenceIterationStatus.Stop())
 
 
@@ -802,3 +811,18 @@ class Converger(MultiService):
             # the return value is ignored, but we return this for testing
             eff = self._converge_all(my_buckets, children)
             return perform(self._dispatcher, self._with_conv_runid(eff))
+
+
+class ConvergenceExecutor(object):
+    gather = attr.ib()
+    plan = attr.ib()
+    get_desired_group_state = attr.ib()
+    update_cache = attr.ib()
+
+
+@attr.s
+class LaunchServerExecutor(ConvergenceExecutor):
+    gather = attr.ib(default=get_all_launch_server_data)
+    plan = attr.ib(default=plan_launch_server)
+    get_desired_group_state = attr.ib(default=get_desired_server_group_state)
+    update_cache = attr.ib(default=update_servers_cache)

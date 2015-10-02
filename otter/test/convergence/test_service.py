@@ -4,6 +4,8 @@ import traceback
 import uuid
 from datetime import datetime
 
+import attr
+
 from effect import (
     ComposedDispatcher, Effect, Error, Func, base_dispatcher, sync_perform)
 from effect.ref import (
@@ -24,19 +26,24 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.cloud_client import NoSuchCLBError, TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import get_desired_server_group_state
+from otter.convergence.gathering import get_all_launch_server_data
 from otter.convergence.model import (
     CLBDescription, CLBNode, ConvergenceIterationStatus, ErrorReason,
     ServerState, StepResult)
+from otter.convergence.planning import plan_launch_server
 from otter.convergence.service import (
     ConcurrentError,
+    ConvergenceExecutor,
     ConvergenceStarter,
     Converger,
+    LaunchServerExecutor,
     converge_all_groups,
     converge_one_group,
     execute_convergence, get_my_divergent_groups,
     is_autoscale_active,
     non_concurrently,
-    trigger_convergence)
+    trigger_convergence,
+    update_servers_cache)
 from otter.convergence.steps import ConvergeLater, CreateServer
 from otter.log.intents import BoundFields, Log, LogErr, MsgWithTime
 from otter.models.intents import (
@@ -806,7 +813,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                 {}, {}, None, {}, False,
                                 ScalingGroupStatus.ACTIVE, desired=2)
         self.group = mock_group(self.state, self.tenant_id, self.group_id)
-        self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
+        self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []},
+                   'type': 'launch_server'}
 
         self.clb_desc = CLBDescription(lb_id='23', port=80)
         self.desired_lbs = s(self.clb_desc)
@@ -855,12 +863,13 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
 
     def _invoke(self, plan=None):
-        kwargs = {'plan_launch_server': plan} if plan is not None else {}
+        kwargs = {'plan': plan} if plan is not None else {}
+        executor = LaunchServerExecutor(gather=intent_func("gacd"), **kwargs)
         return execute_convergence(
             self.tenant_id, self.group_id, build_timeout=3600,
             waiting=self.waiting,
             limited_retry_iterations=43,
-            get_all_launch_server_data=intent_func("gacd"), **kwargs)
+            get_executor=lambda _: executor)
 
     def test_no_steps(self):
         """
@@ -1417,3 +1426,28 @@ class IsAutoscaleActiveTests(SynchronousTestCase):
                        desired_lbs=desired_lbs),
                 lb_nodes),
             True)
+
+
+class ConvergenceExecutorTests(SynchronousTestCase):
+    def setUp(self):
+        self.fake_attrs = {
+            'gather': 'g',
+            'plan': 'p',
+            'get_desired_group_state': 'gdgs',
+            'update_cache': 'uc',
+        }
+        self.lse = LaunchServerExecutor()
+
+    def test_launch_server_executor(self):
+        attrs = {
+            'gather': get_all_launch_server_data,
+            'plan': plan_launch_server,
+            'get_desired_group_state': get_desired_server_group_state,
+            'update_cache': update_servers_cache,
+        }
+        self.assertTrue(isinstance(self.lse, ConvergenceExecutor))
+        self.assertEqual(attr.asdict(self.lse), attrs)
+
+    def test_launch_server_overrides(self):
+        ce = LaunchServerExecutor(**self.fake_attrs)
+        self.assertEqual(attr.asdict(ce), self.fake_attrs)
