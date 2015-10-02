@@ -33,7 +33,7 @@ from otter.cloud_client import (
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
     extract_CLB_drained_at,
-    get_all_convergence_data,
+    get_all_launch_server_data,
     get_all_scaling_group_servers,
     get_all_server_details,
     get_clb_contents,
@@ -631,8 +631,8 @@ def _constant_as_eff(args, retval):
     return lambda *a: Effect(Stub(Constant(retval))) if a == args else (1 / 0)
 
 
-class GetAllConvergenceDataTests(SynchronousTestCase):
-    """Tests for :func:`get_all_convergence_data`."""
+class GetAllLaunchServerDataTests(SynchronousTestCase):
+    """Tests for :func:`get_all_launch_server_data`."""
 
     def setUp(self):
         """Save some stuff."""
@@ -665,7 +665,7 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
         rcv3_nodes = [RCv3Node(node_id='node2', cloud_server_id='a',
                                description=RCv3Description(lb_id='lb2'))]
 
-        eff = get_all_convergence_data(
+        eff = get_all_launch_server_data(
             'tid',
             'gid',
             self.now,
@@ -688,10 +688,10 @@ class GetAllConvergenceDataTests(SynchronousTestCase):
 
     def test_no_group_servers(self):
         """
-        If there are no servers in a group, get_all_convergence_data includes
+        If there are no servers in a group, get_all_launch_server_data includes
         an empty list.
         """
-        eff = get_all_convergence_data(
+        eff = get_all_launch_server_data(
             'tid',
             'gid',
             self.now,
