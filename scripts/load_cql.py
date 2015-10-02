@@ -165,7 +165,7 @@ def webhook_migrate(reactor, conn):
     """
     Migrate webhook indexes to table
     """
-    store = CassScalingGroupCollection(conn, None, 3)
+    store = CassScalingGroupCollection(None, None, 3)
     eff = store.get_webhook_index_only().on(store.add_webhook_keys)
     return perform(get_working_cql_dispatcher(reactor, conn), eff)
 
@@ -175,7 +175,7 @@ def insert_deleting_false(reactor, conn):
     """
     Insert false to all group's deleting column
     """
-    store = CassScalingGroupCollection(None, None, 3)
+    store = CassScalingGroupCollection(conn, None, 3)
     groups = yield store.get_scaling_group_rows()
     query = (
         'INSERT INTO scaling_group ("tenantId", "groupId", deleting) '
