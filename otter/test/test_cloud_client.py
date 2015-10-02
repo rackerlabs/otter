@@ -1157,11 +1157,11 @@ class NovaClientTests(SynchronousTestCase):
         """
         Correctly parses user configuration errors.
         """
-        def _plaintext(msg):
+        def _plaintext(msg, extra=""):
             body = "".join((
                 "403 Forbidden\n\n",
                 "Access was denied to this resource.\n\n ",
-                msg))
+                msg + extra))
             return (403, body, msg)
 
         def _badrequest(msg):
@@ -1177,7 +1177,8 @@ class NovaClientTests(SynchronousTestCase):
                 "11111111-1111-1111-1111-111111111111) required but missing"),
             _plaintext(
                 "Networks (00000000-0000-0000-0000-000000000000) not allowed"),
-            _plaintext("Exactly 1 isolated network(s) must be attached")]
+            _plaintext("Exactly 1 isolated network(s) must be attached"),
+            _plaintext("Exactly 1 isolated network(s) must be attached", " ")]
 
         expected, real = self._setup_for_create_server()
 

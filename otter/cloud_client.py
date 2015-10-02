@@ -771,7 +771,7 @@ def _process_clb_api_error(api_error_code, json_body, lb_id):
 
 def _forbidden_plaintext(message):
     return _regex(
-        "403 Forbidden\s+Access was denied to this resource\.\s+({0})$"
+        "403 Forbidden\s+Access was denied to this resource\.\s+({0})\s*$"
         .format(message))
 
 _NOVA_403_NO_PUBLIC_NETWORK = _forbidden_plaintext(
