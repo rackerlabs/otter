@@ -35,8 +35,6 @@ from otter.metrics import (
     collect_metrics,
     get_all_metrics,
     get_all_metrics_effects,
-    # get_scaling_group_rows,
-    # get_scaling_groups,
     get_tenant_metrics,
     get_todays_scaling_groups,
     get_todays_tenants,
