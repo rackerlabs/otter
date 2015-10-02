@@ -21,7 +21,6 @@ from twisted.internet.endpoints import clientFromString
 from txeffect import perform
 
 from otter.effect_dispatcher import get_working_cql_dispatcher
-from otter.metrics import get_scaling_group_rows
 from otter.models.cass import CassScalingGroupCollection
 from otter.test.resources import CQLGenerator
 from otter.util.cqlbatch import batch
@@ -176,7 +175,8 @@ def insert_deleting_false(reactor, conn):
     """
     Insert false to all group's deleting column
     """
-    groups = yield get_scaling_group_rows(conn)
+    store = CassScalingGroupCollection(conn, None, 3)
+    groups = yield store.get_scaling_group_rows()
     query = (
         'INSERT INTO scaling_group ("tenantId", "groupId", deleting) '
         'VALUES (:tenantId{i}, :groupId{i}, false);')
