@@ -23,7 +23,7 @@ from pyrsistent import freeze
 
 from silverberg.client import ConsistencyLevel
 
-from toolz.curried import filter, map
+from toolz.curried import filter, groupby, map
 from toolz.dicttoolz import keymap, merge
 from toolz.functoolz import compose
 
@@ -1732,6 +1732,79 @@ class CassScalingGroupCollection:
                       (True, {'cassandra_time':
                               self.reactor.seconds() - start_time}))
         return d
+
+    def get_all_groups(self):
+        """
+        Get *all* valid scaling groups, grouped by tenantId.
+
+        :return: `Deferred` fired with ``dict`` of the form
+            {"tenantId1": [{group_dict_1...}, {group_dict_2..}],
+             "tenantId2": [{group_dict_1...}, {group_dict_2..}, ...]}
+        """
+        def _valid_group_row(row):
+            return (row.get('created_at') is not None and
+                    row.get('desired') is not None and
+                    row.get('status') not in ('DISABLED', 'ERROR') and
+                    not row.get('deleting', False))
+
+        d = self._get_scaling_group_rows(
+            props=["status", "deleting", "created_at"])
+        d.addCallback(filter(_valid_group_row))
+        return d.addCallback(groupby(lambda g: g["tenantId"]))
+
+    @defer.inlineCallbacks
+    def _get_scaling_group_rows(self, props=None, batch_size=100):
+        """
+        Return scaling group rows from Cassandra as a list of ``dict`` where
+        each dict has 'tenantId', 'groupId', 'desired', 'active', 'pending' and
+        any other properties given in `props`
+
+        :param ``list`` props: List of extra properties to extract
+        :param int batch_size: Number of groups to fetch at a time
+        :return: `Deferred` fired with ``list`` of ``dict``
+        """
+        # TODO: Currently returning all groups as one giant list for now.
+        # Will try to use Twisted tubes to do streaming later
+        _props = set(['"tenantId"', '"groupId"', 'desired',
+                      'active', 'pending']) | set(props or [])
+        query = ('SELECT ' + ','.join(sorted(list(_props))) +
+                 ' FROM scaling_group {where} LIMIT :limit;')
+        where_key = 'WHERE "tenantId"=:tenantId AND "groupId">:groupId'
+        where_token = 'WHERE token("tenantId") > token(:tenantId)'
+
+        # We first start by getting all groups limited on batch size
+        # It will return groups sorted first based on hash of tenant id
+        # and then based group id. Note that only tenant id is sorted
+        # based on hash; group id is sorted normally
+        batch = yield self.connection.execute(
+            query.format(where=''),
+            {'limit': batch_size}, ConsistencyLevel.ONE)
+        if len(batch) < batch_size:
+            defer.returnValue(batch)
+
+        # We got batch size response. That means there are probably more groups
+        groups = batch
+        while batch != []:
+            # We start by getting all the groups of last tenant ID we received
+            # except the ones we already got. We do that by asking
+            # groups > last group id since groups are sorted
+            tenant_id = batch[-1]['tenantId']
+            while len(batch) == batch_size:
+                batch = yield self.connection.execute(
+                    query.format(where=where_key),
+                    {'limit': batch_size,
+                     'tenantId': tenant_id,
+                     'groupId': batch[-1]['groupId']},
+                    ConsistencyLevel.ONE)
+                groups.extend(batch)
+            # We then get next tenant's groups by using there hash value. i.e
+            # tenants whose hash > last tenant id we just fetched
+            batch = yield self.connection.execute(
+                query.format(where=where_token),
+                {'limit': batch_size, 'tenantId': tenant_id},
+                ConsistencyLevel.ONE)
+            groups.extend(batch)
+        defer.returnValue(groups)
 
 
 @implementer(IScalingGroupServersCache)
