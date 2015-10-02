@@ -1747,13 +1747,13 @@ class CassScalingGroupCollection:
                     row.get('status') not in ('DISABLED', 'ERROR') and
                     not row.get('deleting', False))
 
-        d = self._get_scaling_group_rows(
+        d = self.get_scaling_group_rows(
             props=["status", "deleting", "created_at"])
         d.addCallback(filter(_valid_group_row))
         return d.addCallback(groupby(lambda g: g["tenantId"]))
 
     @defer.inlineCallbacks
-    def _get_scaling_group_rows(self, props=None, batch_size=100):
+    def get_scaling_group_rows(self, props=None, batch_size=100):
         """
         Return scaling group rows from Cassandra as a list of ``dict`` where
         each dict has 'tenantId', 'groupId', 'desired', 'active', 'pending' and

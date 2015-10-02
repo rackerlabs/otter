@@ -3974,7 +3974,7 @@ class GetScalingGroupsTests(SynchronousTestCase):
     """Tests for ``get_all_groups``."""
 
     @mock.patch("otter.models.cass.CassScalingGroupCollection"
-                "._get_scaling_group_rows")
+                ".get_scaling_group_rows")
     def test_success(self, mock_gsgr):
         clock = Clock()
         client = mock.Mock(spec=CQLClient)
@@ -4026,7 +4026,7 @@ class GetScalingGroupRowsTests(SynchronousTestCase):
                   for i in range(2) for j in range(2)]
         self._add_exec_args(
             self.select + ' LIMIT :limit;', {'limit': 5}, groups)
-        d = self.collection._get_scaling_group_rows(batch_size=5)
+        d = self.collection.get_scaling_group_rows(batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups)
 
     def test_gets_props(self):
@@ -4042,8 +4042,8 @@ class GetScalingGroupRowsTests(SynchronousTestCase):
              'desired,launch,pending '
              'FROM scaling_group  LIMIT :limit;'),
             {'limit': 5}, groups)
-        d = self.collection._get_scaling_group_rows(props=['launch'],
-                                                    batch_size=5)
+        d = self.collection.get_scaling_group_rows(props=['launch'],
+                                                   batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups)
 
     def test_last_tenant_has_less_groups(self):
@@ -4064,7 +4064,7 @@ class GetScalingGroupRowsTests(SynchronousTestCase):
             self.select + ('WHERE token("tenantId") > token(:tenantId)'
                            ' LIMIT :limit;'),
             {'limit': 5, 'tenantId': 1}, [])
-        d = self.collection._get_scaling_group_rows(batch_size=5)
+        d = self.collection.get_scaling_group_rows(batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups)
 
     def test_many_tenants_having_more_than_batch_groups(self):
@@ -4096,5 +4096,5 @@ class GetScalingGroupRowsTests(SynchronousTestCase):
         self._add_exec_args(
             self.select + where_token,
             {'limit': 5, 'tenantId': 2}, [])
-        d = self.collection._get_scaling_group_rows(batch_size=5)
+        d = self.collection.get_scaling_group_rows(batch_size=5)
         self.assertEqual(list(self.successResultOf(d)), groups1 + groups2)
