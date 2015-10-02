@@ -3968,3 +3968,133 @@ class CassAdminTestCase(SynchronousTestCase):
         result = self.successResultOf(d)
         self.assertEquals(result, expectedResults)
         self.connection.execute.assert_has_calls(calls)
+
+
+class GetScalingGroupsTests(SynchronousTestCase):
+    """Tests for ``get_all_groups``."""
+
+    @mock.patch("otter.models.cass.CassScalingGroupCollection"
+                "._get_scaling_group_rows")
+    def test_success(self, mock_gsgr):
+        clock = Clock()
+        client = mock.Mock(spec=CQLClient)
+        collection = CassScalingGroupCollection(client, clock, 1)
+        rows = [
+            {'created_at': '0', 'desired': 'some', 'status': 'ACTIVE'},
+            {'desired': 'some', 'status': 'ACTIVE'},  # no created_at
+            {'created_at': '0', 'status': 'ACTIVE'},  # no desired
+            {'created_at': '0', 'desired': 'some'},   # no status
+            {'created_at': '0', 'desired': 'some', 'status': 'DISABLED'},
+            {'created_at': '0', 'desired': 'some', 'deleting': 'True', },
+            {'created_at': '0', 'desired': 'some', 'status': 'ERROR'}]
+        rows = [assoc(row, "tenantId", "t1") for row in rows]
+        mock_gsgr.return_value = defer.succeed(rows)
+        results = self.successResultOf(collection.get_all_groups())
+        self.assertEqual(results, {"t1": [rows[0], rows[3]]})
+        mock_gsgr.assert_called_once_with(
+            props=["status", "deleting", "created_at"])
+
+
+class GetScalingGroupRowsTests(SynchronousTestCase):
+    """Tests for ``get_scaling_group_rows``."""
+
+    def setUp(self):
+        """Mock"""
+        self.clock = Clock()
+        self.client = mock.Mock(spec=CQLClient)
+        self.collection = CassScalingGroupCollection(self.client,
+                                                     self.clock, 1)
+        self.exec_args = {}
+
+        def _exec(query, params, c):
+            return defer.succeed(self.exec_args[freeze((query, params))])
+
+        self.client.execute.side_effect = _exec
+        self.select = ('SELECT "groupId","tenantId",'
+                       'active,desired,pending '
+                       'FROM scaling_group ')
+
+    def _add_exec_args(self, query, params, ret):
+        self.exec_args[freeze((query, params))] = ret
+
+    def test_all_groups_less_than_batch(self):
+        """
+        Works when number of all groups of all tenants < batch size
+        """
+        groups = [{'tenantId': i, 'groupId': j,
+                   'desired': 3, 'created_at': 'c'}
+                  for i in range(2) for j in range(2)]
+        self._add_exec_args(
+            self.select + ' LIMIT :limit;', {'limit': 5}, groups)
+        d = self.collection._get_scaling_group_rows(batch_size=5)
+        self.assertEqual(list(self.successResultOf(d)), groups)
+
+    def test_gets_props(self):
+        """
+        If props arg is given then returns groups with that property in it
+        """
+        groups = [{'tenantId': 1, 'groupId': 2, 'desired': 3,
+                   'created_at': 'c', 'launch': 'l'},
+                  {'tenantId': 1, 'groupId': 3, 'desired': 2,
+                   'created_at': 'c', 'launch': 'b'}]
+        self._add_exec_args(
+            ('SELECT "groupId","tenantId",active,'
+             'desired,launch,pending '
+             'FROM scaling_group  LIMIT :limit;'),
+            {'limit': 5}, groups)
+        d = self.collection._get_scaling_group_rows(props=['launch'],
+                                                    batch_size=5)
+        self.assertEqual(list(self.successResultOf(d)), groups)
+
+    def test_last_tenant_has_less_groups(self):
+        """
+        Fetches initial batch, then gets all groups of last tenant
+        in that batch and stops when there are no more tenants
+        """
+        groups = [{'tenantId': 1, 'groupId': i,
+                   'desired': 3, 'created_at': 'c'}
+                  for i in range(7)]
+        self._add_exec_args(
+            self.select + ' LIMIT :limit;', {'limit': 5}, groups[:5])
+        self._add_exec_args(
+            self.select + ('WHERE "tenantId"=:tenantId AND '
+                           '"groupId">:groupId LIMIT :limit;'),
+            {'limit': 5, 'tenantId': 1, 'groupId': 4}, groups[5:])
+        self._add_exec_args(
+            self.select + ('WHERE token("tenantId") > token(:tenantId)'
+                           ' LIMIT :limit;'),
+            {'limit': 5, 'tenantId': 1}, [])
+        d = self.collection._get_scaling_group_rows(batch_size=5)
+        self.assertEqual(list(self.successResultOf(d)), groups)
+
+    def test_many_tenants_having_more_than_batch_groups(self):
+        """
+        Gets all groups when there are many tenants each of them
+        having groups > batch size
+        """
+        groups1 = [{'tenantId': 1, 'groupId': i,
+                    'desired': 3, 'created_at': 'c'}
+                   for i in range(7)]
+        groups2 = [{'tenantId': 2, 'groupId': i,
+                    'desired': 4, 'created_at': 'c'}
+                   for i in range(9)]
+        self._add_exec_args(
+            self.select + ' LIMIT :limit;', {'limit': 5}, groups1[:5])
+        where_tenant = ('WHERE "tenantId"=:tenantId AND '
+                        '"groupId">:groupId LIMIT :limit;')
+        where_token = ('WHERE token("tenantId") > token(:tenantId) '
+                       'LIMIT :limit;')
+        self._add_exec_args(
+            self.select + where_tenant,
+            {'limit': 5, 'tenantId': 1, 'groupId': 4}, groups1[5:])
+        self._add_exec_args(
+            self.select + where_token,
+            {'limit': 5, 'tenantId': 1}, groups2[:5])
+        self._add_exec_args(
+            self.select + where_tenant,
+            {'limit': 5, 'tenantId': 2, 'groupId': 4}, groups2[5:])
+        self._add_exec_args(
+            self.select + where_token,
+            {'limit': 5, 'tenantId': 2}, [])
+        d = self.collection._get_scaling_group_rows(batch_size=5)
+        self.assertEqual(list(self.successResultOf(d)), groups1 + groups2)

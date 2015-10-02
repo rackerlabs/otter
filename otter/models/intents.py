@@ -15,6 +15,16 @@ from otter.models.cass import CassScalingGroupServersCache
 from otter.util.fp import assoc_obj
 
 
+@attr.s
+class GetAllGroups(object):
+    pass
+
+
+@deferred_performer
+def perform_get_all_groups(store, dispatcher, intent):
+    return store.get_all_groups()
+
+
 @attributes(['tenant_id', 'group_id'])
 class GetScalingGroupInfo(object):
     """Get a scaling group and its manifest."""
@@ -127,5 +137,6 @@ def get_model_dispatcher(log, store):
         UpdateGroupStatus: perform_update_group_status,
         UpdateServersCache: perform_update_servers_cache,
         UpdateGroupErrorReasons: perform_update_error_reasons,
-        ModifyGroupStatePaused: perform_modify_group_state_paused
+        ModifyGroupStatePaused: perform_modify_group_state_paused,
+        GetAllGroups: partial(perform_get_all_groups, store),
     })

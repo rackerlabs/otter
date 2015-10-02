@@ -12,13 +12,9 @@ from effect.testing import SequenceDispatcher, perform_sequence
 
 import mock
 
-from pyrsistent import freeze
-
-from silverberg.client import CQLClient
-
 from testtools.matchers import IsInstance
 
-from toolz.dicttoolz import assoc, keyfilter, merge
+from toolz.dicttoolz import keyfilter, merge
 from toolz.itertoolz import groupby
 
 from twisted.internet.base import ReactorBase
@@ -39,8 +35,8 @@ from otter.metrics import (
     collect_metrics,
     get_all_metrics,
     get_all_metrics_effects,
-    get_scaling_group_rows,
-    get_scaling_groups,
+    # get_scaling_group_rows,
+    # get_scaling_groups,
     get_tenant_metrics,
     get_todays_scaling_groups,
     get_todays_tenants,
@@ -62,133 +58,6 @@ from otter.test.utils import (
     resolve_effect,
 )
 from otter.util.fileio import ReadFileLines, WriteFileLines
-
-
-class GetScalingGroupsTests(SynchronousTestCase):
-    """Tests for :func:`get_scaling_groups`"""
-
-    @mock.patch("otter.metrics.get_scaling_group_rows")
-    def test_success(self, mock_gsgr):
-        rows = [
-            {'created_at': '0', 'desired': 'some', 'status': 'ACTIVE'},
-            {'desired': 'some', 'status': 'ACTIVE'},  # no created_at
-            {'created_at': '0', 'status': 'ACTIVE'},  # no desired
-            {'created_at': '0', 'desired': 'some'},   # no status
-            {'created_at': '0', 'desired': 'some', 'status': 'DISABLED'},
-            {'created_at': '0', 'desired': 'some', 'deleting': 'True', },
-            {'created_at': '0', 'desired': 'some', 'status': 'ERROR'}]
-        rows = [assoc(row, "tenantId", "t1") for row in rows]
-        mock_gsgr.return_value = succeed(rows)
-        results = self.successResultOf(get_scaling_groups("client"))
-        self.assertEqual(results, {"t1": [rows[0], rows[3]]})
-        mock_gsgr.assert_called_once_with(
-            "client", props=["status", "deleting", "created_at"])
-
-
-class GetScalingGroupRowsTests(SynchronousTestCase):
-    """
-    Tests for :func:`get_scaling_group_rows`
-    """
-
-    def setUp(self):
-        """
-        Mock
-        """
-        self.client = mock.Mock(spec=CQLClient)
-        self.exec_args = {}
-
-        def _exec(query, params, c):
-            return succeed(self.exec_args[freeze((query, params))])
-
-        self.client.execute.side_effect = _exec
-        self.select = ('SELECT "groupId","tenantId",'
-                       'active,desired,pending '
-                       'FROM scaling_group ')
-
-    def _add_exec_args(self, query, params, ret):
-        self.exec_args[freeze((query, params))] = ret
-
-    def test_all_groups_less_than_batch(self):
-        """
-        Works when number of all groups of all tenants < batch size
-        """
-        groups = [{'tenantId': i, 'groupId': j,
-                   'desired': 3, 'created_at': 'c'}
-                  for i in range(2) for j in range(2)]
-        self._add_exec_args(
-            self.select + ' LIMIT :limit;', {'limit': 5}, groups)
-        d = get_scaling_group_rows(self.client, batch_size=5)
-        self.assertEqual(list(self.successResultOf(d)), groups)
-
-    def test_gets_props(self):
-        """
-        If props arg is given then returns groups with that property in it
-        """
-        groups = [{'tenantId': 1, 'groupId': 2, 'desired': 3,
-                   'created_at': 'c', 'launch': 'l'},
-                  {'tenantId': 1, 'groupId': 3, 'desired': 2,
-                   'created_at': 'c', 'launch': 'b'}]
-        self._add_exec_args(
-            ('SELECT "groupId","tenantId",active,'
-             'desired,launch,pending '
-             'FROM scaling_group  LIMIT :limit;'),
-            {'limit': 5}, groups)
-        d = get_scaling_group_rows(self.client, props=['launch'],
-                                   batch_size=5)
-        self.assertEqual(list(self.successResultOf(d)), groups)
-
-    def test_last_tenant_has_less_groups(self):
-        """
-        Fetches initial batch, then gets all groups of last tenant
-        in that batch and stops when there are no more tenants
-        """
-        groups = [{'tenantId': 1, 'groupId': i,
-                   'desired': 3, 'created_at': 'c'}
-                  for i in range(7)]
-        self._add_exec_args(
-            self.select + ' LIMIT :limit;', {'limit': 5}, groups[:5])
-        self._add_exec_args(
-            self.select + ('WHERE "tenantId"=:tenantId AND '
-                           '"groupId">:groupId LIMIT :limit;'),
-            {'limit': 5, 'tenantId': 1, 'groupId': 4}, groups[5:])
-        self._add_exec_args(
-            self.select + ('WHERE token("tenantId") > token(:tenantId)'
-                           ' LIMIT :limit;'),
-            {'limit': 5, 'tenantId': 1}, [])
-        d = get_scaling_group_rows(self.client, batch_size=5)
-        self.assertEqual(list(self.successResultOf(d)), groups)
-
-    def test_many_tenants_having_more_than_batch_groups(self):
-        """
-        Gets all groups when there are many tenants each of them
-        having groups > batch size
-        """
-        groups1 = [{'tenantId': 1, 'groupId': i,
-                    'desired': 3, 'created_at': 'c'}
-                   for i in range(7)]
-        groups2 = [{'tenantId': 2, 'groupId': i,
-                    'desired': 4, 'created_at': 'c'}
-                   for i in range(9)]
-        self._add_exec_args(
-            self.select + ' LIMIT :limit;', {'limit': 5}, groups1[:5])
-        where_tenant = ('WHERE "tenantId"=:tenantId AND '
-                        '"groupId">:groupId LIMIT :limit;')
-        where_token = ('WHERE token("tenantId") > token(:tenantId) '
-                       'LIMIT :limit;')
-        self._add_exec_args(
-            self.select + where_tenant,
-            {'limit': 5, 'tenantId': 1, 'groupId': 4}, groups1[5:])
-        self._add_exec_args(
-            self.select + where_token,
-            {'limit': 5, 'tenantId': 1}, groups2[:5])
-        self._add_exec_args(
-            self.select + where_tenant,
-            {'limit': 5, 'tenantId': 2, 'groupId': 4}, groups2[5:])
-        self._add_exec_args(
-            self.select + where_token,
-            {'limit': 5, 'tenantId': 2}, [])
-        d = get_scaling_group_rows(self.client, batch_size=5)
-        self.assertEqual(list(self.successResultOf(d)), groups1 + groups2)
 
 
 class GetTenantMetricsTests(SynchronousTestCase):

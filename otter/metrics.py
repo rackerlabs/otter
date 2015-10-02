@@ -12,15 +12,12 @@ from collections import namedtuple
 from datetime import datetime, timedelta
 from functools import partial
 
-import attr
-
-from effect import ComposedDispatcher, Effect, Func, TypeDispatcher
+from effect import ComposedDispatcher, Effect, Func
 from effect.do import do, do_return
 
-from silverberg.client import ConsistencyLevel
 from silverberg.cluster import RoundRobinCassandraCluster
 
-from toolz.curried import filter, get_in, groupby
+from toolz.curried import filter, get_in
 from toolz.dicttoolz import keyfilter, merge
 
 from twisted.application.internet import TimerService
@@ -29,7 +26,7 @@ from twisted.internet import defer, task
 from twisted.internet.endpoints import clientFromString
 from twisted.python import usage
 
-from txeffect import deferred_performer, exc_info_to_failure, perform
+from txeffect import exc_info_to_failure, perform
 
 from otter.auth import generate_authenticator
 from otter.cloud_client import TenantScope, service_request
@@ -38,6 +35,8 @@ from otter.convergence.gathering import get_all_scaling_group_servers
 from otter.effect_dispatcher import get_legacy_dispatcher, get_log_dispatcher
 from otter.log import log as otter_log
 from otter.log.intents import err
+from otter.models.cass import CassScalingGroupCollection
+from otter.models.intents import GetAllGroups, get_model_dispatcher
 from otter.util.fileio import (
     ReadFileLines, WriteFileLines, get_dispatcher as file_dispatcher)
 from otter.util.fp import partition_bool
@@ -61,11 +60,6 @@ def update_last_info(fname, tenants_len, time):
         WriteFileLines(
             fname, [tenants_len, datetime_to_epoch(time)]))
     return eff.on(error=lambda e: err(e, "error updating number of tenants"))
-
-
-@attr.s
-class GetAllGroups(object):
-    pass
 
 
 def get_todays_tenants(tenants, today, last_tenants_len, last_date):
@@ -99,86 +93,6 @@ def get_todays_scaling_groups(convergence_tids, fname):
     yield update_last_info(fname, last_tenants_len, last_date)
     yield do_return(
         keyfilter(lambda t: t in set(tenants + convergence_tids), groups))
-
-
-def valid_group_row(row):
-    """
-    Return True if given scaling group row is valid scaling group
-    """
-    return (
-        row.get('created_at') is not None and
-        row.get('desired') is not None and
-        row.get('status') not in ('DISABLED', 'ERROR') and
-        not row.get('deleting', False))
-
-
-def get_scaling_groups(client):
-    """
-    Get valid scaling groups grouped on tenantId from Cassandra
-
-    :param :class:`silverberg.client.CQLClient` client: A cassandra client
-    :return: `Deferred` fired with ``dict`` of the form
-        {"tenantId1": [{group_dict_1...}, {group_dict_2..}],
-         "tenantId2": [{group_dict_1...}, {group_dict_2..}, ...]}
-    """
-    d = get_scaling_group_rows(
-        client, props=["status", "deleting", "created_at"])
-    d.addCallback(filter(valid_group_row))
-    return d.addCallback(groupby(lambda g: g["tenantId"]))
-
-
-@defer.inlineCallbacks
-def get_scaling_group_rows(client, props=None, batch_size=100):
-    """
-    Return scaling group rows from Cassandra as a list of ``dict`` where each
-    dict has 'tenantId', 'groupId', 'desired', 'active', 'pending'
-    and any other properties given in `props`
-
-    :param :class:`silverberg.client.CQLClient` client: A cassandra client
-    :param ``list`` props: List of extra properties to extract
-    :param int batch_size: Number of groups to fetch at a time
-    :return: `Deferred` fired with ``list`` of ``dict``
-    """
-    # TODO: Currently returning all groups as one giant list for now.
-    # Will try to use Twisted tubes to do streaming later
-    _props = set(['"tenantId"', '"groupId"', 'desired',
-                  'active', 'pending']) | set(props or [])
-    query = ('SELECT ' + ','.join(sorted(list(_props))) +
-             ' FROM scaling_group {where} LIMIT :limit;')
-    where_key = 'WHERE "tenantId"=:tenantId AND "groupId">:groupId'
-    where_token = 'WHERE token("tenantId") > token(:tenantId)'
-
-    # We first start by getting all groups limited on batch size
-    # It will return groups sorted first based on hash of tenant id
-    # and then based group id. Note that only tenant id is sorted
-    # based on hash; group id is sorted normally
-    batch = yield client.execute(query.format(where=''),
-                                 {'limit': batch_size}, ConsistencyLevel.ONE)
-    if len(batch) < batch_size:
-        defer.returnValue(batch)
-
-    # We got batch size response. That means there are probably more groups
-    groups = batch
-    while batch != []:
-        # We start by getting all the groups of last tenant ID we received
-        # except the ones we already got. We do that by asking
-        # groups > last group id since groups are sorted
-        tenant_id = batch[-1]['tenantId']
-        while len(batch) == batch_size:
-            batch = yield client.execute(query.format(where=where_key),
-                                         {'limit': batch_size,
-                                          'tenantId': tenant_id,
-                                          'groupId': batch[-1]['groupId']},
-                                         ConsistencyLevel.ONE)
-            groups.extend(batch)
-        # We then get next tenant's groups by using there hash value. i.e
-        # tenants whose hash > last tenant id we just fetched
-        batch = yield client.execute(query.format(where=where_token),
-                                     {'limit': batch_size,
-                                      'tenantId': tenant_id},
-                                     ConsistencyLevel.ONE)
-        groups.extend(batch)
-    defer.returnValue(groups)
 
 
 GroupMetrics = namedtuple('GroupMetrics',
@@ -311,15 +225,12 @@ def connect_cass_servers(reactor, config):
         seed_endpoints, config['keyspace'], disconnect_on_cancel=True)
 
 
-def get_dispatcher(reactor, authenticator, log, service_configs, client):
+def get_dispatcher(reactor, authenticator, log, service_configs, store):
     return ComposedDispatcher([
         get_legacy_dispatcher(reactor, authenticator, log, service_configs),
         get_log_dispatcher(log, {}),
-        TypeDispatcher({
-            GetAllGroups: deferred_performer(
-                lambda d, i: get_scaling_groups(client))
-        }),
-        file_dispatcher()
+        get_model_dispatcher(log, store),
+        file_dispatcher(),
     ])
 
 
@@ -346,8 +257,9 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     _client = client or connect_cass_servers(reactor, config['cassandra'])
     authenticator = authenticator or generate_authenticator(reactor,
                                                             config['identity'])
+    store = CassScalingGroupCollection(_client, reactor, 1000)
     dispatcher = get_dispatcher(reactor, authenticator, log,
-                                get_service_configs(config), _client)
+                                get_service_configs(config), store)
 
     # calculate metrics
     fpath = get_in(["metrics", "last_tenant_fpath"], config,
