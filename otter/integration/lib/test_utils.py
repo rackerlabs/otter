@@ -9,7 +9,7 @@ from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence.model import (
-    DesiredGroupState,
+    DesiredServerGroupState,
     NovaServer,
     ServerState
 )
@@ -52,7 +52,7 @@ class MeasureProgressTests(SynchronousTestCase):
             servers=self._create_servers(4),
             lb_connections=pset([])
         )
-        desired_state = DesiredGroupState(
+        desired_state = DesiredServerGroupState(
             server_config=pmap(),
             capacity=5,
         )
@@ -73,7 +73,7 @@ class MeasureProgressTests(SynchronousTestCase):
             servers=self._create_servers(2),
             lb_connections=pset([])
         )
-        desired_state = DesiredGroupState(
+        desired_state = DesiredServerGroupState(
             server_config=pmap(),
             capacity=1,
         )
@@ -94,7 +94,7 @@ class MeasureProgressTests(SynchronousTestCase):
             servers=self._create_servers(6),
             lb_connections=pset([])
         )
-        desired_state = DesiredGroupState(
+        desired_state = DesiredServerGroupState(
             server_config=pmap(),
             capacity=5,
         )
@@ -115,7 +115,7 @@ class MeasureProgressTests(SynchronousTestCase):
             servers=self._create_servers(4),
             lb_connections=pset([])
         )
-        desired_state = DesiredGroupState(
+        desired_state = DesiredServerGroupState(
             server_config=pmap(),
             capacity=5,
         )
@@ -133,11 +133,11 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         current_state = GroupState(
-            servers=(self._create_servers(2, state=ServerState.ACTIVE)
-                     | self._create_servers(2, state=ServerState.BUILD)),
+            servers=(self._create_servers(2, state=ServerState.ACTIVE) |
+                     self._create_servers(2, state=ServerState.BUILD)),
             lb_connections=pset([])
         )
-        desired_state = DesiredGroupState(
+        desired_state = DesiredServerGroupState(
             server_config=pmap(),
             capacity=5,
         )
@@ -154,11 +154,11 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         current_state = GroupState(
-            servers=(self._create_servers(1, state=ServerState.ACTIVE)
-                     | self._create_servers(2, state=ServerState.ERROR)),
+            servers=(self._create_servers(1, state=ServerState.ACTIVE) |
+                     self._create_servers(2, state=ServerState.ERROR)),
             lb_connections=pset([])
         )
-        desired_state = DesiredGroupState(
+        desired_state = DesiredServerGroupState(
             server_config=pmap(),
             capacity=5,
         )
@@ -177,11 +177,11 @@ class MeasureProgressTests(SynchronousTestCase):
             lb_connections=pset([])
         )
         current_state = GroupState(
-            servers=(self._create_servers(1, state=ServerState.ACTIVE)
-                     | self._create_servers(1, state=ServerState.ERROR)),
+            servers=(self._create_servers(1, state=ServerState.ACTIVE) |
+                     self._create_servers(1, state=ServerState.ERROR)),
             lb_connections=pset([])
         )
-        desired_state = DesiredGroupState(
+        desired_state = DesiredServerGroupState(
             server_config=pmap(),
             capacity=5,
         )
@@ -194,15 +194,15 @@ class MeasureProgressTests(SynchronousTestCase):
         Errored servers are removed; no progress is made.
         """
         previous_state = GroupState(
-            servers=(self._create_servers(1, state=ServerState.ACTIVE)
-                     | self._create_servers(2, state=ServerState.ERROR)),
+            servers=(self._create_servers(1, state=ServerState.ACTIVE) |
+                     self._create_servers(2, state=ServerState.ERROR)),
             lb_connections=pset([])
         )
         current_state = GroupState(
             servers=(self._create_servers(1, state=ServerState.ACTIVE)),
             lb_connections=pset([])
         )
-        desired_state = DesiredGroupState(
+        desired_state = DesiredServerGroupState(
             server_config=pmap(),
             capacity=5,
         )

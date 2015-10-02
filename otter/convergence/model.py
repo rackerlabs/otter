@@ -307,6 +307,27 @@ class NovaServer(object):
         return repr(self)
 
 
+@attr.s
+class HeatStack(object):
+    action = attr.ib()
+    id = attr.ib()
+    name = attr.ib()
+    status = attr.ib()
+
+    @classmethod
+    def from_stack_details_json(cls, stack_json):
+        action, status = stack_json['stack_status'].split('_', 1)
+
+        return cls(id=stack_json['id'],
+                   name=stack_json['stack_name'],
+                   action=action,
+                   status=status)
+
+
+def get_stack_tag_for_group(group_id):
+    return "autoscale_%s" % group_id
+
+
 def group_id_from_metadata(metadata):
     """
     Get the group ID of a server based on the metadata.
@@ -350,9 +371,9 @@ def generate_metadata(group_id, lb_descriptions):
              Attribute('desired_lbs', default_factory=pset, instance_of=PSet),
              Attribute('draining_timeout', default_value=0.0,
                        instance_of=float)])
-class DesiredGroupState(object):
+class DesiredServerGroupState(object):
     """
-    The desired state for a scaling group.
+    The desired state for a server scaling group.
 
     :ivar dict server_config: compute/nova part of the group launch config.
     :ivar int capacity: the number of desired servers within the group.
@@ -368,6 +389,21 @@ class DesiredGroupState(object):
         Make attributes immutable.
         """
         self.server_config = freeze(self.server_config)
+
+
+@attributes(['stack_config', 'capacity'])
+class DesiredStackGroupState(object):
+    """
+    The desired state for a stack scaling group.
+
+    :ivar dict stack_config: stack part of the group launch config.
+    :ivar int capacity: the number of desired stack within the group.
+    """
+    def __init__(self):
+        """
+        Make attributes immutable.
+        """
+        self.stack_config = freeze(self.stack_config)
 
 
 class ILBDescription(Interface):

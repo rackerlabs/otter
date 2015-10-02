@@ -7,7 +7,7 @@ from toolz.dicttoolz import assoc, dissoc
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.convergence.model import DesiredGroupState
+from otter.convergence.model import DesiredServerGroupState
 
 from otter.log.spec import (
     SpecificationObserverWrapper,
@@ -194,7 +194,8 @@ class ExecuteConvergenceSplitTests(SynchronousTestCase):
         Set up a desired group state to use for desired, so that serializing
         objects can be tested.
         """
-        self.state = DesiredGroupState(server_config='config', capacity=1)
+        self.state = DesiredServerGroupState(
+            server_config='config', capacity=1)
 
     def test_split_out_servers_if_servers_longer(self):
         """

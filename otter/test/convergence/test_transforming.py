@@ -12,6 +12,7 @@ from otter.convergence.steps import (
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     CreateServer,
+    CreateStack,
     DeleteServer,
     RemoveNodesFromCLB,
     )
@@ -82,7 +83,7 @@ class LimitStepCount(SynchronousTestCase):
         The default limit limits server creation to up to 10 steps.
         """
         limits = limit_steps_by_count.keywords["step_limits"]
-        self.assertEqual(limits, pmap({CreateServer: 10}))
+        self.assertEqual(limits, pmap({CreateServer: 10, CreateStack: 10}))
 
 
 class OptimizerTests(SynchronousTestCase):

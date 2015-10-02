@@ -1051,3 +1051,62 @@ def publish_to_cloudfeeds(event, log=None):
             'content-type': ['application/vnd.rackspace.atom+json']},
         data=event, log=log, success_pred=has_code(201),
         json_response=False)
+
+
+# ----- Cloud orchestration requests -----
+def list_stacks_all(parameters=None):
+    """
+    List Heat stacks.
+
+    :ivar dict parameters: Query parameters to include.
+
+    Succeed on 200.
+
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
+    """
+
+    # TODO Actually implement batch handling
+    return (
+        service_request(
+            ServiceType.CLOUD_ORCHESTRATION,
+            'GET', 'stacks',
+            params=parameters)
+        .on(log_success_response('request-list-stacks-all', identity))
+        .on(lambda (response, body): body['stacks'])
+    )
+
+
+def create_stack(stack_args):
+    """
+    Create a stack using Heat.
+
+    :ivar dict stack_args:  The dictionary to pass to Heat specifying how
+        the stack should be built.
+
+    :return: a `tuple` of (:obj:`twisted.web.client.Response`, JSON `dict`)
+    :raise: :class:`APIError`
+    """
+    eff = service_request(
+        ServiceType.CLOUD_ORCHESTRATION,
+        'POST', 'stacks',
+        data=stack_args,
+        success_pred=has_code(201),
+        reauth_codes=(401,))
+
+    return eff.on(log_success_response('request-create-stack', identity))
+
+
+def delete_stack(stack_name, stack_id):
+    """
+    Delete a stack using Heat.
+    """
+    return (
+        service_request(
+            ServiceType.CLOUD_ORCHESTRATION,
+            'DELETE', append_segments('stacks', stack_name, stack_id),
+            success_pred=has_code(204),
+            reauth_codes=(401,))
+        .on(log_success_response('request-delete-stack', identity,
+                                 log_as_json=False))
+        .on(lambda _: None)
+    )

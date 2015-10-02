@@ -23,7 +23,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import NoSuchCLBError, TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
-from otter.convergence.composition import get_desired_group_state
+from otter.convergence.composition import get_desired_server_group_state
 from otter.convergence.model import (
     CLBDescription, CLBNode, ConvergenceIterationStatus, ErrorReason,
     ServerState, StepResult)
@@ -60,7 +60,6 @@ from otter.test.utils import (
     noop,
     raise_,
     raise_to_exc_info,
-    test_dispatcher,
     transform_eq)
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
@@ -807,7 +806,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                 {}, {}, None, {}, False,
                                 ScalingGroupStatus.ACTIVE, desired=2)
         self.group = mock_group(self.state, self.tenant_id, self.group_id)
-        self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
+        self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []},
+                   'type': 'launch_server'}
         self.desired_lbs = s(CLBDescription(lb_id='23', port=80))
         self.servers = (
             server('a', ServerState.ACTIVE, servicenet_address='10.0.0.1',
@@ -831,11 +831,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
     def get_seq(self, with_cache=True):
         exec_seq = [
-            parallel_sequence([
-                [(self.gsgi, lambda i: self.gsgi_result)],
-                [(("gacd", self.tenant_id, self.group_id, self.now),
-                 lambda i: (self.servers, ()))]
-            ])
+            (self.gsgi, lambda i: self.gsgi_result),
+            (("gacd", self.tenant_id, self.group_id, self.now),
+             lambda i: (self.servers, ()))
         ]
         if with_cache:
             exec_seq.append(
@@ -851,12 +849,12 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         ]
 
     def _invoke(self, plan=None):
-        kwargs = {'plan': plan} if plan is not None else {}
+        kwargs = {'plan_launch_server': plan} if plan is not None else {}
         return execute_convergence(
             self.tenant_id, self.group_id, build_timeout=3600,
             waiting=self.waiting,
             limited_retry_iterations=43,
-            get_all_convergence_data=intent_func("gacd"), **kwargs)
+            get_all_launch_server_data=intent_func("gacd"), **kwargs)
 
     def test_no_steps(self):
         """
@@ -892,7 +890,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         Executes the plan and returns SUCCESS when that's the most severe
         result.
         """
-        dgs = get_desired_group_state(self.group_id, self.lc, 2)
+        dgs = get_desired_server_group_state(self.group_id, self.lc, 2)
         deleted = server(
             'c', ServerState.DELETED, servicenet_address='10.0.0.3',
             desired_lbs=self.desired_lbs,
@@ -942,30 +940,6 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             ConvergenceIterationStatus.Stop())
-
-    def test_first_error_extraction(self):
-        """
-        If the GetScalingGroupInfo effect fails, its exception is raised
-        directly, without the FirstError wrapper.
-        """
-        # Perform the GetScalingGroupInfo by raising an exception
-        sequence = [
-            (Log("begin-convergence", {}), noop),
-            (Func(datetime.utcnow), lambda i: self.now),
-            (MsgWithTime("gather-convergence-data", mock.ANY),
-             nested_sequence([
-                parallel_sequence([
-                    [(self.gsgi, lambda i: raise_(RuntimeError('foo')))],
-                    [("anything", noop)]
-                ])
-             ]))
-        ]
-
-        # And make sure that exception isn't wrapped in FirstError.
-        e = self.assertRaises(
-            RuntimeError, perform_sequence, sequence, self._invoke(),
-            test_dispatcher())
-        self.assertEqual(str(e), 'foo')
 
     def test_log_reasons(self):
         """When a step doesn't succeed, useful information is logged."""
@@ -1373,6 +1347,36 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             ConvergenceIterationStatus.Stop())
+
+    def test_launch_stack_config(self):
+        lc = {'args': {'stack': {'stack_name': 'foo'}},
+              'type': 'launch_stack'}
+
+        self.manifest = {
+            'state': self.state,
+            'launchConfiguration': lc,
+        }
+
+        self.gsgi_result = (self.group, self.manifest)
+
+        seq = [
+            parallel_sequence([]),
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            (ModifyReference(self.waiting,
+                             match_func(pmap({self.group_id: 43}),
+                                        pmap())),
+             dispatch(reference_dispatcher)),
+        ]
+        eff = (
+            execute_convergence(
+                self.tenant_id, self.group_id, build_timeout=3600,
+                waiting=self.waiting,
+                limited_retry_iterations=43,
+                get_all_launch_stack_data=intent_func('gacd'),
+                plan_launch_server=None)
+        )
+        perform_sequence(self.get_seq(with_cache=False) + seq, eff)
 
 
 class IsAutoscaleActiveTests(SynchronousTestCase):
