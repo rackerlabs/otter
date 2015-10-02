@@ -95,6 +95,10 @@ def make_service_configs():
             'name': 'cloud_feeds',
             'region': 'DFW',
             'url': 'special cloudfeeds url'
+        },
+        ServiceType.CLOUD_ORCHESTRATION: {
+            'name': 'cloudOrchestration',
+            'region': 'DFW'
         }
     }
 

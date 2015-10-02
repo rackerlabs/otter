@@ -565,7 +565,9 @@ class CollectMetricsTests(SynchronousTestCase):
                                    'region': 'IAD',
                                    'ttl': 200, "last_tenant_fpath": "lpath"},
                        'region': 'r', 'cloudServersOpenStack': 'nova',
-                       'cloudLoadBalancers': 'clb', 'rackconnect': 'rc',
+                       'cloudLoadBalancers': 'clb',
+                       'cloudOrchestration': 'orch',
+                       'rackconnect': 'rc',
                        "convergence-tenants": ["ct"]}
 
         self.sequence = SequenceDispatcher([

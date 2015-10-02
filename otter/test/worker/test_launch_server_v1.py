@@ -84,6 +84,11 @@ fake_service_catalog = [
      'name': 'cloudLoadBalancers',
      'endpoints': [
          {'region': 'DFW', 'publicURL': 'http://dfw.lbaas/'},
+     ]},
+    {'type': 'orchestration',
+     'name': 'cloudOrchestration',
+     'endpoints': [
+         {'region': 'DFW', 'publicURL': 'http://dfw.orch/'},
      ]}
 ]
 

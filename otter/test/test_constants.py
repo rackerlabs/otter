@@ -16,6 +16,7 @@ class GetServiceMappingTests(SynchronousTestCase):
         """
         self.config = {'cloudServersOpenStack': 'nova',
                        'cloudLoadBalancers': 'clb',
+                       'cloudOrchestration': 'orch',
                        'rackconnect': 'rc',
                        'region': 'DFW',
                        'metrics': {'service': 'm',
@@ -35,6 +36,10 @@ class GetServiceMappingTests(SynchronousTestCase):
                 },
                 ServiceType.CLOUD_LOAD_BALANCERS: {
                     'name': 'clb',
+                    'region': 'DFW',
+                },
+                ServiceType.CLOUD_ORCHESTRATION: {
+                    'name': 'orch',
                     'region': 'DFW',
                 },
                 ServiceType.RACKCONNECT_V3: {
