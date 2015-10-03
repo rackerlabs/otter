@@ -394,8 +394,7 @@ class DefaultThrottlerTests(SynchronousTestCase):
     """Tests for :func:`_default_throttler`."""
 
     def setUp(self):
-        self.conf = {"cloud_client": {"throttling": {}}}
-        set_config_data(self.conf)
+        set_config_data({"cloud_client": {"throttling": {}}})
 
     def tearDown(self):
         set_config_data(None)
