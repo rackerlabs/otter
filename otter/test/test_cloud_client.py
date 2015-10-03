@@ -488,6 +488,10 @@ class GetCloudClientDispatcherTests(SynchronousTestCase):
         # 2. the ServiceRequest is run within a lock, since it matches the
         #    default throttling policy
 
+        set_config_data(
+            {"cloud_client": {"throttling": {"create_server_delay": 1,
+                                             "delete_server_delay": 0.4}}})
+        self.addCleanup(set_config_data, None)
         clock = Clock()
         authenticator = object()
         log = object()
