@@ -269,13 +269,12 @@ def _default_throttler(clock, stype, method):
     # no more than that are executed by a node, plus serialization of requests
     # will make it quite a bit lower than that.
 
-    cloud_client_config = config_value('cloud_client')
-    if cloud_client_config is None:
-        cloud_client_config = {}
-    throttling_config = cloud_client_config.get('throttling', {})
+    throttling_config = config_value('cloud_client.throttling')
+    if throttling_config is None:
+        return None
+
     create_server_delay = throttling_config.get('create_server_delay', 1)
     delete_server_delay = throttling_config.get('delete_server_delay', 0.4)
-
     policy = {
         (ServiceType.CLOUD_SERVERS, 'post'):
             _serialize_and_delay(clock, create_server_delay),

@@ -393,9 +393,22 @@ class SerializeAndDelayTests(SynchronousTestCase):
 class DefaultThrottlerTests(SynchronousTestCase):
     """Tests for :func:`_default_throttler`."""
 
+    def setUp(self):
+        self.conf = {"cloud_client": {"throttling": {}}}
+        set_config_data(self.conf)
+
+    def tearDown(self):
+        set_config_data(None)
+
     def test_mismatch(self):
         """policy doesn't have a throttler for random junk."""
         bracket = _default_throttler(None, 'foo', 'get')
+        self.assertIs(bracket, None)
+
+    def test_no_config(self):
+        """ No config results in no throttling """
+        set_config_data(None)
+        bracket = _default_throttler(None, ServiceType.CLOUD_SERVERS, 'get')
         self.assertIs(bracket, None)
 
     def test_post_cloud_servers(self):
