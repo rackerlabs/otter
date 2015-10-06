@@ -241,32 +241,6 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         self.assertTrue(set(scaled_down_server_ip) not in set(lb_node_list))
 
     @tags(speed='slow', type='lbaas', convergence='yes')
-    def test_delete_group_when_autoscale_server_is_the_last_node_on_lb(self):
-        """
-        Create a scaling group with load balancer.  After the servers on the
-        group are added to the loadbalancer, delete the older node with which
-        the lb was created.  Update minentities on the group to scale down and
-        delete group.
-        """
-        load_balancer = self.load_balancer_3
-        lb_node_id_list_before_scale = [each_node.id for each_node in
-                                        self._get_node_list_from_lb(
-                                            load_balancer)]
-        group = self._create_group_given_lbaas_id(load_balancer)
-        active_server_list = self.wait_for_expected_number_of_active_servers(
-            group.id,
-            self.gc_min_entities_alt)
-        self.common.verify_lbs_on_group_have_servers_as_nodes(
-            self, group.id, active_server_list, load_balancer)
-        self.delete_nodes_in_loadbalancer(lb_node_id_list_before_scale,
-                                          load_balancer)
-        self.empty_scaling_group(group=group, delete=False)
-        self.assert_servers_deleted_successfully(
-            group.launchConfiguration.server.name)
-        lb_node_after_del = self._get_node_list_from_lb(load_balancer)
-        self.assertEquals(len(lb_node_after_del), 0)
-
-    @tags(speed='slow', type='lbaas', convergence='yes')
     def test_existing_nodes_on_lb_unaffected_by_scaling(self):
         """
         Get load balancer node id list before anyscale operation, create a
