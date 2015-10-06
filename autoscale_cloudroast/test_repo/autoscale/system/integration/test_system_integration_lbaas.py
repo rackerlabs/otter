@@ -397,11 +397,12 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         balancers, and verify that all the servers on the group are deleted and
         nodes from valid load balancers are removed.
         """
+        nodes_before_group = self._get_node_list_from_lb(self.load_balancer_3)
         group = self._create_group_given_lbaas_id(self.load_balancer_3,
                                                   self.lb_other_region)
         self.wait_for_expected_group_state(group.id, 0, 900)
-        nodes_on_lb = self._get_node_list_from_lb(self.load_balancer_3)
-        self.assertEquals(len(nodes_on_lb), 0)
+        nodes_after_group = self._get_node_list_from_lb(self.load_balancer_3)
+        self.assertEquals(nodes_before_group, nodes_after_group)
 
     def _create_group_given_lbaas_id(self, *lbaas_ids, **kwargs):
         """
