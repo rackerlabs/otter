@@ -152,9 +152,23 @@ def wait_for_active(log,
         deferred_description=timeout_description)
 
 
-# limit on 1 servers to be created simultaneously
-MAX_CREATE_SERVER = 1
-create_server_sem = DeferredSemaphore(MAX_CREATE_SERVER)
+# single global instance of create server semaphore
+_create_server_sem = None
+
+
+def get_create_server_sempahore():
+    """
+    Get global instance of create server semaphore if configured. Otherwise
+    return None
+    """
+    global _create_server_sem
+    if _create_server_sem is not None:
+        return _create_server_sem
+    conf = config_value("worker.create_server_limit")
+    if conf is None:
+        return None
+    _create_server_sem = DeferredSemaphore(conf)
+    return _create_server_sem
 
 
 class ServerCreationRetryError(Exception):
@@ -310,11 +324,12 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
         d.addBoth(_check_results, f)
         return d
 
-    def _create_with_delay():
+    def _create_with_delay(to_delay):
         d = _treq.post(path, headers=headers(auth_token),
                        data=json.dumps({'server': server_config}), log=log)
-        # Add 1 second delay to space 1 second between server creations
-        d.addCallback(delay, clock, 1)
+        if to_delay:
+            # Add 1 second delay to space 1 second between server creations
+            d.addCallback(delay, clock, 1)
         return d
 
     def _create_server():
@@ -325,7 +340,11 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
 
         If not, and if no further errors occur, server creation can be retried.
         """
-        d = create_server_sem.run(_create_with_delay)
+        create_server_sem = get_create_server_sempahore()
+        if create_server_sem is not None:
+            d = create_server_sem.run(_create_with_delay, True)
+        else:
+            d = _create_with_delay(False)
         d.addCallback(check_success, [202], _treq=_treq)
         d.addCallback(_treq.json_content)
         d.addErrback(_check_server_created)

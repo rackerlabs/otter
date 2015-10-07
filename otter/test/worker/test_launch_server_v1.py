@@ -907,6 +907,8 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
         patch(self, 'otter.util.http.treq', new=self.treq)
 
+        launch_server_v1._create_server_sem = None
+
         self.generate_server_name = patch(
             self,
             'otter.worker.launch_server_v1.generate_server_name')
@@ -1143,11 +1145,6 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         d = create_server('http://url/', 'my-auth-token', {'some': 'stuff'},
                           _treq=_treq, clock=self.clock)
 
-        # No result initially. Will be avail after 1 second due to
-        # injected delay
-        self.assertNoResult(d)
-        self.clock.advance(1)
-
         result = self.successResultOf(d)
         self.assertEqual(result, {"server": "created"})
         self.assertFalse(fs.called)
@@ -1155,7 +1152,7 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
     def test_create_server_limits(self):
         """
         create_server when called many times will post only 1 request at
-        a time
+        a time if configured with limit of 1
         """
         deferreds = [Deferred() for i in range(3)]
         post_ds = deferreds[:]
@@ -1166,6 +1163,7 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
             'imageRef': '1',
             'flavorRef': '3'
         }
+        set_config_data({"worker": {"create_server_limit": 1}})
 
         ret_ds = [create_server('http://url/', 'my-auth-token',
                                 server_config, clock=self.clock)
@@ -1194,11 +1192,6 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.successResultOf(ret_ds[1])
         self.successResultOf(ret_ds[2])
 
-    def _create_server(self, url, token, conf, **kwargs):
-        d = create_server(url, token, conf, clock=self.clock, **kwargs)
-        self.clock.advance(1)
-        return d
-
     @mock.patch('otter.worker.launch_server_v1.find_server')
     def test_create_server_propagates_api_failure_from_create(self, fs):
         """
@@ -1217,9 +1210,9 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
 
         fs.return_value = fail(APIError(401, '', {}))
 
-        d = self._create_server(
+        d = create_server(
             'http://url/', 'my-auth-token', {}, log=self.log, retries=0,
-            _treq=_treq, create_failure_delay=5)
+            _treq=_treq, create_failure_delay=5, clock=self.clock)
         self.clock.advance(5)
 
         failure = self.failureResultOf(d, RequestError)
@@ -1248,9 +1241,9 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
 
         fs.return_value = succeed("I'm a server!")
 
-        d = self._create_server(
+        d = create_server(
             'http://url/', 'my-auth-token', {'some': 'stuff'}, _treq=_treq,
-            create_failure_delay=5)
+            create_failure_delay=5, clock=self.clock)
         self.assertNoResult(d)
 
         self.clock.advance(5)
@@ -1276,9 +1269,9 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
 
         fs.return_value = succeed(None)
 
-        d = self._create_server(
+        d = create_server(
             'http://url/', 'my-auth-token', {}, log=self.log, retries=0,
-            _treq=_treq, create_failure_delay=5)
+            _treq=_treq, create_failure_delay=5, clock=self.clock)
         self.assertNoResult(d)
         self.clock.advance(5)
 
@@ -1337,7 +1330,7 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
 
         _treq = StubTreq([(req, resp)], [(resp, "User error!")])
 
-        d = self._create_server(
+        d = create_server(
             'http://url/', 'my-auth-token', {}, log=self.log, _treq=_treq)
         self.clock.advance(15)
 
