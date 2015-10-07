@@ -261,26 +261,21 @@ def _serialize_and_delay(clock, delay):
 
 
 def _default_throttler(clock, stype, method):
-    """Get a throttler function with default throttling policies."""
-    # Serialize creation and deletion of cloud servers because the Compute team
-    # has suggested we do this.
+    """
+    Get a throttler function with throttling policies based on configuration.
+    """
+    policy = {}
 
-    # Compute suggested 150 deletion req/min. A delay of 0.4 should guarantee
-    # no more than that are executed by a node, plus serialization of requests
-    # will make it quite a bit lower than that.
+    conf = config_value('cloud_client.throttling.create_server_delay')
+    if conf is not None:
+        policy[(ServiceType.CLOUD_SERVERS, 'post')] = _serialize_and_delay(
+            clock, conf)
 
-    throttling_config = config_value('cloud_client.throttling')
-    if throttling_config is None:
-        return None
+    conf = config_value('cloud_client.throttling.delete_server_delay')
+    if conf is not None:
+        policy[(ServiceType.CLOUD_SERVERS, 'delete')] = _serialize_and_delay(
+            clock, conf)
 
-    create_server_delay = throttling_config.get('create_server_delay', 1)
-    delete_server_delay = throttling_config.get('delete_server_delay', 0.4)
-    policy = {
-        (ServiceType.CLOUD_SERVERS, 'post'):
-            _serialize_and_delay(clock, create_server_delay),
-        (ServiceType.CLOUD_SERVERS, 'delete'):
-            _serialize_and_delay(clock, delete_server_delay),
-    }
     return policy.get((stype, method))
 
 

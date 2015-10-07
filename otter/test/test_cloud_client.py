@@ -393,9 +393,6 @@ class SerializeAndDelayTests(SynchronousTestCase):
 class DefaultThrottlerTests(SynchronousTestCase):
     """Tests for :func:`_default_throttler`."""
 
-    def setUp(self):
-        set_config_data({"cloud_client": {"throttling": {}}})
-
     def tearDown(self):
         set_config_data(None)
 
@@ -406,33 +403,16 @@ class DefaultThrottlerTests(SynchronousTestCase):
 
     def test_no_config(self):
         """ No config results in no throttling """
-        set_config_data(None)
         bracket = _default_throttler(None, ServiceType.CLOUD_SERVERS, 'get')
         self.assertIs(bracket, None)
-
-    def test_post_cloud_servers(self):
-        """POSTs to cloud servers get throttled by a second."""
-        clock = Clock()
-        bracket = _default_throttler(clock, ServiceType.CLOUD_SERVERS, 'post')
-        d = bracket(lambda: 'foo')
-        self.assertNoResult(d)
-        clock.advance(1)
-        self.assertEqual(self.successResultOf(d), 'foo')
-
-    def test_delete_cloud_servers(self):
-        """DELETEs to cloud servers get throttled by a second."""
-        clock = Clock()
-        bracket = _default_throttler(clock,
-                                     ServiceType.CLOUD_SERVERS, 'delete')
-        d = bracket(lambda: 'foo')
-        self.assertNoResult(d)
-        clock.advance(0.4)
-        self.assertEqual(self.successResultOf(d), 'foo')
 
     def test_post_and_delete_not_the_same(self):
         """
         The throttlers for POST and DELETE to cloud servers are different.
         """
+        set_config_data(
+            {"cloud_client": {"throttling": {"create_server_delay": 1,
+                                             "delete_server_delay": 0.4}}})
         clock = Clock()
         deleter = _default_throttler(clock, ServiceType.CLOUD_SERVERS,
                                      'delete')
@@ -456,7 +436,6 @@ class DefaultThrottlerTests(SynchronousTestCase):
         """The delay for deleting servers is configurable."""
         set_config_data(
             {'cloud_client': {'throttling': {'delete_server_delay': 500}}})
-        self.addCleanup(set_config_data, {})
         clock = Clock()
         bracket = _default_throttler(clock,
                                      ServiceType.CLOUD_SERVERS, 'delete')
