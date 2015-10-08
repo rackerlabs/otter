@@ -419,31 +419,29 @@ class DefaultThrottlerTests(SynchronousTestCase):
         poster = _default_throttler(clock, ServiceType.CLOUD_SERVERS, 'post')
         self.assertIsNot(deleter, poster)
 
-    def test_post_delay_configurable(self):
-        """The delay for creating servers is configurable."""
+    def _cfg(self, cfg_name, stype, method):
         set_config_data(
-            {'cloud_client': {'throttling': {'create_server_delay': 500}}})
+            {'cloud_client': {'throttling': {cfg_name: 500}}})
         self.addCleanup(set_config_data, {})
         clock = Clock()
-        bracket = _default_throttler(clock, ServiceType.CLOUD_SERVERS, 'post')
+        bracket = _default_throttler(clock, stype, method)
+        if bracket is None:
+            self.fail("No throttler for %s and %s" % (stype, method))
         d = bracket(lambda: 'foo')
         clock.advance(499)
         self.assertNoResult(d)
         clock.advance(500)
         self.assertEqual(self.successResultOf(d), 'foo')
 
-    def test_delete_delay_configurable(self):
-        """The delay for deleting servers is configurable."""
-        set_config_data(
-            {'cloud_client': {'throttling': {'delete_server_delay': 500}}})
-        clock = Clock()
-        bracket = _default_throttler(clock,
-                                     ServiceType.CLOUD_SERVERS, 'delete')
-        d = bracket(lambda: 'foo')
-        clock.advance(499)
-        self.assertNoResult(d)
-        clock.advance(500)
-        self.assertEqual(self.successResultOf(d), 'foo')
+    def test_post_delay_configurable(self):
+        """The delay for creating servers is configurable."""
+        self._cfg('create_server_delay', ServiceType.CLOUD_SERVERS, 'post')
+        self._cfg('delete_server_delay', ServiceType.CLOUD_SERVERS, 'delete')
+        self._cfg('get_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'get')
+        self._cfg('post_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'post')
+        self._cfg('put_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'put')
+        self._cfg('delete_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS,
+                  'delete')
 
 
 class GetCloudClientDispatcherTests(SynchronousTestCase):

@@ -264,19 +264,20 @@ def _default_throttler(clock, stype, method):
     """
     Get a throttler function with throttling policies based on configuration.
     """
-    policy = {}
+    cfg_names = {
+        (ServiceType.CLOUD_SERVERS, 'post'): 'create_server_delay',
+        (ServiceType.CLOUD_SERVERS, 'delete'): 'delete_server_delay',
+        (ServiceType.CLOUD_LOAD_BALANCERS, 'get'): 'get_clb_delay',
+        (ServiceType.CLOUD_LOAD_BALANCERS, 'post'): 'post_clb_delay',
+        (ServiceType.CLOUD_LOAD_BALANCERS, 'put'): 'put_clb_delay',
+        (ServiceType.CLOUD_LOAD_BALANCERS, 'delete'): 'delete_clb_delay',
+    }
 
-    conf = config_value('cloud_client.throttling.create_server_delay')
-    if conf is not None:
-        policy[(ServiceType.CLOUD_SERVERS, 'post')] = _serialize_and_delay(
-            clock, conf)
-
-    conf = config_value('cloud_client.throttling.delete_server_delay')
-    if conf is not None:
-        policy[(ServiceType.CLOUD_SERVERS, 'delete')] = _serialize_and_delay(
-            clock, conf)
-
-    return policy.get((stype, method))
+    cfg_name = cfg_names.get((stype, method))
+    if cfg_name is not None:
+        conf = config_value('cloud_client.throttling.' + cfg_name)
+        if conf is not None:
+            return _serialize_and_delay(clock, conf)
 
 
 def perform_tenant_scope(
