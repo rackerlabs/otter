@@ -420,6 +420,8 @@ class DefaultThrottlerTests(SynchronousTestCase):
         clock.advance(1)
         self.assertEqual(self.successResultOf(result1), 'bar1')
         self.assertNoResult(result2)
+        clock.advance(500)
+        self.assertEqual(self.successResultOf(result2), 'bar2')
 
     def test_post_delay_configurable(self):
         """Delays are configurable."""
