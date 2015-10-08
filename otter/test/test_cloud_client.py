@@ -19,7 +19,6 @@ import six
 
 from toolz.dicttoolz import assoc
 
-from twisted.internet.defer import succeed
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -46,7 +45,6 @@ from otter.cloud_client import (
     _Throttle,
     _default_throttler,
     _perform_throttle,
-    _serialize_and_delay,
     add_bind_service,
     add_clb_nodes,
     change_clb_node,
@@ -365,36 +363,12 @@ class ThrottleTests(SynchronousTestCase):
         self.assertEqual(result, ('bracketed', 'foo'))
 
 
-class SerializeAndDelayTests(SynchronousTestCase):
-    """Tests for :func:`_serialize_and_delay`."""
-
-    @mock.patch('otter.cloud_client.DeferredLock')
-    def test_serialize_and_delay(self, deferred_lock):
-        """
-        :func:`_serialize_and_delay` returns a function that, when given a
-        function and arguments, calls it inside of a lock and after a specified
-        delay.
-        """
-        class DeferredLock(object):
-            def run(self, f, *args, **kwargs):
-                return f(*args, **kwargs).addCallback(lambda r: ('locked', r))
-        deferred_lock.side_effect = DeferredLock
-
-        clock = Clock()
-        bracket = _serialize_and_delay(clock, 15)
-
-        result = bracket(lambda: succeed('foo'))
-        clock.advance(14)
-        self.assertNoResult(result)
-        clock.advance(15)
-        self.assertEqual(self.successResultOf(result), ('locked', 'foo'))
-
-
 class DefaultThrottlerTests(SynchronousTestCase):
     """Tests for :func:`_default_throttler`."""
 
     def tearDown(self):
         set_config_data(None)
+#        theLocks.clear()
 
     def test_mismatch(self):
         """policy doesn't have a throttler for random junk."""
@@ -433,6 +407,19 @@ class DefaultThrottlerTests(SynchronousTestCase):
         self.assertNoResult(d)
         clock.advance(500)
         self.assertEqual(self.successResultOf(d), 'foo')
+
+        # also make sure that the lock is shared between different calls to the
+        # throttler.
+        bracket1 = _default_throttler(clock, stype, method)
+        result1 = bracket1(lambda: 'bar1')
+        bracket2 = _default_throttler(clock, stype, method)
+        result2 = bracket2(lambda: 'bar2')
+        clock.advance(499)
+        self.assertNoResult(result1)
+        self.assertNoResult(result2)
+        clock.advance(1)
+        self.assertEqual(self.successResultOf(result1), 'bar1')
+        self.assertNoResult(result2)
 
     def test_post_delay_configurable(self):
         """Delays are configurable."""

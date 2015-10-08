@@ -251,33 +251,30 @@ def _perform_throttle(dispatcher, throttle):
     return lock(twisted_perform, dispatcher, eff)
 
 
-def _serialize_and_delay(clock, delay):
-    """
-    Return a function that when invoked with another function will run it
-    serialized and after a delay.
-    """
-    lock = DeferredLock()
-    return partial(lock.run, deferLater, clock, delay)
+CFG_NAMES = {
+    (ServiceType.CLOUD_SERVERS, 'post'): 'create_server_delay',
+    (ServiceType.CLOUD_SERVERS, 'delete'): 'delete_server_delay',
+    (ServiceType.CLOUD_LOAD_BALANCERS, 'get'): 'get_clb_delay',
+    (ServiceType.CLOUD_LOAD_BALANCERS, 'post'): 'post_clb_delay',
+    (ServiceType.CLOUD_LOAD_BALANCERS, 'put'): 'put_clb_delay',
+    (ServiceType.CLOUD_LOAD_BALANCERS, 'delete'): 'delete_clb_delay',
+}
+
+
+LOCKS = {(stype, method): DeferredLock()
+         for stype, method in CFG_NAMES.keys()}
 
 
 def _default_throttler(clock, stype, method):
     """
     Get a throttler function with throttling policies based on configuration.
     """
-    cfg_names = {
-        (ServiceType.CLOUD_SERVERS, 'post'): 'create_server_delay',
-        (ServiceType.CLOUD_SERVERS, 'delete'): 'delete_server_delay',
-        (ServiceType.CLOUD_LOAD_BALANCERS, 'get'): 'get_clb_delay',
-        (ServiceType.CLOUD_LOAD_BALANCERS, 'post'): 'post_clb_delay',
-        (ServiceType.CLOUD_LOAD_BALANCERS, 'put'): 'put_clb_delay',
-        (ServiceType.CLOUD_LOAD_BALANCERS, 'delete'): 'delete_clb_delay',
-    }
-
-    cfg_name = cfg_names.get((stype, method))
+    cfg_name = CFG_NAMES.get((stype, method))
     if cfg_name is not None:
-        conf = config_value('cloud_client.throttling.' + cfg_name)
-        if conf is not None:
-            return _serialize_and_delay(clock, conf)
+        delay = config_value('cloud_client.throttling.' + cfg_name)
+        if delay is not None:
+            lock = LOCKS.get((stype, method))
+            return partial(lock.run, deferLater, clock, delay)
 
 
 def perform_tenant_scope(
