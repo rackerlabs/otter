@@ -420,6 +420,7 @@ class DefaultThrottlerTests(SynchronousTestCase):
         self.assertIsNot(deleter, poster)
 
     def _cfg(self, cfg_name, stype, method):
+        """Test a specific throttling configuration."""
         set_config_data(
             {'cloud_client': {'throttling': {cfg_name: 500}}})
         self.addCleanup(set_config_data, {})
@@ -434,7 +435,7 @@ class DefaultThrottlerTests(SynchronousTestCase):
         self.assertEqual(self.successResultOf(d), 'foo')
 
     def test_post_delay_configurable(self):
-        """The delay for creating servers is configurable."""
+        """Delays are configurable."""
         self._cfg('create_server_delay', ServiceType.CLOUD_SERVERS, 'post')
         self._cfg('delete_server_delay', ServiceType.CLOUD_SERVERS, 'delete')
         self._cfg('get_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'get')
