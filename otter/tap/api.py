@@ -183,7 +183,7 @@ def makeService(config):
     config = dict(config)
     set_config_data(config)
 
-    s = MultiService()
+    parent = MultiService()
 
     region = config_value('region')
 
@@ -214,7 +214,7 @@ def makeService(config):
     authenticator = generate_authenticator(reactor, config['identity'])
     supervisor = SupervisorService(authenticator, region, coiterate,
                                    service_configs)
-    supervisor.setServiceParent(s)
+    supervisor.setServiceParent(parent)
 
     set_supervisor(supervisor)
 
@@ -226,7 +226,7 @@ def makeService(config):
 
     # Setup cassandra cluster to disconnect when otter shuts down
     if 'cassandra_cluster' in locals():
-        s.addService(FunctionalService(stop=partial(
+        parent.addService(FunctionalService(stop=partial(
             call_after_supervisor, cassandra_cluster.disconnect, supervisor)))
 
     otter = Otter(store, region, health_checker.health_check)
@@ -234,7 +234,7 @@ def makeService(config):
     site.displayTracebacks = False
 
     api_service = service(str(config_value('port')), site)
-    api_service.setServiceParent(s)
+    api_service.setServiceParent(parent)
 
     # Setup admin service
     admin_port = config_value('admin')
@@ -243,7 +243,7 @@ def makeService(config):
         admin_site = Site(admin.app.resource())
         admin_site.displayTracebacks = False
         admin_service = service(str(admin_port), admin_site)
-        admin_service.setServiceParent(s)
+        admin_service.setServiceParent(parent)
 
     # setup cloud feed
     cf_conf = config.get('cloudfeeds', None)
@@ -279,7 +279,7 @@ def makeService(config):
                                              kz_client, store, supervisor,
                                              cassandra_cluster)
             # Setup scheduler service after starting
-            scheduler = setup_scheduler(s, dispatcher, store, kz_client)
+            scheduler = setup_scheduler(parent, dispatcher, store, kz_client)
             health_checker.checks['scheduler'] = scheduler.health_check
             otter.scheduler = scheduler
             # Give dispatcher to Otter REST object
@@ -290,12 +290,12 @@ def makeService(config):
             # policy execution and group delete will fail
             store.kz_client = kz_client
             # Setup kazoo to stop when shutting down
-            s.addService(FunctionalService(
+            parent.addService(FunctionalService(
                 stop=partial(call_after_supervisor,
                              kz_client.stop, supervisor)))
 
             setup_converger(
-                s, kz_client, dispatcher,
+                parent, kz_client, dispatcher,
                 config_value('converger.interval') or 10,
                 config_value('converger.build_timeout') or 3600,
                 config_value('converger.limited_retry_iterations') or 10)
@@ -303,7 +303,7 @@ def makeService(config):
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
 
-    return s
+    return parent
 
 
 def setup_converger(parent, kz_client, dispatcher, interval, build_timeout,
