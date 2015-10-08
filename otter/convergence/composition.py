@@ -23,6 +23,8 @@ def tenant_is_enabled(tenant_id, get_config_value):
     :param callable get_config_value: config key -> config value.
     """
     enabled_tenant_ids = get_config_value("convergence-tenants")
+    if enabled_tenant_ids == 'all':
+        return True
     if enabled_tenant_ids is not None:
         return (tenant_id in enabled_tenant_ids)
     return False

@@ -168,3 +168,10 @@ class FeatureFlagTest(SynchronousTestCase):
         returned.
         """
         self.assertEqual(tenant_is_enabled('foo', lambda x: None), False)
+
+    def test_all(self):
+        """When the value is ``'all'``, True is returned for any tenant."""
+        def get_config_value(config_key):
+            self.assertEqual(config_key, "convergence-tenants")
+            return 'all'
+        self.assertEqual(tenant_is_enabled('foo', get_config_value), True)
