@@ -444,8 +444,8 @@ class GetCloudClientDispatcherTests(SynchronousTestCase):
                              effect=Effect(Constant('foo')))
         self.assertIs(dispatcher(throttle), _perform_throttle)
 
-    @mock.patch('otter.cloud_client.DeferredLock')
-    def test_performs_tenant_scope(self, deferred_lock):
+    @mock.patch('twisted.internet.defer.DeferredLock.run')
+    def test_performs_tenant_scope(self, deferred_lock_run):
         """
         :func:`perform_tenant_scope` performs :obj:`TenantScope`, and uses the
         default throttler
@@ -467,13 +467,12 @@ class GetCloudClientDispatcherTests(SynchronousTestCase):
         svcreq = service_request(ServiceType.CLOUD_SERVERS, 'POST', 'servers')
         tscope = TenantScope(tenant_id='111', effect=svcreq)
 
-        class DeferredLock(object):
-            def run(self, f, *args, **kwargs):
-                result = f(*args, **kwargs)
-                result.addCallback(
-                    lambda x: (x[0], assoc(x[1], 'locked', True)))
-                return result
-        deferred_lock.side_effect = DeferredLock
+        def run(f, *args, **kwargs):
+            result = f(*args, **kwargs)
+            result.addCallback(
+                lambda x: (x[0], assoc(x[1], 'locked', True)))
+            return result
+        deferred_lock_run.side_effect = run
 
         response = stub_pure_response({}, 200)
         seq = SequenceDispatcher([
