@@ -10,7 +10,6 @@ will trigger convergence on all groups got from cassandra
 """
 
 import json
-import sys
 from argparse import ArgumentParser
 
 import treq
@@ -52,15 +51,16 @@ def trigger_convergence_groups(authenticator, region, groups,
 def main(reactor):
     parser = ArgumentParser(
         description="Trigger convergence on all/some groups")
-    parser.add_argument("-c", dest="config", required=True,
-                        help="Config file containing identity and cassandra info")
+    parser.add_argument(
+        "-c", dest="config", required=True,
+        help="Config file containing identity and cassandra info")
     parser.add_argument(
         "-g", nargs="+", dest="group",
-        help=("Group to trigger. Should be in tenantId:groupId form. "
+        help=("Group(s) to trigger. Should be in tenantId:groupId form. "
               "If not provided convergence will be triggerred on all groups "
               "in CASS"))
-    parser.add_argument("-l", dest="limit", help="Concurrency limit", type=int,
-                        default=10)
+    parser.add_argument("-l", dest="limit", type=int, default=10,
+                        help="Concurrency limit. Defaults to 10")
 
     parsed = parser.parse_args()
     conf = json.load(open(parsed.config))
