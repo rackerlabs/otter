@@ -22,7 +22,6 @@ from toolz.dicttoolz import get_in
 from toolz.functoolz import identity
 from toolz.itertoolz import concat
 
-from twisted.internet.defer import DeferredLock
 from twisted.internet.task import deferLater
 
 from txeffect import deferred_performer, perform as twisted_perform
@@ -43,6 +42,7 @@ from otter.util.pure_http import (
     has_code,
     request,
 )
+from otter.util.weaklocks import WeakLocks
 
 
 def add_bind_service(catalog, service_name, region, log, request_func):
@@ -211,7 +211,8 @@ def concretize_service_request(
 
     eff = auth_eff.on(got_auth)
     bracket = throttler(service_request.service_type,
-                        service_request.method.lower())
+                        service_request.method.lower(),
+                        tenant_id)
     if bracket is not None:
         return Effect(_Throttle(bracket=bracket, effect=eff))
     else:
@@ -251,32 +252,38 @@ def _perform_throttle(dispatcher, throttle):
     return lock(twisted_perform, dispatcher, eff)
 
 
-def _serialize_and_delay(clock, delay):
-    """
-    Return a function that when invoked with another function will run it
-    serialized and after a delay.
-    """
-    lock = DeferredLock()
-    return partial(lock.run, deferLater, clock, delay)
+CFG_NAMES = {
+    (ServiceType.CLOUD_SERVERS, 'post'): 'create_server_delay',
+    (ServiceType.CLOUD_SERVERS, 'delete'): 'delete_server_delay',
+}
 
 
-def _default_throttler(clock, stype, method):
+CFG_NAMES_PER_TENANT = {
+    (ServiceType.CLOUD_LOAD_BALANCERS, 'get'): 'get_clb_delay',
+    (ServiceType.CLOUD_LOAD_BALANCERS, 'post'): 'post_clb_delay',
+    (ServiceType.CLOUD_LOAD_BALANCERS, 'put'): 'put_clb_delay',
+    (ServiceType.CLOUD_LOAD_BALANCERS, 'delete'): 'delete_clb_delay',
+}
+
+
+def _default_throttler(locks, clock, stype, method, tenant_id):
     """
     Get a throttler function with throttling policies based on configuration.
     """
-    policy = {}
+    cfg_name = CFG_NAMES.get((stype, method))
+    if cfg_name is not None:
+        delay = config_value('cloud_client.throttling.' + cfg_name)
+        if delay is not None:
+            lock = locks.get_lock((stype, method))
+            return partial(lock.run, deferLater, clock, delay)
 
-    conf = config_value('cloud_client.throttling.create_server_delay')
-    if conf is not None:
-        policy[(ServiceType.CLOUD_SERVERS, 'post')] = _serialize_and_delay(
-            clock, conf)
-
-    conf = config_value('cloud_client.throttling.delete_server_delay')
-    if conf is not None:
-        policy[(ServiceType.CLOUD_SERVERS, 'delete')] = _serialize_and_delay(
-            clock, conf)
-
-    return policy.get((stype, method))
+    # Okay, so maybe it's a per-tenant lock.
+    cfg_name = CFG_NAMES_PER_TENANT.get((stype, method))
+    if cfg_name is not None:
+        delay = config_value('cloud_client.throttling.' + cfg_name)
+        if delay is not None:
+            lock = locks.get_lock((stype, method, tenant_id))
+            return partial(lock.run, deferLater, clock, delay)
 
 
 def perform_tenant_scope(
@@ -311,7 +318,7 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
     """
     # this throttler could be parameterized but for now it's basically a hack
     # that we want to keep private to this module
-    throttler = partial(_default_throttler, reactor)
+    throttler = partial(_default_throttler, WeakLocks(), reactor)
     return TypeDispatcher({
         TenantScope: partial(perform_tenant_scope, authenticator, log,
                              service_configs, throttler),

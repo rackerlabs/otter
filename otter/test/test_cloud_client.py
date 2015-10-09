@@ -19,7 +19,6 @@ import six
 
 from toolz.dicttoolz import assoc
 
-from twisted.internet.defer import succeed
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -46,7 +45,6 @@ from otter.cloud_client import (
     _Throttle,
     _default_throttler,
     _perform_throttle,
-    _serialize_and_delay,
     add_bind_service,
     add_clb_nodes,
     change_clb_node,
@@ -78,6 +76,7 @@ from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.config import set_config_data
 from otter.util.http import APIError, headers
 from otter.util.pure_http import Request, has_code
+from otter.util.weaklocks import WeakLocks
 
 
 def make_service_configs():
@@ -118,7 +117,7 @@ def service_request_eqf(stub_response):
             authenticator=object(),
             log=object(),
             service_configs=make_service_configs(),
-            throttler=lambda stype, method: None,
+            throttler=lambda stype, method, tid: None,
             tenant_id='000000',
             service_request=service_request_intent)
 
@@ -209,7 +208,7 @@ class PerformServiceRequestTests(SynchronousTestCase):
         Call :func:`concretize_service_request` with premade test objects.
         """
         if throttler is None:
-            def throttler(stype, method):
+            def throttler(stype, method, tid):
                 pass
         return concretize_service_request(
             self.authenticator, self.log, self.service_configs,
@@ -320,8 +319,9 @@ class PerformServiceRequestTests(SynchronousTestCase):
         When the throttler function returns a bracketing function, it's used to
         throttle the request.
         """
-        def throttler(stype, method):
-            if stype == ServiceType.CLOUD_SERVERS and method == 'get':
+        def throttler(stype, method, tid):
+            if (stype == ServiceType.CLOUD_SERVERS and
+                    method == 'get' and tid == 1):
                 return bracket
         bracket = object()
         svcreq = service_request(
@@ -331,15 +331,15 @@ class PerformServiceRequestTests(SynchronousTestCase):
         seq = SequenceDispatcher([
             (_Throttle(bracket=bracket, effect=mock.ANY),
              nested_sequence([
-                (Authenticate(authenticator=self.authenticator,
-                              tenant_id=1,
-                              log=self.log),
-                 lambda i: ('token', fake_service_catalog)),
-                (Request(method='GET', url='http://dfw.openstack/servers',
-                         headers=headers('token'), log=self.log),
-                 lambda i: response),
+                 (Authenticate(authenticator=self.authenticator,
+                               tenant_id=1,
+                               log=self.log),
+                  lambda i: ('token', fake_service_catalog)),
+                 (Request(method='GET', url='http://dfw.openstack/servers',
+                          headers=headers('token'), log=self.log),
+                  lambda i: response),
              ])),
-         ])
+        ])
 
         eff = self._concrete(svcreq, throttler=throttler)
         with seq.consume():
@@ -365,31 +365,6 @@ class ThrottleTests(SynchronousTestCase):
         self.assertEqual(result, ('bracketed', 'foo'))
 
 
-class SerializeAndDelayTests(SynchronousTestCase):
-    """Tests for :func:`_serialize_and_delay`."""
-
-    @mock.patch('otter.cloud_client.DeferredLock')
-    def test_serialize_and_delay(self, deferred_lock):
-        """
-        :func:`_serialize_and_delay` returns a function that, when given a
-        function and arguments, calls it inside of a lock and after a specified
-        delay.
-        """
-        class DeferredLock(object):
-            def run(self, f, *args, **kwargs):
-                return f(*args, **kwargs).addCallback(lambda r: ('locked', r))
-        deferred_lock.side_effect = DeferredLock
-
-        clock = Clock()
-        bracket = _serialize_and_delay(clock, 15)
-
-        result = bracket(lambda: succeed('foo'))
-        clock.advance(14)
-        self.assertNoResult(result)
-        clock.advance(15)
-        self.assertEqual(self.successResultOf(result), ('locked', 'foo'))
-
-
 class DefaultThrottlerTests(SynchronousTestCase):
     """Tests for :func:`_default_throttler`."""
 
@@ -398,12 +373,14 @@ class DefaultThrottlerTests(SynchronousTestCase):
 
     def test_mismatch(self):
         """policy doesn't have a throttler for random junk."""
-        bracket = _default_throttler(None, 'foo', 'get')
+        bracket = _default_throttler(
+            WeakLocks(), None, 'foo', 'get', 'any-tenant')
         self.assertIs(bracket, None)
 
     def test_no_config(self):
         """ No config results in no throttling """
-        bracket = _default_throttler(None, ServiceType.CLOUD_SERVERS, 'get')
+        bracket = _default_throttler(
+            WeakLocks(), None, ServiceType.CLOUD_SERVERS, 'get', 'any-tenant')
         self.assertIs(bracket, None)
 
     def test_post_and_delete_not_the_same(self):
@@ -414,36 +391,85 @@ class DefaultThrottlerTests(SynchronousTestCase):
             {"cloud_client": {"throttling": {"create_server_delay": 1,
                                              "delete_server_delay": 0.4}}})
         clock = Clock()
-        deleter = _default_throttler(clock, ServiceType.CLOUD_SERVERS,
-                                     'delete')
-        poster = _default_throttler(clock, ServiceType.CLOUD_SERVERS, 'post')
+        locks = WeakLocks()
+        deleter = _default_throttler(
+            locks, clock, ServiceType.CLOUD_SERVERS, 'delete', 'any-tenant')
+        poster = _default_throttler(
+            locks, clock, ServiceType.CLOUD_SERVERS, 'post', 'any-tenant')
         self.assertIsNot(deleter, poster)
 
-    def test_post_delay_configurable(self):
-        """The delay for creating servers is configurable."""
+    def _cfg(self, cfg_name, stype, method):
+        """Test a specific throttling configuration."""
+        locks = WeakLocks()
         set_config_data(
-            {'cloud_client': {'throttling': {'create_server_delay': 500}}})
+            {'cloud_client': {'throttling': {cfg_name: 500}}})
         self.addCleanup(set_config_data, {})
         clock = Clock()
-        bracket = _default_throttler(clock, ServiceType.CLOUD_SERVERS, 'post')
+        bracket = _default_throttler(locks, clock, stype, method, 'tenant1')
+        if bracket is None:
+            self.fail("No throttler for %s and %s" % (stype, method))
         d = bracket(lambda: 'foo')
         clock.advance(499)
         self.assertNoResult(d)
         clock.advance(500)
         self.assertEqual(self.successResultOf(d), 'foo')
 
-    def test_delete_delay_configurable(self):
-        """The delay for deleting servers is configurable."""
-        set_config_data(
-            {'cloud_client': {'throttling': {'delete_server_delay': 500}}})
-        clock = Clock()
-        bracket = _default_throttler(clock,
-                                     ServiceType.CLOUD_SERVERS, 'delete')
-        d = bracket(lambda: 'foo')
+        # also make sure that the lock is shared between different calls to the
+        # throttler.
+        bracket1 = _default_throttler(locks, clock, stype, method, 'tenant1')
+        result1 = bracket1(lambda: 'bar1')
+        bracket2 = _default_throttler(locks, clock, stype, method, 'tenant1')
+        result2 = bracket2(lambda: 'bar2')
         clock.advance(499)
-        self.assertNoResult(d)
+        self.assertNoResult(result1)
+        self.assertNoResult(result2)
+        clock.advance(1)
+        self.assertEqual(self.successResultOf(result1), 'bar1')
+        self.assertNoResult(result2)
         clock.advance(500)
-        self.assertEqual(self.successResultOf(d), 'foo')
+        self.assertEqual(self.successResultOf(result2), 'bar2')
+
+    def _tenant_cfg(self, cfg_name, stype, method):
+        """
+        Test a specific throttling configuration, and ensure that locks are
+        per-tenant.
+        """
+        locks = WeakLocks()
+        set_config_data(
+            {'cloud_client': {'throttling': {cfg_name: 500}}})
+        self.addCleanup(set_config_data, {})
+        clock = Clock()
+        bracket1 = _default_throttler(locks, clock, stype, method, 'tenant1')
+        if bracket1 is None:
+            self.fail("No throttler for %s and %s" % (stype, method))
+        result1 = bracket1(lambda: 'bar1')
+        bracket2 = _default_throttler(locks, clock, stype, method, 'tenant2')
+        result2 = bracket2(lambda: 'bar2')
+        self.assertNoResult(result1)
+        self.assertNoResult(result2)
+        clock.advance(500)
+        self.assertEqual(self.successResultOf(result1), 'bar1')
+        self.assertEqual(self.successResultOf(result2), 'bar2')
+
+    def test_delay_configurable(self):
+        """Delays are configurable."""
+        self._cfg('create_server_delay', ServiceType.CLOUD_SERVERS, 'post')
+        self._cfg('delete_server_delay', ServiceType.CLOUD_SERVERS, 'delete')
+        self._cfg('get_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'get')
+        self._cfg('post_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'post')
+        self._cfg('put_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'put')
+        self._cfg('delete_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS,
+                  'delete')
+
+    def test_tenant_specific_locking(self):
+        self._tenant_cfg('get_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS,
+                         'get')
+        self._tenant_cfg('post_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS,
+                         'post')
+        self._tenant_cfg('put_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS,
+                         'put')
+        self._tenant_cfg('delete_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS,
+                         'delete')
 
 
 class GetCloudClientDispatcherTests(SynchronousTestCase):
@@ -456,8 +482,8 @@ class GetCloudClientDispatcherTests(SynchronousTestCase):
                              effect=Effect(Constant('foo')))
         self.assertIs(dispatcher(throttle), _perform_throttle)
 
-    @mock.patch('otter.cloud_client.DeferredLock')
-    def test_performs_tenant_scope(self, deferred_lock):
+    @mock.patch('twisted.internet.defer.DeferredLock.run')
+    def test_performs_tenant_scope(self, deferred_lock_run):
         """
         :func:`perform_tenant_scope` performs :obj:`TenantScope`, and uses the
         default throttler
@@ -479,13 +505,12 @@ class GetCloudClientDispatcherTests(SynchronousTestCase):
         svcreq = service_request(ServiceType.CLOUD_SERVERS, 'POST', 'servers')
         tscope = TenantScope(tenant_id='111', effect=svcreq)
 
-        class DeferredLock(object):
-            def run(self, f, *args, **kwargs):
-                result = f(*args, **kwargs)
-                result.addCallback(
-                    lambda x: (x[0], assoc(x[1], 'locked', True)))
-                return result
-        deferred_lock.side_effect = DeferredLock
+        def run(f, *args, **kwargs):
+            result = f(*args, **kwargs)
+            result.addCallback(
+                lambda x: (x[0], assoc(x[1], 'locked', True)))
+            return result
+        deferred_lock_run.side_effect = run
 
         response = stub_pure_response({}, 200)
         seq = SequenceDispatcher([
