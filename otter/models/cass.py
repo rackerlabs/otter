@@ -6,7 +6,6 @@ import functools
 import json
 import time
 import uuid
-import weakref
 from datetime import datetime
 from itertools import cycle, takewhile
 
@@ -57,6 +56,7 @@ from otter.util.cqlbatch import Batch, batch
 from otter.util.deferredutils import with_lock
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util.retry import repeating_interval, retry, retry_times
+from otter.util.weaklocks import WeakLocks
 
 
 LOCK_PATH = '/locks'
@@ -573,29 +573,6 @@ def _del_webhook_queries(table, webhooks):
         queries.append(_cql_del_on_key.format(cf=table, name=name))
         params[name + 'webhookKey'] = webhook['webhookKey']
     return queries, params
-
-
-class WeakLocks(object):
-    """
-    A cache of DeferredLocks mapped based on uuid that gets garbage collected
-    after the lock has been utilized
-    """
-
-    def __init__(self):
-        self._locks = weakref.WeakValueDictionary()
-
-    def get_lock(self, uuid):
-        """
-        Get lock based on uuid
-
-        :param str uuid: Lock's corresponding UUID
-        :return: :class:`~defer.DeferredLock`
-        """
-        lock = self._locks.get(uuid)
-        if not lock:
-            lock = defer.DeferredLock()
-            self._locks[uuid] = lock
-        return lock
 
 
 def get_client_ts(reactor):
