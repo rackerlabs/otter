@@ -117,7 +117,7 @@ def service_request_eqf(stub_response):
             authenticator=object(),
             log=object(),
             service_configs=make_service_configs(),
-            throttler=lambda stype, method: None,
+            throttler=lambda stype, method, tid: None,
             tenant_id='000000',
             service_request=service_request_intent)
 
@@ -208,7 +208,7 @@ class PerformServiceRequestTests(SynchronousTestCase):
         Call :func:`concretize_service_request` with premade test objects.
         """
         if throttler is None:
-            def throttler(stype, method):
+            def throttler(stype, method, tid):
                 pass
         return concretize_service_request(
             self.authenticator, self.log, self.service_configs,
@@ -319,8 +319,9 @@ class PerformServiceRequestTests(SynchronousTestCase):
         When the throttler function returns a bracketing function, it's used to
         throttle the request.
         """
-        def throttler(stype, method):
-            if stype == ServiceType.CLOUD_SERVERS and method == 'get':
+        def throttler(stype, method, tid):
+            if (stype == ServiceType.CLOUD_SERVERS and
+                    method == 'get' and tid == 1):
                 return bracket
         bracket = object()
         svcreq = service_request(
@@ -372,13 +373,14 @@ class DefaultThrottlerTests(SynchronousTestCase):
 
     def test_mismatch(self):
         """policy doesn't have a throttler for random junk."""
-        bracket = _default_throttler(WeakLocks(), None, 'foo', 'get')
+        bracket = _default_throttler(
+            WeakLocks(), None, 'foo', 'get', 'any-tenant')
         self.assertIs(bracket, None)
 
     def test_no_config(self):
         """ No config results in no throttling """
         bracket = _default_throttler(
-            WeakLocks(), None, ServiceType.CLOUD_SERVERS, 'get')
+            WeakLocks(), None, ServiceType.CLOUD_SERVERS, 'get', 'any-tenant')
         self.assertIs(bracket, None)
 
     def test_post_and_delete_not_the_same(self):
@@ -391,9 +393,9 @@ class DefaultThrottlerTests(SynchronousTestCase):
         clock = Clock()
         locks = WeakLocks()
         deleter = _default_throttler(
-            locks, clock, ServiceType.CLOUD_SERVERS, 'delete')
+            locks, clock, ServiceType.CLOUD_SERVERS, 'delete', 'any-tenant')
         poster = _default_throttler(
-            locks, clock, ServiceType.CLOUD_SERVERS, 'post')
+            locks, clock, ServiceType.CLOUD_SERVERS, 'post', 'any-tenant')
         self.assertIsNot(deleter, poster)
 
     def _test_throttle(self, cfg_name, stype, method):
@@ -403,7 +405,7 @@ class DefaultThrottlerTests(SynchronousTestCase):
             {'cloud_client': {'throttling': {cfg_name: 500}}})
         self.addCleanup(set_config_data, {})
         clock = Clock()
-        bracket = _default_throttler(locks, clock, stype, method)
+        bracket = _default_throttler(locks, clock, stype, method, 'tenant1')
         if bracket is None:
             self.fail("No throttler for %s and %s" % (stype, method))
         d = bracket(lambda: 'foo')
@@ -414,9 +416,9 @@ class DefaultThrottlerTests(SynchronousTestCase):
 
         # also make sure that the lock is shared between different calls to the
         # throttler.
-        bracket1 = _default_throttler(locks, clock, stype, method)
+        bracket1 = _default_throttler(locks, clock, stype, method, 'tenant1')
         result1 = bracket1(lambda: 'bar1')
-        bracket2 = _default_throttler(locks, clock, stype, method)
+        bracket2 = _default_throttler(locks, clock, stype, method, 'tenant1')
         result2 = bracket2(lambda: 'bar2')
         clock.advance(499)
         self.assertNoResult(result1)
@@ -427,12 +429,56 @@ class DefaultThrottlerTests(SynchronousTestCase):
         clock.advance(500)
         self.assertEqual(self.successResultOf(result2), 'bar2')
 
+    def _test_tenant(self, cfg_name, stype, method):
+        """
+        Test a specific throttling configuration, and ensure that locks are
+        per-tenant.
+        """
+        locks = WeakLocks()
+        set_config_data(
+            {'cloud_client': {'throttling': {cfg_name: 500}}})
+        self.addCleanup(set_config_data, {})
+        clock = Clock()
+        bracket1 = _default_throttler(locks, clock, stype, method, 'tenant1')
+        if bracket1 is None:
+            self.fail("No throttler for %s and %s" % (stype, method))
+        result1 = bracket1(lambda: 'bar1')
+        bracket2 = _default_throttler(locks, clock, stype, method, 'tenant2')
+        result2 = bracket2(lambda: 'bar2')
+        self.assertNoResult(result1)
+        self.assertNoResult(result2)
+        clock.advance(500)
+        self.assertEqual(self.successResultOf(result1), 'bar1')
+        self.assertEqual(self.successResultOf(result2), 'bar2')
+
     def test_delay_configurable(self):
         """Delays are configurable."""
         self._test_throttle(
             'create_server_delay', ServiceType.CLOUD_SERVERS, 'post')
         self._test_throttle(
             'delete_server_delay', ServiceType.CLOUD_SERVERS, 'delete')
+        self._test_throttle(
+            'create_server_delay', ServiceType.CLOUD_SERVERS, 'post')
+        self._test_throttle(
+            'delete_server_delay', ServiceType.CLOUD_SERVERS, 'delete')
+        self._test_throttle(
+            'get_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'get')
+        self._test_throttle(
+            'post_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'post')
+        self._test_throttle(
+            'put_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'put')
+        self._test_throttle(
+            'delete_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'delete')
+
+    def test_tenant_specific_locking(self):
+        self._test_tenant(
+            'get_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'get')
+        self._test_tenant(
+            'post_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'post')
+        self._test_tenant(
+            'put_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'put')
+        self._test_tenant(
+            'delete_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'delete')
 
 
 class GetCloudClientDispatcherTests(SynchronousTestCase):
