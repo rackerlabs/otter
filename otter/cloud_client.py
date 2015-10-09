@@ -266,10 +266,7 @@ CFG_NAMES_PER_TENANT = {
 }
 
 
-LOCKS = WeakLocks()
-
-
-def _default_throttler(clock, stype, method, tenant_id):
+def _default_throttler(locks, clock, stype, method, tenant_id):
     """
     Get a throttler function with throttling policies based on configuration.
     """
@@ -277,7 +274,7 @@ def _default_throttler(clock, stype, method, tenant_id):
     if cfg_name is not None:
         delay = config_value('cloud_client.throttling.' + cfg_name)
         if delay is not None:
-            lock = LOCKS.get_lock((stype, method))
+            lock = locks.get_lock((stype, method))
             return partial(lock.run, deferLater, clock, delay)
 
     # Okay, so maybe it's a per-tenant lock.
@@ -285,7 +282,7 @@ def _default_throttler(clock, stype, method, tenant_id):
     if cfg_name is not None:
         delay = config_value('cloud_client.throttling.' + cfg_name)
         if delay is not None:
-            lock = LOCKS.get_lock((stype, method, tenant_id))
+            lock = locks.get_lock((stype, method, tenant_id))
             return partial(lock.run, deferLater, clock, delay)
 
 
@@ -321,7 +318,7 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
     """
     # this throttler could be parameterized but for now it's basically a hack
     # that we want to keep private to this module
-    throttler = partial(_default_throttler, reactor)
+    throttler = partial(_default_throttler, WeakLocks(), reactor)
     return TypeDispatcher({
         TenantScope: partial(perform_tenant_scope, authenticator, log,
                              service_configs, throttler),

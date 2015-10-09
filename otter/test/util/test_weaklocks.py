@@ -1,7 +1,7 @@
-from otter.util.weaklocks import WeakLocks
-
 from twisted.internet.defer import DeferredLock
 from twisted.trial.unittest import SynchronousTestCase
+
+from otter.util.weaklocks import WeakLocks
 
 
 class WeakLocksTests(SynchronousTestCase):

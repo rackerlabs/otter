@@ -76,6 +76,7 @@ from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.config import set_config_data
 from otter.util.http import APIError, headers
 from otter.util.pure_http import Request, has_code
+from otter.util.weaklocks import WeakLocks
 
 
 def make_service_configs():
@@ -372,13 +373,14 @@ class DefaultThrottlerTests(SynchronousTestCase):
 
     def test_mismatch(self):
         """policy doesn't have a throttler for random junk."""
-        bracket = _default_throttler(None, 'foo', 'get', 'any-tenant')
+        bracket = _default_throttler(
+            WeakLocks(), None, 'foo', 'get', 'any-tenant')
         self.assertIs(bracket, None)
 
     def test_no_config(self):
         """ No config results in no throttling """
-        bracket = _default_throttler(None, ServiceType.CLOUD_SERVERS, 'get',
-                                     'any-tenant')
+        bracket = _default_throttler(
+            WeakLocks(), None, ServiceType.CLOUD_SERVERS, 'get', 'any-tenant')
         self.assertIs(bracket, None)
 
     def test_post_and_delete_not_the_same(self):
@@ -389,19 +391,21 @@ class DefaultThrottlerTests(SynchronousTestCase):
             {"cloud_client": {"throttling": {"create_server_delay": 1,
                                              "delete_server_delay": 0.4}}})
         clock = Clock()
-        deleter = _default_throttler(clock, ServiceType.CLOUD_SERVERS,
-                                     'delete', 'any-tenant')
-        poster = _default_throttler(clock, ServiceType.CLOUD_SERVERS, 'post',
-                                    'any-tenant')
+        locks = WeakLocks()
+        deleter = _default_throttler(
+            locks, clock, ServiceType.CLOUD_SERVERS, 'delete', 'any-tenant')
+        poster = _default_throttler(
+            locks, clock, ServiceType.CLOUD_SERVERS, 'post', 'any-tenant')
         self.assertIsNot(deleter, poster)
 
     def _cfg(self, cfg_name, stype, method):
         """Test a specific throttling configuration."""
+        locks = WeakLocks()
         set_config_data(
             {'cloud_client': {'throttling': {cfg_name: 500}}})
         self.addCleanup(set_config_data, {})
         clock = Clock()
-        bracket = _default_throttler(clock, stype, method, 'tenant1')
+        bracket = _default_throttler(locks, clock, stype, method, 'tenant1')
         if bracket is None:
             self.fail("No throttler for %s and %s" % (stype, method))
         d = bracket(lambda: 'foo')
@@ -412,9 +416,9 @@ class DefaultThrottlerTests(SynchronousTestCase):
 
         # also make sure that the lock is shared between different calls to the
         # throttler.
-        bracket1 = _default_throttler(clock, stype, method, 'tenant1')
+        bracket1 = _default_throttler(locks, clock, stype, method, 'tenant1')
         result1 = bracket1(lambda: 'bar1')
-        bracket2 = _default_throttler(clock, stype, method, 'tenant1')
+        bracket2 = _default_throttler(locks, clock, stype, method, 'tenant1')
         result2 = bracket2(lambda: 'bar2')
         clock.advance(499)
         self.assertNoResult(result1)
@@ -430,15 +434,16 @@ class DefaultThrottlerTests(SynchronousTestCase):
         Test a specific throttling configuration, and ensure that locks are
         per-tenant.
         """
+        locks = WeakLocks()
         set_config_data(
             {'cloud_client': {'throttling': {cfg_name: 500}}})
         self.addCleanup(set_config_data, {})
         clock = Clock()
-        bracket1 = _default_throttler(clock, stype, method, 'tenant1')
+        bracket1 = _default_throttler(locks, clock, stype, method, 'tenant1')
         if bracket1 is None:
             self.fail("No throttler for %s and %s" % (stype, method))
         result1 = bracket1(lambda: 'bar1')
-        bracket2 = _default_throttler(clock, stype, method, 'tenant2')
+        bracket2 = _default_throttler(locks, clock, stype, method, 'tenant2')
         result2 = bracket2(lambda: 'bar2')
         self.assertNoResult(result1)
         self.assertNoResult(result2)
