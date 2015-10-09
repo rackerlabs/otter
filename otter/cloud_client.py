@@ -22,7 +22,6 @@ from toolz.dicttoolz import get_in
 from toolz.functoolz import identity
 from toolz.itertoolz import concat
 
-from twisted.internet.defer import DeferredLock
 from twisted.internet.task import deferLater
 
 from txeffect import deferred_performer, perform as twisted_perform
@@ -43,6 +42,7 @@ from otter.util.pure_http import (
     has_code,
     request,
 )
+from otter.util.weaklocks import WeakLocks
 
 
 def add_bind_service(catalog, service_name, region, log, request_func):
@@ -211,7 +211,8 @@ def concretize_service_request(
 
     eff = auth_eff.on(got_auth)
     bracket = throttler(service_request.service_type,
-                        service_request.method.lower())
+                        service_request.method.lower(),
+                        tenant_id)
     if bracket is not None:
         return Effect(_Throttle(bracket=bracket, effect=eff))
     else:
@@ -254,6 +255,10 @@ def _perform_throttle(dispatcher, throttle):
 CFG_NAMES = {
     (ServiceType.CLOUD_SERVERS, 'post'): 'create_server_delay',
     (ServiceType.CLOUD_SERVERS, 'delete'): 'delete_server_delay',
+}
+
+
+CFG_NAMES_PER_TENANT = {
     (ServiceType.CLOUD_LOAD_BALANCERS, 'get'): 'get_clb_delay',
     (ServiceType.CLOUD_LOAD_BALANCERS, 'post'): 'post_clb_delay',
     (ServiceType.CLOUD_LOAD_BALANCERS, 'put'): 'put_clb_delay',
@@ -261,11 +266,10 @@ CFG_NAMES = {
 }
 
 
-LOCKS = {(stype, method): DeferredLock()
-         for stype, method in CFG_NAMES.keys()}
+LOCKS = WeakLocks()
 
 
-def _default_throttler(clock, stype, method):
+def _default_throttler(clock, stype, method, tenant_id):
     """
     Get a throttler function with throttling policies based on configuration.
     """
@@ -273,7 +277,15 @@ def _default_throttler(clock, stype, method):
     if cfg_name is not None:
         delay = config_value('cloud_client.throttling.' + cfg_name)
         if delay is not None:
-            lock = LOCKS.get((stype, method))
+            lock = LOCKS.get_lock((stype, method))
+            return partial(lock.run, deferLater, clock, delay)
+
+    # Okay, so maybe it's a per-tenant lock.
+    cfg_name = CFG_NAMES_PER_TENANT.get((stype, method))
+    if cfg_name is not None:
+        delay = config_value('cloud_client.throttling.' + cfg_name)
+        if delay is not None:
+            lock = LOCKS.get_lock((stype, method, tenant_id))
             return partial(lock.run, deferLater, clock, delay)
 
 
