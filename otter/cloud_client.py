@@ -211,7 +211,8 @@ def concretize_service_request(
 
     eff = auth_eff.on(got_auth)
     bracket = throttler(service_request.service_type,
-                        service_request.method.lower())
+                        service_request.method.lower(),
+                        tenant_id)
     if bracket is not None:
         return Effect(_Throttle(bracket=bracket, effect=eff))
     else:
@@ -256,8 +257,16 @@ _CFG_NAMES = {
     (ServiceType.CLOUD_SERVERS, 'delete'): 'delete_server_delay',
 }
 
+# Throttling configs where locking is done per-tenant instead of globally
+_CFG_NAMES_PER_TENANT = {
+    (ServiceType.CLOUD_LOAD_BALANCERS, 'get'): 'get_clb_delay',
+    (ServiceType.CLOUD_LOAD_BALANCERS, 'post'): 'post_clb_delay',
+    (ServiceType.CLOUD_LOAD_BALANCERS, 'put'): 'put_clb_delay',
+    (ServiceType.CLOUD_LOAD_BALANCERS, 'delete'): 'delete_clb_delay',
+}
 
-def _default_throttler(locks, clock, stype, method):
+
+def _default_throttler(locks, clock, stype, method, tenant_id):
     """
     Get a throttler function with throttling policies based on configuration.
     """
@@ -266,6 +275,14 @@ def _default_throttler(locks, clock, stype, method):
         delay = config_value('cloud_client.throttling.' + cfg_name)
         if delay is not None:
             lock = locks.get_lock((stype, method))
+            return partial(lock.run, deferLater, clock, delay)
+
+    # Could be a per-tenant lock
+    cfg_name = _CFG_NAMES_PER_TENANT.get((stype, method))
+    if cfg_name is not None:
+        delay = config_value('cloud_client.throttling.' + cfg_name)
+        if delay is not None:
+            lock = locks.get_lock((stype, method, tenant_id))
             return partial(lock.run, deferLater, clock, delay)
 
 

@@ -69,7 +69,11 @@
     "cloud_client": {
     	"throttling": {
     	    "create_server_delay": 1,
-            "delete_server_delay": 0.4
+            "delete_server_delay": 0.4,
+            "get_clb_delay": 0.2,
+            "post_clb_delay": 0.5,
+            "put_clb_delay": 0.2,
+            "delete_clb_delay": 0.5
     	}
     }
 }
