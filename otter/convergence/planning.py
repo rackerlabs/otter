@@ -367,8 +367,8 @@ def converge_launch_server(desired_state, servers_with_cheese,
                 converge_later)
 
 
-def plan_launch_server(desired_group_state, servers, lb_nodes, now,
-                       build_timeout):
+def plan_launch_server(desired_group_state, now, build_timeout, servers,
+                       lb_nodes):
     """
     Get an optimized convergence plan.
 

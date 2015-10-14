@@ -243,12 +243,15 @@ def get_all_launch_server_data(
     Gather all launch_server data relevant for convergence w.r.t given time,
     in parallel where possible.
 
-    Returns an Effect of ([NovaServer], [LBNode]).
+    Returns an Effect of {'servers': [NovaServer], 'lb_nodes': [LBNode]}.
     """
     eff = parallel(
         [get_scaling_group_servers(tenant_id, group_id, now)
          .on(map(NovaServer.from_server_details_json)).on(list),
          get_clb_contents(),
          get_rcv3_contents()]
-    ).on(lambda (servers, clb, rcv3): (servers, list(concat([clb, rcv3]))))
+    ).on(lambda (servers, clb, rcv3): {
+        'servers': servers,
+        'lb_nodes': list(concat([clb, rcv3]))
+    })
     return eff

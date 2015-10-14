@@ -684,7 +684,8 @@ class GetAllLaunchServerDataTests(SynchronousTestCase):
                    json=freeze(self.servers[1]))
         ]
         self.assertEqual(resolve_stubs(eff),
-                         (expected_servers, clb_nodes + rcv3_nodes))
+                         {'servers': expected_servers,
+                          'lb_nodes': clb_nodes + rcv3_nodes})
 
     def test_no_group_servers(self):
         """
@@ -700,4 +701,4 @@ class GetAllLaunchServerDataTests(SynchronousTestCase):
             get_clb_contents=_constant_as_eff((), []),
             get_rcv3_contents=_constant_as_eff((), []))
 
-        self.assertEqual(resolve_stubs(eff), ([], []))
+        self.assertEqual(resolve_stubs(eff), {'servers': [], 'lb_nodes': []})

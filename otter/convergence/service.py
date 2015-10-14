@@ -170,7 +170,7 @@ def is_autoscale_active(server, lb_nodes):
                              if node.matches(server)]))
 
 
-def update_servers_cache(group, servers, lb_nodes, now, include_deleted=True):
+def update_servers_cache(group, now, servers, lb_nodes, include_deleted=True):
     """
     Updates the cache, adding servers, with a flag if autoscale is active on
     each one.
@@ -241,21 +241,19 @@ def convergence_exec_data(tenant_id, group_id, now, get_executor):
 
     executor = get_executor(launch_config)
 
-    gather_eff = executor.gather(tenant_id, group_id, now)
-
-    (servers, lb_nodes) = yield gather_eff
+    resources = yield executor.gather(tenant_id, group_id, now)
 
     if group_state.status == ScalingGroupStatus.DELETING:
         desired_capacity = 0
     else:
         desired_capacity = group_state.desired
-        yield executor.update_cache(scaling_group, servers, lb_nodes, now)
+        yield executor.update_cache(scaling_group, now, **resources)
 
     desired_group_state = executor.get_desired_group_state(
         group_id, launch_config, desired_capacity)
 
     yield do_return((executor, scaling_group, group_state, desired_group_state,
-                     servers, lb_nodes))
+                     resources))
 
 
 def _clean_waiting(waiting, group_id):
@@ -293,17 +291,17 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
         convergence_exec_data(tenant_id, group_id, now_dt,
                               get_executor=get_executor))
     (executor, scaling_group, group_state, desired_group_state,
-     servers, lb_nodes) = all_data
+     resources) = all_data
 
     # prepare plan
-    steps = executor.plan(desired_group_state, servers, lb_nodes,
-                          datetime_to_epoch(now_dt), build_timeout)
+    steps = executor.plan(desired_group_state, datetime_to_epoch(now_dt),
+                          build_timeout, **resources)
     yield log_steps(steps)
 
     # Execute plan
     yield msg('execute-convergence',
-              servers=servers, lb_nodes=lb_nodes, steps=steps, now=now_dt,
-              desired=desired_group_state)
+              steps=steps, now=now_dt, desired=desired_group_state,
+              **resources)
     worst_status, reasons = yield _execute_steps(steps)
 
     if worst_status != StepResult.LIMITED_RETRY:
@@ -314,7 +312,7 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
     # Handle the status from execution
     if worst_status == StepResult.SUCCESS:
         result = yield convergence_succeeded(
-            executor, scaling_group, group_state, servers, lb_nodes, now_dt)
+            executor, scaling_group, group_state, resources, now_dt)
     elif worst_status == StepResult.FAILURE:
         result = yield convergence_failed(scaling_group, reasons)
     elif worst_status is StepResult.LIMITED_RETRY:
@@ -336,8 +334,8 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
 
 
 @do
-def convergence_succeeded(executor, scaling_group, group_state, servers,
-                          lb_nodes, now):
+def convergence_succeeded(executor, scaling_group, group_state, resources,
+                          now):
     """
     Handle convergence success
     """
@@ -352,8 +350,8 @@ def convergence_succeeded(executor, scaling_group, group_state, servers,
         yield cf_msg('group-status-active',
                      status=ScalingGroupStatus.ACTIVE.name)
     # update servers cache with latest servers
-    yield executor.update_cache(scaling_group, servers, lb_nodes, now,
-                                include_deleted=False)
+    yield executor.update_cache(scaling_group, now, include_deleted=False,
+                                **resources)
     yield do_return(ConvergenceIterationStatus.Stop())
 
 
