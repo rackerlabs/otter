@@ -134,7 +134,7 @@ from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 def get_executor(launch_config):
     if launch_config['type'] == 'launch_server':
-        return LaunchServerExecutor()
+        return launch_server_executor
     raise NotImplementedError
 
 
@@ -813,6 +813,7 @@ class Converger(MultiService):
             return perform(self._dispatcher, self._with_conv_runid(eff))
 
 
+@attr.s
 class ConvergenceExecutor(object):
     gather = attr.ib()
     plan = attr.ib()
@@ -820,9 +821,8 @@ class ConvergenceExecutor(object):
     update_cache = attr.ib()
 
 
-@attr.s
-class LaunchServerExecutor(ConvergenceExecutor):
-    gather = attr.ib(default=get_all_launch_server_data)
-    plan = attr.ib(default=plan_launch_server)
-    get_desired_group_state = attr.ib(default=get_desired_server_group_state)
-    update_cache = attr.ib(default=update_servers_cache)
+launch_server_executor = ConvergenceExecutor(
+    gather=get_all_launch_server_data,
+    plan=plan_launch_server,
+    get_desired_group_state=get_desired_server_group_state,
+    update_cache=update_servers_cache)

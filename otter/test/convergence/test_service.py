@@ -36,11 +36,11 @@ from otter.convergence.service import (
     ConvergenceExecutor,
     ConvergenceStarter,
     Converger,
-    LaunchServerExecutor,
     converge_all_groups,
     converge_one_group,
     execute_convergence, get_my_divergent_groups,
     is_autoscale_active,
+    launch_server_executor,
     non_concurrently,
     trigger_convergence,
     update_servers_cache)
@@ -864,7 +864,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
 
     def _invoke(self, plan=None):
         kwargs = {'plan': plan} if plan is not None else {}
-        executor = LaunchServerExecutor(gather=intent_func("gacd"), **kwargs)
+        executor = attr.assoc(launch_server_executor,
+                              gather=intent_func("gacd"), **kwargs)
         return execute_convergence(
             self.tenant_id, self.group_id, build_timeout=3600,
             waiting=self.waiting,
@@ -1436,7 +1437,7 @@ class ConvergenceExecutorTests(SynchronousTestCase):
             'get_desired_group_state': 'gdgs',
             'update_cache': 'uc',
         }
-        self.lse = LaunchServerExecutor()
+        self.lse = launch_server_executor
 
     def test_launch_server_executor(self):
         attrs = {
@@ -1449,5 +1450,5 @@ class ConvergenceExecutorTests(SynchronousTestCase):
         self.assertEqual(attr.asdict(self.lse), attrs)
 
     def test_launch_server_overrides(self):
-        ce = LaunchServerExecutor(**self.fake_attrs)
+        ce = attr.assoc(launch_server_executor, **self.fake_attrs)
         self.assertEqual(attr.asdict(ce), self.fake_attrs)
