@@ -164,8 +164,12 @@ def is_autoscale_active(server, lb_nodes):
 
 def update_cache(group, servers, lb_nodes, now, include_deleted=True):
     """
+    Updates the cache, adding servers, with a flag if autoscale is active on
+    each one.
     :param group: scaling group
     :param list servers: list of NovaServer objects
+    :param list lb_nodes: list of CLBNode objects
+    :param include_deleted: Include deleted servers in cache. Defaults to True.
     """
     server_dicts = []
     for server in servers:
