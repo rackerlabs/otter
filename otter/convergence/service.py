@@ -162,7 +162,7 @@ def is_autoscale_active(server, lb_nodes):
                              if node.matches(server)]))
 
 
-def update_cache(group, servers, lb_nodes, now):
+def update_cache(group, servers, lb_nodes, now, include_deleted=True):
     """
     :param group: scaling group
     :param list servers: list of NovaServer objects
@@ -172,7 +172,8 @@ def update_cache(group, servers, lb_nodes, now):
         sd = thaw(server.json)
         if is_autoscale_active(server, lb_nodes):
             sd["_is_as_active"] = True
-        server_dicts.append(sd)
+        if server.state != ServerState.DELETED or include_deleted:
+            server_dicts.append(sd)
 
     return Effect(
         UpdateServersCache(group.tenant_id, group.uuid, now, server_dicts))
@@ -303,7 +304,7 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     # Handle the status from execution
     if worst_status == StepResult.SUCCESS:
         result = yield convergence_succeeded_servers(
-            scaling_group, group_state, servers, now_dt)
+            scaling_group, group_state, servers, lb_nodes, now_dt)
     elif worst_status == StepResult.FAILURE:
         result = yield convergence_failed(scaling_group, reasons)
     elif worst_status is StepResult.LIMITED_RETRY:
@@ -325,7 +326,8 @@ def execute_convergence(tenant_id, group_id, build_timeout,
 
 
 @do
-def convergence_succeeded_servers(scaling_group, group_state, servers, now):
+def convergence_succeeded_servers(scaling_group, group_state, servers,
+                                  lb_nodes, now):
     """
     Handle convergence success
     """
@@ -340,11 +342,8 @@ def convergence_succeeded_servers(scaling_group, group_state, servers, now):
         yield cf_msg('group-status-active',
                      status=ScalingGroupStatus.ACTIVE.name)
     # update servers cache with latest servers
-    yield Effect(
-        UpdateServersCache(
-            scaling_group.tenant_id, scaling_group.uuid, now,
-            [thaw(s.json.set("_is_as_active", True))
-             for s in servers if s.state != ServerState.DELETED]))
+    yield update_cache(scaling_group, servers, lb_nodes, now,
+                       include_deleted=False)
     yield do_return(ConvergenceIterationStatus.Stop())
 
 

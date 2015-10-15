@@ -807,7 +807,13 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                 ScalingGroupStatus.ACTIVE, desired=2)
         self.group = mock_group(self.state, self.tenant_id, self.group_id)
         self.lc = {'args': {'server': {'name': 'foo'}, 'loadBalancers': []}}
-        self.desired_lbs = s(CLBDescription(lb_id='23', port=80))
+
+        self.clb_desc = CLBDescription(lb_id='23', port=80)
+        self.desired_lbs = s(self.clb_desc)
+        self.lb_nodes = [CLBNode(node_id='1', address='10.0.0.1',
+                                 description=self.clb_desc),
+                         CLBNode(node_id='2', address='10.0.0.2',
+                                 description=self.clb_desc)]
         self.servers = (
             server('a', ServerState.ACTIVE, servicenet_address='10.0.0.1',
                    desired_lbs=self.desired_lbs,
@@ -817,7 +823,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                    links=freeze([{'href': 'link2', 'rel': 'self'}]))
         )
         self.state_active = {}
-        self.cache = [thaw(self.servers[0].json), thaw(self.servers[1].json)]
+        self.cache = [thaw(self.servers[0].json.set('_is_as_active', True)),
+                      thaw(self.servers[1].json.set('_is_as_active', True))]
         self.gsgi = GetScalingGroupInfo(tenant_id='tenant-id',
                                         group_id='group-id')
         self.manifest = {  # Many details elided!
@@ -832,7 +839,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         exec_seq = [
             (self.gsgi, lambda i: self.gsgi_result),
             (("gacd", self.tenant_id, self.group_id, self.now),
-             lambda i: (self.servers, ()))
+             lambda i: (self.servers, self.lb_nodes))
         ]
         if with_cache:
             exec_seq.append(
@@ -860,6 +867,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         If state of world matches desired, no steps are executed, but the
         `active` servers are still updated, and SUCCESS is the return value.
         """
+        self.lb_nodes = ()
         for serv in self.servers:
             serv.desired_lbs = pset()
         sequence = [
@@ -912,8 +920,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         sequence = [
             parallel_sequence([]),
             (Log('execute-convergence',
-                 dict(servers=self.servers, lb_nodes=(), steps=steps,
-                      now=self.now, desired=dgs)), noop),
+                 dict(servers=self.servers, lb_nodes=self.lb_nodes,
+                      steps=steps, now=self.now, desired=dgs)), noop),
             parallel_sequence([
                 [({'dgs': dgs, 'servers': self.servers,
                    'lb_nodes': (), 'now': 0},
@@ -1208,6 +1216,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         group is put back into ACTIVE, even if there were no steps to execute.
         """
         self.manifest['state'].status = ScalingGroupStatus.ERROR
+        self.lb_nodes = ()
         for serv in self.servers:
             serv.desired_lbs = pset()
         sequence = [
