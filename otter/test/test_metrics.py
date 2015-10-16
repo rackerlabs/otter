@@ -182,28 +182,34 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         """
         total desired, pending and actual are added to cloud metrics
         """
-        td = 10
-        ta = 20
-        tp = 3
-        tt = 7
-        tg = 13
+        metrics = [GroupMetrics('t1', 'g1', 3, 2, 0),
+                   GroupMetrics('t2', 'g1', 4, 4, 1),
+                   GroupMetrics('t2', 'g', 100, 20, 0)]
         m = {'collectionTime': 100000, 'ttlInSeconds': 5 * 24 * 60 * 60}
-        md = merge(m, {'metricValue': td, 'metricName': 'ord.desired'})
-        ma = merge(m, {'metricValue': ta, 'metricName': 'ord.actual'})
-        mp = merge(m, {'metricValue': tp, 'metricName': 'ord.pending'})
-        mt = merge(m, {'metricValue': tt, 'metricName': 'ord.tenants'})
-        mg = merge(m, {'metricValue': tg, 'metricName': 'ord.groups'})
-        req_data = [md, ma, mp, mt, mg]
-        log = object()
+        md = merge(m, {'metricValue': 107, 'metricName': 'ord.desired'})
+        ma = merge(m, {'metricValue': 26, 'metricName': 'ord.actual'})
+        mp = merge(m, {'metricValue': 1, 'metricName': 'ord.pending'})
+        mt = merge(m, {'metricValue': 2, 'metricName': 'ord.tenants'})
+        mg = merge(m, {'metricValue': 3, 'metricName': 'ord.groups'})
+        mt1d = merge(m, {'metricValue': 3, 'metricName': 'ord.t1.desired'})
+        mt1a = merge(m, {'metricValue': 2, 'metricName': 'ord.t1.actual'})
+        mt1p = merge(m, {'metricValue': 0, 'metricName': 'ord.t1.pending'})
+        mt2d = merge(m, {'metricValue': 104, 'metricName': 'ord.t2.desired'})
+        mt2a = merge(m, {'metricValue': 24, 'metricName': 'ord.t2.actual'})
+        mt2p = merge(m, {'metricValue': 1, 'metricName': 'ord.t2.pending'})
+        req_data = [md, ma, mp, mt, mg, mt1d, mt1a, mt1p, mt2d, mt2a, mt2p]
+        log = mock_log()
         seq = [
             (Func(time.time), const(100)),
             (service_request(
                 ServiceType.CLOUD_METRICS_INGEST, "POST", "ingest",
                 data=req_data, log=log).intent, noop)
         ]
-        eff = add_to_cloud_metrics(
-            m['ttlInSeconds'], 'ord', td, ta, tp, tt, tg, log=log)
+        eff = add_to_cloud_metrics(m['ttlInSeconds'], 'ord', metrics, 2, log)
         self.assertIsNone(perform_sequence(seq, eff))
+        log.msg.assert_called_once_with(
+            'total desired: {td}, total_actual: {ta}, total pending: {tp}',
+            td=107, ta=26, tp=1)
 
 
 class UnchangedDivergentGroupsTests(SynchronousTestCase):
@@ -416,11 +422,8 @@ class CollectMetricsTests(SynchronousTestCase):
             side_effect=intent_func("gtsg"))
         self.log = mock_log()
 
-        self.metrics = [GroupMetrics('t', 'g1', 3, 2, 0),
-                        GroupMetrics('t2', 'g1', 4, 4, 1),
-                        GroupMetrics('t2', 'g', 100, 20, 0)]
         self.get_all_metrics = patch(self, 'otter.metrics.get_all_metrics',
-                                     return_value=succeed(self.metrics))
+                                     return_value=succeed("metrics"))
         self.groups = {"t": "t1group", "t2": "2 groups"}
 
         self.add_to_cloud_metrics = patch(
@@ -441,7 +444,7 @@ class CollectMetricsTests(SynchronousTestCase):
             (("gtsg", ["ct"], "lpath"), const(self.groups)),
             (TenantScope(mock.ANY, "tid"),
              nested_sequence([
-                 (("atcm", 200, "r", 107, 26, 1, 2, 3, self.log), noop)
+                 (("atcm", 200, "r", "metrics", 2, self.log, False), noop)
              ]))
         ])
         self.get_dispatcher = patch(self, "otter.metrics.get_dispatcher",
@@ -456,7 +459,7 @@ class CollectMetricsTests(SynchronousTestCase):
 
         with self.sequence.consume():
             d = collect_metrics(_reactor, self.config, self.log)
-            self.assertEqual(self.successResultOf(d), self.metrics)
+            self.assertEqual(self.successResultOf(d), "metrics")
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
         self.get_all_metrics.assert_called_once_with(
@@ -471,7 +474,7 @@ class CollectMetricsTests(SynchronousTestCase):
         client = mock.Mock(spec=['disconnect'])
         with self.sequence.consume():
             d = collect_metrics("reactr", self.config, self.log, client=client)
-            self.assertEqual(self.successResultOf(d), self.metrics)
+            self.assertEqual(self.successResultOf(d), "metrics")
         self.assertFalse(self.connect_cass_servers.called)
         self.assertFalse(client.disconnect.called)
 
@@ -483,7 +486,7 @@ class CollectMetricsTests(SynchronousTestCase):
         with self.sequence.consume():
             d = collect_metrics(_reactor, self.config, self.log,
                                 authenticator=auth)
-            self.assertEqual(self.successResultOf(d), self.metrics)
+            self.assertEqual(self.successResultOf(d), "metrics")
         self.get_dispatcher.assert_called_once_with(
             _reactor, auth, self.log, mock.ANY, mock.ANY)
 
@@ -498,7 +501,7 @@ class CollectMetricsTests(SynchronousTestCase):
         del self.config["metrics"]
         with sequence.consume():
             d = collect_metrics("reactor", self.config, self.log)
-            self.assertEqual(self.successResultOf(d), self.metrics)
+            self.assertEqual(self.successResultOf(d), "metrics")
         self.assertFalse(self.add_to_cloud_metrics.called)
 
 
