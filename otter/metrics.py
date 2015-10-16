@@ -217,7 +217,11 @@ def add_to_cloud_metrics(ttl, region, group_metrics, no_tenants, log=None,
     to Cloud metrics.
 
     :param str region: which region's metric is collected
+    :param group_metrics: List of :obj:`GroupMetric`
     :param int no_tenants: total number of tenants
+    :param log: Optional logger
+    :param bool _print: Should it print activity on stdout? Useful when running
+        as a script
 
     :return: `Effect` with None
     """
