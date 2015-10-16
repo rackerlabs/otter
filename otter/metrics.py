@@ -8,9 +8,11 @@ import json
 import operator
 import sys
 import time
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from datetime import datetime, timedelta
 from functools import partial
+
+import attr
 
 from effect import ComposedDispatcher, Effect, Func
 from effect.do import do, do_return
@@ -180,37 +182,63 @@ def get_all_metrics(dispatcher, tenanted_groups, log, _print=False,
     return d.addCallback(lambda x: reduce(operator.add, x, []))
 
 
+@attr.s
+class Metric(object):
+    desired = attr.ib(default=0)
+    actual = attr.ib(default=0)
+    pending = attr.ib(default=0)
+
+
+def calc_total(group_metrics):
+    tenanted = defaultdict(Metric)
+    total = Metric()
+    for gm in group_metrics:
+        total.desired += gm.desired
+        total.actual += gm.actual
+        total.pending += gm.pending
+        tenanted[gm.tenant_id].desired += gm.desired
+        tenanted[gm.tenant_id].actual += gm.actual
+        tenanted[gm.tenant_id].pending += gm.pending
+    return tenanted, total
+
+
 @do
-def add_to_cloud_metrics(ttl, region, total_desired, total_actual,
-                         total_pending, no_tenants, no_groups, log=None):
+def add_to_cloud_metrics(ttl, region, group_metrics, no_tenants, log=None,
+                         _print=False):
     """
     Add total number of desired, actual and pending servers of a region
     to Cloud metrics.
 
-    :param dict conf: Metrics configuration, will contain tenant ID of tenant
-        used to ingest metrics and other conf like ttl
     :param str region: which region's metric is collected
-    :param int total_desired: Total number of servers currently desired
-        in the region
-    :param int total_actual: Total number of servers currently
-        there in the region
-    :param int total_pending: Total number of servers currently
-        building in a region
     :param int no_tenants: total number of tenants
-    :param int no_groups: total number of groups
 
     :return: `Effect` with None
     """
     epoch = yield Effect(Func(time.time))
     metric_part = {'collectionTime': int(epoch * 1000),
                    'ttlInSeconds': ttl}
-    totals = [('desired', total_desired), ('actual', total_actual),
-              ('pending', total_pending), ('tenants', no_tenants),
-              ('groups', no_groups)]
+
+    tenanted_metrics, total = calc_total(group_metrics)
+    if log is not None:
+        log.msg(
+            'total desired: {td}, total_actual: {ta}, total pending: {tp}',
+            td=total.desired, ta=total.actual, tp=total.pending)
+    if _print:
+        print('total desired: {}, total actual: {}, total pending: {}'.format(
+            total.desired, total.actual, total.pending))
+
+    metrics = [('desired', total.desired), ('actual', total.actual),
+               ('pending', total.pending), ('tenants', no_tenants),
+               ('groups', len(group_metrics))]
+    for tenant_id, metric in sorted(tenanted_metrics.items()):
+        metrics.append(("{}.desired".format(tenant_id), metric.desired))
+        metrics.append(("{}.actual".format(tenant_id), metric.actual))
+        metrics.append(("{}.pending".format(tenant_id), metric.pending))
+
     data = [merge(metric_part,
                   {'metricValue': value,
                    'metricName': '{}.{}'.format(region, metric)})
-            for metric, value in totals]
+            for metric, value in metrics]
     yield service_request(ServiceType.CLOUD_METRICS_INGEST,
                           'POST', 'ingest', data=data, log=log)
 
@@ -270,25 +298,12 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     group_metrics = yield get_all_metrics(
         dispatcher, tenanted_groups, log, _print=_print)
 
-    # Calculate total desired, actual and pending
-    total_desired, total_actual, total_pending = 0, 0, 0
-    for group_metric in group_metrics:
-        total_desired += group_metric.desired
-        total_actual += group_metric.actual
-        total_pending += group_metric.pending
-    log.msg(
-        'total desired: {td}, total_actual: {ta}, total pending: {tp}',
-        td=total_desired, ta=total_actual, tp=total_pending)
-    if _print:
-        print('total desired: {}, total actual: {}, total pending: {}'.format(
-            total_desired, total_actual, total_pending))
-
     # Add to cloud metrics
     metr_conf = config.get("metrics", None)
     if metr_conf is not None:
         eff = add_to_cloud_metrics(
-            metr_conf['ttl'], config['region'], total_desired, total_actual,
-            total_pending, len(tenanted_groups), len(group_metrics), log)
+            metr_conf['ttl'], config['region'], group_metrics,
+            len(tenanted_groups), log, _print)
         eff = Effect(TenantScope(eff, metr_conf['tenant_id']))
         yield perform(dispatcher, eff)
         log.msg('added to cloud metrics')
