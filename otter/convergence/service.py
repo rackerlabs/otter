@@ -227,8 +227,7 @@ def _execute_steps(steps):
 
 
 @do
-def convergence_exec_data(tenant_id, group_id, now,
-                          get_executor):
+def convergence_exec_data(tenant_id, group_id, now, get_executor):
     """
     Get data required while executing convergence
     """
@@ -265,9 +264,8 @@ def _clean_waiting(waiting, group_id):
 
 
 @do
-def execute_convergence(tenant_id, group_id, build_timeout,
-                        waiting, limited_retry_iterations,
-                        get_executor=get_executor):
+def execute_convergence(tenant_id, group_id, build_timeout, waiting,
+                        limited_retry_iterations, get_executor=get_executor):
     """
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
@@ -292,9 +290,8 @@ def execute_convergence(tenant_id, group_id, build_timeout,
     now_dt = yield Effect(Func(datetime.utcnow))
     all_data = yield msg_with_time(
         "gather-convergence-data",
-        convergence_exec_data(
-            tenant_id, group_id, now_dt,
-            get_executor=get_executor))
+        convergence_exec_data(tenant_id, group_id, now_dt,
+                              get_executor=get_executor))
     (executor, scaling_group, group_state, desired_group_state,
      servers, lb_nodes) = all_data
 
