@@ -193,7 +193,9 @@ def calc_total(group_metrics):
     """
     Calculate total metric for all groups and per tenant
 
+    :param group_metrics: List of :obj:`GroupMetric`
     :return (``dict``, :obj:`Metric`) where dict is tenant-id -> `Metric`
+        representing per tenant metric and second element is total metric
     """
     tenanted = defaultdict(Metric)
     total = Metric()
