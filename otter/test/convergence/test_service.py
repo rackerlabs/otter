@@ -1430,6 +1430,9 @@ class IsAutoscaleActiveTests(SynchronousTestCase):
 
 
 class ConvergenceExecutorTests(SynchronousTestCase):
+    """
+    Tests for :obj:`ConvergenceExecutor`.
+    """
     def setUp(self):
         self.fake_attrs = {
             'gather': 'g',
@@ -1440,6 +1443,9 @@ class ConvergenceExecutorTests(SynchronousTestCase):
         self.lse = launch_server_executor
 
     def test_launch_server_executor(self):
+        """
+        Ensures :obj:`launch_server_executor` contains the correct methods.
+        """
         attrs = {
             'gather': get_all_launch_server_data,
             'plan': plan_launch_server,
@@ -1450,5 +1456,8 @@ class ConvergenceExecutorTests(SynchronousTestCase):
         self.assertEqual(attr.asdict(self.lse), attrs)
 
     def test_launch_server_overrides(self):
+        """
+        Ensures methods in :obj:`launch_server_executor` can be overridden.
+        """
         ce = attr.assoc(launch_server_executor, **self.fake_attrs)
         self.assertEqual(attr.asdict(ce), self.fake_attrs)

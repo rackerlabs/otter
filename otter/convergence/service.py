@@ -133,6 +133,9 @@ from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 
 def get_executor(launch_config):
+    """
+    Returns a ConvergenceExecutor based upon the launch_config type given.
+    """
     if launch_config['type'] == 'launch_server':
         return launch_server_executor
     raise NotImplementedError
@@ -815,6 +818,10 @@ class Converger(MultiService):
 
 @attr.s
 class ConvergenceExecutor(object):
+    """
+    A bag of methods to enable configurable logic for different types of launch
+    configurations.
+    """
     gather = attr.ib()
     plan = attr.ib()
     get_desired_group_state = attr.ib()
