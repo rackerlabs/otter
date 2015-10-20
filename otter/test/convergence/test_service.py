@@ -847,7 +847,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         exec_seq = [
             (self.gsgi, lambda i: self.gsgi_result),
             (("gacd", self.tenant_id, self.group_id, self.now),
-             lambda i: (self.servers, self.lb_nodes))
+             lambda i: {'servers': self.servers, 'lb_nodes': self.lb_nodes})
         ]
         if with_cache:
             exec_seq.append(
@@ -923,7 +923,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                      'now': 0})
                 .on(lambda _: (StepResult.SUCCESS, [])))]
 
-        def plan(dgs, servers, lb_nodes, now, build_timeout):
+        def plan(dgs, now, build_timeout, servers, lb_nodes):
             self.assertEqual(build_timeout, 3600)
             return steps
 

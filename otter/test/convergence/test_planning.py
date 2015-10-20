@@ -1097,15 +1097,15 @@ class PlanTests(SynchronousTestCase):
 
         result = plan_launch_server(
             desired_group_state,
-            set([server('server1', state=ServerState.ACTIVE,
-                        servicenet_address='1.1.1.1',
-                        desired_lbs=desired_lbs),
-                 server('server2', state=ServerState.ACTIVE,
-                        servicenet_address='1.2.3.4',
-                        desired_lbs=desired_lbs)]),
-            set(),
             0,
-            build_timeout=3600)
+            build_timeout=3600,
+            servers=set([server('server1', state=ServerState.ACTIVE,
+                                servicenet_address='1.1.1.1',
+                                desired_lbs=desired_lbs),
+                         server('server2', state=ServerState.ACTIVE,
+                                servicenet_address='1.2.3.4',
+                                desired_lbs=desired_lbs)]),
+            lb_nodes=set())
 
         self.assertEqual(
             result,
@@ -1122,11 +1122,11 @@ class PlanTests(SynchronousTestCase):
 
         result = plan_launch_server(
             desired_group_state,
-            set([server('server1', state=ServerState.BUILD,
-                        servicenet_address='1.1.1.1', created=0)]),
-            set(),
             now=1,
-            build_timeout=1)
+            build_timeout=1,
+            servers=set([server('server1', state=ServerState.BUILD,
+                        servicenet_address='1.1.1.1', created=0)]),
+            lb_nodes=set())
 
         self.assertEqual(
             result,
