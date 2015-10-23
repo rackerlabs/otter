@@ -2,7 +2,7 @@
 Test to create and verify the created group.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from autoscale.models.request.autoscale_requests import null
+from autoscale_fixtures.models.request.autoscale_requests import null
 
 import base64
 from cloudcafe.common.tools.datagen import rand_name

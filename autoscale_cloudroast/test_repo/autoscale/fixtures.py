@@ -18,12 +18,12 @@ from cloudcafe.common.resources import ResourcePool
 from cloudcafe.common.tools.datagen import rand_name
 from cloudcafe.compute.servers_api.client import ServersClient
 
-from autoscale.behaviors import AutoscaleBehaviors
-from autoscale.client import (
+from autoscale_fixtures.behaviors import AutoscaleBehaviors
+from autoscale_fixtures.client import (
     AutoscalingAPIClient, LbaasAPIClient, RackConnectV3APIClient
 )
-from autoscale.config import AutoscaleConfig
-from autoscale.otter_constants import OtterConstants
+from autoscale_fixtures.config import AutoscaleConfig
+from autoscale_fixtures.otter_constants import OtterConstants
 
 
 def _make_client(access_data, service_name, region, client_cls, debug_name):

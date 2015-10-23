@@ -9,7 +9,7 @@ from cloudcafe.identity.v2_0.tokens_api.behaviors import \
 from cloudcafe.identity.v2_0.tokens_api.client import \
     TokenAPI_Client as OSTokenAPI_Client
 
-from autoscale.client import AutoscalingAPIClient
+from autoscale_fixtures.client import AutoscalingAPIClient
 
 from test_repo.autoscale.fixtures import AutoscaleFixture
 

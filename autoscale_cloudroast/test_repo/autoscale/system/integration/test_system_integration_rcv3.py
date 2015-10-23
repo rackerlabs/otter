@@ -11,7 +11,7 @@ from cafe.drivers.unittest.decorators import tags
 
 from cloudcafe.common.tools.datagen import rand_name
 
-from autoscale.behaviors import safe_hasattr
+from autoscale_fixtures.behaviors import safe_hasattr
 
 from test_repo.autoscale.fixtures import (
     AutoscaleFixture, autoscale_config, rcv3_client)

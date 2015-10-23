@@ -2,7 +2,7 @@
 System Integration tests autoscaling with repose when unauthenticated
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from autoscale.client import AutoscalingAPIClient
+from autoscale_fixtures.client import AutoscalingAPIClient
 from cafe.drivers.unittest.decorators import tags
 
 

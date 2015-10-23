@@ -15,7 +15,7 @@ from cloudcafe.common.tools.datagen import rand_name
 
 from retrying import retry
 
-from autoscale.models.servers import Metadata
+from .models.servers import Metadata
 
 
 log = logging.getLogger('RunnerLog')
