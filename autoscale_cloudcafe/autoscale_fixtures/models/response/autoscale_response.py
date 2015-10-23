@@ -2,9 +2,8 @@
 Marshalling for autoscale reponses
 """
 from cafe.engine.models.base import AutoMarshallingModel
-from autoscale.models.response.group_response import (Active, Server,
-                                                      Lbaas, PolicyArgs)
-from autoscale.models.servers import Metadata, Links
+from .group_response import Active, Server, Lbaas, PolicyArgs
+from ..servers import Metadata, Links
 import json
 import re
 

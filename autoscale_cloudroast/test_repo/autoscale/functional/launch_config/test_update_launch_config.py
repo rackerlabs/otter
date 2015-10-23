@@ -1,7 +1,7 @@
 """
 Test to update launch config.
 """
-from autoscale.models.request.autoscale_requests import null
+from autoscale_fixtures.models.request.autoscale_requests import null
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cloudcafe.common.tools.datagen import rand_name
 

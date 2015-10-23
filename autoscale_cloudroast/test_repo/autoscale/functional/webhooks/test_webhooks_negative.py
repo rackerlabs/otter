@@ -2,7 +2,7 @@
 Test to verify negative cases for webhooks.
 """
 from test_repo.autoscale.fixtures import ScalingGroupPolicyFixture
-from autoscale.status_codes import HttpStatusCodes
+from autoscale_fixtures.status_codes import HttpStatusCodes
 import urlparse
 from time import sleep
 import unittest

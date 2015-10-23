@@ -2,7 +2,7 @@
 Marshalling for group state responses
 """
 from cafe.engine.models.base import AutoMarshallingModel
-from autoscale.models.servers import Metadata, Network, \
+from ..servers import Metadata, Network, \
     Links, Personality
 import re
 

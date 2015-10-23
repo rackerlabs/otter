@@ -9,20 +9,20 @@ from urlparse import urlparse
 
 from cafe.engine.clients.rest import AutoMarshallingRestClient
 
-from autoscale.models.lbaas import LoadBalancer, NodeList
-from autoscale.models.request.autoscale_requests import (
+from .models.lbaas import LoadBalancer, NodeList
+from .models.request.autoscale_requests import (
     Config_Request, Group_Request, Policy_Batch_Request,
     Policy_Request, ScalingGroup_Request,
     Update_Policy_Request, Update_Webhook_Request, Webhook_Multi_Request,
     Webhook_Request
 )
-from autoscale.models.response.autoscale_response import (
+from .models.response.autoscale_response import (
     Config, Group, Groups, Policies, Policy, RackConnectLBNodeDetail,
     RackConnectLBNodes, RackConnectLBPool, RackConnectLBPools,
     RackConnectNetworkInfo, ScalingGroup, Webhook, Webhooks
 )
 
-from autoscale.models.response.limits_response import Limits
+from .models.response.limits_response import Limits
 
 
 class AutoscalingAPIClient(AutoMarshallingRestClient):

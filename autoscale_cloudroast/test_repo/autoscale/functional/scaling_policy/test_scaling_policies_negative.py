@@ -2,7 +2,7 @@
 Test to negative scenarios for a scaling policy.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from autoscale.status_codes import HttpStatusCodes
+from autoscale_fixtures.status_codes import HttpStatusCodes
 import sys
 
 
