@@ -1,14 +1,17 @@
 """Tests for convergence steps."""
 import json
+from uuid import UUID
 
 from effect import Effect, Func, base_dispatcher, sync_perform
 from effect.testing import SequenceDispatcher, perform_sequence
 
 from mock import ANY, patch
 
-from pyrsistent import freeze, pset
+from pyrsistent import freeze, pmap, pset, thaw
 
 from testtools.matchers import ContainsAll
+
+from toolz.functoolz import identity
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -28,8 +31,12 @@ from otter.cloud_client import (
     NovaComputeFaultError,
     NovaRateLimitError,
     ServerMetadataOverLimitError,
+    check_stack,
+    create_stack,
+    delete_stack,
     has_code,
-    service_request)
+    service_request,
+    update_stack)
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
@@ -42,18 +49,23 @@ from otter.convergence.steps import (
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeCLBNode,
+    CheckStack,
     ConvergeLater,
     CreateServer,
+    CreateStack,
     DeleteServer,
+    DeleteStack,
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
     UnexpectedServerStatus,
+    UpdateStack,
     _RCV3_LB_DOESNT_EXIST_PATTERN,
     _RCV3_LB_INACTIVE_PATTERN,
     _RCV3_NODE_ALREADY_A_MEMBER_PATTERN,
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
     _rcv3_check_bulk_add,
     _rcv3_check_bulk_delete,
+    append_stack_uuid,
     delete_and_verify,
 )
 from otter.log.intents import Log
@@ -62,6 +74,7 @@ from otter.test.utils import (
     matches,
     raise_,
     resolve_effect,
+    stack,
     stub_pure_response,
     transform_eq)
 from otter.util.hashkey import generate_server_name
@@ -1177,3 +1190,140 @@ class ConvergeLaterTests(SynchronousTestCase):
         self.assertEqual(
             sync_perform(base_dispatcher, eff),
             (StepResult.RETRY, ['building']))
+
+
+class AppendStackUUIDTests(SynchronousTestCase):
+    """Tests for :func:`append_stack_uuid`."""
+
+    def test_prefix(self):
+        """
+        Ensures prefix is kept.
+        """
+        new_config = append_stack_uuid(pmap({'stack_name': 'mystack'}))
+        new_name = new_config.get('stack_name')
+        self.assertTrue(new_name.startswith('mystack'))
+
+    def test_is_uuid(self):
+        """
+        Ensures UUID is appended. Raises ValueError if not valid UUID.
+        """
+        new_config = append_stack_uuid(pmap({'stack_name': 'mystack'}))
+        new_name = new_config.get('stack_name')
+        uuid_part = new_name[len('mystack_'):]
+        UUID(uuid_part, version=4)
+
+
+class CreateStackTests(SynchronousTestCase):
+    """Tests for CreateStack."""
+
+    def test_normal_use(self):
+        """Tests normal usage."""
+        stack_config = pmap({'foo': 'bar'})
+        create = CreateStack(stack_config)
+        self.assertEqual(create.as_effect(append_stack_uuid=identity).intent,
+                         create_stack(thaw(stack_config)).intent)
+
+    def test_ensure_retry(self):
+        """Tests that retry will be returned."""
+        stack_config = pmap({'foo': 'bar'})
+        seq = [
+            (create_stack(thaw(stack_config)).intent,
+             lambda _: (StubResponse(200, {}), {'stack': {}})),
+            (Log('request-create-stack', ANY), lambda _: None)
+        ]
+        create = CreateStack(stack_config)
+        reason = 'Waiting for stack to create'
+        result = perform_sequence(seq,
+                                  create.as_effect(append_stack_uuid=identity))
+        self.assertEqual(result,
+                         (StepResult.RETRY, [ErrorReason.String(reason)]))
+
+
+class CheckStackTests(SynchronousTestCase):
+    """Tests for CheckStack."""
+    def setUp(self):
+        self.stack = stack(id='some_id', name='some_name')
+        self.check_call = check_stack(stack_name=self.stack.name,
+                                      stack_id=self.stack.id)
+
+    def test_normal_use(self):
+        """Tests normal usage."""
+        self.assertEqual(CheckStack(stack=self.stack).as_effect().intent,
+                         self.check_call.intent)
+
+    def test_ensure_retry(self):
+        """Tests that retry will be returned."""
+        seq = [
+            (self.check_call.intent, lambda _: (StubResponse(204, ''), None)),
+            (Log('request-check-stack', ANY), lambda _: None)
+        ]
+        reason = 'Waiting for stack check to complete'
+        result = perform_sequence(seq, CheckStack(self.stack).as_effect())
+        self.assertEqual(result,
+                         (StepResult.RETRY, [ErrorReason.String(reason)]))
+
+
+class UpdateStackTests(SynchronousTestCase):
+    """Tests for UpdateStack."""
+    def setUp(self):
+        self.config = pmap({'foo': 'bar', 'stack_name': 'to_be_removed'})
+        self.config_after = {'foo': 'bar'}
+        self.stack = stack(id='foo_id', name='foo_name')
+        self.update_call = update_stack(stack_name=self.stack.name,
+                                        stack_id=self.stack.id,
+                                        stack_args=self.config_after)
+
+    def test_normal_use(self):
+        """Tests normal usage."""
+        update = UpdateStack(stack=self.stack, stack_config=self.config)
+        self.assertEqual(update.as_effect().intent,
+                         self.update_call.intent)
+
+    def test_retry_default(self):
+        """Tests correct behavior when retry is not specified."""
+        seq = [
+            (self.update_call.intent, lambda _: (StubResponse(202, ''), None)),
+            (Log('request-update-stack', ANY), lambda _: None)
+        ]
+        update = UpdateStack(stack=self.stack, stack_config=self.config)
+        reason = 'Waiting for stack to update'
+        result = perform_sequence(seq, update.as_effect())
+        self.assertEqual(result,
+                         (StepResult.RETRY, [ErrorReason.String(reason)]))
+
+    def test_retry_false(self):
+        """Tests correct behavior when retry is passed as false."""
+        seq = [
+            (self.update_call.intent, lambda _: (StubResponse(202, ''), None)),
+            (Log('request-update-stack', ANY), lambda _: None)
+        ]
+        update = UpdateStack(stack=self.stack, stack_config=self.config,
+                             retry=False)
+        result = perform_sequence(seq, update.as_effect())
+        self.assertEqual(result, (StepResult.SUCCESS, []))
+
+
+class DeleteStackTests(SynchronousTestCase):
+    """Tests for DeleteStack."""
+
+    def test_normal_use(self):
+        """Tests normal usage."""
+        foo_stack = stack(id='foo', name='bar')
+        delete = DeleteStack(foo_stack)
+        self.assertEqual(delete.as_effect().intent,
+                         delete_stack(stack_id='foo', stack_name='bar').intent)
+
+    def test_ensure_retry(self):
+        """Tests that retry will be returned."""
+        seq = [
+            (delete_stack(stack_id='foo', stack_name='bar').intent,
+             lambda _: (StubResponse(204, ''), None)),
+            (Log('request-delete-stack', ANY), lambda _: None)
+        ]
+        foo_stack = stack(id='foo', name='bar')
+        delete = DeleteStack(foo_stack)
+        reason = ('Must re-gather after stack deletion in order to update the '
+                  'active cache')
+        result = perform_sequence(seq, delete.as_effect())
+        self.assertEqual(result,
+                         (StepResult.RETRY, [ErrorReason.String(reason)]))
