@@ -114,14 +114,18 @@ from txeffect import exc_info_to_failure, perform
 
 from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
-from otter.convergence.composition import get_desired_server_group_state
+from otter.convergence.composition import (get_desired_server_group_state,
+                                           get_desired_stack_group_state)
 from otter.convergence.effecting import steps_to_effect
 from otter.convergence.errors import present_reasons, structure_reason
-from otter.convergence.gathering import get_all_launch_server_data
+from otter.convergence.gathering import (get_all_launch_server_data,
+                                         get_all_launch_stack_data)
 from otter.convergence.logging import log_steps
 from otter.convergence.model import (
-    ConvergenceIterationStatus, ServerState, StepResult)
-from otter.convergence.planning import plan_launch_server
+    ConvergenceIterationStatus,
+    ServerState,
+    StepResult)
+from otter.convergence.planning import plan_launch_server, plan_launch_stack
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, msg_with_time, with_log
 from otter.models.intents import (
@@ -138,6 +142,8 @@ def get_executor(launch_config):
     """
     if launch_config['type'] == 'launch_server':
         return launch_server_executor
+    elif launch_config['type'] == 'launch_stack':
+        return launch_stack_executor
     raise NotImplementedError
 
 
@@ -334,6 +340,10 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
     else:
         result = ConvergenceIterationStatus.Continue()
     yield do_return(result)
+
+
+def update_stacks_cache(scaling_group, now, stacks, include_deleted=True):
+    return Effect(Func(lambda: None))
 
 
 @do
@@ -828,3 +838,10 @@ launch_server_executor = ConvergenceExecutor(
     plan=plan_launch_server,
     get_desired_group_state=get_desired_server_group_state,
     update_cache=update_servers_cache)
+
+
+launch_stack_executor = ConvergenceExecutor(
+    gather=get_all_launch_stack_data,
+    plan=plan_launch_stack,
+    get_desired_group_state=get_desired_stack_group_state,
+    update_cache=update_stacks_cache)
