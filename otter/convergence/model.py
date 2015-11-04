@@ -356,6 +356,10 @@ class HeatStack(object):
         return StackState.OTHER
 
 
+def get_stack_tag_for_group(group_id):
+    return "autoscale_%s" % group_id
+
+
 def group_id_from_metadata(metadata):
     """
     Get the group ID of a server based on the metadata.
