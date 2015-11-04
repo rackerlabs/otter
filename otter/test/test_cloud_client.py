@@ -48,8 +48,11 @@ from otter.cloud_client import (
     add_bind_service,
     add_clb_nodes,
     change_clb_node,
+    check_stack,
     concretize_service_request,
     create_server,
+    create_stack,
+    delete_stack,
     get_clb_node_feed,
     get_clb_nodes,
     get_clbs,
@@ -57,11 +60,13 @@ from otter.cloud_client import (
     get_server_details,
     list_servers_details_all,
     list_servers_details_page,
+    list_stacks_all,
     perform_tenant_scope,
     publish_to_cloudfeeds,
     remove_clb_nodes,
     service_request,
-    set_nova_metadata_item)
+    set_nova_metadata_item,
+    update_stack)
 from otter.constants import ServiceType
 from otter.log.intents import Log
 from otter.test.utils import (
@@ -1405,3 +1410,118 @@ class CloudFeedsTests(SynchronousTestCase):
             expected.intent,
             service_request_eqf(stub_pure_response('<this is xml>', 202)))])
         self.assertRaises(APIError, sync_perform, dispatcher, eff)
+
+
+class CloudOrchestrationTests(SynchronousTestCase):
+    """
+    Tests for cloud orchestration functions.
+    """
+    def _list_stacks_all_intent(self, params):
+        """Return the expected intent for listing stacks given parameters."""
+        return service_request(
+            ServiceType.CLOUD_ORCHESTRATION,
+            'GET', 'stacks',
+            reauth_codes=(401,),
+            params=params).intent
+
+    def _create_stack_intent(self, data):
+        return service_request(
+            ServiceType.CLOUD_ORCHESTRATION,
+            'POST', 'stacks',
+            data=data,
+            success_pred=has_code(201),
+            reauth_codes=(401,)).intent
+
+    def _check_stack_intent(self, stack_name, stack_id):
+        return service_request(
+            ServiceType.CLOUD_ORCHESTRATION,
+            'POST', 'stacks/{0}/{1}/actions'.format(stack_name, stack_id),
+            data={'check': None},
+            success_pred=has_code(201),
+            reauth_codes=(401,)).intent
+
+    def _update_stack_intent(self, stack_name, stack_id, stack_args):
+        return service_request(
+            ServiceType.CLOUD_ORCHESTRATION,
+            'PUT', 'stacks/{0}/{1}'.format(stack_name, stack_id),
+            data=stack_args,
+            success_pred=has_code(202),
+            reauth_codes=(401,)).intent
+
+    def _delete_stack_intent(self, stack_name, stack_id):
+        return service_request(
+            ServiceType.CLOUD_ORCHESTRATION,
+            'DELETE', 'stacks/{0}/{1}'.format(stack_name, stack_id),
+            success_pred=has_code(204),
+            reauth_codes=(401,)).intent
+
+    def test_list_stacks_all(self):
+        """
+        :func:`list_stacks_all` returns the JSON response from listing stacks.
+        """
+        body = {'stacks': ['foo', 'bar']}
+        eff = list_stacks_all()
+        expected_intent = self._list_stacks_all_intent(None)
+        seq = [
+            (expected_intent,
+             service_request_eqf(stub_pure_response(json.dumps(body), 200))),
+            (log_intent('request-list-stacks-all', body), lambda _: None)
+        ]
+        stacks = perform_sequence(seq, eff)
+        self.assertEqual(stacks, ['foo', 'bar'])
+
+    def test_create_stack(self):
+        data = {'data': 'data'}
+        body = {'stack': 'the_stack_json'}
+        eff = create_stack(data)
+        expected_intent = self._create_stack_intent(data)
+        seq = [
+            (expected_intent,
+             service_request_eqf(stub_pure_response(json.dumps(body), 201))),
+            (log_intent('request-create-stack', body), lambda _: None)
+        ]
+        result = perform_sequence(seq, eff)
+        self.assertEqual(result, 'the_stack_json')
+
+    def test_check_stack(self):
+        stack_name = 'foostack'
+        stack_id = 'foo_id'
+        eff = check_stack(stack_name, stack_id)
+        expected_intent = self._check_stack_intent(stack_name, stack_id)
+
+        seq = [
+            (expected_intent,
+             service_request_eqf(stub_pure_response(b'', 201))),
+            (log_intent('request-check-stack', None, False), lambda _: None)
+        ]
+        result = perform_sequence(seq, eff)
+        self.assertEqual(result, None)
+
+    def test_update_stack(self):
+        stack_name = 'foostack'
+        stack_id = 'foo_id'
+        stack_args = {'stack': 'data'}
+        eff = update_stack(stack_name, stack_id, stack_args)
+        expected_intent = self._update_stack_intent(stack_name, stack_id,
+                                                    stack_args)
+        seq = [
+            (expected_intent,
+             service_request_eqf(stub_pure_response(b'', 202))),
+            (log_intent('request-update-stack', None, False), lambda _: None)
+        ]
+        result = perform_sequence(seq, eff)
+        self.assertEqual(result, None)
+
+    def test_delete_stack(self):
+        stack_name = 'foostack'
+        stack_id = 'foo_id'
+        eff = delete_stack(stack_name, stack_id)
+        expected_intent = self._delete_stack_intent(stack_name, stack_id)
+
+        seq = [
+            (expected_intent,
+             service_request_eqf(stub_pure_response(b'', 204))),
+            (log_intent('request-delete-stack', None, False), lambda _: None)
+        ]
+        result = perform_sequence(seq, eff)
+        self.assertEqual(result, None)
