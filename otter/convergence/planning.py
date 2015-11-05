@@ -262,10 +262,10 @@ def converge_launch_server(desired_state, servers_with_cheese,
                            load_balancer_contents, now, timeout=3600):
     """
     Create steps that indicate how to transition from the state provided
-    by the given parameters to the :obj:`DesiredGroupState` described by
+    by the given parameters to the :obj:`DesiredServerGroupState` described by
     ``desired_state``.
 
-    :param DesiredGroupState desired_state: The desired group state.
+    :param DesiredServerGroupState desired_state: The desired group state.
     :param set servers_with_cheese: a list of :obj:`NovaServer` instances.
         This must only contain servers that are being managed for the specified
         group.
