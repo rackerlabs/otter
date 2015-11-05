@@ -483,6 +483,19 @@ def plan_launch_server(desired_group_state, now, build_timeout, servers,
     return optimize_steps(steps)
 
 
+def plan_launch_stack(desired_group_state, now, build_timeout, stacks):
+    """
+    Get an optimized convergence plan.
+
+    The arguments `now` and `build_timeout` are ignored and only necessary to
+    match those of `plan_launch_server`. The arguments `desired_group_state`
+    and `stacks` are the same as in `converge_launch_stack`.
+    """
+    steps = converge_launch_stack(desired_group_state, stacks)
+    steps = limit_steps_by_count(steps)
+    return optimize_steps(steps)
+
+
 def add_server_to_lb(server, description):
     """
     Add a server to a load balancing entity as described by `description`.

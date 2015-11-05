@@ -23,7 +23,8 @@ from otter.convergence.planning import (
     converge_launch_server,
     converge_launch_stack,
     get_destiny,
-    plan_launch_server)
+    plan_launch_server,
+    plan_launch_stack)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -1495,6 +1496,27 @@ class ConvergeLaunchStackTests(SynchronousTestCase):
                 num_combinations += 1
 
         self.assertEqual(num_combinations, 2048)
+
+
+class PlanLaunchStackTests(SynchronousTestCase):
+    """Tests for :func:`plan_launch_stack`."""
+
+    def test_plan_launch_stack_limit_steps(self):
+        """A plan is returned with a limited number of steps."""
+        fake_config = {'foo': 'bar'}
+        desired_group_state = DesiredStackGroupState(
+            stack_config=fake_config, capacity=25)
+
+        result = plan_launch_stack(
+            desired_group_state=desired_group_state,
+            now=0,
+            build_timeout=3600,
+            stacks=set([stack('stack1'),
+                        stack('stack2', action='CHECK', status='COMPLETE')]))
+
+        self.assertEqual(
+            result,
+            pbag([CreateStack(stack_config=pmap(fake_config))] * 10))
 
 
 class DestinyTests(SynchronousTestCase):
