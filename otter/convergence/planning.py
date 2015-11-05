@@ -17,20 +17,26 @@ from otter.convergence.model import (
     IDrainable,
     RCv3Description,
     RCv3Node,
-    ServerState)
+    ServerState,
+    StackState)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeCLBNode,
+    CheckStack,
     ConvergeLater,
     CreateServer,
+    CreateStack,
     DeleteServer,
+    DeleteStack,
+    FailConvergence,
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
+    UpdateStack,
 )
 from otter.convergence.transforming import limit_steps_by_count, optimize_steps
-from otter.util.fp import partition_bool
+from otter.util.fp import partition_bool, partition_groups
 
 
 DRAINING_METADATA = ('rax:autoscale:server:state', 'DRAINING')
@@ -364,6 +370,103 @@ def converge_launch_server(desired_state, servers_with_cheese,
                 cleanup_errored_and_deleted_steps +
                 delete_timeout_steps +
                 lb_converge_steps +
+                converge_later)
+
+
+def converge_launch_stack(desired_state, stacks):
+    """
+    Create steps that indicate how to transition from the state provided
+    by the given parameters to the :obj:`DesiredStackGroupState` described by
+    ``desired_state``.
+
+    :param DesiredStackGroupState desired_state: The desired group state.
+    :param set stacks: a set of :obj:`HeatStack` instances.
+        This must only contain stacks that are being managed for the specified
+        group.
+    :rtype: :obj:`pbag` of `IStep`
+
+    """
+    config = desired_state.stack_config
+
+    group_states = [StackState.CREATE_UPDATE_COMPLETE,
+                    StackState.CREATE_UPDATE_FAILED,
+                    StackState.CHECK_COMPLETE,
+                    StackState.CHECK_FAILED,
+                    StackState.IN_PROGRESS,
+                    StackState.DELETE_IN_PROGRESS,
+                    StackState.DELETE_FAILED]
+
+    (stacks_complete,
+     stacks_failed,
+     stacks_check_complete,
+     stacks_check_failed,
+     stacks_in_progress,
+     stacks_delete_in_progress,
+     stacks_delete_failed) = partition_groups(lambda stack: stack.get_state(),
+                                              stacks,
+                                              group_states)
+
+    stacks_amiss = (stacks_failed +
+                    stacks_check_failed +
+                    stacks_in_progress +
+                    stacks_delete_in_progress)
+
+    if stacks_delete_failed:
+        return pbag([FailConvergence(["Stacks in DELETE_FAILED found."])])
+
+    # If there are no stacks in CHECK_* or other work to be done, we assume
+    # we're at the beginning of a convergence cycle and need to perform stack
+    # checks.
+    if not (stacks_check_complete or stacks_amiss):
+        return pbag([CheckStack(stack) for stack in stacks_complete])
+
+    # Otherwise, if all stacks are in a good state and we have the right number
+    # of stacks, we call update on the stacks in CHECK_COMPLETE and return
+    # SUCCESS without waiting for it to finish (calling update on a stack in
+    # CREATE_COMPLETE is essentially a no-op) so that there will be no stacks
+    # in CREATE_* the next time otter tries to converge this group. This will
+    # cause all of the stacks to be checked at that time and let otter know
+    # if there are any stacks that have fallen into an error state.
+    elif not stacks_amiss and len(stacks) == desired_state.capacity:
+        return pbag([UpdateStack(stack=stack, stack_config=config, retry=False)
+                     for stack in stacks_check_complete])
+
+    good_stacks = stacks_complete + stacks_check_complete
+
+    def get_create_steps():
+        create_stack = CreateStack(stack_config=config)
+        good_or_fixable_stack_count = (len(good_stacks) +
+                                       len(stacks_in_progress) +
+                                       len(stacks_check_failed))
+        return [create_stack] * (desired_state.capacity -
+                                 good_or_fixable_stack_count)
+
+    def get_scale_down_steps():
+        stacks_in_preferred_order = (
+            good_stacks + stacks_in_progress + stacks_check_failed)
+        unneeded_stacks = stacks_in_preferred_order[desired_state.capacity:]
+        return map(DeleteStack, unneeded_stacks)
+
+    def get_fix_steps(scale_down_steps):
+        num_stacks_to_update = len(stacks_check_failed) - len(scale_down_steps)
+        stacks_to_update = (stacks_check_failed[:num_stacks_to_update]
+                            if num_stacks_to_update > 0 else [])
+        return [UpdateStack(stack=s, stack_config=config)
+                for s in stacks_to_update]
+
+    create_steps = get_create_steps()
+    scale_down_steps = get_scale_down_steps()
+    fix_steps = get_fix_steps(scale_down_steps)
+    delete_stacks_failed_steps = map(DeleteStack, stacks_failed)
+
+    converge_later = ([ConvergeLater(["Waiting for stacks to finish."])]
+                      if stacks_delete_in_progress or stacks_in_progress
+                      else [])
+
+    return pbag(create_steps +
+                fix_steps +
+                scale_down_steps +
+                delete_stacks_failed_steps +
                 converge_later)
 
 
