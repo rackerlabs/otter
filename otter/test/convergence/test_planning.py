@@ -768,7 +768,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             ]))
 
 
-class ConvergeTests(SynchronousTestCase):
+class ConvergeLaunchServerTests(SynchronousTestCase):
     """
     Tests for :func:`converge_launch_server` that do not specifically cover
     load balancers, although some load balancer information may be included.
@@ -1085,7 +1085,7 @@ class ConvergeTests(SynchronousTestCase):
             ]))
 
 
-class PlanTests(SynchronousTestCase):
+class PlanLaunchServerTests(SynchronousTestCase):
     """Tests for :func:`plan_launch_server`."""
 
     def test_plan(self):
