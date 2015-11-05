@@ -423,6 +423,21 @@ class DesiredServerGroupState(object):
         self.server_config = freeze(self.server_config)
 
 
+@attributes(['stack_config', 'capacity'])
+class DesiredStackGroupState(object):
+    """
+    The desired state for a stack scaling group.
+
+    :ivar dict stack_config: stack part of the group launch config.
+    :ivar int capacity: the number of desired stack within the group.
+    """
+    def __init__(self):
+        """
+        Make attributes immutable.
+        """
+        self.stack_config = freeze(self.stack_config)
+
+
 class ILBDescription(Interface):
     """
     A description of how to create a node on a load balancing entity.
