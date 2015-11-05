@@ -3,6 +3,7 @@ Tests for `worker.validate_config.py`
 """
 
 import base64
+import json
 
 import mock
 
@@ -11,7 +12,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.utils import CheckFailure, mock_log, mock_treq, patch
 from otter.util.config import set_config_data
-from otter.util.http import RequestError
+from otter.util.http import RequestError, headers
 
 from otter.worker.validate_config import (
     InactiveImage,
@@ -22,11 +23,13 @@ from otter.worker.validate_config import (
     InvalidPersonality,
     UnknownFlavor,
     UnknownImage,
+    get_heat_endpoint,
     get_servers_endpoint,
     shorten,
     validate_flavor,
     validate_image,
     validate_launch_server_config,
+    validate_launch_stack_config,
     validate_personality)
 
 
@@ -215,6 +218,63 @@ class ValidateLaunchServerConfigTests(SynchronousTestCase):
                                           self.launch_config)
         self.successResultOf(d)
         self.assertFalse(self.validate_flavor.called)
+
+
+class ValidateLaunchStackConfigTests(SynchronousTestCase):
+    """Tests for `validate_launch_stack_config`."""
+    def setUp(self):
+        self.log = mock_log()
+        self.launch_config = {'stack': {'foo': 'bar'}}
+        self.expected_args = {'foo': 'bar', 'stack_name': 'some_uuid'}
+
+        self.get_heat_endpoint = patch(
+            self, 'otter.worker.validate_config.get_heat_endpoint',
+            return_value='https://service')
+
+        self.uuid4 = patch(
+            self,
+            'uuid.uuid4',
+            return_value='some_uuid')
+        patch(self, 'otter.worker.validate_config.uuid4', new=self.uuid4)
+
+    def patch_treq(self, the_mock):
+        """Convenience method for patching the treq methods."""
+        self.treq = patch(self, 'otter.worker.validate_config.treq',
+                          new=the_mock)
+        patch(self, 'otter.util.http.treq', new=self.treq)
+
+    def test_valid(self):
+        """Result is successful when stack preview returns success."""
+        self.patch_treq(
+            mock_treq(code=200, json_content={'stack': {}}, method='post'))
+
+        d = validate_launch_stack_config(self.log, 'dfw', 'catalog', 'token',
+                                         self.launch_config)
+
+        self.successResultOf(d)
+        self.treq.post.assert_called_with('https://service/stacks/preview',
+                                          self.expected_args,
+                                          headers=headers('token'),
+                                          log=self.log)
+
+    def test_invalid(self):
+        """
+        Certain 40x responses should be handled and result in
+        InvalidLaunchConfiguration.
+        """
+        for code in [400, 404, 409]:
+            json_content = {"explanation": "some explanation %s" % code}
+
+            self.patch_treq(mock_treq(code=code,
+                                      json_content=json_content,
+                                      content=json.dumps(json_content),
+                                      method='post'))
+
+            d = validate_launch_stack_config(self.log, 'dfw', 'catalog',
+                                             'token', self.launch_config)
+
+            f = self.failureResultOf(d, InvalidLaunchConfiguration)
+            self.assertEqual(f.value.message, json.dumps(json_content))
 
 
 class ShortenTests(SynchronousTestCase):
@@ -446,14 +506,15 @@ class ValidatePersonalityTests(SynchronousTestCase):
 
 class GetServiceEndpointTests(SynchronousTestCase):
     """
-    Tests for `get_servers_endpoint`.
+    Tests for `get_servers_endpoint` and `get_heat_endpoint`.
     """
 
     def setUp(self):
         """
         Mock public_endpoint_url and set_config_data
         """
-        set_config_data({'cloudServersOpenStack': 'cloud'})
+        set_config_data({'cloudServersOpenStack': 'cloud',
+                         'cloudOrchestration': 'orch'})
         self.public_endpoint_url = patch(
             self,
             'otter.worker.validate_config.public_endpoint_url',
@@ -473,3 +534,12 @@ class GetServiceEndpointTests(SynchronousTestCase):
         self.assertEqual(endpoint, 'http://service')
         self.public_endpoint_url.assert_called_once_with(
             'catalog', 'cloud', 'dfw')
+
+    def test_heat_works(self):
+        """
+        Calls `public_endpoint_url` with correct args.
+        """
+        endpoint = get_heat_endpoint('catalog', 'dfw')
+        self.assertEqual(endpoint, 'http://service')
+        self.public_endpoint_url.assert_called_once_with(
+            'catalog', 'orch', 'dfw')

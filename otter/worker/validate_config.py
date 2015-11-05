@@ -6,14 +6,25 @@ import base64
 import itertools
 import re
 
+from uuid import uuid4
+
+from pyrsistent import thaw
+
 from twisted.internet import defer
+
+from otter.auth import public_endpoint_url
 
 from otter.util import logging_treq as treq
 
-from otter.auth import public_endpoint_url
 from otter.util.config import config_value
-from otter.util.http import (append_segments, headers, check_success,
-                             raise_error_on_code, wrap_request_error)
+from otter.util.fp import set_in
+from otter.util.http import (
+    APIError,
+    append_segments,
+    check_success,
+    headers,
+    raise_error_on_code,
+    wrap_request_error)
 
 
 b64_chars_re = re.compile("^[+/=a-zA-Z0-9]+$")
@@ -109,6 +120,11 @@ def get_servers_endpoint(svc_catalog, region):
     return get_service_endpoint('cloudServersOpenStack', svc_catalog, region)
 
 
+def get_heat_endpoint(svc_catalog, region):
+    """Get the service endpoint for cloud orchestration."""
+    return get_service_endpoint('cloudOrchestration', svc_catalog, region)
+
+
 def shorten(s, length):
     """
     Shorten `s` to `length` by appending it with "...". If `s` is small,
@@ -171,6 +187,27 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
 
     return (defer.DeferredList(deferreds, consumeErrors=True)
             .addCallback(collect_errors))
+
+
+def validate_launch_stack_config(log, region, service_catalog, auth_token,
+                                 launch_config):
+    """Validates a launch_stack config using Heat's stack-preview endpoint."""
+    stack_args = launch_config['stack']
+
+    heat_endpoint = get_heat_endpoint(service_catalog, region)
+    url = append_segments(heat_endpoint, 'stacks', 'preview')
+    new_args = thaw(set_in(stack_args, ('stack_name',), str(uuid4())))
+
+    def catch_error(error):
+        error.trap(APIError)
+        if error.value.code in [400, 404, 409]:
+            raise InvalidLaunchConfiguration(error.value.body)
+
+    d = treq.post(url, new_args, headers=headers(auth_token), log=log)
+    d.addCallback(check_success, [200])
+    d.addCallback(treq.json_content)
+    d.addErrback(catch_error)
+    return d
 
 
 def validate_image(log, auth_token, server_endpoint, image_ref):

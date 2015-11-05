@@ -228,11 +228,18 @@ class SupervisorService(Service, object):
             return do_validate(validate_config.validate_launch_server_config,
                                auth_token, service_catalog)
 
+        def validate_launch_stack_config((auth_token, service_catalog)):
+            log.msg('Validating launch stack config')
+            return do_validate(validate_config.validate_launch_stack_config,
+                               auth_token, service_catalog)
+
         if launch_config['type'] == 'launch_server':
             when_authenticated = validate_launch_server_config
+        elif launch_config['type'] == 'launch_stack':
+            when_authenticated = validate_launch_stack_config
         else:
             raise NotImplementedError('Validating launch config for '
-                                      'launch_server only')
+                                      'launch_server or launch_stack only')
 
         log = log.bind(system='otter.supervisor.validate_launch_config',
                        tenant_id=tenant_id)
