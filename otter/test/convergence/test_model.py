@@ -16,12 +16,14 @@ from otter.convergence.model import (
     CLBNode,
     CLBNodeCondition,
     CLBNodeType,
+    HeatStack,
     IDrainable,
     ILBDescription,
     ILBNode,
     NovaServer,
     RCv3Description,
     ServerState,
+    StackState,
     _private_ipv4_addresses,
     _servicenet_address,
     get_service_metadata,
@@ -664,3 +666,49 @@ class IPAddressTests(SynchronousTestCase):
         """
         del self.addresses["private"]
         self.assertEqual(_servicenet_address(self.server_dict), "")
+
+
+class HeatStackTests(SynchronousTestCase):
+    """
+    Tests for :obj:`HeatStack`.
+    """
+    def test_get_state(self):
+        """
+        Tests result of :func:`get_state` for all possible stack states,
+        including ones otter doesn't handle.
+        """
+        SS = StackState
+        all_other = {'COMPLETE':    SS.OTHER,
+                     'IN_PROGRESS': SS.OTHER,
+                     'FAILED':      SS.OTHER}
+        actions = {
+            'CREATE': {
+                'COMPLETE':    SS.CREATE_UPDATE_COMPLETE,
+                'IN_PROGRESS': SS.IN_PROGRESS,
+                'FAILED':      SS.CREATE_UPDATE_FAILED},
+            'DELETE': {
+                'COMPLETE':    SS.DELETED,
+                'IN_PROGRESS': SS.DELETED,
+                'FAILED':      SS.DELETED},
+            'UPDATE': {
+                'COMPLETE':    SS.CREATE_UPDATE_COMPLETE,
+                'IN_PROGRESS': SS.IN_PROGRESS,
+                'FAILED':      SS.CREATE_UPDATE_FAILED},
+            'CHECK': {
+                'COMPLETE':    SS.CHECK_COMPLETE,
+                'IN_PROGRESS': SS.IN_PROGRESS,
+                'FAILED':      SS.CHECK_FAILED},
+            'ROLLBACK': all_other,
+            'SUSPEND': all_other,
+            'RESUME': all_other,
+            'ADOPT': all_other,
+            'SNAPSHOT': all_other,
+            'RESTORE': all_other
+        }
+
+        for action, statuses in actions.items():
+            for status, result in statuses.items():
+                stack = HeatStack(
+                    id='a', name='b', action=action, status=status)
+                self.assertEqual(stack.get_state(), result,
+                                 'Failed at %s_%s' % (action, status))
