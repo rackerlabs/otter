@@ -38,7 +38,7 @@ from twisted.web.http_headers import Headers
 from zope.interface import directlyProvides, implementer, interface
 from zope.interface.verify import verifyObject
 
-from otter.convergence.model import NovaServer, ServerState
+from otter.convergence.model import HeatStack, NovaServer, ServerState
 from otter.log.bound import BoundLog, bound_log_kwargs
 from otter.models.interface import IScalingGroup, IScalingGroupServersCache
 from otter.supervisor import ISupervisor
@@ -959,3 +959,8 @@ def server(id, state, created=0, image_id='image', flavor_id='flavor',
     return NovaServer(id=id, state=state, created=created, image_id=image_id,
                       flavor_id=flavor_id,
                       json=json, **kwargs)
+
+
+def stack(id, name='foostack', action='CREATE', status='COMPLETE'):
+    """Convenience for creating a :obj:`HeatStack`."""
+    return HeatStack(id=id, name=name, action=action, status=status)
