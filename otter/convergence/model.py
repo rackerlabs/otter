@@ -95,6 +95,16 @@ class ServerState(Names):
     """
 
 
+class StackState(Names):
+    CREATE_UPDATE_COMPLETE = NamedConstant()
+    CREATE_UPDATE_FAILED = NamedConstant()
+    CHECK_COMPLETE = NamedConstant()
+    CHECK_FAILED = NamedConstant()
+    IN_PROGRESS = NamedConstant()
+    DELETED = NamedConstant()
+    OTHER = NamedConstant()  # For states due to out-of-band changes.
+
+
 class StepResult(Names):
     """
     Constants representing the condition of a step's effect.
@@ -305,6 +315,45 @@ class NovaServer(object):
     def __str__(self):
         """Return the repr"""
         return repr(self)
+
+
+@attr.s
+class HeatStack(object):
+    action = attr.ib()
+    id = attr.ib()
+    name = attr.ib()
+    status = attr.ib()
+
+    @classmethod
+    def from_stack_details_json(cls, stack_json):
+        action, status = stack_json['stack_status'].split('_', 1)
+
+        return cls(id=stack_json['id'],
+                   name=stack_json['stack_name'],
+                   action=action,
+                   status=status)
+
+    def get_state(self):
+        if self.action == 'DELETE':
+            return StackState.DELETED
+
+        if (self.status == 'IN_PROGRESS' and
+                self.action in ('CREATE', 'UPDATE', 'CHECK')):
+            return StackState.IN_PROGRESS
+
+        if self.action == 'CREATE' or self.action == 'UPDATE':
+            if self.status == 'COMPLETE':
+                return StackState.CREATE_UPDATE_COMPLETE
+            if self.status == 'FAILED':
+                return StackState.CREATE_UPDATE_FAILED
+
+        if self.action == 'CHECK':
+            if self.status == 'COMPLETE':
+                return StackState.CHECK_COMPLETE
+            if self.status == 'FAILED':
+                return StackState.CHECK_FAILED
+
+        return StackState.OTHER
 
 
 def group_id_from_metadata(metadata):
