@@ -22,12 +22,12 @@ def tenant_is_enabled(tenant_id, get_config_value):
         "convergence-tenants" portion of the configuration file.
     :param callable get_config_value: config key -> config value.
     """
-    enabled_tenant_ids = get_config_value("convergence-tenants")
-    if enabled_tenant_ids == 'all':
+    disabled_tenant_ids = get_config_value("non-convergence-tenants")
+    if disabled_tenant_ids == 'none':
         return True
-    if enabled_tenant_ids is not None:
-        return (tenant_id in enabled_tenant_ids)
-    return False
+    if disabled_tenant_ids is not None:
+        return (tenant_id not in disabled_tenant_ids)
+    return True
 
 
 def json_to_LBConfigs(lbs_json):
