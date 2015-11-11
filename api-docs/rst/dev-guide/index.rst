@@ -16,7 +16,6 @@ of the Autoscale service.
 
 - :ref:`Release notes <release-notes>`
 
-- :ref:`Glossary <glossary>`
 
 .. toctree:: :hidden:
    :maxdepth: 2
@@ -28,4 +27,3 @@ of the Autoscale service.
    api-reference
    api-operations/index
    release-notes
-   glossary
