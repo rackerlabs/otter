@@ -150,11 +150,9 @@ def get_all_stacks(stack_tag=None, batch_size=100):
     return list_stacks_all(query)
 
 
-@do
 def get_scaling_group_stacks(tenant_id, group_id, now,
                              get_all_stacks=get_all_stacks):
-    stacks = yield get_all_stacks(stack_tag=get_stack_tag_for_group(group_id))
-    yield do_return(stacks)
+    return get_all_stacks(stack_tag=get_stack_tag_for_group(group_id))
 
 
 @do
