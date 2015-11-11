@@ -282,8 +282,7 @@ def get_all_launch_stack_data(
     """
     Gather all launch_stack data relevant for convergence w.r.t given time
 
-    Returns an Effect of ([HeatStack], None) to match
-    get_all_launch_server_data.
+    Returns an Effect of {'stacks': [HeatStack]}.
     """
     eff = (get_scaling_group_stacks(tenant_id, group_id, now)
            .on(map(HeatStack.from_stack_details_json)).on(list)
