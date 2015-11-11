@@ -81,6 +81,9 @@ def set_server_name(server_config_args, name_suffix):
 
 
 def append_stack_uuid(stack_config, uuid):
+    """
+    Append the given uuid to the `stack_name` value in `stack_config`.
+    """
     name_key = ('stack_name',)
     name = get_in(name_key, stack_config)
     return set_in(stack_config, name_key, name + '_%s' % uuid)
