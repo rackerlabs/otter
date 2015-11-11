@@ -573,7 +573,6 @@ class CreateStack(object):
 
     def as_effect(self):
         """Produce a :obj:`Effect` to create a stack."""
-
         eff = Effect(Func(uuid4))
 
         def got_uuid(uuid):
@@ -591,7 +590,6 @@ class CheckStack(object):
     A stack's resources must be checked to see if any are in an error state.
     Returns RETRY.
     """
-
     stack = attr.ib(validator=instance_of(HeatStack))
 
     def as_effect(self):
@@ -604,7 +602,7 @@ class CheckStack(object):
 @attr.s
 class UpdateStack(object):
     """
-    A stack must be updated. Returns RETRY unless Retry=False is passed upon
+    A stack must be updated. Returns RETRY unless retry=False is passed upon
     instantiation.
     """
     stack = attr.ib(validator=instance_of(HeatStack))
@@ -632,12 +630,10 @@ class DeleteStack(object):
     A stack must be deleted.
     Returns RETRY.
     """
-
     stack = attr.ib(validator=instance_of(HeatStack))
 
     def as_effect(self):
         """Produce a :obj:`Effect` to delete a stack."""
-
         eff = delete_stack(stack_name=self.stack.name, stack_id=self.stack.id)
 
         def report_success(result):
