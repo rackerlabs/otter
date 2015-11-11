@@ -1,7 +1,7 @@
 """Steps for convergence."""
 import re
-import uuid
 from functools import partial
+from uuid import uuid4
 
 import attr
 from attr.validators import instance_of
@@ -80,10 +80,10 @@ def set_server_name(server_config_args, name_suffix):
     return set_in(server_config_args, ('server', 'name'), name)
 
 
-def append_stack_uuid(stack_config):
+def append_stack_uuid(stack_config, uuid):
     name_key = ('stack_name',)
     name = get_in(name_key, stack_config)
-    return set_in(stack_config, name_key, name + '_%s' % uuid.uuid4())
+    return set_in(stack_config, name_key, name + '_%s' % uuid)
 
 
 def _ignore_errors(*ignored_err_types):
@@ -568,13 +568,17 @@ class CreateStack(object):
     """
     stack_config = attr.ib(validator=instance_of(PMap))
 
-    def as_effect(self, append_stack_uuid=append_stack_uuid):
+    def as_effect(self):
         """Produce a :obj:`Effect` to create a stack."""
 
-        stack_config = append_stack_uuid(self.stack_config)
-        eff = create_stack(thaw(stack_config))
+        eff = Effect(Func(uuid4))
 
-        return eff.on(_success_reporter('Waiting for stack to create'))
+        def got_uuid(uuid):
+            stack_config = append_stack_uuid(self.stack_config, uuid)
+            return create_stack(thaw(stack_config)).on(
+                _success_reporter('Waiting for stack to create'))
+
+        return eff.on(got_uuid)
 
 
 @implementer(IStep)

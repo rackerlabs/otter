@@ -1,6 +1,6 @@
 """Tests for convergence steps."""
 import json
-from uuid import UUID
+from uuid import uuid4
 
 from effect import Effect, Func, base_dispatcher, sync_perform
 from effect.testing import SequenceDispatcher, perform_sequence
@@ -10,8 +10,6 @@ from mock import ANY, patch
 from pyrsistent import freeze, pmap, pset, thaw
 
 from testtools.matchers import ContainsAll
-
-from toolz.functoolz import identity
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -1195,22 +1193,10 @@ class ConvergeLaterTests(SynchronousTestCase):
 class AppendStackUUIDTests(SynchronousTestCase):
     """Tests for :func:`append_stack_uuid`."""
 
-    def test_prefix(self):
-        """
-        Ensures prefix is kept.
-        """
-        new_config = append_stack_uuid(pmap({'stack_name': 'mystack'}))
-        new_name = new_config.get('stack_name')
-        self.assertTrue(new_name.startswith('mystack'))
-
-    def test_is_uuid(self):
-        """
-        Ensures UUID is appended. Raises ValueError if not valid UUID.
-        """
-        new_config = append_stack_uuid(pmap({'stack_name': 'mystack'}))
-        new_name = new_config.get('stack_name')
-        uuid_part = new_name[len('mystack_'):]
-        UUID(uuid_part, version=4)
+    def test_normal_use(self):
+        """Ensures correct behavior."""
+        new_config = append_stack_uuid(pmap({'stack_name': 'mystack'}), 'foo')
+        self.assertEqual(new_config, pmap({'stack_name': 'mystack_foo'}))
 
 
 class CreateStackTests(SynchronousTestCase):
@@ -1218,23 +1204,20 @@ class CreateStackTests(SynchronousTestCase):
 
     def test_normal_use(self):
         """Tests normal usage."""
-        stack_config = pmap({'foo': 'bar'})
-        create = CreateStack(stack_config)
-        self.assertEqual(create.as_effect(append_stack_uuid=identity).intent,
-                         create_stack(thaw(stack_config)).intent)
 
-    def test_ensure_retry(self):
-        """Tests that retry will be returned."""
-        stack_config = pmap({'foo': 'bar'})
-        seq = [
-            (create_stack(thaw(stack_config)).intent,
+        stack_config = pmap({'stack_name': 'baz', 'foo': 'bar'})
+        new_stack_config = pmap({'stack_name': 'baz_foo', 'foo': 'bar'})
+
+        self.create = CreateStack(stack_config)
+        self.seq = [
+            (Func(uuid4), lambda _: 'foo'),
+            (create_stack(thaw(new_stack_config)).intent,
              lambda _: (StubResponse(200, {}), {'stack': {}})),
             (Log('request-create-stack', ANY), lambda _: None)
         ]
-        create = CreateStack(stack_config)
+
         reason = 'Waiting for stack to create'
-        result = perform_sequence(seq,
-                                  create.as_effect(append_stack_uuid=identity))
+        result = perform_sequence(self.seq, self.create.as_effect())
         self.assertEqual(result,
                          (StepResult.RETRY, [ErrorReason.String(reason)]))
 
