@@ -1194,7 +1194,7 @@ class AppendStackUUIDTests(SynchronousTestCase):
     """Tests for :func:`append_stack_uuid`."""
 
     def test_normal_use(self):
-        """Ensures correct behavior."""
+        """Appends the given UUID to `stack_name` in the given stack_config."""
         new_config = append_stack_uuid(pmap({'stack_name': 'mystack'}), 'foo')
         self.assertEqual(new_config, pmap({'stack_name': 'mystack_foo'}))
 
