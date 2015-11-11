@@ -63,7 +63,6 @@ from otter.convergence.steps import (
     _RCV3_NODE_NOT_A_MEMBER_PATTERN,
     _rcv3_check_bulk_add,
     _rcv3_check_bulk_delete,
-    append_stack_uuid,
     delete_and_verify,
 )
 from otter.log.intents import Log
@@ -1188,15 +1187,6 @@ class ConvergeLaterTests(SynchronousTestCase):
         self.assertEqual(
             sync_perform(base_dispatcher, eff),
             (StepResult.RETRY, ['building']))
-
-
-class AppendStackUUIDTests(SynchronousTestCase):
-    """Tests for :func:`append_stack_uuid`."""
-
-    def test_normal_use(self):
-        """Appends the given UUID to `stack_name` in the given stack_config."""
-        new_config = append_stack_uuid(pmap({'stack_name': 'mystack'}), 'foo')
-        self.assertEqual(new_config, pmap({'stack_name': 'mystack_foo'}))
 
 
 class CreateStackTests(SynchronousTestCase):
