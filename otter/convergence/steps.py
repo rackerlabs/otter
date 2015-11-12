@@ -652,8 +652,6 @@ class DeleteStack(object):
 
         def report_success(result):
             return StepResult.RETRY, [
-                ErrorReason.String(
-                    'Must re-gather after stack deletion in order to update '
-                    'the active cache')]
+                ErrorReason.String('Waiting for stack to delete')]
 
         return eff.on(success=report_success)

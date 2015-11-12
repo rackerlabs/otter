@@ -1306,8 +1306,7 @@ class DeleteStackTests(SynchronousTestCase):
         ]
         foo_stack = stack(id='foo', name='bar')
         delete = DeleteStack(foo_stack)
-        reason = ('Must re-gather after stack deletion in order to update the '
-                  'active cache')
+        reason = ('Waiting for stack to delete')
         result = perform_sequence(seq, delete.as_effect())
         self.assertEqual(result,
                          (StepResult.RETRY, [ErrorReason.String(reason)]))
