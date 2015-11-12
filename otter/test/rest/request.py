@@ -11,15 +11,15 @@ from klein.test.test_resource import requestMock
 import mock
 
 from twisted.internet import defer
-from twisted.web import server, http
+from twisted.web import http, server
+from twisted.web.http import parse_qs
 from twisted.web.resource import getChildForRequest
 from twisted.web.server import Request
-from twisted.web.http import parse_qs
 
-from otter.models.interface import IAdmin, IScalingGroup, IScalingGroupCollection
-from otter.rest.application import Otter
+from otter.models.interface import IAdmin, IScalingGroupCollection
 from otter.rest.admin import OtterAdmin
-from otter.test.utils import iMock, patch
+from otter.rest.application import Otter
+from otter.test.utils import iMock, mock_group, patch
 from otter.util.config import set_config_data
 
 
@@ -282,22 +282,15 @@ class RestAPITestMixin(RequestTestMixin):
         :return: None
         """
         self.mock_store = iMock(IScalingGroupCollection)
-        self.mock_group = iMock(IScalingGroup)
+        # mock out modify state
+        self.mock_state = mock.MagicMock(spec=[])  # so nothing can call it
+        self.mock_group = mock_group(self.mock_state, '11111', 'one')
         self.mock_store.get_scaling_group.return_value = self.mock_group
 
         self.mock_generate_transaction_id = patch(
             self, 'otter.rest.decorators.generate_transaction_id',
             return_value='transaction-id')
 
-        # mock out modify state
-        self.mock_state = mock.MagicMock(spec=[])  # so nothing can call it
-
-        def _mock_modify_state(modifier, modify_state_reason=None,
-                               *args, **kwargs):
-            return defer.maybeDeferred(
-                modifier, self.mock_group, self.mock_state, *args, **kwargs)
-
-        self.mock_group.modify_state.side_effect = _mock_modify_state
         self.otter = Otter(self.mock_store, 'ord')
         self.root = self.otter.app.resource()
 
