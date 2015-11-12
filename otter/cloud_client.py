@@ -1063,8 +1063,6 @@ def list_stacks_all(parameters=None):
 
     :return: List of stack details JSON.
     """
-
-    # TODO Actually implement batch handling
     eff = service_request(
         ServiceType.CLOUD_ORCHESTRATION,
         'GET', 'stacks',

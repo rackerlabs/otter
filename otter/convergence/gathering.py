@@ -16,14 +16,17 @@ from otter.cloud_client import (
     get_clb_nodes,
     get_clbs,
     list_servers_details_all,
+    list_stacks_all,
     service_request)
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBNode,
     CLBNodeCondition,
+    HeatStack,
     NovaServer,
     RCv3Description,
     RCv3Node,
+    get_stack_tag_for_group,
     group_id_from_metadata)
 from otter.indexer import atom
 from otter.models.cass import CassScalingGroupServersCache
@@ -136,6 +139,19 @@ def get_scaling_group_servers(tenant_id, group_id, now,
         servers = mark_deleted_servers(cached_servers, current)
         servers = list(filter(server_of_group(group_id), servers))
     yield do_return(servers)
+
+
+def get_all_stacks(stack_tag=None):
+    query = {}
+
+    if stack_tag is not None:
+        query['tags'] = stack_tag
+
+    return list_stacks_all(query)
+
+
+def get_scaling_group_stacks(group_id, get_all_stacks=get_all_stacks):
+    return get_all_stacks(stack_tag=get_stack_tag_for_group(group_id))
 
 
 @do
@@ -254,4 +270,20 @@ def get_all_launch_server_data(
         'servers': servers,
         'lb_nodes': list(concat([clb, rcv3]))
     })
+    return eff
+
+
+def get_all_launch_stack_data(
+        tenant_id,
+        group_id,
+        now,
+        get_scaling_group_stacks=get_scaling_group_stacks):
+    """
+    Gather all launch_stack data relevant for convergence w.r.t given time
+
+    Returns an Effect of {'stacks': [HeatStack]}.
+    """
+    eff = (get_scaling_group_stacks(group_id)
+           .on(map(HeatStack.from_stack_details_json)).on(list)
+           .on(lambda stacks: {'stacks': stacks}))
     return eff
