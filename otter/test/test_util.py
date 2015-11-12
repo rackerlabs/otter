@@ -502,7 +502,9 @@ class ConfigTest(SynchronousTestCase):
         others
         """
         config.update_config_data("baz.new", "wha")
+        config.update_config_data("baz.some.other", "who")
         self.assertEqual(config.config_value("baz.new"), "wha")
+        self.assertEqual(config.config_value("baz.some.other"), "who")
         self.assertEqual(config.config_value("baz.bax"), "quux")
 
 
