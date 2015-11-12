@@ -1,9 +1,10 @@
 """Steps for convergence."""
 import re
-
 from functools import partial
+from uuid import uuid4
 
 import attr
+from attr.validators import instance_of
 
 from characteristic import Attribute, attributes
 
@@ -12,6 +13,8 @@ from effect import Constant, Effect, Func, catch
 from pyrsistent import PMap, PSet, freeze, pset, thaw
 
 import six
+
+from toolz.dicttoolz import dissoc, get_in
 
 from twisted.python.constants import NamedConstant
 
@@ -25,13 +28,17 @@ from otter.cloud_client import (
     NoSuchCLBNodeError,
     add_clb_nodes,
     change_clb_node,
+    check_stack,
     create_server,
+    create_stack,
+    delete_stack,
     has_code,
     remove_clb_nodes,
     service_request,
-    set_nova_metadata_item)
+    set_nova_metadata_item,
+    update_stack)
 from otter.constants import ServiceType
-from otter.convergence.model import ErrorReason, StepResult
+from otter.convergence.model import ErrorReason, HeatStack, StepResult
 from otter.util.fp import set_in
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError, append_segments
@@ -71,6 +78,15 @@ def set_server_name(server_config_args, name_suffix):
     else:
         name = name_suffix
     return set_in(server_config_args, ('server', 'name'), name)
+
+
+def append_stack_uuid(stack_config, uuid):
+    """
+    Append the given uuid to the `stack_name` value in `stack_config`.
+    """
+    name_key = ('stack_name',)
+    name = get_in(name_key, stack_config)
+    return set_in(stack_config, name_key, name + '_%s' % uuid)
 
 
 def _ignore_errors(*ignored_err_types):
@@ -539,3 +555,91 @@ class ConvergeLater(object):
         """
         result = StepResult.LIMITED_RETRY if self.limited else StepResult.RETRY
         return Effect(Constant((result, list(self.reasons))))
+
+
+# ----- Cloud Orchestration Steps -----
+
+
+@implementer(IStep)
+@attr.s
+class CreateStack(object):
+    """
+    A stack must be created.
+
+    :ivar pmap stack_config: Heat launch configuration.
+
+    """
+    stack_config = attr.ib(validator=instance_of(PMap))
+
+    def as_effect(self):
+        """Produce a :obj:`Effect` to create a stack."""
+        eff = Effect(Func(uuid4))
+
+        def got_uuid(uuid):
+            stack_config = append_stack_uuid(self.stack_config, uuid)
+            return create_stack(thaw(stack_config)).on(
+                _success_reporter('Waiting for stack to create'))
+
+        return eff.on(got_uuid)
+
+
+@implementer(IStep)
+@attr.s
+class CheckStack(object):
+    """
+    A stack's resources must be checked to see if any are in an error state.
+    Returns RETRY.
+    """
+    stack = attr.ib(validator=instance_of(HeatStack))
+
+    def as_effect(self):
+        """Produce a :obj:`Effect` to check a stack's resources."""
+        eff = check_stack(stack_name=self.stack.name, stack_id=self.stack.id)
+        return eff.on(_success_reporter('Waiting for stack check to complete'))
+
+
+@implementer(IStep)
+@attr.s
+class UpdateStack(object):
+    """
+    A stack must be updated. Returns RETRY unless retry=False is passed upon
+    instantiation.
+    """
+    stack = attr.ib(validator=instance_of(HeatStack))
+    stack_config = attr.ib(validator=instance_of(PMap))
+    retry = attr.ib(default=True)
+
+    def as_effect(self):
+        """Produce an :obj:`Effect` to update a stack."""
+        stack_config = dissoc(thaw(self.stack_config), 'stack_name')
+        eff = update_stack(stack_name=self.stack.name, stack_id=self.stack.id,
+                           stack_args=stack_config)
+
+        def report_success(result):
+            retry_msg = 'Waiting for stack to update'
+            return ((StepResult.RETRY, [ErrorReason.String(retry_msg)])
+                    if self.retry else (StepResult.SUCCESS, []))
+
+        return eff.on(success=report_success)
+
+
+@implementer(IStep)
+@attr.s
+class DeleteStack(object):
+    """
+    A stack must be deleted.
+    Returns RETRY.
+    """
+    stack = attr.ib(validator=instance_of(HeatStack))
+
+    def as_effect(self):
+        """Produce a :obj:`Effect` to delete a stack."""
+        eff = delete_stack(stack_name=self.stack.name, stack_id=self.stack.id)
+
+        def report_success(result):
+            return StepResult.RETRY, [
+                ErrorReason.String(
+                    'Must re-gather after stack deletion in order to update '
+                    'the active cache')]
+
+        return eff.on(success=report_success)
