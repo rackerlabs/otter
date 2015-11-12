@@ -141,7 +141,7 @@ def get_scaling_group_servers(tenant_id, group_id, now,
     yield do_return(servers)
 
 
-def get_all_stacks(stack_tag=None, batch_size=100):
+def get_all_stacks(stack_tag=None):
     query = {}
 
     if stack_tag is not None:
@@ -150,8 +150,7 @@ def get_all_stacks(stack_tag=None, batch_size=100):
     return list_stacks_all(query)
 
 
-def get_scaling_group_stacks(tenant_id, group_id, now,
-                             get_all_stacks=get_all_stacks):
+def get_scaling_group_stacks(group_id, get_all_stacks=get_all_stacks):
     return get_all_stacks(stack_tag=get_stack_tag_for_group(group_id))
 
 
@@ -284,7 +283,7 @@ def get_all_launch_stack_data(
 
     Returns an Effect of {'stacks': [HeatStack]}.
     """
-    eff = (get_scaling_group_stacks(tenant_id, group_id, now)
+    eff = (get_scaling_group_stacks(group_id)
            .on(map(HeatStack.from_stack_details_json)).on(list)
            .on(lambda stacks: {'stacks': stacks}))
     return eff

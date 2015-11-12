@@ -712,24 +712,19 @@ class GetAllStacksTests(SynchronousTestCase):
     """Tests for :func:`get_all_stacks`."""
 
     def test_default(self):
-        """
-        Tests for passing no arguments.
-        """
+        """Passing no arguments causes all stacks to be requested."""
         svc_intent = service_request(ServiceType.CLOUD_ORCHESTRATION, 'GET',
                                      'stacks', reauth_codes=(401,),
                                      params={}).intent
         self.assertEqual(get_all_stacks().intent, svc_intent)
 
     def test_stack_tag(self):
-        """
-        Tests stack_tag being added to params.
-        """
+        """The query parameters include `tags` when `stack_tag` is passed."""
         tag = 'footag'
         svc_intent = service_request(ServiceType.CLOUD_ORCHESTRATION, 'GET',
                                      'stacks', reauth_codes=(401,),
                                      params={'tags': tag}).intent
-        self.assertEqual(get_all_stacks(stack_tag=tag).intent,
-                         svc_intent)
+        self.assertEqual(get_all_stacks(stack_tag=tag).intent, svc_intent)
 
 
 class GetScalingGroupStacksTests(SynchronousTestCase):
@@ -737,14 +732,13 @@ class GetScalingGroupStacksTests(SynchronousTestCase):
 
     def test_normal_use(self):
         """
-        Tests for stack_tag being used.
+        The correct stack tag should be included in when retrieving stacks.
         """
         def fake_get_all_stacks(stack_tag):
             return Effect(('all-stacks', stack_tag))
 
-        now = datetime(2015, 9, 30)
         seq = [(('all-stacks', 'autoscale_gid'), lambda _: [])]
-        eff = get_scaling_group_stacks('tid', 'gid', now,
+        eff = get_scaling_group_stacks('gid',
                                        get_all_stacks=fake_get_all_stacks)
 
         result = perform_sequence(seq, eff)
@@ -763,9 +757,7 @@ class GetAllLaunchStackDataTests(SynchronousTestCase):
         self.now = datetime(2010, 10, 20, 03, 30, 00)
 
     def test_success(self):
-        """
-        Tests HeatStack instances being returned from JSON.
-        """
+        """HeatStack instances should be returned from JSON."""
         expected_stacks = [
             stack(id='a', name='aa', action='CREATE', status='COMPLETE'),
             stack(id='b', name='bb', action='CREATE', status='COMPLETE')
@@ -774,8 +766,7 @@ class GetAllLaunchStackDataTests(SynchronousTestCase):
             'tid',
             'gid',
             self.now,
-            get_scaling_group_stacks=_constant_as_eff(
-                ('tid', 'gid', self.now), self.stacks))
+            get_scaling_group_stacks=_constant_as_eff(('gid',), self.stacks))
 
         self.assertEqual(resolve_stubs(eff), {'stacks': expected_stacks})
 
@@ -788,7 +779,6 @@ class GetAllLaunchStackDataTests(SynchronousTestCase):
             'tid',
             'gid',
             self.now,
-            get_scaling_group_stacks=_constant_as_eff(
-                ('tid', 'gid', self.now), []))
+            get_scaling_group_stacks=_constant_as_eff(('gid',), []))
 
         self.assertEqual(resolve_stubs(eff), {'stacks': []})
