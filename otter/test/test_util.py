@@ -487,6 +487,26 @@ class ConfigTest(SynchronousTestCase):
         value = config.config_value('prefix.shouldnt.be.ignored.foo')
         self.assertIdentical(value, None)
 
+    def test_update_config_existing(self):
+        """
+        :func:`~config.update_config_data` will update existing config
+        and not remove others
+        """
+        config.update_config_data("baz.bax", "new")
+        self.assertEqual(config.config_value("baz.bax"), "new")
+        self.assertEqual(config.config_value("foo"), "bar")
+
+    def test_update_config_new(self):
+        """
+        :func:`~config.update_config_data` will add new config and not remove
+        others
+        """
+        config.update_config_data("baz.new", "wha")
+        config.update_config_data("baz.some.other", "who")
+        self.assertEqual(config.config_value("baz.new"), "wha")
+        self.assertEqual(config.config_value("baz.some.other"), "who")
+        self.assertEqual(config.config_value("baz.bax"), "quux")
+
 
 class WithLockTests(SynchronousTestCase):
     """
