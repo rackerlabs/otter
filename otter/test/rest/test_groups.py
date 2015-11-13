@@ -44,7 +44,7 @@ from otter.supervisor import (
 )
 from otter.test.rest.request import (
     DummyException, RestAPITestMixin, setup_mod_and_trigger)
-from otter.test.utils import IsBoundWith, set_non_conv_tenant, matches, patch
+from otter.test.utils import IsBoundWith, matches, patch, set_non_conv_tenant
 from otter.util.config import set_config_data
 from otter.worker.validate_config import InvalidLaunchConfiguration
 
