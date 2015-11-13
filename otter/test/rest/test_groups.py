@@ -44,7 +44,7 @@ from otter.supervisor import (
 )
 from otter.test.rest.request import (
     DummyException, RestAPITestMixin, setup_mod_and_trigger)
-from otter.test.utils import IsBoundWith, matches, patch
+from otter.test.utils import IsBoundWith, set_non_conv_tenant, matches, patch
 from otter.util.config import set_config_data
 from otter.worker.validate_config import InvalidLaunchConfiguration
 
@@ -58,7 +58,7 @@ class FormatterHelpers(SynchronousTestCase):
         Patch url root
         """
         set_config_data({'url_root': 'root'})
-        self.addCleanup(set_config_data, None)
+        self.addCleanup(set_config_data, {})
 
     def links(self, server_id):
         return [
@@ -275,6 +275,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         set_supervisor(self.supervisor)
 
         set_config_data({'limits': {'pagination': 100}, 'url_root': ''})
+        set_non_conv_tenant('11111', self)
 
     def tearDown(self):
         """
@@ -400,7 +401,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         taken from servers cache table
         """
         set_config_data({'convergence-tenants': ['11111'], 'url_root': 'root'})
-        self.addCleanup(set_config_data, None)
+        self.addCleanup(set_config_data, {})
 
         mock_gac.return_value = defer.succeed({'s1': {'links': 'l'}})
         self.mock_store.connection = 'connection'
@@ -887,6 +888,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
         setup_mod_and_trigger(self)
         self.mock_group.uuid = "one"
+        set_non_conv_tenant("11111", self)
 
     def test_view_manifest_404(self):
         """
@@ -983,7 +985,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         returns state based on servers cache
         """
         set_config_data({'convergence-tenants': ['11111'], 'url_root': 'root'})
-        self.addCleanup(set_config_data, None)
+        self.addCleanup(set_config_data, {})
 
         manifest = {
             'groupConfiguration': config_examples()[0],
@@ -1203,6 +1205,7 @@ class GroupStateTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         super(GroupStateTestCase, self).setUp()
         self.mock_group.uuid = "one"
+        set_non_conv_tenant("11111", self)
 
     def test_view_state_404(self):
         """
@@ -1259,7 +1262,7 @@ class GroupStateTestCase(RestAPITestMixin, SynchronousTestCase):
         enabled tenant returns the active list from servers cache table
         """
         set_config_data({'convergence-tenants': ['11111'], 'url_root': 'root'})
-        self.addCleanup(set_config_data, None)
+        self.addCleanup(set_config_data, {})
 
         self.mock_group.view_state.return_value = defer.succeed(
             GroupState("11111", "one", 'g', None, None, False, False, False,
@@ -1338,6 +1341,7 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
             return_value=None)
         self.patch(groups, "extract_bool_arg", self._extract_bool_arg)
         self._replace = self._purge = True
+        set_non_conv_tenant("11111", self)
 
     def _extract_bool_arg(self, request, key, default):
         """
