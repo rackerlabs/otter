@@ -102,6 +102,8 @@ class StackState(Names):
     CHECK_FAILED = NamedConstant()
     IN_PROGRESS = NamedConstant()
     DELETED = NamedConstant()
+    DELETE_IN_PROGRESS = NamedConstant()
+    DELETE_FAILED = NamedConstant()
     OTHER = NamedConstant()  # For states due to out-of-band changes.
 
 
@@ -324,6 +326,16 @@ class HeatStack(object):
     name = attr.ib()
     status = attr.ib()
 
+    delete_states = {'COMPLETE': StackState.DELETED,
+                     'FAILED': StackState.DELETE_FAILED,
+                     'IN_PROGRESS': StackState.DELETE_IN_PROGRESS}
+
+    create_update_states = {'COMPLETE': StackState.CREATE_UPDATE_COMPLETE,
+                            'FAILED': StackState.CREATE_UPDATE_FAILED}
+
+    check_states = {'COMPLETE': StackState.CHECK_COMPLETE,
+                    'FAILED': StackState.CHECK_FAILED}
+
     @classmethod
     def from_stack_details_json(cls, stack_json):
         action, status = stack_json['stack_status'].split('_', 1)
@@ -335,23 +347,17 @@ class HeatStack(object):
 
     def get_state(self):
         if self.action == 'DELETE':
-            return StackState.DELETED
+            return self.delete_states.get(self.status, StackState.OTHER)
 
         if (self.status == 'IN_PROGRESS' and
                 self.action in ('CREATE', 'UPDATE', 'CHECK')):
             return StackState.IN_PROGRESS
 
         if self.action == 'CREATE' or self.action == 'UPDATE':
-            if self.status == 'COMPLETE':
-                return StackState.CREATE_UPDATE_COMPLETE
-            if self.status == 'FAILED':
-                return StackState.CREATE_UPDATE_FAILED
+            return self.create_update_states.get(self.status, StackState.OTHER)
 
         if self.action == 'CHECK':
-            if self.status == 'COMPLETE':
-                return StackState.CHECK_COMPLETE
-            if self.status == 'FAILED':
-                return StackState.CHECK_FAILED
+            return self.check_states.get(self.status, StackState.OTHER)
 
         return StackState.OTHER
 
