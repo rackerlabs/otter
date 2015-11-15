@@ -199,6 +199,8 @@ def insert_deleting_false(reactor, conn, args):
 
 @inlineCallbacks
 def set_desired(reactor, conn, args):
+    if not args.desired_csv:
+        raise Exception("Please provide a --desired-csv")
     reader = csv.reader(open(args.desired_csv))
 
     query = (
@@ -206,11 +208,12 @@ def set_desired(reactor, conn, args):
         'WHERE "tenantId"=:tenantId{i} AND "groupId"=:groupId{i}')
     queries, params = [], {}
     for i, (tenant_id, group_id, new_desired) in enumerate(reader):
-        queries.append(query.format(i=0))
+        queries.append(query.format(i=i))
         params['tenantId{}'.format(i)] = tenant_id
         params['groupId{}'.format(i)] = group_id
-        params['desired{}'.format(i)] = new_desired
+        params['desired{}'.format(i)] = int(new_desired)
     yield conn.execute(batch(queries), params, ConsistencyLevel.ONE)
+    returnValue(None)
 
 
 def setup_connection(reactor, args):
