@@ -98,15 +98,15 @@ class InvalidFileContentSize(InvalidPersonality):
         self.max_size = max_size
 
 
-def get_service_endpoint(service_catalog, region):
-    """
-    Get the service endpoint used to connect cloud services
-    """
-    cloudServersOpenStack = config_value('cloudServersOpenStack')
-    server_endpoint = public_endpoint_url(service_catalog,
-                                          cloudServersOpenStack,
-                                          region)
-    return server_endpoint
+def get_service_endpoint(service_name, service_catalog, region):
+    """Get the service endpoint used to connect cloud services."""
+    return public_endpoint_url(
+        service_catalog, config_value(service_name), region)
+
+
+def get_servers_endpoint(svc_catalog, region):
+    """Get the service endpoint for cloud servers."""
+    return get_service_endpoint('cloudServersOpenStack', svc_catalog, region)
 
 
 def shorten(s, length):
@@ -160,7 +160,7 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
             raise InvalidLaunchConfiguration(msg.format(prop_name=prop_name,
                                                         prop_value=prop_value))
 
-    service_endpoint = get_service_endpoint(service_catalog, region)
+    service_endpoint = get_servers_endpoint(service_catalog, region)
     deferreds = []
     for validate, prop_name in validate_functions:
         prop_value = server.get(prop_name)

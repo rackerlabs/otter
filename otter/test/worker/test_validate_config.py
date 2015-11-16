@@ -395,7 +395,7 @@ class ValidatePersonalityTests(SynchronousTestCase):
 
 class GetServiceEndpointTests(SynchronousTestCase):
     """
-    Tests for `get_service_endpoint`
+    Tests for `get_servers_endpoint`.
     """
 
     def setUp(self):
@@ -403,8 +403,10 @@ class GetServiceEndpointTests(SynchronousTestCase):
         Mock public_endpoint_url and set_config_data
         """
         set_config_data({'cloudServersOpenStack': 'cloud'})
-        self.public_endpoint_url = patch(self, 'otter.worker.validate_config.public_endpoint_url',
-                                         return_value='http://service')
+        self.public_endpoint_url = patch(
+            self,
+            'otter.worker.validate_config.public_endpoint_url',
+            return_value='http://service')
 
     def tearDown(self):
         """
@@ -412,10 +414,11 @@ class GetServiceEndpointTests(SynchronousTestCase):
         """
         set_config_data({})
 
-    def test_works(self):
+    def test_servers_works(self):
         """
-        Calls `public_endpoint_url` with correct args
+        Calls `public_endpoint_url` with correct args.
         """
-        endpoint = get_service_endpoint('catalog', 'dfw')
+        endpoint = get_servers_endpoint('catalog', 'dfw')
         self.assertEqual(endpoint, 'http://service')
-        self.public_endpoint_url.assert_called_once_with('catalog', 'cloud', 'dfw')
+        self.public_endpoint_url.assert_called_once_with(
+            'catalog', 'cloud', 'dfw')
