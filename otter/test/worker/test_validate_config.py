@@ -2,21 +2,32 @@
 Tests for `worker.validate_config.py`
 """
 
-import mock
 import base64
+
+import mock
+
 from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.test.utils import mock_log, patch, mock_treq, CheckFailure
+from otter.test.utils import CheckFailure, mock_log, mock_treq, patch
 from otter.util.config import set_config_data
 from otter.util.http import RequestError
-from otter.worker.validate_config import shorten
 
 from otter.worker.validate_config import (
-    validate_launch_server_config, validate_image, validate_flavor, get_service_endpoint,
-    InvalidLaunchConfiguration, UnknownImage, InactiveImage, UnknownFlavor,
-    validate_personality, InvalidPersonality, InvalidBase64Encoding, InvalidMaxPersonality,
-    InvalidFileContentSize)
+    InactiveImage,
+    InvalidBase64Encoding,
+    InvalidFileContentSize,
+    InvalidLaunchConfiguration,
+    InvalidMaxPersonality,
+    InvalidPersonality,
+    UnknownFlavor,
+    UnknownImage,
+    get_servers_endpoint,
+    shorten,
+    validate_flavor,
+    validate_image,
+    validate_launch_server_config,
+    validate_personality)
 
 
 class ValidateLaunchServerConfigTests(SynchronousTestCase):

@@ -169,7 +169,8 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
             d.addErrback(raise_validation_error, prop_name, prop_value)
             deferreds.append(d)
 
-    return defer.DeferredList(deferreds, consumeErrors=True).addCallback(collect_errors)
+    return (defer.DeferredList(deferreds, consumeErrors=True)
+            .addCallback(collect_errors))
 
 
 def validate_image(log, auth_token, server_endpoint, image_ref):
