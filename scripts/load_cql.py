@@ -6,6 +6,7 @@ Loads cql into Cassandra
 from __future__ import print_function
 
 import argparse
+import csv
 import re
 import sys
 
@@ -35,8 +36,15 @@ the_parser.add_argument(
 
 the_parser.add_argument(
     '--migrate', '-m', type=str,
-    choices=['webhook_migrate', 'webhook_index', 'insert_deleting_false'],
+    choices=['webhook_migrate', 'webhook_index', 'insert_deleting_false',
+             'set_desired'],
     help='Run a migration job')
+
+the_parser.add_argument(
+    "--desired-csv", dest="desired_csv",
+    help=("CSV file containing three columns: tenant ID, group ID and new "
+          "desired value. This is only necessary/valid for the `set_desired` "
+          "migration."))
 
 the_parser.add_argument(
     '--keyspace', type=str, default='otter',
@@ -152,7 +160,7 @@ def execute_commands(cursor, commands, verbose):
                 print("Ok.")
 
 
-def webhook_index(reactor, conn):
+def webhook_index(reactor, conn, args):
     """
     Show webhook indexes that is not there table connection
     """
@@ -161,7 +169,7 @@ def webhook_index(reactor, conn):
     return perform(get_working_cql_dispatcher(reactor, conn), eff)
 
 
-def webhook_migrate(reactor, conn):
+def webhook_migrate(reactor, conn, args):
     """
     Migrate webhook indexes to table
     """
@@ -171,7 +179,7 @@ def webhook_migrate(reactor, conn):
 
 
 @inlineCallbacks
-def insert_deleting_false(reactor, conn):
+def insert_deleting_false(reactor, conn, args):
     """
     Insert false to all group's deleting column
     """
@@ -189,6 +197,25 @@ def insert_deleting_false(reactor, conn):
     returnValue(None)
 
 
+@inlineCallbacks
+def set_desired(reactor, conn, args):
+    if not args.desired_csv:
+        raise Exception("Please provide a --desired-csv")
+    reader = csv.reader(open(args.desired_csv))
+
+    query = (
+        'UPDATE scaling_group SET desired=:desired{i} '
+        'WHERE "tenantId"=:tenantId{i} AND "groupId"=:groupId{i}')
+    queries, params = [], {}
+    for i, (tenant_id, group_id, new_desired) in enumerate(reader):
+        queries.append(query.format(i=i))
+        params['tenantId{}'.format(i)] = tenant_id
+        params['groupId{}'.format(i)] = group_id
+        params['desired{}'.format(i)] = int(new_desired)
+    yield conn.execute(batch(queries), params, ConsistencyLevel.ONE)
+    returnValue(None)
+
+
 def setup_connection(reactor, args):
     """
     Return Cassandra connection
@@ -201,7 +228,7 @@ def setup_connection(reactor, args):
 def run_migration(reactor, job, args):
     """ Run migration job """
     conn = setup_connection(reactor, args)
-    d = globals()[job](reactor, conn)
+    d = globals()[job](reactor, conn, args)
     return d.addCallback(lambda _: conn.disconnect())
 
 
