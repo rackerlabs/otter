@@ -1,5 +1,66 @@
 """Code related to creating a plan for convergence."""
 
+# # Note [Converging stacks]
+# The process for converging a group of stacks involves calling stack check [1]
+# to make sure a stack is healthy. This operation changes the status of the
+# stack asynchronously so it cannot be a part of gathering. Instead, stack
+# check steps must be generated during planning and then the results will be
+# picked up by the stack list that happens during gathering. This means
+# `converge_launch_stack`' must know when stacks need to be checked and when
+# they need actual work done on them.
+#
+# To keep the convergence engine as stateless as possible, planning steps are
+# derived from the states of the stacks themselves. This table lists the
+# actions that generally result from the various stack states:
+#
+# CREATE_COMPLETE    | *
+# UPDATE_COMPLETE    | * Explained below
+# CHECK_COMPLETE     | *
+# CREATE_FAILED      | Delete stack, create another stack to replace it
+# UPDATE_FAILED      | Delete stack, create another stack to replace it
+# CHECK_FAILED       | Update stack to have Heat fix problems
+# DELETE_COMPLETE    | (Ignored)
+# *_IN_PROGRESS      | Wait (run another convergence cycle)
+# DELETE_FAILED      | Set the entire group to error
+#
+# Care must be taken to not get caught in an infinite loop of stack checking
+# and creating/updating/deleting, so all of the states together are used to
+# determine if the current convergence cycle is the first, (should be) the
+# last, or somewhere in the middle.
+#
+# The planner essentially follows one of these paths:
+# 1. If there is a stack in DELETE_FAILED, stop converging and set the group to
+#    error. Multiple attempts can be made to delete the stack but without
+#    information about the number of attempts convergence can run forever if it
+#    never succeeds, so this is treated as an unrecoverable error.
+# 2. If all stacks are healthy, but unchecked (e.g. all CREATE_COMPLETE or
+#    UPDATE_COMPLETE), then it assumed to be the first convergence cycle and
+#    stack check is run for all stacks.
+# 3. If there are some unhealthy stacks (*_FAILED) or stacks in progress
+#    (*_IN_PROGRESS), then it assumed that this convergence cycle is not the
+#    first (and more are needed) so work will be planned out and another cycle
+#    will be required.
+# 4. If all stacks are healthy and there are some stacks that have been checked
+#    (e.g. CREATE_COMPLETE, UPDATE_COMPLETE, and at least one CHECK_COMPLETE),
+#    then it is decided that this should be the last convergence cycle. All
+#    stacks in CHECK_COMPLETE have stack update run on them to get rid of their
+#    status [2]. This has the effect of setting the group up to be checked in
+#    (2) whenever convergence begins again. The stack updates in this case
+#    purposefully do not cause another convergence cycle, so convergence will
+#    end.
+#
+# There are a few edge cases that cause more than one round of stack checking
+# to occur in a set of convergence cycles, but these cases are unlikely and
+# will eventually converge. For example, if stack check is run on a set of
+# stacks and they all end up in CHECK_FAILED, when all of them are fixed they
+# will be "healthy", but none of them will be in CHECK_COMPLETE, so another
+# round of stack checking will be done. Assuming that succeeds, the next cycle
+# will run stack update on all of the stacks and end convergence.
+#
+# [1] http://developer.openstack.org/api-ref-orchestration-v1.html#stack_action_check # noqa
+# [2] Updating a stack in CHECK_COMPLETE is essentially a no-op. The only thing
+#     Heat does is update the status to UPDATE_COMPLETE.
+
 from collections import defaultdict
 
 from pyrsistent import pbag, pset
@@ -378,6 +439,8 @@ def converge_launch_stack(desired_state, stacks):
     Create steps that indicate how to transition from the state provided
     by the given parameters to the :obj:`DesiredStackGroupState` described by
     ``desired_state``.
+
+    See note [Converging stacks] for more information.
 
     :param DesiredStackGroupState desired_state: The desired group state.
     :param set stacks: a set of :obj:`HeatStack` instances.
