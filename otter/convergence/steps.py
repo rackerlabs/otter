@@ -557,6 +557,20 @@ class ConvergeLater(object):
         return Effect(Constant((result, list(self.reasons))))
 
 
+@implementer(IStep)
+@attr.s(init=False)
+class FailConvergence(object):
+    """Convergence cannot continue, put the group into an error state."""
+    reasons = attr.ib()
+
+    def __init__(self, reasons):
+        self.reasons = freeze(reasons)
+
+    def as_effect(self):
+        """Return an effect that always results in failure."""
+        return Effect(Constant((StepResult.FAILURE, list(self.reasons))))
+
+
 # ----- Cloud Orchestration Steps -----
 
 
@@ -638,8 +652,6 @@ class DeleteStack(object):
 
         def report_success(result):
             return StepResult.RETRY, [
-                ErrorReason.String(
-                    'Must re-gather after stack deletion in order to update '
-                    'the active cache')]
+                ErrorReason.String('Waiting for stack to delete')]
 
         return eff.on(success=report_success)

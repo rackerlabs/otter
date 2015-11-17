@@ -16,6 +16,7 @@ from toolz.itertoolz import concat, concatv
 from otter.convergence.steps import (
     AddNodesToCLB,
     CreateServer,
+    CreateStack,
     RemoveNodesFromCLB)
 
 
@@ -91,7 +92,8 @@ def optimize_steps(steps):
 
 
 _DEFAULT_STEP_LIMITS = pmap({
-    CreateServer: 10
+    CreateServer: 10,
+    CreateStack: 10
 })
 
 

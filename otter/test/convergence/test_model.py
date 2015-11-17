@@ -688,8 +688,8 @@ class HeatStackTests(SynchronousTestCase):
                 'FAILED':      SS.CREATE_UPDATE_FAILED},
             'DELETE': {
                 'COMPLETE':    SS.DELETED,
-                'IN_PROGRESS': SS.DELETED,
-                'FAILED':      SS.DELETED},
+                'IN_PROGRESS': SS.DELETE_IN_PROGRESS,
+                'FAILED':      SS.DELETE_FAILED},
             'UPDATE': {
                 'COMPLETE':    SS.CREATE_UPDATE_COMPLETE,
                 'IN_PROGRESS': SS.IN_PROGRESS,

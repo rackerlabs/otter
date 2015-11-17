@@ -12,6 +12,7 @@ from otter.convergence.model import (
     CLBNodeCondition,
     CLBNodeType,
     DesiredServerGroupState,
+    DesiredStackGroupState,
     ErrorReason,
     RCv3Description,
     RCv3Node,
@@ -20,19 +21,26 @@ from otter.convergence.planning import (
     DRAINING_METADATA,
     Destiny,
     converge_launch_server,
+    converge_launch_stack,
     get_destiny,
-    plan_launch_server)
+    plan_launch_server,
+    plan_launch_stack)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeCLBNode,
+    CheckStack,
     ConvergeLater,
     CreateServer,
+    CreateStack,
     DeleteServer,
+    DeleteStack,
+    FailConvergence,
     RemoveNodesFromCLB,
-    SetMetadataItemOnServer)
-from otter.test.utils import server
+    SetMetadataItemOnServer,
+    UpdateStack)
+from otter.test.utils import server, stack
 
 
 def copy_clb_desc(clb_desc, condition=CLBNodeCondition.ENABLED, weight=1):
@@ -768,7 +776,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
             ]))
 
 
-class ConvergeTests(SynchronousTestCase):
+class ConvergeLaunchServerTests(SynchronousTestCase):
     """
     Tests for :func:`converge_launch_server` that do not specifically cover
     load balancers, although some load balancer information may be included.
@@ -1085,7 +1093,7 @@ class ConvergeTests(SynchronousTestCase):
             ]))
 
 
-class PlanTests(SynchronousTestCase):
+class PlanLaunchServerTests(SynchronousTestCase):
     """Tests for :func:`plan_launch_server`."""
 
     def test_plan(self):
@@ -1134,6 +1142,468 @@ class PlanTests(SynchronousTestCase):
                 DeleteServer(server_id='server1'),
                 CreateServer(server_config=pmap({}))
             ]))
+
+
+class ConvergeLaunchStackTests(SynchronousTestCase):
+    """Tests for :func:`converge_launch_stack`."""
+
+    def setUp(self):
+        """Save a couple of useful things."""
+        self.fake_config = {'foo': 'bar'}
+        self.stack_count = 0
+
+    def _invoke_converge_stack(self, stacks, capacity):
+        """Convenience method to call ``converge_launch_stack``."""
+        return converge_launch_stack(
+            desired_state=self.desired_state(capacity), stacks=set(stacks))
+
+    def steps_for_stacks(self, steps, stacks):
+        """Filter out steps that don't correspond to the given stacks."""
+        return [s for s in steps if getattr(s, 'stack', None) in stacks]
+
+    def to_stack(self, abbrev):
+        """
+        Returns a HeatStack based on a string abbreviation. For
+        example, `to_stack('cp')` returns a CREATE_IN_PROGRESS stack.
+        """
+        actions = {'c': 'CREATE',
+                   'd': 'DELETE',
+                   'k': 'CHECK',
+                   'u': 'UPDATE'}
+        statuses = {'c': 'COMPLETE',
+                    'f': 'FAILED',
+                    'p': 'IN_PROGRESS'}
+        action, status = tuple(abbrev)
+        self.stack_count += 1
+        return stack('s%i' % self.stack_count,
+                     action=actions[action], status=statuses[status])
+
+    def to_step(self, abbrev):
+        """Returns a step class based on a string abbreviation."""
+        steps = {'CL': ConvergeLater,
+                 'CS': CreateStack,
+                 'FC': FailConvergence,
+                 'KS': CheckStack,
+                 'US': UpdateStack,
+                 'DS': DeleteStack}
+        return steps[abbrev]
+
+    def check_converge(self, capacity, abbreviated_groups, extra_steps=[]):
+        """
+        Run convergence on a group of stacks and assert that the steps match
+        what was given. ``abbreviated_groups`` is a list of groupings of the
+        form::
+
+            {'stacks': ('stack_abbrev', 'stack_abbrev', ...),
+             'steps': ('step_type_abbrev', 'step_type_abbrev', ...)}
+
+        where ``stack_abbrev`` is an string that can be passed to
+        ``to_stack`` and ``step_type_abbrev`` is a string that can be passed to
+        ``to_step``. For example::
+
+            {'stacks': ('cc', 'cc'), 'steps': ('US', 'DS')}
+
+        corresponds to two stacks in CREATE_COMPLETE, an ``UpdateStack`` step,
+        and a ``DeleteStack`` step. The ``steps`` value defines the steps
+        corresponding to the stacks that are expected to result from
+        convergence. In a given grouping, which steps corresponds to which
+        stacks is not checked, so in the above example, one stack would
+        have a corresponding ``UpdateStack`` step and the other would have a
+        ``DeleteStack`` step, but which one has which doesn't matter.
+
+        All stacks in the list of groups are passed to a single converge call.
+
+        Returns the steps resulting from converge.
+        """
+        def unabbreviate_group(group):
+            return {'stacks': map(self.to_stack, group['stacks']),
+                    'steps': map(self.to_step, group['steps']),
+                    'original': group}
+
+        def extract_stacks(groups):
+            return [stack
+                    for group in groups
+                    for stack in group['stacks']]
+
+        def extract_steps(groups):
+            return [step
+                    for group in groups
+                    for step in group['steps']]
+
+        def check_group(group, steps):
+            group_only_steps = self.steps_for_stacks(steps, group['stacks'])
+            step_types = map(type, group_only_steps)
+
+            self.assertEqual(pbag(step_types), pbag(group['steps']),
+                             "Original: %s" % group['original'])
+
+            reason = "A stack had multiple steps: %s" % group_only_steps
+            self.assertEqual(len(group_only_steps),
+                             len(set(s.stack for s in group_only_steps)),
+                             reason)
+
+        groups = map(unabbreviate_group, abbreviated_groups)
+        stacks = extract_stacks(groups)
+        all_expected_steps = (extract_steps(groups) +
+                              map(self.to_step, extra_steps))
+
+        steps = self._invoke_converge_stack(stacks, capacity)
+
+        for group in groups:
+            check_group(group, steps)
+
+        self.assertEqual(pbag(map(type, steps)), pbag(all_expected_steps))
+
+        return steps
+
+    def desired_state(self, capacity):
+        """Returns a :obj:`DesiredStackGroupState` with a given capacity."""
+        return DesiredStackGroupState(stack_config=self.fake_config,
+                                      capacity=capacity)
+
+    def test_to_stack_unique(self):
+        """Invoking ``to_stack`` multiple times results in unique stacks."""
+        self.assertEqual(len(set(map(self.to_stack, ('uc', 'uc', 'uc')))), 3)
+
+    def test_stack_check_for_create_complete(self):
+        """
+        A plan is returned to do stack checking when all stacks are in
+        CREATE_COMPLETE.
+        """
+        stacks = map(self.to_stack, ['cc'] * 3)
+        result = self._invoke_converge_stack(stacks=stacks, capacity=3)
+        self.assertEqual(result, pbag([CheckStack(s) for s in stacks]))
+
+    def test_stack_check_for_update_complete(self):
+        """
+        A plan is returned to do stack checking when all stacks are in
+        UPDATE_COMPLETE.
+        """
+        stacks = map(self.to_stack, ['uc'] * 3)
+        result = self._invoke_converge_stack(capacity=3, stacks=stacks)
+        self.assertEqual(result, pbag([CheckStack(s) for s in stacks]))
+
+    def test_stack_check_for_create_and_update_complete(self):
+        """
+        A plan is returned to do stack checking when all stacks are in
+        CREATE_COMPLETE and UPDATE_COMPLETE.
+        """
+        stacks = map(self.to_stack, ('cc', 'uc') * 3)
+        result = self._invoke_converge_stack(capacity=3, stacks=stacks)
+        self.assertEqual(result, pbag([CheckStack(s) for s in stacks]))
+
+    def test_dont_stack_check_if_in_progress(self):
+        """
+        Stack check should not be done if there are any in progress stacks.
+        """
+        in_progress_types = ('dp', 'cp', 'up', 'kp')
+
+        for s_type in in_progress_types:
+            capacity = 6 if s_type == 'dp' else 8
+            stacks = [{'stacks': ['cc', 'uc'] * 3 + [s_type] * 2, 'steps': ()}]
+            self.check_converge(capacity, stacks, extra_steps=['CL'])
+
+    def test_converge_zero_to_zero(self):
+        """No steps are returned when there are 0 stacks and capacity is 0."""
+        stacks = [{'stacks': (), 'steps': ()}]
+        self.check_converge(0, stacks)
+
+    def test_one_stack_end_convergence(self):
+        """Convergence should end when the stack is check_complete."""
+        stacks = [{'stacks': ['kc'], 'steps': ['US']}]
+        steps = self.check_converge(1, stacks)
+        self.assertTrue(list(steps)[0].retry is False)
+
+    def test_one_stack_fix(self):
+        """Stack should be updated when it is check_failed."""
+        stacks = [{'stacks': ['kf'], 'steps': ['US']}]
+        steps = self.check_converge(1, stacks)
+        self.assertTrue(list(steps)[0].retry is True)
+
+    def test_one_stack_stack_check(self):
+        """The stack should be checked when it is healthy but unchecked."""
+        stack_types = ('cc', 'uc')
+        for st in stack_types:
+            stacks = [{'stacks': [st], 'steps': ['KS']}]
+            self.check_converge(1, stacks)
+
+    def test_one_stack_replace(self):
+        """The stack should be replaced when it is unhealthy."""
+        stack_types = ('cf', 'uf')
+        for st in stack_types:
+            stacks = [{'stacks': [st], 'steps': ['DS']}]
+            self.check_converge(1, stacks, extra_steps=['CS'])
+
+    def test_one_stack_in_progress(self):
+        """Convergence should continue when the stack is in progress."""
+        stack_types = ('cp', 'up', 'kp')
+        for st in stack_types:
+            stacks = [{'stacks': [st], 'steps': ()}]
+            self.check_converge(1, stacks, extra_steps=['CL'])
+
+    def test_one_stack_delete_in_progress(self):
+        """
+        A stack should be created and convergence should continue when the
+        stack is delete in progress.
+        """
+        stacks = [{'stacks': ['dp'], 'steps': ()}]
+        self.check_converge(1, stacks, extra_steps=['CS', 'CL'])
+
+    def test_fix_check_failed(self):
+        """Stacks should be fixed if they are in check failed."""
+        stacks = [{'stacks': ('kf', 'kf', 'kf'), 'steps': ('US', 'US', 'US')}]
+        steps = self.check_converge(3, stacks)
+        self.assertTrue(all(s.retry is True for s in steps))
+        self.assertTrue(all(s.stack_config == self.fake_config for s in steps))
+
+    def test_converge_later(self):
+        """In progress stacks cause convergence to retry."""
+        stacks = [{'stacks': ['cp'], 'steps': ()}]
+        self.assertEqual(
+            self.check_converge(1, stacks, extra_steps=['CL']),
+            pbag([ConvergeLater(["Waiting for stacks to finish."])]))
+
+    def test_end_convergence(self):
+        """
+        A plan is returned with steps to update any stacks that are in
+        CHECK_COMPLETE status, without retry.
+        """
+        stacks = (
+            {'stacks': ('cc', 'cc', 'cc'), 'steps': ()},
+            {'stacks': ('uc', 'uc', 'uc'), 'steps': ()},
+            {'stacks': ('kc', 'kc', 'kc'), 'steps': ('US', 'US', 'US')}
+        )
+        steps = self.check_converge(9, stacks)
+        self.assertTrue(all(s.retry is False for s in steps))
+        self.assertTrue(all(s.stack_config == self.fake_config for s in steps))
+
+    def test_dont_end_convergence_if_check_failed(self):
+        """
+        A plan is returned with steps to retry if any stacks are in check
+        failed instead of ending convergence.
+        """
+        stacks = (
+            {'stacks': ('cc', 'kc', 'uc'), 'steps': ()},
+            {'stacks': ('kf', 'kf', 'kf'), 'steps': ('US', 'US', 'US')}
+        )
+        self.check_converge(6, stacks)
+
+    def test_dont_end_convergence_if_in_progress(self):
+        """
+        A plan is returned with steps to retry if any stacks are in progress
+        instead of ending convergence.
+        """
+        in_progress_types = ('dp', 'cp', 'up', 'kp')
+
+        for s_type in in_progress_types:
+            capacity = 9 if s_type == 'dp' else 11
+            stacks = [{'stacks': ['cc', 'kc', 'uc'] * 3 + [s_type] * 2,
+                       'steps': ()}]
+            self.check_converge(capacity, stacks, extra_steps=['CL'])
+
+    def test_scale_up(self):
+        """A plan is returned with the correct number of create steps."""
+        stack_scenarios = (map(self.to_stack, ['kc'] * 3),
+                           map(self.to_stack, ['kc', 'cc', 'uc']))
+
+        for stacks in stack_scenarios:
+            result = self._invoke_converge_stack(capacity=7, stacks=stacks)
+            create = CreateStack(stack_config=pmap(self.fake_config))
+            self.assertEqual(result, pbag([create] * 4))
+
+    def test_scale_up_from_zero(self):
+        """Create a stack when there are 0 stacks and capcity is 1."""
+        stacks = [{'stacks': (), 'steps': ()}]
+        self.check_converge(1, stacks, extra_steps=['CS'])
+
+    def test_fix_delete_create_on_scale_up(self):
+        """
+        A plan is returned with the correct create, update, and delete steps
+        for a scale up event.
+        """
+        stacks = (
+            {'stacks': ('cc', 'cc', 'cc',
+                        'uc', 'uc', 'uc',
+                        'cp', 'up', 'cp'), 'steps': ()},
+            {'stacks': ('kf', 'kf', 'kf'), 'steps': ('US', 'US', 'US')},
+            {'stacks': ('uf', 'uf', 'cf'), 'steps': ('DS', 'DS', 'DS')},
+        )
+        extra_steps = ['CL'] + ['CS'] * 6
+        steps = self.check_converge(18, stacks, extra_steps)
+
+        self.assertEqual(
+            [s for s in steps if type(s) == CreateStack],
+            [CreateStack(stack_config=pmap(self.fake_config))] * 6)
+
+    def test_scale_down(self):
+        """A plan is returned with the correct number of delete steps."""
+        stacks = [{'stacks': ['kc'] * 3, 'steps': ['DS'] * 2}]
+        self.check_converge(1, stacks)
+
+    def test_scale_down_one_to_zero_check_instead(self):
+        """Stack check a healthy stack instead of scale down."""
+        stack_types = ('cc', 'uc')
+
+        for st in stack_types:
+            stacks = [{'stacks': [st], 'steps': ['KS']}]
+            self.check_converge(0, stacks)
+
+    def test_scale_down_one_to_zero(self):
+        """
+        On scale down, delete the one stack that is check complete or
+        check/create/update failed.
+        """
+        stack_types = ('kc', 'kf', 'cf', 'uf')
+
+        for st in stack_types:
+            stacks = [{'stacks': [st], 'steps': ['DS']}]
+            self.check_converge(0, stacks)
+
+    def test_scale_down_one_to_zero_in_progress(self):
+        """
+        On scale down, delete the one stack that is check/create/update in
+        progress.
+        """
+        stack_types = ('kp', 'cp', 'up')
+
+        for st in stack_types:
+            stacks = [{'stacks': [st], 'steps': ['DS']}]
+            self.check_converge(0, stacks, extra_steps=['CL'])
+
+    def test_scale_down_one_to_zero_delete_in_progress(self):
+        """On scale down, wait for the delete in progress stack to finish."""
+        stacks = [{'stacks': ['dp'], 'steps': ()}]
+        self.check_converge(0, stacks, extra_steps=['CL'])
+
+    def test_scale_down_delete_check_failed(self):
+        """Check failed stacks are deleted as necessary on scale down."""
+        stacks = (
+            {'stacks': ('cc', 'kc', 'uc'), 'steps': ()},
+            {'stacks': ('kf', 'kf', 'kf'), 'steps': ('DS', 'DS', 'DS')}
+        )
+        self.check_converge(3, stacks)
+
+    def test_scale_down_delete_create_failed(self):
+        """Create failed stacks are deleted as necessary on scale down."""
+        stacks = (
+            {'stacks': ('cc', 'kc', 'uc'), 'steps': ()},
+            {'stacks': ('cf', 'cf', 'cf'), 'steps': ('DS', 'DS', 'DS')}
+        )
+        self.check_converge(3, stacks)
+
+    def test_scale_down_delete_update_failed(self):
+        """Update failed stacks are deleted as necessary on scale down."""
+        stacks = (
+            {'stacks': ('cc', 'kc', 'uc'), 'steps': ()},
+            {'stacks': ('uf', 'uf', 'uf'), 'steps': ('DS', 'DS', 'DS')}
+        )
+        self.check_converge(3, stacks)
+
+    def test_scale_down_split_check_failed(self):
+        """
+        A plan is returned that removes some, but not all, of the stacks in
+        CHECK_FAILED during a scale down event.
+        """
+        stacks = (
+            {'stacks': ('cc', 'cc', 'cc',
+                        'uc', 'uc', 'uc',
+                        'cp', 'up', 'cp'), 'steps': ()},
+            {'stacks': ('kf', 'kf', 'kf'), 'steps': ('US', 'DS', 'DS')}
+        )
+        self.check_converge(10, stacks, extra_steps=['CL'])
+
+    def test_scale_down_split_in_progress(self):
+        """
+        A plan is returned that removes some, but not all, of the stacks in
+        progress on a scale down event when there are not enough check failed
+        stacks to remove.
+        """
+        stacks = (
+            {'stacks': ('cc', 'cc', 'cc',
+                        'uc', 'uc', 'uc'), 'steps': ()},
+            {'stacks': ('cp', 'up', 'cp'), 'steps': ('DS', 'DS')},
+            {'stacks': ('kf', 'kf', 'kf'), 'steps': ('DS', 'DS', 'DS')}
+        )
+        self.check_converge(7, stacks, extra_steps=['CL'])
+
+    def test_scale_down_split_completed(self):
+        """
+        A plan is returned that removes some, but not all, of the completed
+        stacks on a scale down event when there are not enough check failed
+        and in progress stacks to remove.
+        """
+        stacks = (
+            {'stacks': ('cc', 'cc', 'cc',
+                        'uc', 'uc', 'uc'), 'steps': ('DS', 'DS', 'DS')},
+            {'stacks': ('cp', 'up', 'cp'), 'steps': ('DS', 'DS', 'DS')},
+            {'stacks': ('kf', 'kf', 'kf'), 'steps': ('DS', 'DS', 'DS')}
+        )
+        self.check_converge(3, stacks, extra_steps=['CL'])
+
+    def test_scale_down_with_delete_in_progress(self):
+        """
+        A plan is returned that removes some, but not all, of the stacks in
+        CHECK_FAILED during a scale down event, while not counting the
+        DELETE_IN_PROGRESS stacks towards the capacity.
+        """
+        stacks = (
+            {'stacks': ('cc', 'cc', 'cc',
+                        'uc', 'uc', 'uc'), 'steps': ()},
+            {'stacks': ('cp', 'up', 'cp'), 'steps': ()},
+            {'stacks': ('kf', 'kf', 'kf'), 'steps': ('US', 'DS', 'DS')},
+            {'stacks': ('dp', 'dp', 'dp'), 'steps': ()}
+        )
+        self.check_converge(10, stacks, extra_steps=['CL'])
+
+    def test_fail_if_delete_failed_no_matter_what(self):
+        """
+        Converging any set of stacks that include a delete failed stack should
+        result in the group being set to an error state.
+        """
+        types = map(self.to_stack, ('cc', 'cp', 'cf',
+                                    'uc', 'up', 'uf',
+                                    'kc', 'kp', 'kf',
+                                    'dc', 'dp'))
+        failed_stack = self.to_stack('df')
+        fail_step = pbag([FailConvergence(["Stacks in DELETE_FAILED found."])])
+
+        num_combinations = 0
+        for r in range(0, len(types) + 1):
+            for c in combinations(types, r):
+                stacks = c + (failed_stack,)
+                self.assertEqual(
+                    self._invoke_converge_stack(stacks=stacks, capacity=0),
+                    fail_step)
+                self.assertEqual(
+                    self._invoke_converge_stack(stacks=stacks, capacity=r),
+                    fail_step)
+                self.assertEqual(
+                    self._invoke_converge_stack(stacks=stacks, capacity=100),
+                    fail_step)
+                num_combinations += 1
+
+        self.assertEqual(num_combinations, 2048)
+
+
+class PlanLaunchStackTests(SynchronousTestCase):
+    """Tests for :func:`plan_launch_stack`."""
+
+    def test_plan_launch_stack_limit_steps(self):
+        """A plan is returned with a limited number of steps."""
+        fake_config = {'foo': 'bar'}
+        desired_group_state = DesiredStackGroupState(
+            stack_config=fake_config, capacity=25)
+
+        result = plan_launch_stack(
+            desired_group_state=desired_group_state,
+            now=0,
+            build_timeout=3600,
+            stacks=set([stack('stack1'),
+                        stack('stack2', action='CHECK', status='COMPLETE')]))
+
+        self.assertEqual(
+            result,
+            pbag([CreateStack(stack_config=pmap(fake_config))] * 10))
 
 
 class DestinyTests(SynchronousTestCase):
