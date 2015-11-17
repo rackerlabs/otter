@@ -1302,6 +1302,52 @@ class ConvergeLaunchStackTests(SynchronousTestCase):
             stacks = [{'stacks': ['cc', 'uc'] * 3 + [s_type] * 2, 'steps': ()}]
             self.check_converge(capacity, stacks, extra_steps=['CL'])
 
+    def test_converge_zero_to_zero(self):
+        """No steps are returned when there are 0 stacks and capacity is 0."""
+        stacks = [{'stacks': (), 'steps': ()}]
+        self.check_converge(0, stacks)
+
+    def test_one_stack_end_convergence(self):
+        """Convergence should end when the stack is check_complete."""
+        stacks = [{'stacks': ['kc'], 'steps': ['US']}]
+        steps = self.check_converge(1, stacks)
+        self.assertTrue(list(steps)[0].retry is False)
+
+    def test_one_stack_fix(self):
+        """Stack should be updated when it is check_failed."""
+        stacks = [{'stacks': ['kf'], 'steps': ['US']}]
+        steps = self.check_converge(1, stacks)
+        self.assertTrue(list(steps)[0].retry is True)
+
+    def test_one_stack_stack_check(self):
+        """The stack should be checked when it is healthy but unchecked."""
+        stack_types = ('cc', 'uc')
+        for st in stack_types:
+            stacks = [{'stacks': [st], 'steps': ['KS']}]
+            self.check_converge(1, stacks)
+
+    def test_one_stack_replace(self):
+        """The stack should be replaced when it is unhealthy."""
+        stack_types = ('cf', 'uf')
+        for st in stack_types:
+            stacks = [{'stacks': [st], 'steps': ['DS']}]
+            self.check_converge(1, stacks, extra_steps=['CS'])
+
+    def test_one_stack_in_progress(self):
+        """Convergence should continue when the stack is in progress."""
+        stack_types = ('cp', 'up', 'kp')
+        for st in stack_types:
+            stacks = [{'stacks': [st], 'steps': ()}]
+            self.check_converge(1, stacks, extra_steps=['CL'])
+
+    def test_one_stack_delete_in_progress(self):
+        """
+        A stack should be created and convergence should continue when the
+        stack is delete in progress.
+        """
+        stacks = [{'stacks': ['dp'], 'steps': ()}]
+        self.check_converge(1, stacks, extra_steps=['CS', 'CL'])
+
     def test_fix_check_failed(self):
         """Stacks should be fixed if they are in check failed."""
         stacks = [{'stacks': ('kf', 'kf', 'kf'), 'steps': ('US', 'US', 'US')}]
@@ -1364,6 +1410,11 @@ class ConvergeLaunchStackTests(SynchronousTestCase):
             create = CreateStack(stack_config=pmap(self.fake_config))
             self.assertEqual(result, pbag([create] * 4))
 
+    def test_scale_up_from_zero(self):
+        """Create a stack when there are 0 stacks and capcity is 1."""
+        stacks = [{'stacks': (), 'steps': ()}]
+        self.check_converge(1, stacks, extra_steps=['CS'])
+
     def test_fix_delete_create_on_scale_up(self):
         """
         A plan is returned with the correct create, update, and delete steps
@@ -1387,6 +1438,41 @@ class ConvergeLaunchStackTests(SynchronousTestCase):
         """A plan is returned with the correct number of delete steps."""
         stacks = [{'stacks': ['kc'] * 3, 'steps': ['DS'] * 2}]
         self.check_converge(1, stacks)
+
+    def test_scale_down_one_to_zero_check_instead(self):
+        """Stack check a healthy stack instead of scale down."""
+        stack_types = ('cc', 'uc')
+
+        for st in stack_types:
+            stacks = [{'stacks': [st], 'steps': ['KS']}]
+            self.check_converge(0, stacks)
+
+    def test_scale_down_one_to_zero(self):
+        """
+        On scale down, delete the one stack that is check complete or
+        check/create/update failed.
+        """
+        stack_types = ('kc', 'kf', 'cf', 'uf')
+
+        for st in stack_types:
+            stacks = [{'stacks': [st], 'steps': ['DS']}]
+            self.check_converge(0, stacks)
+
+    def test_scale_down_one_to_zero_in_progress(self):
+        """
+        On scale down, delete the one stack that is check/create/update in
+        progress.
+        """
+        stack_types = ('kp', 'cp', 'up')
+
+        for st in stack_types:
+            stacks = [{'stacks': [st], 'steps': ['DS']}]
+            self.check_converge(0, stacks, extra_steps=['CL'])
+
+    def test_scale_down_one_to_zero_delete_in_progress(self):
+        """On scale down, wait for the delete in progress stack to finish."""
+        stacks = [{'stacks': ['dp'], 'steps': ()}]
+        self.check_converge(0, stacks, extra_steps=['CL'])
 
     def test_scale_down_delete_check_failed(self):
         """Check failed stacks are deleted as necessary on scale down."""

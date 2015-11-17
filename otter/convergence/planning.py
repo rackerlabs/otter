@@ -398,6 +398,7 @@ def converge_launch_stack(desired_state, stacks):
     stacks_delete_in_progress = by_state.get(StackState.DELETE_IN_PROGRESS, [])
     stacks_delete_failed = by_state.get(StackState.DELETE_FAILED, [])
 
+    stacks_good = stacks_complete + stacks_check_complete
     stacks_amiss = (stacks_failed +
                     stacks_check_failed +
                     stacks_in_progress +
@@ -409,7 +410,7 @@ def converge_launch_stack(desired_state, stacks):
     # If there are no stacks in CHECK_* or other work to be done, we assume
     # we're at the beginning of a convergence cycle and need to perform stack
     # checks.
-    if not (stacks_check_complete or stacks_amiss):
+    if stacks_complete and not (stacks_check_complete or stacks_amiss):
         return pbag([CheckStack(stack) for stack in stacks_complete])
 
     # Otherwise, if all stacks are in a good state and we have the right number
@@ -419,15 +420,13 @@ def converge_launch_stack(desired_state, stacks):
     # in CREATE_* the next time otter tries to converge this group. This will
     # cause all of the stacks to be checked at that time and let otter know
     # if there are any stacks that have fallen into an error state.
-    elif not stacks_amiss and len(stacks) == desired_state.capacity:
+    elif not stacks_amiss and len(stacks_good) == desired_state.capacity:
         return pbag([UpdateStack(stack=stack, stack_config=config, retry=False)
                      for stack in stacks_check_complete])
 
-    good_stacks = stacks_complete + stacks_check_complete
-
     def get_create_steps():
         create_stack = CreateStack(stack_config=config)
-        good_or_fixable_stack_count = (len(good_stacks) +
+        good_or_fixable_stack_count = (len(stacks_good) +
                                        len(stacks_in_progress) +
                                        len(stacks_check_failed))
         return [create_stack] * (desired_state.capacity -
@@ -435,7 +434,7 @@ def converge_launch_stack(desired_state, stacks):
 
     def get_scale_down_steps():
         stacks_in_preferred_order = (
-            good_stacks + stacks_in_progress + stacks_check_failed)
+            stacks_good + stacks_in_progress + stacks_check_failed)
         unneeded_stacks = stacks_in_preferred_order[desired_state.capacity:]
         return map(DeleteStack, unneeded_stacks)
 
