@@ -36,7 +36,7 @@ from otter.convergence.steps import (
     UpdateStack,
 )
 from otter.convergence.transforming import limit_steps_by_count, optimize_steps
-from otter.util.fp import partition_bool, partition_groups
+from otter.util.fp import partition_bool
 
 
 DRAINING_METADATA = ('rax:autoscale:server:state', 'DRAINING')
@@ -388,23 +388,15 @@ def converge_launch_stack(desired_state, stacks):
     """
     config = desired_state.stack_config
 
-    group_states = [StackState.CREATE_UPDATE_COMPLETE,
-                    StackState.CREATE_UPDATE_FAILED,
-                    StackState.CHECK_COMPLETE,
-                    StackState.CHECK_FAILED,
-                    StackState.IN_PROGRESS,
-                    StackState.DELETE_IN_PROGRESS,
-                    StackState.DELETE_FAILED]
+    by_state = groupby(lambda stack: stack.get_state(), stacks)
 
-    (stacks_complete,
-     stacks_failed,
-     stacks_check_complete,
-     stacks_check_failed,
-     stacks_in_progress,
-     stacks_delete_in_progress,
-     stacks_delete_failed) = partition_groups(lambda stack: stack.get_state(),
-                                              stacks,
-                                              group_states)
+    stacks_complete = by_state.get(StackState.CREATE_UPDATE_COMPLETE, [])
+    stacks_failed = by_state.get(StackState.CREATE_UPDATE_FAILED, [])
+    stacks_check_complete = by_state.get(StackState.CHECK_COMPLETE, [])
+    stacks_check_failed = by_state.get(StackState.CHECK_FAILED, [])
+    stacks_in_progress = by_state.get(StackState.IN_PROGRESS, [])
+    stacks_delete_in_progress = by_state.get(StackState.DELETE_IN_PROGRESS, [])
+    stacks_delete_failed = by_state.get(StackState.DELETE_FAILED, [])
 
     stacks_amiss = (stacks_failed +
                     stacks_check_failed +
