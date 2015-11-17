@@ -1153,7 +1153,7 @@ class ConvergeLaunchStackTests(SynchronousTestCase):
         self.stack_count = 0
 
     def _invoke_converge_stack(self, stacks, capacity):
-        """Convenience method to call `converge_launch_stack`."""
+        """Convenience method to call ``converge_launch_stack``."""
         return converge_launch_stack(
             desired_state=self.desired_state(capacity), stacks=set(stacks))
 
@@ -1191,24 +1191,25 @@ class ConvergeLaunchStackTests(SynchronousTestCase):
     def check_converge(self, capacity, abbreviated_groups, extra_steps=[]):
         """
         Run convergence on a group of stacks and assert that the steps match
-        what was given. `abbreviated_groups` is a list of groupings of the form
+        what was given. ``abbreviated_groups`` is a list of groupings of the
+        form::
 
-        `{'stacks': ('stack_abbrev', 'stack_abbrev', ...),
-          'steps': ('step_type_abbrev', 'step_type_abbrev', ...)}`
+            {'stacks': ('stack_abbrev', 'stack_abbrev', ...),
+             'steps': ('step_type_abbrev', 'step_type_abbrev', ...)}
 
-        where `stack_abbrev` is an string that can be passed to
-        `to_stack` and `step_type_abbrev` is a string that can be passed to
-        `to_step`. For example,
+        where ``stack_abbrev`` is an string that can be passed to
+        ``to_stack`` and ``step_type_abbrev`` is a string that can be passed to
+        ``to_step``. For example::
 
-        `{'stacks': ('cc', 'cc'), 'steps': ('US', 'DS')}`
+            {'stacks': ('cc', 'cc'), 'steps': ('US', 'DS')}
 
-        corresponds to two stacks in CREATE_COMPLETE, an `UpdateStack` step,
-        and a `DeleteStack` step.  The `steps` value defines the steps
+        corresponds to two stacks in CREATE_COMPLETE, an ``UpdateStack`` step,
+        and a ``DeleteStack`` step. The ``steps`` value defines the steps
         corresponding to the stacks that are expected to result from
         convergence. In a given grouping, which steps corresponds to which
         stacks is not checked, so in the above example, one stack would
-        have a corresponding `UpdateStack` step and the other would have a
-        `DeleteStack` step, but which one has which doesn't matter.
+        have a corresponding ``UpdateStack`` step and the other would have a
+        ``DeleteStack`` step, but which one has which doesn't matter.
 
         All stacks in the list of groups are passed to a single converge call.
 
@@ -1261,7 +1262,7 @@ class ConvergeLaunchStackTests(SynchronousTestCase):
                                       capacity=capacity)
 
     def test_to_stack_unique(self):
-        """Invoking `to_stack` multiple times results in unique stacks."""
+        """Invoking ``to_stack`` multiple times results in unique stacks."""
         self.assertEqual(len(set(map(self.to_stack, ('uc', 'uc', 'uc')))), 3)
 
     def test_stack_check_for_create_complete(self):

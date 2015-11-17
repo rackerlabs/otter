@@ -6,8 +6,8 @@
 # stack asynchronously so it cannot be a part of gathering. Instead, stack
 # check steps must be generated during planning and then the results will be
 # picked up by the stack list that happens during gathering. This means
-# `converge_launch_stack`' must know when stacks need to be checked and when
-# they need actual work done on them.
+# converge_launch_stack must know when stacks need to be checked and when they
+# need actual work done on them.
 #
 # To keep the convergence engine as stateless as possible, planning steps are
 # derived from the states of the stacks themselves. This table lists the
