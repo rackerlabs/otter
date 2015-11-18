@@ -4,7 +4,6 @@ Tests for `metrics.py`
 
 import operator
 import time
-from datetime import datetime
 from io import StringIO
 
 from effect import Constant, Effect, Func, base_dispatcher
@@ -14,8 +13,7 @@ import mock
 
 from testtools.matchers import IsInstance
 
-from toolz.dicttoolz import keyfilter, merge
-from toolz.itertoolz import groupby
+from toolz.dicttoolz import merge
 
 from twisted.internet.base import ReactorBase
 from twisted.internet.defer import fail, succeed
@@ -25,7 +23,6 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.auth import IAuthenticator
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType
-from otter.log.intents import LogErr
 from otter.metrics import (
     GetAllGroups,
     GroupMetrics,
@@ -50,10 +47,8 @@ from otter.test.utils import (
     nested_sequence,
     noop,
     patch,
-    raise_,
     resolve_effect,
 )
-from otter.util.fileio import ReadFileLines, WriteFileLines
 
 
 class GetTenantMetricsTests(SynchronousTestCase):

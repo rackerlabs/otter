@@ -9,18 +9,18 @@ import operator
 import sys
 import time
 from collections import defaultdict, namedtuple
-from datetime import datetime, timedelta
+from datetime import timedelta
 from functools import partial
 
 import attr
 
 from effect import ComposedDispatcher, Effect, Func
-from effect.do import do, do_return
+from effect.do import do
 
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in
-from toolz.dicttoolz import keyfilter, merge
+from toolz.dicttoolz import merge
 
 from twisted.application.internet import TimerService
 from twisted.application.service import Service
@@ -36,13 +36,9 @@ from otter.constants import ServiceType, get_service_configs
 from otter.convergence.gathering import get_all_scaling_group_servers
 from otter.effect_dispatcher import get_legacy_dispatcher, get_log_dispatcher
 from otter.log import log as otter_log
-from otter.log.intents import err
 from otter.models.cass import CassScalingGroupCollection
 from otter.models.intents import GetAllGroups, get_model_dispatcher
-from otter.util.fileio import (
-    ReadFileLines, WriteFileLines, get_dispatcher as file_dispatcher)
 from otter.util.fp import partition_bool
-from otter.util.timestamp import datetime_to_epoch
 
 
 GroupMetrics = namedtuple('GroupMetrics',
@@ -216,8 +212,7 @@ def get_dispatcher(reactor, authenticator, log, service_configs, store):
     return ComposedDispatcher([
         get_legacy_dispatcher(reactor, authenticator, log, service_configs),
         get_log_dispatcher(log, {}),
-        get_model_dispatcher(log, store),
-        file_dispatcher(),
+        get_model_dispatcher(log, store)
     ])
 
 
@@ -240,7 +235,6 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
 
     :return: :class:`Deferred` fired with ``list`` of `GroupMetrics`
     """
-    convergence_tids = config.get('convergence-tenants', [])
     _client = client or connect_cass_servers(reactor, config['cassandra'])
     authenticator = authenticator or generate_authenticator(reactor,
                                                             config['identity'])
