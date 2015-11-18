@@ -4,7 +4,6 @@ Tests for `metrics.py`
 
 import operator
 import time
-from datetime import datetime
 from io import StringIO
 
 from effect import Constant, Effect, Func, base_dispatcher
@@ -14,8 +13,7 @@ import mock
 
 from testtools.matchers import IsInstance
 
-from toolz.dicttoolz import keyfilter, merge
-from toolz.itertoolz import groupby
+from toolz.dicttoolz import merge
 
 from twisted.internet.base import ReactorBase
 from twisted.internet.defer import fail, succeed
@@ -25,7 +23,6 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.auth import IAuthenticator
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType
-from otter.log.intents import LogErr
 from otter.metrics import (
     GetAllGroups,
     GroupMetrics,
@@ -36,8 +33,6 @@ from otter.metrics import (
     get_all_metrics,
     get_all_metrics_effects,
     get_tenant_metrics,
-    get_todays_scaling_groups,
-    get_todays_tenants,
     makeService,
     unchanged_divergent_groups
 )
@@ -52,10 +47,8 @@ from otter.test.utils import (
     nested_sequence,
     noop,
     patch,
-    raise_,
     resolve_effect,
 )
-from otter.util.fileio import ReadFileLines, WriteFileLines
 
 
 class GetTenantMetricsTests(SynchronousTestCase):
@@ -279,129 +272,6 @@ class UnchangedDivergentGroupsTests(SynchronousTestCase):
             [(metrics[1], 3603), (metrics[2], 7203)])
 
 
-class GetTodaysTenants(SynchronousTestCase):
-    """
-    Tests for :func:`get_todays_tenants`
-    """
-
-    def setUp(self):
-        self.tenants = range(10)
-        self.today = datetime(1970, 1, 2)
-
-    def test_last_none(self):
-        """
-        returns first 5 sorted tenants with length 5 and todays date
-        """
-        self.assertEqual(
-            get_todays_tenants(self.tenants, self.today, None, None),
-            (self.tenants[:5], 5, self.today))
-
-    def test_same_day(self):
-        """
-        returns same tenants as last time if asked within same day
-        """
-        today = self.today.replace(hour=13, minute=20)
-        last_date = self.today
-        self.assertEqual(
-            get_todays_tenants(self.tenants, today, 3, last_date),
-            (self.tenants[:3], 3, last_date))
-
-    def test_next_day(self):
-        """
-        returns tenants with 5 more for next day
-        """
-        prev_day = datetime(1970, 1, 1)
-        self.assertEqual(
-            get_todays_tenants(self.tenants, self.today, 3, prev_day),
-            (self.tenants[:8], 8, self.today))
-
-    def test_all(self):
-        """
-        returns all tenants for new day if < 5 tenants are remaining since
-        last time
-        """
-        prev_day = datetime(1970, 1, 1)
-        self.assertEqual(
-            get_todays_tenants(self.tenants, self.today, 7, prev_day),
-            (self.tenants, 10, self.today))
-
-    def test_previous_day(self):
-        """
-        Same as `test_same_day`
-        """
-        next_day = datetime(1970, 1, 3)
-        self.assertEqual(
-            get_todays_tenants(self.tenants, self.today, 3, next_day),
-            (self.tenants[:3], 3, self.today))
-
-
-class GetTodaysScalingGroupsTests(SynchronousTestCase):
-    """
-    Tests for :func:`get_todays_scaling_groups`
-    """
-
-    def setUp(self):
-        self.groups = groupby(
-            lambda g: g["tenantId"],
-            ([{"tenantId": "t1", "a": "1"}, {"tenantId": "t1", "a": "2"}] +
-             [{"tenantId": "t{}".format(i), "b": str(i)}
-              for i in range(2, 10)]))
-
-    def test_success(self):
-        """
-        Returns todays scaling groups based on number of tenants fetched
-        since last time. Updates the current fetch in file
-        """
-        seq = [
-            (GetAllGroups(), const(self.groups)),
-            (ReadFileLines("file"), const(["2", "0.0"])),
-            (Func(datetime.utcnow), const(datetime(1970, 1, 2))),
-            (WriteFileLines("file", [7, 86400.0]), noop)
-        ]
-        r = perform_sequence(seq, get_todays_scaling_groups(["t1"], "file"))
-        self.assertEqual(
-            r,
-            keyfilter(lambda k: k in ["t{}".format(i) for i in range(1, 9)],
-                      self.groups))
-
-    def test_no_last_info(self):
-        """
-        Returns first 5 non-convergence tenants if could not fetch last info
-        from file
-        """
-        seq = [
-            (GetAllGroups(), const(self.groups)),
-            (ReadFileLines("file"), lambda i: raise_(IOError("e"))),
-            (LogErr(mock.ANY, "error reading previous number of tenants", {}),
-             noop),
-            (Func(datetime.utcnow), const(datetime(1970, 1, 2))),
-            (WriteFileLines("file", [5, 86400.0]), noop)
-        ]
-        r = perform_sequence(seq, get_todays_scaling_groups(["t1"], "file"))
-        self.assertEqual(
-            r,
-            keyfilter(lambda k: k in ["t{}".format(i) for i in range(1, 7)],
-                      self.groups))
-
-    def test_error_writing(self):
-        """
-        Logs and ignores error writing to the file
-        """
-        seq = [
-            (GetAllGroups(), const(self.groups)),
-            (ReadFileLines("file"), const(["2", "0.0"])),
-            (Func(datetime.utcnow), const(datetime(1970, 1, 2))),
-            (WriteFileLines("file", [7, 86400.0]),
-             lambda i: raise_(IOError("bad"))),
-            (LogErr(mock.ANY, "error updating number of tenants", {}), noop)
-        ]
-        r = perform_sequence(seq, get_todays_scaling_groups(["t1"], "file"))
-        self.assertEqual(
-            r,
-            keyfilter(lambda k: k in ["t{}".format(i) for i in range(1, 9)],
-                      self.groups))
-
-
 class CollectMetricsTests(SynchronousTestCase):
     """
     Tests for :func:`collect_metrics`
@@ -417,9 +287,6 @@ class CollectMetricsTests(SynchronousTestCase):
         self.client.disconnect.return_value = succeed(None)
         self.connect_cass_servers.return_value = self.client
 
-        self.get_todays_scaling_groups = patch(
-            self, 'otter.metrics.get_todays_scaling_groups',
-            side_effect=intent_func("gtsg"))
         self.log = mock_log()
 
         self.get_all_metrics = patch(self, 'otter.metrics.get_all_metrics',
@@ -441,7 +308,7 @@ class CollectMetricsTests(SynchronousTestCase):
                        "convergence-tenants": ["ct"]}
 
         self.sequence = SequenceDispatcher([
-            (("gtsg", ["ct"], "lpath"), const(self.groups)),
+            (GetAllGroups(), const(self.groups)),
             (TenantScope(mock.ANY, "tid"),
              nested_sequence([
                  (("atcm", 200, "r", "metrics", 2, self.log, False), noop)
@@ -495,7 +362,7 @@ class CollectMetricsTests(SynchronousTestCase):
         Doesnt add metrics to blueflood if metrics config is not there
         """
         sequence = SequenceDispatcher([
-            (("gtsg", ["ct"], "last_tenant.txt"), const(self.groups))
+            (GetAllGroups(), const(self.groups))
         ])
         self.get_dispatcher.return_value = sequence
         del self.config["metrics"]
