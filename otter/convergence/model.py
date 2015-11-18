@@ -289,7 +289,7 @@ class NovaServer(object):
             id=server_json['id'],
             state=server_state,
             created=timestamp_to_epoch(server_json['created']),
-            image_id=server_json.get('image', {}).get('id'),
+            image_id=get_in(["image", "id"], server_json),
             flavor_id=server_json['flavor']['id'],
             links=freeze(server_json['links']),
             desired_lbs=_lbs_from_metadata(metadata),
