@@ -464,7 +464,7 @@ class NovaServerTests(SynchronousTestCase):
         Create server that has missing image in it in various ways.
         (for the case of BFV)
         """
-        for image in ({}, {'id': None}):
+        for image in ({}, {'id': None}, ""):
             self.servers[0]['image'] = image
             self.assertEqual(
                 NovaServer.from_server_details_json(self.servers[0]),
