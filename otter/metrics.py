@@ -45,58 +45,6 @@ from otter.util.fp import partition_bool
 from otter.util.timestamp import datetime_to_epoch
 
 
-def get_last_info(fname):
-    eff = Effect(ReadFileLines(fname)).on(
-        lambda lines: (int(lines[0]),
-                       datetime.utcfromtimestamp(float(lines[1]))))
-
-    def log_and_return(e):
-        _eff = err(e, "error reading previous number of tenants")
-        return _eff.on(lambda _: (None, None))
-
-    return eff.on(error=log_and_return)
-
-
-def update_last_info(fname, tenants_len, time):
-    eff = Effect(
-        WriteFileLines(
-            fname, [tenants_len, datetime_to_epoch(time)]))
-    return eff.on(error=lambda e: err(e, "error updating number of tenants"))
-
-
-def get_todays_tenants(tenants, today, last_tenants_len, last_date):
-    """
-    Get tenants that are enabled till today
-    """
-    batch_size = 5
-    tenants = sorted(tenants)
-    if last_tenants_len is None:
-        return tenants[:batch_size], batch_size, today
-    days = (today - last_date).days
-    if days < 0:
-        return tenants[:last_tenants_len], last_tenants_len, today
-    if days == 0:
-        return tenants[:last_tenants_len], last_tenants_len, last_date
-    tenants = tenants[:last_tenants_len + batch_size]
-    return tenants, len(tenants), today
-
-
-@do
-def get_todays_scaling_groups(convergence_tids, fname):
-    """
-    Get scaling groups that from tenants that are enabled till today
-    """
-    groups = yield Effect(GetAllGroups())
-    non_conv_tenants = set(groups.keys()) - set(convergence_tids)
-    last_tenants_len, last_date = yield get_last_info(fname)
-    now = yield Effect(Func(datetime.utcnow))
-    tenants, last_tenants_len, last_date = get_todays_tenants(
-        non_conv_tenants, now, last_tenants_len, last_date)
-    yield update_last_info(fname, last_tenants_len, last_date)
-    yield do_return(
-        keyfilter(lambda t: t in set(tenants + convergence_tids), groups))
-
-
 GroupMetrics = namedtuple('GroupMetrics',
                           'tenant_id group_id desired actual pending')
 
@@ -301,11 +249,7 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
                                 get_service_configs(config), store)
 
     # calculate metrics
-    fpath = get_in(["metrics", "last_tenant_fpath"], config,
-                   default="last_tenant.txt")
-    tenanted_groups = yield perform(
-        dispatcher,
-        get_todays_scaling_groups(convergence_tids, fpath))
+    tenanted_groups = yield perform(dispatcher, Effect(GetAllGroups()))
     group_metrics = yield get_all_metrics(
         dispatcher, tenanted_groups, log, _print=_print)
 
