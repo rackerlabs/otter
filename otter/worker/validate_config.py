@@ -2,10 +2,11 @@
 Contains code to validate launch config
 """
 
-from twisted.internet import defer
 import base64
-import re
 import itertools
+import re
+
+from twisted.internet import defer
 
 from otter.util import logging_treq as treq
 
@@ -173,7 +174,8 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
 
 def validate_image(log, auth_token, server_endpoint, image_ref):
     """
-    Validate Image by getting the image information. It ensures that image is active
+    Validate Image by getting the image information. It ensures that image is
+    active.
     """
     url = append_segments(server_endpoint, 'images', image_ref)
     d = treq.get(url, headers=headers(auth_token), log=log)
