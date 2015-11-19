@@ -380,7 +380,7 @@ class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
     def test_empty_image_no_bfv(self):
         """
         Empty string or null for ``imageRef`` is not valid, if no
-        ``block_device_mapping`` is provided.
+        ``block_device_mapping`` or ``block_device_mapping_v2`` is provided.
         """
         for ref in ('', None):
             self.server['imageRef'] = ref
@@ -390,7 +390,7 @@ class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
     def test_null_image_no_bfv(self):
         """
         Not providing ``imageRef`` is not valid, if no
-        ``block_device_mapping`` is provided.
+        ``block_device_mapping`` or ``block_device_mapping_v2`` is provided.
         """
         self.server.pop('imageRef')
         self.assertRaisesRegexp(ValidationError, "is not of type",
@@ -399,20 +399,26 @@ class LaunchConfigServerPayloadValidationTests(SynchronousTestCase):
     def test_empty_image_bfv(self):
         """
         Empty string or null for ``imageRef`` is valid, if
-        ``block_device_mapping`` is provided.
+        ``block_device_mapping`` or ``block_device_mapping_v2`` is provided.
         """
         for ref in ('', None):
             self.server['imageRef'] = ref
             self.server['block_device_mapping'] = [{'volume_id': '235'}]
             validate(self.server, group_schemas.server)
+            self.server.pop('block_device_mapping')
+            self.server['block_device_mapping_v2'] = [{'volume_id': '235'}]
+            validate(self.server, group_schemas.server)
 
     def test_no_image_bfv(self):
         """
-        Not providing ``imageRef`` is valid, if ``block_device_mapping`` is
-        provided.
+        Not providing ``imageRef`` is valid, if ``block_device_mapping``
+        or ``block_device_mapping_v2`` is provided.
         """
         self.server.pop('imageRef')
         self.server['block_device_mapping'] = [{'volume_id': '235'}]
+        validate(self.server, group_schemas.server)
+        self.server.pop('block_device_mapping')
+        self.server['block_device_mapping_v2'] = [{'volume_id': '235'}]
         validate(self.server, group_schemas.server)
 
     def test_blank_image(self):

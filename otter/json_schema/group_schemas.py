@@ -87,6 +87,10 @@ _bfv_server = {
     }
 }
 
+_bfv2_server = deepcopy(_bfv_server)
+bdm = _bfv2_server["properties"].pop("block_device_mapping")
+_bfv2_server["properties"]["block_device_mapping_v2"] = bdm
+
 _non_bfv_server = {
     "type": "object",
     "properties": {
@@ -159,7 +163,7 @@ _clb_lb = {
 
 
 server = {
-    "type": [_bfv_server, _non_bfv_server],
+    "type": [_bfv_server, _bfv2_server, _non_bfv_server],
     # The schema for the create server attributes should come
     # from Nova, or Nova should provide some no-op method to
     # validate creating a server. Autoscale should not
