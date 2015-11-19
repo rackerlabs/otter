@@ -88,8 +88,8 @@ _bfv_server = {
 }
 
 _bfv2_server = deepcopy(_bfv_server)
-bdm = _bfv2_server["properties"].pop("block_device_mapping")
-_bfv2_server["properties"]["block_device_mapping_v2"] = bdm
+_bdm = _bfv2_server["properties"].pop("block_device_mapping")
+_bfv2_server["properties"]["block_device_mapping_v2"] = _bdm
 
 _non_bfv_server = {
     "type": "object",
