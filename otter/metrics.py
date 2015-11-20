@@ -57,19 +57,27 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
     if _print:
         print('processing tenant {} with groups {} and servers {}'.format(
               tenant_id, len(scaling_groups), len(servers)))
-    metrics = []
-    for group in scaling_groups:
-        group_id = group['groupId']
-        create_metrics = partial(GroupMetrics, tenant_id,
-                                 group_id, group['desired'])
-        if group_id not in servers:
-            metrics.append(create_metrics(0, 0))
+
+    groups = {g['groupId']: g for g in scaling_groups}
+
+    def get_metric(args):
+        if len(args) == 2:
+            group, servers = args
+        elif isinstance(args[0], dict):
+            group = args[0]
+            servers = []
         else:
-            active = len(list(filter(lambda s: s['status'] == 'ACTIVE',
-                                     servers[group_id])))
-            metrics.append(
-                create_metrics(active, len(servers[group_id]) - active))
-    return metrics
+            servers = args[0]
+            group = {'groupId': group_id_from_metadata(servers[0]['metadata']),
+                     'desired': 0}
+        servers = map(NovaServer.from_server_details_json, servers)
+        active = filter(lambda s: s.state == ServerState.ACTIVE, servers)
+        bad = filter(lambda s: s.state in (ServerState.SHUTOFF, ServerState.ERROR, ServerState.DELETED), servers)
+        _len = compose(len, list)
+        return GroupMetrics(tenant_id, group['groupId'], group['desired'],
+                            _len(active), _len(servers) - active)
+
+    return merge_with(get_metric, groups, servers).values()
 
 
 def get_all_metrics_effects(tenanted_groups, log, _print=False):
@@ -85,8 +93,7 @@ def get_all_metrics_effects(tenanted_groups, log, _print=False):
     """
     effs = []
     for tenant_id, groups in tenanted_groups.iteritems():
-        eff = get_all_scaling_group_servers(
-            server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'))
+        eff = get_all_scaling_group_servers()
         eff = Effect(TenantScope(eff, tenant_id))
         eff = eff.on(partial(get_tenant_metrics, tenant_id, groups,
                              _print=_print))
