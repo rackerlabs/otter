@@ -24,6 +24,7 @@ from otter.json_schema import rest_schemas, validate
 from otter.json_schema.group_examples import (
     config as config_examples,
     launch_server_config as launch_examples,
+    launch_stack_config as launch_stack_examples,
     policy as policy_examples,
 )
 from otter.json_schema.group_schemas import MAX_ENTITIES
@@ -701,6 +702,16 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         self._test_successful_create({
             'groupConfiguration': config_examples()[0],
             'launchConfiguration': launch_examples()[0],
+        })
+
+    def test_create_launch_stack_config(self):
+        """
+        A scaling group with a launch_stack config is created successfully.
+        """
+        self._test_successful_create({
+            'groupConfiguration': config_examples()[0],
+            'launchConfiguration': launch_stack_examples()['all_options'],
+            'scalingPolicies': [policy_examples()[0]]
         })
 
     def test_group_create_calls_obey_config_changes(self):
