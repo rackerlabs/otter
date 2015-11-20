@@ -2,17 +2,29 @@
 Contains code to validate launch config
 """
 
-from twisted.internet import defer
 import base64
-import re
 import itertools
+import re
+
+from uuid import uuid4
+
+from pyrsistent import thaw
+
+from twisted.internet import defer
+
+from otter.auth import public_endpoint_url
 
 from otter.util import logging_treq as treq
 
-from otter.auth import public_endpoint_url
 from otter.util.config import config_value
-from otter.util.http import (append_segments, headers, check_success,
-                             raise_error_on_code, wrap_request_error)
+from otter.util.fp import set_in
+from otter.util.http import (
+    APIError,
+    append_segments,
+    check_success,
+    headers,
+    raise_error_on_code,
+    wrap_request_error)
 
 
 b64_chars_re = re.compile("^[+/=a-zA-Z0-9]+$")
@@ -97,15 +109,20 @@ class InvalidFileContentSize(InvalidPersonality):
         self.max_size = max_size
 
 
-def get_service_endpoint(service_catalog, region):
-    """
-    Get the service endpoint used to connect cloud services
-    """
-    cloudServersOpenStack = config_value('cloudServersOpenStack')
-    server_endpoint = public_endpoint_url(service_catalog,
-                                          cloudServersOpenStack,
-                                          region)
-    return server_endpoint
+def get_service_endpoint(service_name, service_catalog, region):
+    """Get the service endpoint used to connect cloud services."""
+    return public_endpoint_url(
+        service_catalog, config_value(service_name), region)
+
+
+def get_servers_endpoint(svc_catalog, region):
+    """Get the service endpoint for cloud servers."""
+    return get_service_endpoint('cloudServersOpenStack', svc_catalog, region)
+
+
+def get_heat_endpoint(svc_catalog, region):
+    """Get the service endpoint for cloud orchestration."""
+    return get_service_endpoint('cloudOrchestration', svc_catalog, region)
 
 
 def shorten(s, length):
@@ -159,7 +176,7 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
             raise InvalidLaunchConfiguration(msg.format(prop_name=prop_name,
                                                         prop_value=prop_value))
 
-    service_endpoint = get_service_endpoint(service_catalog, region)
+    service_endpoint = get_servers_endpoint(service_catalog, region)
     deferreds = []
     for validate, prop_name in validate_functions:
         prop_value = server.get(prop_name)
@@ -168,12 +185,35 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
             d.addErrback(raise_validation_error, prop_name, prop_value)
             deferreds.append(d)
 
-    return defer.DeferredList(deferreds, consumeErrors=True).addCallback(collect_errors)
+    return (defer.DeferredList(deferreds, consumeErrors=True)
+            .addCallback(collect_errors))
+
+
+def validate_launch_stack_config(log, region, service_catalog, auth_token,
+                                 launch_config):
+    """Validates a launch_stack config using Heat's stack-preview endpoint."""
+    stack_args = launch_config['stack']
+
+    heat_endpoint = get_heat_endpoint(service_catalog, region)
+    url = append_segments(heat_endpoint, 'stacks', 'preview')
+    new_args = thaw(set_in(stack_args, ('stack_name',), str(uuid4())))
+
+    def catch_error(error):
+        error.trap(APIError)
+        if error.value.code in [400, 404, 409]:
+            raise InvalidLaunchConfiguration(error.value.body)
+
+    d = treq.post(url, new_args, headers=headers(auth_token), log=log)
+    d.addCallback(check_success, [200])
+    d.addCallback(treq.json_content)
+    d.addErrback(catch_error)
+    return d
 
 
 def validate_image(log, auth_token, server_endpoint, image_ref):
     """
-    Validate Image by getting the image information. It ensures that image is active
+    Validate Image by getting the image information. It ensures that image is
+    active.
     """
     url = append_segments(server_endpoint, 'images', image_ref)
     d = treq.get(url, headers=headers(auth_token), log=log)
