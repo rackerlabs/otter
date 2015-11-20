@@ -263,9 +263,90 @@ launch_server = {
     }
 }
 
+_stack_template_url = {
+    "type": "object",
+    "properties": {
+        "template": {
+            "disallow": "any"
+        },
+        "template_url": {
+            "required": True
+        },
+    }
+}
+
+_stack_template_inline = {
+    "type": "object",
+    "properties": {
+        "template": {
+            "required": True
+        },
+        "template_url": {
+            "disallow": "any"
+        }
+    }
+}
+
+stack = {
+    "type": [_stack_template_url, _stack_template_inline],
+    "properties": {
+        "disable_rollback": {
+            "type": "boolean",
+            "required": False
+        },
+        "environment": {
+            "type": ["string", "object"],
+            "required": False
+        },
+        "files": {
+            "type": "object",
+            "required": False
+        },
+        "parameters": {
+            "type": "object",
+            "required": False
+        },
+        "template": {
+            "type": ["string", "object"],
+            "required": False
+        },
+        "template_url": {
+            "type": "string",
+            "required": False
+        },
+        "timeout_mins": {
+            "type": "number",
+            "required": False
+        },
+    },
+    "additionalProperties": False
+}
+
+launch_stack = {
+    "type": "object",
+    "description": ("'Launch Stack' launch configuration options.  This type "
+                    "of launch configuration will spin up a Heat stack "
+                    "directly with the provided arguments, and add the IP the "
+                    "stack outputs to one or more load balancers (if load "
+                    "balancer arguments are specified."),
+    "properties": {
+        "type": {
+            "enum": ["launch_stack"],
+        },
+        "args": {
+            "type": "object",
+            "properties": {
+                "stack": stack
+            },
+            "additionalProperties": False
+        }
+    },
+    "additionalProperties": False
+}
+
 # base launch config
 launch_config = {
-    "type": [launch_server],
+    "type": [launch_server, launch_stack],
     "properties": {
         "type": {
             "type": "string",
