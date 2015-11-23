@@ -1437,8 +1437,9 @@ class CloudOrchestrationTests(SynchronousTestCase):
             ServiceType.CLOUD_ORCHESTRATION,
             'POST', 'stacks/{0}/{1}/actions'.format(stack_name, stack_id),
             data={'check': None},
-            success_pred=has_code(201),
-            reauth_codes=(401,)).intent
+            success_pred=has_code(200, 201),
+            reauth_codes=(401,),
+            json_response=False).intent
 
     def _update_stack_intent(self, stack_name, stack_id, stack_args):
         return service_request(
@@ -1446,14 +1447,16 @@ class CloudOrchestrationTests(SynchronousTestCase):
             'PUT', 'stacks/{0}/{1}'.format(stack_name, stack_id),
             data=stack_args,
             success_pred=has_code(202),
-            reauth_codes=(401,)).intent
+            reauth_codes=(401,),
+            json_response=False).intent
 
     def _delete_stack_intent(self, stack_name, stack_id):
         return service_request(
             ServiceType.CLOUD_ORCHESTRATION,
             'DELETE', 'stacks/{0}/{1}'.format(stack_name, stack_id),
             success_pred=has_code(204),
-            reauth_codes=(401,)).intent
+            reauth_codes=(401,),
+            json_response=False).intent
 
     def test_list_stacks_all(self):
         """
@@ -1471,6 +1474,7 @@ class CloudOrchestrationTests(SynchronousTestCase):
         self.assertEqual(stacks, ['foo', 'bar'])
 
     def test_create_stack(self):
+        """Create stack calls Heat and returns the new stack details on 201."""
         data = {'data': 'data'}
         body = {'stack': 'the_stack_json'}
         eff = create_stack(data)
@@ -1483,7 +1487,23 @@ class CloudOrchestrationTests(SynchronousTestCase):
         result = perform_sequence(seq, eff)
         self.assertEqual(result, 'the_stack_json')
 
-    def test_check_stack(self):
+    def test_check_stack_200(self):
+        """Check stack calls Heat and returns None on a 200."""
+        stack_name = 'foostack'
+        stack_id = 'foo_id'
+        eff = check_stack(stack_name, stack_id)
+        expected_intent = self._check_stack_intent(stack_name, stack_id)
+
+        seq = [
+            (expected_intent,
+             service_request_eqf(stub_pure_response('200!', 200))),
+            (log_intent('request-check-stack', '200!', False), lambda _: None)
+        ]
+        result = perform_sequence(seq, eff)
+        self.assertEqual(result, None)
+
+    def test_check_stack_201(self):
+        """Check stack calls Heat and returns None on a 201."""
         stack_name = 'foostack'
         stack_id = 'foo_id'
         eff = check_stack(stack_name, stack_id)
@@ -1492,12 +1512,13 @@ class CloudOrchestrationTests(SynchronousTestCase):
         seq = [
             (expected_intent,
              service_request_eqf(stub_pure_response(b'', 201))),
-            (log_intent('request-check-stack', None, False), lambda _: None)
+            (log_intent('request-check-stack', b'', False), lambda _: None)
         ]
         result = perform_sequence(seq, eff)
         self.assertEqual(result, None)
 
     def test_update_stack(self):
+        """Update stack calls Heat and returns None on a 202."""
         stack_name = 'foostack'
         stack_id = 'foo_id'
         stack_args = {'stack': 'data'}
@@ -1507,12 +1528,29 @@ class CloudOrchestrationTests(SynchronousTestCase):
         seq = [
             (expected_intent,
              service_request_eqf(stub_pure_response(b'', 202))),
-            (log_intent('request-update-stack', None, False), lambda _: None)
+            (log_intent('request-update-stack', b'', False), lambda _: None)
+        ]
+        result = perform_sequence(seq, eff)
+        self.assertEqual(result, None)
+
+    def test_update_stack_with_response_body(self):
+        """Update stack succeeds even if there is content in the response."""
+        stack_name = 'foostack'
+        stack_id = 'foo_id'
+        stack_args = {'stack': 'data'}
+        eff = update_stack(stack_name, stack_id, stack_args)
+        expected_intent = self._update_stack_intent(stack_name, stack_id,
+                                                    stack_args)
+        seq = [
+            (expected_intent,
+             service_request_eqf(stub_pure_response('xyz', 202))),
+            (log_intent('request-update-stack', 'xyz', False), lambda _: None)
         ]
         result = perform_sequence(seq, eff)
         self.assertEqual(result, None)
 
     def test_delete_stack(self):
+        """Delete stack calls Heat and returns None on a 204."""
         stack_name = 'foostack'
         stack_id = 'foo_id'
         eff = delete_stack(stack_name, stack_id)
@@ -1521,7 +1559,7 @@ class CloudOrchestrationTests(SynchronousTestCase):
         seq = [
             (expected_intent,
              service_request_eqf(stub_pure_response(b'', 204))),
-            (log_intent('request-delete-stack', None, False), lambda _: None)
+            (log_intent('request-delete-stack', b'', False), lambda _: None)
         ]
         result = perform_sequence(seq, eff)
         self.assertEqual(result, None)
