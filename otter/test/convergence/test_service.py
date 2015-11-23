@@ -41,6 +41,7 @@ from otter.convergence.service import (
     converge_all_groups,
     converge_one_group,
     execute_convergence, get_my_divergent_groups,
+    get_executor,
     is_autoscale_active,
     launch_server_executor,
     launch_stack_executor,
@@ -1471,6 +1472,24 @@ class IsAutoscaleActiveTests(SynchronousTestCase):
                        desired_lbs=desired_lbs),
                 lb_nodes),
             True)
+
+
+class GetExecutorTests(SynchronousTestCase):
+    """Tests for :func:`get_executor`."""
+    def test_get_launch_server(self):
+        """With a launch_server config, launch_server_executor is returned."""
+        self.assertEqual(get_executor({'type': 'launch_server'}),
+                         launch_server_executor)
+
+    def test_get_launch_stack(self):
+        """With a launch_server config, launch_stack_executor is returned."""
+        self.assertEqual(get_executor({'type': 'launch_stack'}),
+                         launch_stack_executor)
+
+    def test_not_implemented(self):
+        """With another config type, ``NotImplementedError`` is raised."""
+        self.assertRaises(NotImplementedError,
+                          get_executor, {'type': 'launch_foo'})
 
 
 class ConvergenceExecutorTests(SynchronousTestCase):
