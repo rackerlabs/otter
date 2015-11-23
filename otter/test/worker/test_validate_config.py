@@ -253,7 +253,7 @@ class ValidateLaunchStackConfigTests(SynchronousTestCase):
 
         self.successResultOf(d)
         self.treq.post.assert_called_with('https://service/stacks/preview',
-                                          self.expected_args,
+                                          json.dumps(self.expected_args),
                                           headers=headers('token'),
                                           log=self.log)
 

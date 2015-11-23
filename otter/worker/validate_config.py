@@ -4,6 +4,7 @@ Contains code to validate launch config
 
 import base64
 import itertools
+import json
 import re
 
 from uuid import uuid4
@@ -203,7 +204,8 @@ def validate_launch_stack_config(log, region, service_catalog, auth_token,
         if error.value.code in [400, 404, 409]:
             raise InvalidLaunchConfiguration(error.value.body)
 
-    d = treq.post(url, new_args, headers=headers(auth_token), log=log)
+    d = treq.post(
+        url, json.dumps(new_args), headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200])
     d.addCallback(treq.json_content)
     d.addErrback(catch_error)
