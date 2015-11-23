@@ -196,7 +196,7 @@ def validate_launch_stack_config(log, region, service_catalog, auth_token,
 
     heat_endpoint = get_heat_endpoint(service_catalog, region)
     url = append_segments(heat_endpoint, 'stacks', 'preview')
-    new_args = thaw(set_in(stack_args, ('stack_name',), str(uuid4())))
+    new_args = thaw(set_in(stack_args, ('stack_name',), 'as_%s' % uuid4()))
 
     def catch_error(error):
         error.trap(APIError)

@@ -225,7 +225,7 @@ class ValidateLaunchStackConfigTests(SynchronousTestCase):
     def setUp(self):
         self.log = mock_log()
         self.launch_config = {'stack': {'foo': 'bar'}}
-        self.expected_args = {'foo': 'bar', 'stack_name': 'some_uuid'}
+        self.expected_args = {'foo': 'bar', 'stack_name': 'as_some_uuid'}
 
         self.get_heat_endpoint = patch(
             self, 'otter.worker.validate_config.get_heat_endpoint',
