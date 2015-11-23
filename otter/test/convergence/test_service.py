@@ -1373,6 +1373,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             ConvergenceIterationStatus.Stop())
 
     def test_launch_stack_config(self):
+        """Using a launch_stack launch config works."""
         lc = {'args': {'stack': {'stack_name': 'foo'}},
               'type': 'launch_stack'}
 
@@ -1392,7 +1393,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                               plan=plan)
 
         seq = [
-            parallel_sequence([]),
+            parallel_sequence([]),  # No steps to log (log_steps)
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             (ModifyReference(self.waiting,
