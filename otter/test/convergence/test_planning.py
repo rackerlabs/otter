@@ -1359,9 +1359,10 @@ class ConvergeLaunchStackTests(SynchronousTestCase):
     def test_converge_later(self):
         """In progress stacks cause convergence to retry."""
         stacks = [{'stacks': ['cp'], 'steps': ()}]
+        reasons = [ErrorReason.String("Waiting for stacks to finish.")]
         self.assertEqual(
             self.check_converge(1, stacks, extra_steps=['CL']),
-            pbag([ConvergeLater(["Waiting for stacks to finish."])]))
+            pbag([ConvergeLater(reasons)]))
 
     def test_end_convergence(self):
         """
@@ -1565,7 +1566,9 @@ class ConvergeLaunchStackTests(SynchronousTestCase):
                                     'kc', 'kp', 'kf',
                                     'dc', 'dp'))
         failed_stack = self.to_stack('df')
-        fail_step = pbag([FailConvergence(["Stacks in DELETE_FAILED found."])])
+        reasons = [ErrorReason.String("Stacks in DELETE_FAILED found.")]
+        fail_step = pbag(
+            [FailConvergence(reasons)])
 
         num_combinations = 0
         for r in range(0, len(types) + 1):

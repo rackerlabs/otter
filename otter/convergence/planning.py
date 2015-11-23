@@ -468,7 +468,8 @@ def converge_launch_stack(desired_state, stacks):
                     stacks_delete_in_progress)
 
     if stacks_delete_failed:
-        return pbag([FailConvergence(["Stacks in DELETE_FAILED found."])])
+        reasons = [ErrorReason.String("Stacks in DELETE_FAILED found.")]
+        return pbag([FailConvergence(reasons)])
 
     # If there are no stacks in CHECK_* or other work to be done, we assume
     # we're at the beginning of a convergence cycle and need to perform stack
@@ -513,9 +514,10 @@ def converge_launch_stack(desired_state, stacks):
     fix_steps = get_fix_steps(scale_down_steps)
     delete_stacks_failed_steps = map(DeleteStack, stacks_failed)
 
-    converge_later = ([ConvergeLater(["Waiting for stacks to finish."])]
-                      if stacks_delete_in_progress or stacks_in_progress
-                      else [])
+    converge_later = (
+        [ConvergeLater([ErrorReason.String("Waiting for stacks to finish.")])]
+        if stacks_delete_in_progress or stacks_in_progress
+        else [])
 
     return pbag(create_steps +
                 fix_steps +
