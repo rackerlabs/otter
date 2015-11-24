@@ -1403,13 +1403,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                         pmap())),
              dispatch(reference_dispatcher)),
         ]
-        eff = (
-            execute_convergence(
-                self.tenant_id, self.group_id, build_timeout=3600,
-                waiting=self.waiting,
-                limited_retry_iterations=43,
-                get_executor=lambda _: executor)
-        )
+        eff = execute_convergence(
+            self.tenant_id, self.group_id, build_timeout=3600,
+            waiting=self.waiting, limited_retry_iterations=43,
+            get_executor=lambda _: executor)
         perform_sequence(self.get_seq(with_cache=False) + seq, eff)
 
 
