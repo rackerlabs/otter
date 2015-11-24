@@ -20,7 +20,8 @@ from effect.do import do
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in
-from toolz.dicttoolz import merge
+from toolz.dicttoolz import merge, merge_with
+from toolz.functoolz import compose, flip
 
 from twisted.application.internet import TimerService
 from twisted.application.service import Service
@@ -34,6 +35,8 @@ from otter.auth import generate_authenticator
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType, get_service_configs
 from otter.convergence.gathering import get_all_scaling_group_servers
+from otter.convergence.model import (
+    NovaServer, ServerState, group_id_from_metadata)
 from otter.effect_dispatcher import get_legacy_dispatcher, get_log_dispatcher
 from otter.log import log as otter_log
 from otter.models.cass import CassScalingGroupCollection
@@ -61,6 +64,12 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
     groups = {g['groupId']: g for g in scaling_groups}
 
     def get_metric(args):
+        """
+        Return metric of given group
+
+        :params args: 2-element [group, servers] list or single element
+            [group] or [servers] list
+        """
         if len(args) == 2:
             group, servers = args
         elif isinstance(args[0], dict):
@@ -71,11 +80,13 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
             group = {'groupId': group_id_from_metadata(servers[0]['metadata']),
                      'desired': 0}
         servers = map(NovaServer.from_server_details_json, servers)
-        active = filter(lambda s: s.state == ServerState.ACTIVE, servers)
-        bad = filter(lambda s: s.state in (ServerState.SHUTOFF, ServerState.ERROR, ServerState.DELETED), servers)
-        _len = compose(len, list)
+        _len = compose(len, list, flip(filter, servers))
+        active = _len(lambda s: s.state == ServerState.ACTIVE)
+        bad = _len(lambda s: s.state in (ServerState.SHUTOFF,
+                                         ServerState.ERROR,
+                                         ServerState.DELETED))
         return GroupMetrics(tenant_id, group['groupId'], group['desired'],
-                            _len(active), _len(servers) - active)
+                            active, len(servers) - bad - active)
 
     return merge_with(get_metric, groups, servers).values()
 
