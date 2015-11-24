@@ -870,9 +870,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              nested_sequence(exec_seq))
         ]
 
-    def _invoke(self, plan=None):
+    def _invoke(self, plan=None, executor_base=launch_server_executor):
         kwargs = {'plan': plan} if plan is not None else {}
-        executor = attr.assoc(launch_server_executor,
+        executor = attr.assoc(executor_base,
                               gather=intent_func("gacd"), **kwargs)
         return execute_convergence(
             self.tenant_id, self.group_id, build_timeout=3600,
@@ -1390,10 +1390,6 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         def plan(*args, **kwargs):
             return []
 
-        executor = attr.assoc(launch_stack_executor,
-                              gather=intent_func('gacd'),
-                              plan=plan)
-
         seq = [
             parallel_sequence([]),  # No steps to log (log_steps)
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
@@ -1403,11 +1399,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                         pmap())),
              dispatch(reference_dispatcher)),
         ]
-        eff = execute_convergence(
-            self.tenant_id, self.group_id, build_timeout=3600,
-            waiting=self.waiting, limited_retry_iterations=43,
-            get_executor=lambda _: executor)
-        perform_sequence(self.get_seq(with_cache=False) + seq, eff)
+        result = perform_sequence(
+            self.get_seq(with_cache=False) + seq,
+            self._invoke(plan, executor_base=launch_stack_executor))
+        self.assertEqual(result, ConvergenceIterationStatus.Stop())
 
 
 class IsAutoscaleActiveTests(SynchronousTestCase):
