@@ -25,12 +25,14 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import NoSuchCLBError, TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
-from otter.convergence.composition import get_desired_server_group_state
-from otter.convergence.gathering import get_all_launch_server_data
+from otter.convergence.composition import (get_desired_server_group_state,
+                                           get_desired_stack_group_state)
+from otter.convergence.gathering import (get_all_launch_server_data,
+                                         get_all_launch_stack_data)
 from otter.convergence.model import (
     CLBDescription, CLBNode, ConvergenceIterationStatus, ErrorReason,
     ServerState, StepResult)
-from otter.convergence.planning import plan_launch_server
+from otter.convergence.planning import plan_launch_server, plan_launch_stack
 from otter.convergence.service import (
     ConcurrentError,
     ConvergenceExecutor,
@@ -38,12 +40,16 @@ from otter.convergence.service import (
     Converger,
     converge_all_groups,
     converge_one_group,
-    execute_convergence, get_my_divergent_groups,
+    execute_convergence,
+    get_executor,
+    get_my_divergent_groups,
     is_autoscale_active,
     launch_server_executor,
+    launch_stack_executor,
     non_concurrently,
     trigger_convergence,
-    update_servers_cache)
+    update_servers_cache,
+    update_stacks_cache)
 from otter.convergence.steps import ConvergeLater, CreateServer
 from otter.log.intents import BoundFields, Log, LogErr, MsgWithTime
 from otter.models.intents import (
@@ -840,6 +846,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             'launchConfiguration': self.lc,
         }
         self.gsgi_result = (self.group, self.manifest)
+        self.gacd_runner = lambda i: {'servers': self.servers,
+                                      'lb_nodes': self.lb_nodes}
         self.now = datetime(1970, 1, 1)
         self.waiting = Reference(pmap())
 
@@ -847,7 +855,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         exec_seq = [
             (self.gsgi, lambda i: self.gsgi_result),
             (("gacd", self.tenant_id, self.group_id, self.now),
-             lambda i: {'servers': self.servers, 'lb_nodes': self.lb_nodes})
+             self.gacd_runner)
         ]
         if with_cache:
             exec_seq.append(
@@ -862,9 +870,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              nested_sequence(exec_seq))
         ]
 
-    def _invoke(self, plan=None):
+    def _invoke(self, plan=None, executor_base=launch_server_executor):
         kwargs = {'plan': plan} if plan is not None else {}
-        executor = attr.assoc(launch_server_executor,
+        executor = attr.assoc(executor_base,
                               gather=intent_func("gacd"), **kwargs)
         return execute_convergence(
             self.tenant_id, self.group_id, build_timeout=3600,
@@ -1366,6 +1374,39 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             ConvergenceIterationStatus.Stop())
 
+    def test_launch_stack_config(self):
+        """
+        Without any steps, using a launch_stack launch config stops
+        convergence.
+        """
+        lc = {'args': {'stack': {'stack_name': 'foo'}},
+              'type': 'launch_stack'}
+
+        self.manifest = {
+            'state': self.state,
+            'launchConfiguration': lc,
+        }
+
+        self.gsgi_result = (self.group, self.manifest)
+        self.gacd_runner = lambda i: {'stacks': []}
+
+        def plan(*args, **kwargs):
+            return []
+
+        seq = [
+            parallel_sequence([]),  # No steps to log (log_steps)
+            (Log(msg='execute-convergence', fields=mock.ANY), noop),
+            (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
+            (ModifyReference(self.waiting,
+                             match_func(pmap({self.group_id: 43}),
+                                        pmap())),
+             dispatch(reference_dispatcher)),
+        ]
+        result = perform_sequence(
+            self.get_seq(with_cache=False) + seq,
+            self._invoke(plan, executor_base=launch_stack_executor))
+        self.assertEqual(result, ConvergenceIterationStatus.Stop())
+
 
 class IsAutoscaleActiveTests(SynchronousTestCase):
     """Tests for :func:`is_autoscale_active`."""
@@ -1429,6 +1470,24 @@ class IsAutoscaleActiveTests(SynchronousTestCase):
             True)
 
 
+class GetExecutorTests(SynchronousTestCase):
+    """Tests for :func:`get_executor`."""
+    def test_get_launch_server(self):
+        """With a launch_server config, launch_server_executor is returned."""
+        self.assertEqual(get_executor({'type': 'launch_server'}),
+                         launch_server_executor)
+
+    def test_get_launch_stack(self):
+        """With a launch_server config, launch_stack_executor is returned."""
+        self.assertEqual(get_executor({'type': 'launch_stack'}),
+                         launch_stack_executor)
+
+    def test_not_implemented(self):
+        """With another config type, ``NotImplementedError`` is raised."""
+        self.assertRaises(NotImplementedError,
+                          get_executor, {'type': 'launch_foo'})
+
+
 class ConvergenceExecutorTests(SynchronousTestCase):
     """
     Tests for :obj:`ConvergenceExecutor`.
@@ -1441,6 +1500,7 @@ class ConvergenceExecutorTests(SynchronousTestCase):
             'update_cache': 'uc',
         }
         self.lse = launch_server_executor
+        self.stack_exec = launch_stack_executor
 
     def test_launch_server_executor(self):
         """
@@ -1460,4 +1520,24 @@ class ConvergenceExecutorTests(SynchronousTestCase):
         Ensures methods in :obj:`launch_server_executor` can be overridden.
         """
         ce = attr.assoc(launch_server_executor, **self.fake_attrs)
+        self.assertEqual(attr.asdict(ce), self.fake_attrs)
+
+    def test_launch_stack_executor(self):
+        """
+        Ensures :obj:`launch_stack_executor` contains the correct methods.
+        """
+        attrs = {
+            'gather': get_all_launch_stack_data,
+            'plan': plan_launch_stack,
+            'get_desired_group_state': get_desired_stack_group_state,
+            'update_cache': update_stacks_cache,
+        }
+        self.assertTrue(isinstance(self.stack_exec, ConvergenceExecutor))
+        self.assertEqual(attr.asdict(self.stack_exec), attrs)
+
+    def test_launch_stack_overrides(self):
+        """
+        Ensures methods in :obj:`launch_stack_executor` can be overridden.
+        """
+        ce = attr.assoc(launch_stack_executor, **self.fake_attrs)
         self.assertEqual(attr.asdict(ce), self.fake_attrs)
