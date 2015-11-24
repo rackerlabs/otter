@@ -1375,7 +1375,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             ConvergenceIterationStatus.Stop())
 
     def test_launch_stack_config(self):
-        """Using a launch_stack launch config works."""
+        """
+        Without any steps, using a launch_stack launch config stops
+        convergence.
+        """
         lc = {'args': {'stack': {'stack_name': 'foo'}},
               'type': 'launch_stack'}
 
