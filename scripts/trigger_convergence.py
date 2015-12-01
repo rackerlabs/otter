@@ -11,7 +11,9 @@ will trigger convergence on all groups got from cassandra
 
 import json
 from argparse import ArgumentParser
-from itertools import chain
+
+from toolz.curried import keyfilter
+from toolz.itertoolz import concat
 
 import treq
 
@@ -76,7 +78,7 @@ def get_groups_of_tenants(log, store, tenant_ids):
     d = gatherResults([
         store.list_scaling_group_states(log, tenant_id)
         for tenant_id in tenant_ids])
-    d.addCallback(chain.from_iterable)
+    d.addCallback(concat)
     d.addCallback(lambda states: [{"tenantId": s.tenant_id,
                                    "groupId": s.group_id}
                                   for s in states])
@@ -100,9 +102,14 @@ def get_groups(parsed, store, conf):
             [{"tenantId": tid, "groupId": gid} for tid, gid in groups])
     elif parsed.all:
         d = store.get_all_groups()
-        d.addCallback(lambda tgs: chain.from_iterable(tgs.values()))
+        d.addCallback(lambda tgs: concat(tgs.values()))
     elif parsed.tenant_id:
         d = get_groups_of_tenants(log, store, parsed.tenant_id)
+    elif parsed.disabled_tenants:
+        non_conv_tenants = conf["non-convergence-tenants"]
+        d = store.get_all_groups()
+        d.addCallback(keyfilter(lambda k: k not in set(non_conv_tenants)))
+        d.addCallback(lambda tgs: concat(tgs.values()))
     else:
         d = get_groups_of_tenants(log, store, conf["convergence-tenants"])
     return d
@@ -124,8 +131,14 @@ def main(reactor):
         "-t", nargs="+", dest="tenant_id",
         help="TenantID(s) whose group's to trigger")
     group.add_argument(
-        "--conf", action="store_true",
-        help="Convergence triggered on tenants configured in config file")
+        "--conf-conv-tenants", action="store_true",
+        help=("Convergence triggered on tenants configured as "
+              "\"convergence-tenants\" setting config file"))
+    group.add_argument(
+        "--conf-non-conv-tenants", action="store_true",
+        dest="disabled_tenants",
+        help=("Convergence triggered on all tenants except ones in "
+              "\"non-convergence-tenants\" setting in conf file"))
     group.add_argument("--all", action="store_true",
                        help="Convergence will be triggered on all groups")
 
