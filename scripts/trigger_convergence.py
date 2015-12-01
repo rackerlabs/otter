@@ -110,8 +110,10 @@ def get_groups(parsed, store, conf):
         d = store.get_all_groups()
         d.addCallback(keyfilter(lambda k: k not in set(non_conv_tenants)))
         d.addCallback(lambda tgs: concat(tgs.values()))
-    else:
+    elif parsed.conf_conv_tenants:
         d = get_groups_of_tenants(log, store, conf["convergence-tenants"])
+    else:
+        raise SystemExit("Unexpected group selection")
     return d
 
 
