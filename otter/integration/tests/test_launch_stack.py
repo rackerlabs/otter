@@ -34,7 +34,7 @@ from otter.util.retry import (
 
 
 class TestLaunchStack(unittest.TestCase):
-    """Tests making sure Otter can talk to Heat properly."""
+    """Tests making sure launch_stack launch configurations can be used."""
 
     def setUp(self):
         """
