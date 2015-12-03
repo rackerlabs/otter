@@ -681,7 +681,7 @@ class OtterGroup(object):
             return controller.modify_and_trigger(
                 self.dispatcher,
                 group,
-                bound_log_kwargs(log),
+                bound_log_kwargs(self.log),
                 is_group_paused)
         else:
             request.setResponseCode(404)
