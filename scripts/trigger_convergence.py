@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Trigger convergence on all or specific tenants/groups. Requires otter type
 config file containing region, identity and cassandra info
