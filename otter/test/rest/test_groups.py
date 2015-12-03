@@ -1177,7 +1177,13 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assert_status_code(
             204, endpoint='{}converge'.format(self.endpoint),
             method='POST')
-        self.assertTrue(self.mock_controller.modify_and_trigger.called)
+        self.mock_controller.modify_and_trigger.assert_called_once_with(
+            'disp', self.mock_group,
+            {'tenant_id': '11111',
+             'system': 'otter.rest.groups.converge_scaling_group',
+             'transaction_id': 'transaction-id',
+             'scaling_group_id': 'one'},
+            mock.ANY)
 
     def test_group_paused_converge(self):
         """
