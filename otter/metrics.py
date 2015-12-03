@@ -48,14 +48,15 @@ GroupMetrics = namedtuple('GroupMetrics',
                           'tenant_id group_id desired actual pending')
 
 
-def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
+def get_tenant_metrics(tenant_id, scaling_groups, grouped_servers,
+                       _print=False):
     """
     Produce per-group metrics for all the groups of a tenant
 
     :param list scaling_groups: Tenant's scaling groups as dict from CASS
-    :param dict servers: Servers from Nova grouped based on scaling group ID.
-                         Expects only ACTIVE or BUILD servers
-    :return: ``list`` of (tenantId, groupId, desired, actual) GroupMetrics
+    :param dict grouped_servers: Servers from Nova grouped based on
+        scaling group ID.
+    :return: generator of (tenantId, groupId, desired, actual) GroupMetrics
     """
     if _print:
         print('processing tenant {} with groups {} and servers {}'.format(
@@ -63,20 +64,11 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
 
     groups = {g['groupId']: g for g in scaling_groups}
 
-    def get_metric(args):
-        """
-        Return metric of given group
-
-        :params args: 2-element [group, servers] list or single element
-            [group] or [servers] list
-        """
-        if len(args) == 2:
-            group, servers = args
-        elif isinstance(args[0], dict):
-            group = args[0]
-            servers = []
+    for group_id in set(groups.keys()) | set(grouped_servers.keys()):
+        servers = grouped_servers.get(group_id, [])
+        if group_id in groups:
+            group = groups[group_id]
         else:
-            servers = args[0]
             group = {'groupId': group_id_from_metadata(servers[0]['metadata']),
                      'desired': 0}
         servers = map(NovaServer.from_server_details_json, servers)
@@ -85,10 +77,8 @@ def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
         bad = _len(lambda s: s.state in (ServerState.SHUTOFF,
                                          ServerState.ERROR,
                                          ServerState.DELETED))
-        return GroupMetrics(tenant_id, group['groupId'], group['desired'],
-                            active, len(servers) - bad - active)
-
-    return merge_with(get_metric, groups, servers).values()
+        yield GroupMetrics(tenant_id, group['groupId'], group['desired'],
+                           active, len(servers) - bad - active)
 
 
 def get_all_metrics_effects(tenanted_groups, log, _print=False):
