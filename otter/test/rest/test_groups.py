@@ -1199,6 +1199,24 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             403, endpoint='{}converge'.format(self.endpoint), method='POST')
         self.assertTrue(self.mock_controller.modify_and_trigger.called)
 
+    def test_error_group_converge(self):
+        """
+        Calling `../converge?on_error=False` will not trigger convergence
+        on ERROR group
+        """
+        set_config_data({'convergence-tenants': ['11111']})
+        self.addCleanup(set_config_data, {})
+        self.mock_state = GroupState(
+            '11111', 'one', '', {}, {}, None, {}, False,
+            ScalingGroupStatus.ERROR)  # error group
+        response_wrapper = self.request(
+            endpoint='{}converge?on_error=false'.format(self.endpoint),
+            method='POST')
+        self.assert_response(response_wrapper, 204)
+        values = response_wrapper.response.headers.getRawHeaders(
+            'x-not-converging')
+        self.assertEqual(values, ["true"])
+
     def test_group_converge_worker_tenant(self):
         """
         Calling `../converge` on non-convergence enabled tenant returns 404
