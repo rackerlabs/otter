@@ -44,9 +44,8 @@ def trigger_convergence(authenticator, region, group, no_error_group):
     endpoint = public_endpoint_url(catalog, "autoscale", region)
     conv_on_error = "false" if no_error_group else "true"
     resp = yield treq.post(
-        append_segments(endpoint, "groups", group["groupId"],
-                        "converge?on_error={}".format(conv_on_error)),
-        headers=headers(token), data="")
+        append_segments(endpoint, "groups", group["groupId"], "converge"),
+        headers=headers(token), params={"on_error": conv_on_error}, data="")
     if resp.code != 204:
         raise ValueError("bad code", resp.code)
 
