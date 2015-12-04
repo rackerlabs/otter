@@ -31,25 +31,27 @@ from otter.util.http import append_segments, headers
 
 
 @inlineCallbacks
-def trigger_convergence(authenticator, region, group):
+def trigger_convergence(authenticator, region, group, no_error_group):
     """
     Trigger convergence on a group
 
     :param IAuthenticator authenticator: Otter authenticator
     :param str region: Region where this is running
     :param dict group: Scaling group dict
+    :param bool no_error_group: If true then do not converge ERROR groups
     """
     token, catalog = yield authenticator.authenticate_tenant(group["tenantId"])
     endpoint = public_endpoint_url(catalog, "autoscale", region)
+    conv_on_error = "false" if no_error_group else "true"
     resp = yield treq.post(
         append_segments(endpoint, "groups", group["groupId"], "converge"),
-        headers=headers(token), data="")
+        headers=headers(token), params={"on_error": conv_on_error}, data="")
     if resp.code != 204:
         raise ValueError("bad code", resp.code)
 
 
 def trigger_convergence_groups(authenticator, region, groups,
-                               concurrency_limit):
+                               concurrency_limit, no_error_group):
     """
     Trigger convergence on given groups
 
@@ -57,12 +59,14 @@ def trigger_convergence_groups(authenticator, region, groups,
     :param str region: Region where this is running
     :param list groups: List of group dicts
     :param int concurrency_limit: Concurrency limit
+    :param bool no_error_group: If true then do not converge ERROR groups
 
     :return: Deferred fired with None
     """
     sem = DeferredSemaphore(concurrency_limit)
     return gatherResults(
-        [sem.run(trigger_convergence, authenticator, region, group)
+        [sem.run(trigger_convergence, authenticator, region, group,
+                 no_error_group)
          for group in groups],
         consumeErrors=True).addCallback(lambda _: None)
 
@@ -148,6 +152,8 @@ def main(reactor):
 
     parser.add_argument("-l", dest="limit", type=int, default=10,
                         help="Concurrency limit. Defaults to 10")
+    parser.add_argument("--no-error-group", action="store_true",
+                        help="Do not converge ERROR groups")
 
     parsed = parser.parse_args()
     conf = json.load(open(parsed.config))
@@ -158,7 +164,8 @@ def main(reactor):
 
     groups = yield get_groups(parsed, store, conf)
     yield trigger_convergence_groups(
-        authenticator, conf["region"], groups, parsed.limit)
+        authenticator, conf["region"], groups, parsed.limit,
+        parsed.no_error_group)
     yield cass_client.disconnect()
 
 
