@@ -42,7 +42,8 @@ def trigger_convergence(authenticator, region, group):
     token, catalog = yield authenticator.authenticate_tenant(group["tenantId"])
     endpoint = public_endpoint_url(catalog, "autoscale", region)
     resp = yield treq.post(
-        append_segments(endpoint, "groups", group["groupId"], "converge"),
+        append_segments(endpoint, "groups", group["groupId"],
+        "converge?on_error=false"),
         headers=headers(token), data="")
     if resp.code != 204:
         raise ValueError("bad code", resp.code)
