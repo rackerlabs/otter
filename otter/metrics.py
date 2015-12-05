@@ -20,7 +20,7 @@ from effect.do import do
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in
-from toolz.dicttoolz import merge, merge_with
+from toolz.dicttoolz import merge
 from toolz.functoolz import compose, flip
 
 from twisted.application.internet import TimerService
