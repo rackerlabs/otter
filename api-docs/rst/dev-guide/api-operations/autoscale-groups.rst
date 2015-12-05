@@ -14,3 +14,4 @@ Scaling groups
 .. include:: methods/delete-delete-scaling-group-v1.0-tenantid-groups-groupid.rst
 .. include:: methods/delete-delete-server-from-scaling-group-v1.0-tenantid-groups-groupid-servers-serverid.rst
 .. include:: methods/get-get-scaling-group-state-v1.0-tenantid-groups-groupid-state.rst
+.. include:: methods/post-create-scaling-group-v1.0-tenantid-convergence.rst
