@@ -60,7 +60,7 @@ def get_tenant_metrics(tenant_id, scaling_groups, grouped_servers,
     """
     if _print:
         print('processing tenant {} with groups {} and servers {}'.format(
-              tenant_id, len(scaling_groups), len(servers)))
+              tenant_id, len(scaling_groups), len(grouped_servers)))
 
     groups = {g['groupId']: g for g in scaling_groups}
 
