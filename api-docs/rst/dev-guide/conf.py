@@ -135,6 +135,15 @@ extlinks = {
 }
 
 
+# Global variables that are replaced by the specified value during the build process.
+
+rst_epilog = """
+.. |apiservice| replace:: Autoscale API
+.. |no changes| replace:: None for this release.
+.. |contract version| replace:: 1.0
+.. |product name| replace:: 'Rackspace Autoscale'
+"""
+
 # A list of ignored prefixes for module index sorting.
 # modindex_common_prefix = []
 

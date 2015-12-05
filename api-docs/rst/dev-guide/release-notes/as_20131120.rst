@@ -1,0 +1,14 @@
+API v1.0 release, November 20, 2013
+-------------------------------------------------
+
+What's new
+~~~~~~~~~~
+Initial release of Rackspace Auto Scale.
+
+Resolved issues
+~~~~~~~~~~~~~~~
+|no changes|
+
+Known issues
+~~~~~~~~~~~~
+|no changes|

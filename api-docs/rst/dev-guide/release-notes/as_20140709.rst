@@ -1,0 +1,15 @@
+API v1.0 release, July 09, 2014
+---------------------------------------------
+
+What's new
+~~~~~~~~~~
+Added `/servers/{/serverID}?replace=true` argument to **delete scaling group**
+for deleting a particular server.
+
+Resolved issues
+~~~~~~~~~~~~~~~
+|no changes|
+
+Known issues
+~~~~~~~~~~~~
+|no changes|
