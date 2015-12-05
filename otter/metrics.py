@@ -98,6 +98,7 @@ def get_all_metrics_effects(tenanted_groups, log, _print=False):
         eff = Effect(TenantScope(eff, tenant_id))
         eff = eff.on(partial(get_tenant_metrics, tenant_id, groups,
                              _print=_print))
+        eff = eff.on(list)
         eff = eff.on(
             error=lambda exc_info: log.err(exc_info_to_failure(exc_info)))
         effs.append(eff)
