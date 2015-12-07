@@ -23,3 +23,4 @@ between products and services.
    date-time-format
    server-flavors
    role-based-access-control
+   service-access-endpoints
