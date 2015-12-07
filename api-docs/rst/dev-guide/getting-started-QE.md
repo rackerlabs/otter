@@ -55,10 +55,6 @@
 - [ ] Authentication section contains short section referencing GS auth example and Identity doc. 
       See [example](https://developer.rackspace.com/docs/cloud-big-data/v2/developer-guide/#document-general-api-info/authentication-gen-api)
 
-- [ ] Authentication section contains short section referencing GS auth example and Identity doc.
-      
-      ![Gen API authl](https://github.com/rackerlabs/docs-common/blob/master/rst/getting-started-content-architecture/QE-images/GS-nav-with-client.png) 
-
 - [ ] Service access endpoints topic follows authentication
 
 - [ ] Service access endpoints topic has link to auth response in Review Auth response section.
