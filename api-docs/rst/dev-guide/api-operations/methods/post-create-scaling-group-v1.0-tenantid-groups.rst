@@ -69,6 +69,9 @@ This table shows the possible response codes for this operation:
 |                         |                           |parameter exceeds       |
 |                         |                           |maximum limit.          |
 +-------------------------+---------------------------+------------------------+
+|400                      |InvalidLaunchConfiguration |The stack configuration |
+|                         |                           |is invalid.             |
++-------------------------+---------------------------+------------------------+
 |400                      |InvalidMinEntities         |The "minEntities" value |
 |                         |                           |is greater than the     |
 |                         |                           |"maxEntities" value.    |
@@ -161,16 +164,18 @@ This table shows the body parameters for the request:
 |                                                   |             |the server image, the flavor of the server image,  |
 |                                                   |             |and the cloud load balancer or RackConnectV3 load  |
 |                                                   |             |balancer pool to which to connect. You must set    |
-|                                                   |             |the ``type`` parameter to ``launch_server``.       |
-|                                                   |             |                                                   |
+|                                                   |             |the ``type`` parameter to ``launch_server`` or     |
+|                                                   |             |``launch_stack``.                                  |
 +---------------------------------------------------+-------------+---------------------------------------------------+
-|launchConfiguration.\ **args**                     |Object       |The configuration used to create new servers in    |
-|                                                   |*(Required)* |the scaling group. You must specify the ``server`` |
+|launchConfiguration.\ **args**                     |Object       |The configuration used to create new servers or    |
+|                                                   |*(Required)* |stacks in the scaling group. For ``launch_server`` |
+|                                                   |             |configurations, you must specify the ``server``    |
 |                                                   |             |attribute, and can also specify the optional       |
 |                                                   |             |``loadBalancers`` attribute. Most launch           |
 |                                                   |             |configurations have both a server and a cloud load |
 |                                                   |             |balancer or RackConnectV3 load balancer pool       |
-|                                                   |             |configured.                                        |
+|                                                   |             |configured. For ``launch_stack`` configurations,   |
+|                                                   |             |you must specify the ``stack`` attribute.          |
 +---------------------------------------------------+-------------+---------------------------------------------------+
 |launchConfiguration.args.\ **loadBalancers**       |Array        |One or more cloud load balancers or RackConnectV3  |
 |                                                   |*(Optional)* |load balancer pools to which to add new servers.   |
@@ -242,12 +247,50 @@ This table shows the body parameters for the request:
 |launchConfiguration.args.server.personality.[*].\  |String       |The content items that is injected into the file   |
 |**contents**                                       |*(Required)* |system of the new cloud server image.              |
 +---------------------------------------------------+-------------+---------------------------------------------------+
-|launchConfiguration.args.server.\ **user_data**    |String       |The base64 encoded string of your create server    |
-|                                                   |*(Optional)* |template.                                          |
+|launchConfiguration.args.\ **stack**               |Object       |The attributes that Auto Scale uses to create a    |
+|                                                   |*(Required)* |new stack. The attributes that you specify for the |
+|                                                   |             |stack entity apply to all new stacks in the        |
+|                                                   |             |scaling group. Note the stack arguments are        |
+|                                                   |             |directly passed to Heat when creating a stack. For |
+|                                                   |             |more information, see `Create                      |
+|                                                   |             |Stack<http://api.rackspace.com/api-                |
+|                                                   |             |ref-orchestration.html#stack_create>`__.           |
 +---------------------------------------------------+-------------+---------------------------------------------------+
-|launchConfiguration.\ **type**                     |String       |The type of the launch configuration. For this     |
-|                                                   |*(Required)* |release, this parameter must be set to             |
-|                                                   |             |``launch_server``.                                 |
+|launchConfiguration.args.stack.\ **template**      |YAML String  |The template that describes the stack. Either      |
+|                                                   |or Object    |template or template_url must be specified. See    |
+|                                                   |*(Optional)* |`Create Stack<http://api.rackspace.com/api-        |
+|                                                   |             |ref-orchestration.html#stack_create>`__.           |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.args.stack.\ **template_url**  |String       |A URI to a template. Either template or            |
+|                                                   |*(Optional)* |template_url must be specified.                    |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.args.stack.\                   |Boolean      |Set to `True` (or `False`) to keep (or delete) the |
+|**disable_rollback**                               |*(Optional)* |resources that have been created if the stack      |
+|                                                   |             |fails to create. Defaults to `True`.               |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.args.stack.\ **environment**   |Object       |The JSON environment for the stack. See            |
+|                                                   |*(Optional)* |`Environments<http://                              |
+|                                                   |             |docs.openstack.org/developer/heat/template_guide/  |
+|                                                   |             |environment.html>`__ for more information.         |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.args.stack.\ **files**         |Object       |The contents of files that the template            |
+|                                                   |*(Optional)* |references. See `Create Stack<http://api.          |
+|                                                   |             |rackspace.com/api-ref-orchestration.html           |
+|                                                   |             |#stack_create>`__ for information on the structure |
+|                                                   |             |of the Object.                                     |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.args.stack.\ **parameters**    |Object       |Key/value pairs of the parameters and their values |
+|                                                   |*(Optional)* |to pass to the parameters in the template. See     |
+|                                                   |             |`Create Stack<http://api.rackspace.com/            |
+|                                                   |             |api-ref-orchestration.html#stack_create>`__ for    |
+|                                                   |             |information.                                       |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.args.stack.\ **timeout_mins**  |Integer      |The stack creation timeout, in minutes.            |
+|                                                   |*(Optional)* |                                                   |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.\ **type**                     |String       |The type of the launch configuration. This         |
+|                                                   |*(Required)* |parameter must be set to ``launch_server`` or      |
+|                                                   |             |``launch_stack``.                                  |
 +---------------------------------------------------+-------------+---------------------------------------------------+
 |\ **groupConfiguration**                           |Object       |The configuration options for the scaling group.   |
 |                                                   |*(Required)* |The scaling group configuration specifies the      |
