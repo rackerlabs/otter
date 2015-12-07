@@ -447,7 +447,7 @@ submit a **POST** request against it, as shown in the following example:
 
 
 
-Executing a capability URL or an anon`ymous webhook will always return a
+Executing a capability URL or an anonymous webhook will always return a
 202, ``Accepted``, response code, even if the request fails because of
 an invalid configuration. This is done to prevent information leakage.
 
