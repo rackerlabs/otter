@@ -15,8 +15,6 @@
 import os
 import sys
 
-# -- Custom options for PHP output ----------------------------------------
-
 from pygments.lexers.web import PhpLexer
 
 from sphinx.highlighting import lexers
@@ -46,7 +44,7 @@ extensions = [
 ]
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+# templates_path = ['_templates']
 
 # The suffix of source filenames.
 source_suffix = '.rst'
@@ -87,7 +85,9 @@ release = '1'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build', 'samples', 'glossary.rst', 'api-operations/methods*', 'common-gs', 'getting-started/examples*']
+exclude_patterns = ['_build', 'samples', 'glossary.rst',
+                    'api-operations/methods*', 'common-gs',
+                    'getting-started/examples*']
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
@@ -119,7 +119,7 @@ extlinks = {
     'rax-cloud': ('http://www.rackspace.com/cloud/%s', ''),
     'rax-docs': ('http://docs.rackspace.com/%s', ''),
     'rax-dev': ('https://developer.rackspace.com/%s', ''),
-    'rax-devdocs': ('https://developer.rackspace.com/docs/%s',''),
+    'rax-devdocs': ('https://developer.rackspace.com/docs/%s', ''),
     'rax-api': ('http://api.rackspace.com/%s', ''),
     'rax-git': ('https://github.com/rackspace/%s', ''),
     'mycloud': ('https://mycloud.rackspace.com/%s', ''),
@@ -138,6 +138,16 @@ extlinks = {
     'rocket': ('https://objectrocket.com/%s', '')
 }
 
+
+# Global variables that are replaced by the specified value during the build
+# process.
+
+rst_epilog = """
+.. |apiservice| replace:: Autoscale API
+.. |no changes| replace:: None for this release.
+.. |contract version| replace:: 1.0
+.. |product name| replace:: 'Rackspace Autoscale'
+"""
 
 # A list of ignored prefixes for module index sorting.
 # modindex_common_prefix = []

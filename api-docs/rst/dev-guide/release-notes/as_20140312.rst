@@ -1,0 +1,15 @@
+API v1.0 release, March 12, 2014
+----------------------------------------------
+
+What's new
+~~~~~~~~~~
+Added `webhooks=true` argument to **show scaling group details** manifest
+view for finer grained scaling group display with fewer requests.
+
+Resolved issues
+~~~~~~~~~~~~~~~
+|no changes|
+
+Known issues
+~~~~~~~~~~~~
+|no changes|
