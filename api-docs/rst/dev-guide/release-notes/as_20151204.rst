@@ -1,0 +1,22 @@
+API v1.1 release, December 08, 2015
+-----------------------------------
+
+What's new
+~~~~~~~~~~
+* Added a new **convergence** endpoint. You can submit a **POST** request to this endpoint to trigger convergence. Convergence implies that Autoscale tries to continuously converge to the desired state of the scaling group, instead of manipulating servers only once.
+When this convergence process starts, it will continue until the desired number of servers are in **ACTIVE** state.
+
+* Added the `status` attribute for group state. This attribute can be either "ACTIVE" or "ERROR". An "ACTIVE" status means that the group is converging
+and everything is operating well. An "ERROR" status means that Autoscale has stopped converging due to an irrecoverable error that requires user attention.
+If the `status` attribute is set to "ERROR", an additional `error` attribute is added that displays a list of errors that Autoscale has encountered.
+
+* Added support for "pause". Pausing a scaling group cancels any executions on the group.
+This includes policy executions via the API and triggering convergence. Any existing convergence that is running will be stopped. Group configuration changes are allowed during a paused state.
+If a scaling group is paused, the group state will return `"paused": true`.
+
+* Added support for "resume". Resuming a scaling group ends the "pause" state. When a scaling group is resumed, policy executions and convergence triggering resume. The group state returns ``"paused": false`.
+
+
+Known issues
+~~~~~~~~~~~~
+|no changes|
