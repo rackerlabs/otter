@@ -14,14 +14,15 @@ This operation retrieves the current state of a scaling group.
 The *GroupState* object consists of the following properties:
 
 
-
-*  *paused*. Specifies whether execution of scaling policies for the group is currently suspended. If this value is set to true, the group will not scale up or down. All policy execution calls and all convergence activities are suspended while this value is set to true.
+*  *paused*. Specifies whether execution of scaling policies for the group is currently suspended. If this value
+   is set to TRUE, the group will not scale up or down. All policy execution calls are suspended and convergence will
+   not be triggered while this value is set to TRUE. Any *POST* calls to the :ref:`/converge <post-create-scaling-group-v1.1-tenantid-convergence>` operation will error with a `403GroupPausedError` if convergence is paused.
 *  *pendingCapacity*. Integer. Specifies the number of servers that are in a "building" state. If this value is set to FALSE, all scaling and convergence activities, as well as all policy execution calls are resumed.
 *  *name*. Specifies the name of the group.
 *  *active*. Specifies an array of active servers in the group. This array includes the server Id, as well as other data.
 *  *activeCapacity*. Integer. Specifies the number of active servers in the group.
-*  *desiredCapacity*. Integer. Specifies the sum of all servers that are in ``Active`` and ``Pending`` state.
-*  *status*. String. This value can be set to either ACTIVE or ERROR. If *status& is set to ACTIVE, the scaling group is converging, if *status* is set to ERROR, it implies that Autoscale has stopped converging due to an irrecoverable error.
+*  *desiredCapacity*. Integer. Specifies the number of servers that are desired in the scaling group.
+*  *status*. String. This value can be set to either ACTIVE or ERROR. If *status* is set to ACTIVE, the scaling group is converging, if *status* is set to ERROR, it implies that Autoscale has stopped converging due to an irrecoverable error.
 *  *errors*. String. This value is provided if *status* is set to ERROR. It represents a JSON object that contains the "message" field with a message that describes the error.
 
 
