@@ -1,0 +1,15 @@
+API v1.0 release, January 16, 2014
+------------------------------------------------
+
+What's new
+~~~~~~~~~~
+Increased maximum allowed scaling policies per scaling group to 100, and
+maximum allowed webhooks per scaling policy to 25.
+
+Resolved issues
+~~~~~~~~~~~~~~~
+|no changes|
+
+Known issues
+~~~~~~~~~~~~
+|no changes|
