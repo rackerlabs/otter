@@ -15,7 +15,7 @@ The *GroupState* object consists of the following properties:
 
 
 *  *paused*. Specifies whether execution of scaling policies for the group is currently suspended. If this value
-   is set to TRUE, the group will not scale up or down. All policy execution calls are suspended and convergence will
+   is set to TRUE, the group will not scale up or down. All scheduled and API-generated policy executions are suspended, and convergence will
    not be triggered while this value is set to TRUE. Any *POST* calls to the :ref:`/converge <post-create-scaling-group-v1.1-tenantid-converge>` operation and any *POST* calls to the :ref:`/execute <post-execute-policy-v1.0-tenantid-groups-groupid-policies-policyid-execute>`
    operation will error with a `403GroupPausedError` error message if convergence is paused. If this value is set FALSE, all scaling and convergence activities, as well as all policy execution calls are resumed.
 *  *pendingCapacity*. Integer. Specifies the number of servers that are in a "building" state.

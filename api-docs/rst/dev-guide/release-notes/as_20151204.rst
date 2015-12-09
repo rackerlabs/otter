@@ -9,7 +9,7 @@ What's new
 
 *  Added the `status` attribute for group state. This attribute can be either "ACTIVE" or "ERROR". An "ACTIVE" status means that the group is converging
    and everything is operating well. An "ERROR" status means that Autoscale has stopped converging due to an irrecoverable error that requires user attention.
-   If the `status` attribute is set to "ERROR", an additional `error` attribute is added that displays a list of errors that Autoscale has encountered.
+   If the `status` attribute is set to "ERROR", an additional `errors` attribute is added that displays a list of errors that Autoscale has encountered.
 
 *  Added support for "pause". Pausing a scaling group cancels any executions on the group.
    This includes policy executions via the API or scheduled scaling activities, as well as triggering convergence. Any existing convergence that is running will be stopped. Group configuration changes are allowed during a paused state.
