@@ -419,11 +419,13 @@ def converge_launch_server(desired_state, servers_with_cheese,
         converge_later = [
             ConvergeLater(reasons=[ErrorReason.String('waiting for servers')])]
 
-    if any((s not in servers_to_delete for s in servers[Destiny.WAIT])):
-        converge_later.append(
-            ConvergeLater(limited=True, reasons=[ErrorReason.UserMessage(
-                'Waiting for temporarily unavailable server to become ACTIVE'
-            )]))
+    unavail_fmt = ('Waiting for server {server_id} to transition to ACTIVE '
+                   'from {status}')
+    reasons = [ErrorReason.UserMessage(unavail_fmt.format(server_id=s.id,
+                                                          status=s.state.name))
+               for s in servers[Destiny.WAIT] if s not in servers_to_delete]
+    if reasons:
+        converge_later.append(ConvergeLater(limited=True, reasons=reasons))
 
     return pbag(create_steps +
                 scale_down_steps +

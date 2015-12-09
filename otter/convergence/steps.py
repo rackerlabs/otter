@@ -546,7 +546,7 @@ class ConvergeLater(object):
     limited = attr.ib()
 
     def __init__(self, reasons, limited=False):
-        self.reasons = freeze(reasons)
+        self.reasons = pset(reasons)
         self.limited = limited
 
     def as_effect(self):

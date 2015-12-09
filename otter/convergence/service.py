@@ -331,7 +331,8 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
         if current_iterations > limited_retry_iterations:
             yield msg('converge-limited-retry-too-long')
             yield clean_waiting
-            result = yield convergence_failed(scaling_group, reasons)
+            # Prefix "Timed out" to all limited retry reasons
+            result = yield convergence_failed(scaling_group, reasons, True)
         else:
             yield waiting.modify(
                 lambda group_iterations:
@@ -369,7 +370,7 @@ def convergence_succeeded(executor, scaling_group, group_state, resources,
 
 
 @do
-def convergence_failed(scaling_group, reasons):
+def convergence_failed(scaling_group, reasons, timedout=False):
     """
     Handle convergence failure
     """
@@ -378,6 +379,9 @@ def convergence_failed(scaling_group, reasons):
     presented_reasons = sorted(present_reasons(reasons))
     if len(presented_reasons) == 0:
         presented_reasons = [u"Unknown error occurred"]
+    elif timedout:
+        presented_reasons = ["Timed out: {}".format(reason)
+                             for reason in presented_reasons]
     yield cf_err(
         'group-status-error', status=ScalingGroupStatus.ERROR.name,
         reasons=presented_reasons)
