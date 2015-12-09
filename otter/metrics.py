@@ -64,7 +64,7 @@ def get_tenant_metrics(tenant_id, scaling_groups, grouped_servers,
 
     groups = {g['groupId']: g for g in scaling_groups}
 
-    for group_id in set(groups.keys()) | set(grouped_servers.keys()):
+    for group_id in set(groups.keys() + grouped_servers.keys()):
         servers = grouped_servers.get(group_id, [])
         if group_id in groups:
             group = groups[group_id]
