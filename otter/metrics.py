@@ -21,6 +21,7 @@ from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in
 from toolz.dicttoolz import merge
+from toolz.functoolz import compose, flip
 
 from twisted.application.internet import TimerService
 from twisted.application.service import Service
@@ -34,6 +35,8 @@ from otter.auth import generate_authenticator
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType, get_service_configs
 from otter.convergence.gathering import get_all_scaling_group_servers
+from otter.convergence.model import (
+    NovaServer, ServerState, group_id_from_metadata)
 from otter.effect_dispatcher import get_legacy_dispatcher, get_log_dispatcher
 from otter.log import log as otter_log
 from otter.models.cass import CassScalingGroupCollection
@@ -45,31 +48,37 @@ GroupMetrics = namedtuple('GroupMetrics',
                           'tenant_id group_id desired actual pending')
 
 
-def get_tenant_metrics(tenant_id, scaling_groups, servers, _print=False):
+def get_tenant_metrics(tenant_id, scaling_groups, grouped_servers,
+                       _print=False):
     """
     Produce per-group metrics for all the groups of a tenant
 
     :param list scaling_groups: Tenant's scaling groups as dict from CASS
-    :param dict servers: Servers from Nova grouped based on scaling group ID.
-                         Expects only ACTIVE or BUILD servers
-    :return: ``list`` of (tenantId, groupId, desired, actual) GroupMetrics
+    :param dict grouped_servers: Servers from Nova grouped based on
+        scaling group ID.
+    :return: generator of (tenantId, groupId, desired, actual) GroupMetrics
     """
     if _print:
         print('processing tenant {} with groups {} and servers {}'.format(
-              tenant_id, len(scaling_groups), len(servers)))
-    metrics = []
-    for group in scaling_groups:
-        group_id = group['groupId']
-        create_metrics = partial(GroupMetrics, tenant_id,
-                                 group_id, group['desired'])
-        if group_id not in servers:
-            metrics.append(create_metrics(0, 0))
+              tenant_id, len(scaling_groups), len(grouped_servers)))
+
+    groups = {g['groupId']: g for g in scaling_groups}
+
+    for group_id in set(groups.keys() + grouped_servers.keys()):
+        servers = grouped_servers.get(group_id, [])
+        if group_id in groups:
+            group = groups[group_id]
         else:
-            active = len(list(filter(lambda s: s['status'] == 'ACTIVE',
-                                     servers[group_id])))
-            metrics.append(
-                create_metrics(active, len(servers[group_id]) - active))
-    return metrics
+            group = {'groupId': group_id_from_metadata(servers[0]['metadata']),
+                     'desired': 0}
+        servers = map(NovaServer.from_server_details_json, servers)
+        _len = compose(len, list, flip(filter, servers))
+        active = _len(lambda s: s.state == ServerState.ACTIVE)
+        bad = _len(lambda s: s.state in (ServerState.SHUTOFF,
+                                         ServerState.ERROR,
+                                         ServerState.DELETED))
+        yield GroupMetrics(tenant_id, group['groupId'], group['desired'],
+                           active, len(servers) - bad - active)
 
 
 def get_all_metrics_effects(tenanted_groups, log, _print=False):
@@ -85,11 +94,11 @@ def get_all_metrics_effects(tenanted_groups, log, _print=False):
     """
     effs = []
     for tenant_id, groups in tenanted_groups.iteritems():
-        eff = get_all_scaling_group_servers(
-            server_predicate=lambda s: s['status'] in ('ACTIVE', 'BUILD'))
+        eff = get_all_scaling_group_servers()
         eff = Effect(TenantScope(eff, tenant_id))
         eff = eff.on(partial(get_tenant_metrics, tenant_id, groups,
                              _print=_print))
+        eff = eff.on(list)
         eff = eff.on(
             error=lambda exc_info: log.err(exc_info_to_failure(exc_info)))
         effs.append(eff)

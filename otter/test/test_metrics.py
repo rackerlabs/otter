@@ -36,6 +36,7 @@ from otter.metrics import (
     makeService,
     unchanged_divergent_groups
 )
+from otter.test.convergence.test_model import sample_servers
 from otter.test.test_auth import identity_config
 from otter.test.utils import (
     CheckFailureValue,
@@ -57,18 +58,29 @@ class GetTenantMetricsTests(SynchronousTestCase):
     def test_get_tenant_metrics(self):
         """Extracts metrics from the servers."""
         servers = {
-            'g1': [{'status': 'ACTIVE'}] * 3 + [{'status': 'BUILD'}] * 2}
+            'g1': ([_server('g1', 'ACTIVE')] * 3 +
+                   [_server('g1', 'BUILD')] * 2 +
+                   [_server("g1", "ERROR"), _server("g1", "DELETED"),
+                    _server("g1", "SHUTOFF"), _server("g1", "PASSWORD")]),
+            'g3': [_server("g3", 'ACTIVE')]
+        }
         groups = [{'groupId': 'g1', 'desired': 3},
                   {'groupId': 'g2', 'desired': 4}]
         self.assertEqual(
-            get_tenant_metrics('t', groups, servers),
-            [GroupMetrics('t', 'g1', 3, 3, 2),
-             GroupMetrics('t', 'g2', 4, 0, 0)])
+            set(get_tenant_metrics('t', groups, servers)),
+            # g1 2 BUILD and 1 PASSWORD servers is considered pending
+            set([GroupMetrics('t', 'g1', 3, 3, 3),
+                 GroupMetrics('t', 'g2', 4, 0, 0),
+                 GroupMetrics('t', 'g3', 0, 1, 0)])
+        )
 
 
 def _server(group, state):
-    return {'status': state,
-            'metadata': {'rax:auto_scaling_group_id': group}}
+    server = sample_servers()[0]
+    return merge(
+        server,
+        {'status': state,
+         'metadata': {'rax:auto_scaling_group_id': group}})
 
 
 class GetAllMetricsEffectsTests(SynchronousTestCase):
