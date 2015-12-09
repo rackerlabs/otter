@@ -16,14 +16,15 @@ The *GroupState* object consists of the following properties:
 
 *  *paused*. Specifies whether execution of scaling policies for the group is currently suspended. If this value
    is set to TRUE, the group will not scale up or down. All policy execution calls are suspended and convergence will
-   not be triggered while this value is set to TRUE. Any *POST* calls to the :ref:`/converge <post-create-scaling-group-v1.1-tenantid-convergence>` operation will error with a `403GroupPausedError` if convergence is paused.
-*  *pendingCapacity*. Integer. Specifies the number of servers that are in a "building" state. If this value is set to FALSE, all scaling and convergence activities, as well as all policy execution calls are resumed.
+   not be triggered while this value is set to TRUE. Any *POST* calls to the :ref:`/converge <post-create-scaling-group-v1.1-tenantid-converge>` operation and any *POST* calls to the :ref:`/execute <post-execute-policy-v1.0-tenantid-groups-groupid-policies-policyid-execute>`
+   operation will error with a `403GroupPausedError` error message if convergence is paused. If this value is set FALSE, all scaling and convergence activities, as well as all policy execution calls are resumed.
+*  *pendingCapacity*. Integer. Specifies the number of servers that are in a "building" state.
 *  *name*. Specifies the name of the group.
 *  *active*. Specifies an array of active servers in the group. This array includes the server Id, as well as other data.
 *  *activeCapacity*. Integer. Specifies the number of active servers in the group.
 *  *desiredCapacity*. Integer. Specifies the number of servers that are desired in the scaling group.
 *  *status*. String. This value can be set to either ACTIVE or ERROR. If *status* is set to ACTIVE, the scaling group is converging, if *status* is set to ERROR, it implies that Autoscale has stopped converging due to an irrecoverable error.
-*  *errors*. String. This value is provided if *status* is set to ERROR. It represents a JSON object that contains the "message" field with a message that describes the error.
+*  *errors*. List of objects. This list is provided if *status* is set to ERROR. It contains a list of JSON objects with each object containing a message property that describes the error in human readable format.
 
 
 This operation retrieves the current state of the specified scaling group. It describes the state of the group in terms of its current set of active entities, the number of pending entities, and the desired number of entities. The description is returned in the response body in JSON format.

@@ -17,3 +17,4 @@ other important details about |apiservice| |version| service updates.
    release-notes/as_20140312.rst
    release-notes/as_20140709.rst
    release-notes/as_20141209.rst
+   release-notes/as_20151204.rst

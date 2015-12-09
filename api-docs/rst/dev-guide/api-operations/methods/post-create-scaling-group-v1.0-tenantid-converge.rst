@@ -1,6 +1,6 @@
 
 
-.. _post-create-scaling-group-v1.1-tenantid-convergence:
+.. _post-create-scaling-group-v1.1-tenantid-converge:
 
 Trigger convergence
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -41,18 +41,10 @@ This table shows the possible response codes for this operation:
 |401                       |InvalidCredentials       |The X-Auth-Token the     |
 |                          |                         |user supplied is bad.    |
 +--------------------------+-------------------------+-------------------------+
-|403                       |CannotExecutePolicyError |The policy was not       |
-|                          |                         |executed because a       |
-|                          |                         |scaling policy or        |
-|                          |                         |scaling group cooldown   |
-|                          |                         |was still in effect.     |
-+--------------------------+-------------------------+-------------------------+
-|403                       |CannotExecutePolicyError |The policy was not       |
-|                          |                         |executed because         |
-|                          |                         |applying the changes     |
-|                          |                         |would not result in the  |
-|                          |                         |addition or deletion of  |
-|                          |                         |any servers.             |
+|403                       |GroupPausedError         |Convergence was not      |
+|                          |                         |triggered because the    |
+|                          |                         |group state is set to    |
+|                          |                         |`"paused": true`.        |
 +--------------------------+-------------------------+-------------------------+
 |403                       |Forbidden                |The user does not have   |
 |                          |                         |permission to perform    |
