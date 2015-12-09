@@ -50,6 +50,11 @@ This table shows the possible response codes for this operation:
 |                          |                         |scaling group cooldown   |
 |                          |                         |was still in effect.     |
 +--------------------------+-------------------------+-------------------------+
+|403                       |GroupPausedError         |The policy was not       |
+|                          |                         |executed because the     |
+|                          |                         |group state is set to    |
+|                          |                         |`"paused": true`.        |
++--------------------------+-------------------------+-------------------------+
 |403                       |CannotExecutePolicyError |The policy was not       |
 |                          |                         |executed because         |
 |                          |                         |applying the changes     |
