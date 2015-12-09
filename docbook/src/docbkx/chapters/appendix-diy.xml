@@ -1,0 +1,1306 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section [
+<!-- in PDF: for line 1 on the cover page -->
+<!ENTITY PRODNAME "Rackspace Auto Scale"> 
+<!-- in PDF: for page headers -->
+<!ENTITY PRODABBV "Rackspace Auto Scale"> 
+<!-- in body -->
+<!ENTITY PROD "Auto Scale">               
+]>
+<appendix xmlns="http://docbook.org/ns/docbook" xmlns:xi="http://www.w3.org/2001/XInclude"
+    xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0" xml:id="autoscale_diy">
+    <title>Appendix: DIY Rackspace Cloud Monitoring and Auto Scale Deployment with cURL for Apache
+        Site</title>
+    <para> &PRODNAME; and Cloud Monitoring provide a secure way to dynamically manage your cloud
+        resources in response to load. This use case walks you through the steps of creating an Auto
+        Scale and Cloud Monitoring deployment with a Rackspace cloud server hosting an Apache
+        website that is load-balanced by a Rackspace cloud load balancer. The exercise describes all
+        aspects of the deployment, including the required setup and traffic load tool to use for
+        testing, and the proper teardown of the deployment. </para>
+    <section xml:id="Prerequisites">
+        <title>Prerequisites</title>
+        <para> On your workstation, install the following tools:</para>
+        <para>
+            <table frame="border">
+                <caption>Prerequisite tools</caption>
+                <col width="42%"/>
+                <col width="58%"/>
+                <thead>
+                    <tr>
+                        <th>Tool</th>
+                        <th>Download URL/Installation path</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>cURL</td>
+                        <td>
+                            <link xlink:href="http://curl.haxx.se/">http://curl.haxx.se/</link>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Apache HTTP server benchmarking tool </td>
+                        <td>
+                            <para><link
+                                    xlink:href="http://httpd.apache.org/docs/2.2/programs/ab.html"
+                                    >http://httpd.apache.org/docs/2.2/programs/ab.html</link></para>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>pip</td>
+                        <td><code>sudo easy install pip</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </para>
+        <section xml:id="process">
+            <title>Process</title>
+            <para>This DIY consists of the following steps: </para>
+            <para>
+                <orderedlist>
+                    <listitem>
+                        <para>Install prerequisites.</para>
+                    </listitem>
+                    <listitem>
+                        <para>Authenticate, export IDs, and set up SSH keys. If you already have SSH
+                            keys, you can use them but only if they are in your Home directory;
+                            otherwise, it’s best to generate new ones and delete them later. </para>
+                    </listitem>
+                    <listitem>
+                        <para>Create a Cloud Server.</para>
+                    </listitem>
+                    <listitem>
+                        <para>Configure the server by installing the <emphasis role="italic">Apache
+                                Server 2</emphasis>, and the Apache agent boot-at-startup script.
+                            Also, create a notification plan (with placeholder notifications),
+                            install the Cloud Monitoring agent and configure a monitoring check, and
+                            alarm using the notification plan. </para>
+                    </listitem>
+                    <listitem>
+                        <para>Create an image of the configured server. Auto Scale will use this
+                            server image to scale up or down. </para>
+                    </listitem>
+                    <listitem>
+                        <para>Create a load balancer, modify it to have the Least-Connections
+                            algorithm, and attach the Cloud Server image you created as a node.
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para> Configure the Auto Scale scaling group, as well as the scaling
+                            policies for scaling up and down; in the response you will get the
+                            webhooks that Cloud Monitoring will use in notifications (you create the
+                            notifications next and then attach them to your notification plan).
+                            Note: a “webhook” is a URL that triggers an action, such as sending an
+                            email. The webhooks the scaling group creates allow monitoring
+                            notifications that trigger the scaling policies. </para>
+                    </listitem>
+                    <listitem>
+                        <para> Create notifications for scaling up and scaling down using the
+                            scaling group webhooks, and update the notification plan that you
+                            specified in the monitoring check.  </para>
+                    </listitem>
+                    <listitem>
+                        <para> Run a load test using the Apache Benchmarking tool and observe
+                            notifications and Auto Scale: Critical notification and scale-up;
+                            without load: OK notification and scale down.</para>
+                    </listitem>
+                    <listitem>
+                        <para>Tear down the deployment.</para>
+                    </listitem>
+                </orderedlist>
+            </para>
+            <para>
+                <tip>
+                    <para>
+                        <itemizedlist>
+                            <listitem>
+                                <para>Copying and pasting commands directly from this documentation
+                                    into your terminal program may be somewhat error-prone, so we
+                                    recommend you first copy them into your text editor of choice,
+                                    modify them as required there, and then copy them into your
+                                    terminal.</para>
+                            </listitem>
+                            <listitem>
+                                <para> Watch out for quotes and dashes.</para>
+                            </listitem>
+                            <listitem>
+                                <para>Commands must use straight quotes (not curly) and dashes must
+                                    be single hyphens (not em or en dashes).</para>
+                            </listitem>
+                            <listitem>
+                                <para> Be careful to not allow a space between an equals sign (=)
+                                    and the following value. </para>
+                            </listitem>
+                        </itemizedlist>
+                    </para>
+                </tip>
+            </para>
+        </section>
+        <section xml:id="Worksheet">
+            <title>Worksheet</title>
+            <para>This DIY recommends that you use a worksheet to record the values that are
+                generated as a result of the API calls, as well as your tenant ID, username, and API
+                Key. Keeping a worksheet will help you have quick access to the respective value
+                when you have to use it for an API call. </para>
+            <para>Throughout this DIY, whenever there is a value generated that needs to be
+                recorded, you will see a NOTE that alerts you to record this value in your
+                worksheet. </para>
+            <para>The following table shows an example of a worksheet that you can use to record the
+                different values that you obtain from your API calls. </para>
+            <para>
+                <table frame="border">
+                    <caption>Sample worksheet</caption>
+                    <col width="246pt"/>
+                    <col width="42%"/>
+                    <col width="31%"/>
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Description</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><emphasis role="italic">tenantID</emphasis></td>
+                            <td>Specifies the 6-digit tenant id of your Rackspace cloud
+                                account.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">username</emphasis></td>
+                            <td>Specifies the user name for your Rackspace cloud writers.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">apiKey</emphasis></td>
+                            <td>Specifies the API key for your acount.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">authToken</emphasis></td>
+                            <td>Specifies the authentication token you obtain from a successful
+                                authentication in <link linkend="Authenticate"
+                                >Authenticate</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">imageRef</emphasis></td>
+                            <td>Specifies the image ID of the server image you create in <link
+                                    linkend="Create_cloud_server">Create a Cloud Server</link>.
+                                This ID derives from one of the preconfigured Cloud Server images
+                                that come with your Rackspace Cloud account.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">flavorRef</emphasis></td>
+                            <td>Specifies the flavor ID for the server image you create in <link
+                                    linkend="Create_cloud_server">Create a Cloud Server</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SSH Keys filename</emphasis></td>
+                            <td>Specifies the filename of the SSH keys that are generated in <link
+                                    linkend="Generate_SSH_keys">Generate SSH Keys</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">PUBKEY</emphasis></td>
+                            <td>Specifies the public key that is generated in <link
+                                    linkend="Generate_SSH_keys">Generate SSH Keys</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SERVER_ID</emphasis></td>
+                            <td>Specifies the ID of the Cloud server you create in <link
+                                    linkend="Create_cloud_server">Create a Cloud Server</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">ADMIN_PASSWORD</emphasis></td>
+                            <td>Specifies the administrator password of the Cloud server you create
+                                in <link linkend="Create_cloud_server">Create a Cloud
+                                Server</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SERVER_IP_ADDRESS</emphasis></td>
+                            <td>Specifies the IPv4 address of the Cloud server you create in <link
+                                    linkend="Create_cloud_server">Create a Cloud Server</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">ENTITY_ID</emphasis></td>
+                            <td>Specifies the ID of the monitoring entity you set up in <link
+                                    linkend="Set_up_monitoring_agent">Set up the monitoring
+                                    agent</link>. This ID starts with the letters "en".</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">NOTIFICATION_PLAN_ID</emphasis></td>
+                            <td>Specifies the ID of the notification plan resource that you create
+                                in <link linkend="Create_notification_plan">Create a notification
+                                    plan</link>. This value starts with the letters "np."</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">CHECK_ID</emphasis></td>
+                            <td>Specifies the ID of the check that you create in <link
+                                    linkend="Create-monitoring_check_and_alarm">Create a monitoring
+                                    check and alarm</link>. This value starts with the letters
+                                "ch."</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SERVER_IMAGE_ID</emphasis></td>
+                            <td>Specifies the ID of the Cloud server image the you create in <link
+                                    linkend="Create_Cloud_server_image">Create a Cloud Server
+                                    image</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">LOAD_BALANCER_ID</emphasis></td>
+                            <td>Specifies the load balancer ID of the load balancer that you create
+                                in <link linkend="Create_load_balancer">Create a load
+                                    balancer</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">VIP_IP</emphasis></td>
+                            <td>Specifies the Virtual IPv4 address of the load balancer.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">GROUP_LINK</emphasis></td>
+                            <td>Specifies the URI of the Auto Scale group that you create in <link
+                                    linkend="Configure_auto_scale">Configure Auto Scale</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">GROUP_ID</emphasis></td>
+                            <td>Specifies the ID of the Auto Scale group that you create in <link
+                                    linkend="Configure_auto_scale">Configure Auto Scale</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SCALE_UP_POLICY_ID</emphasis></td>
+                            <td>Specifies the ID of the scale-up policy that you create in <link
+                                    linkend="Configure_auto_scale">Configure Auto Scale</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SCALE_UP_POLICY_LINK</emphasis></td>
+                            <td>Specifes the URI for the scale-up policy that you create in <link
+                                    linkend="Configure_auto_scale">Configure Auto Scale</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SCALE_DOWN_POLICY_ID</emphasis></td>
+                            <td>Specifies the ID of the scale-down policy that you create in <link
+                                    linkend="Configure_auto_scale">Configure Auto Scale</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SCALE_DOWN_POLICY_LINK</emphasis></td>
+                            <td>Specifies the URI for the scale-down policy that you create in <link
+                                    linkend="Configure_auto_scale">Configure Auto Scale</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SCALE_UP_WEBHOOK_ID</emphasis></td>
+                            <td>Specifies the ID for the scale-up webhook that you create in <link
+                                    linkend="Configure_auto_scale">Configure Auto Scale</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SCALE_UP_EXECUTE_URL</emphasis></td>
+                            <td>Specifies the URI for the scale-up webhook that you create in <link
+                                    linkend="Configure_auto_scale">Configure Auto Scale</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SCALE_DOWN_WEBHOOK_ID</emphasis></td>
+                            <td>Specifies the ID for the scale-down webhook that you create in <link
+                                    linkend="Configure_auto_scale">Configure Auto Scale</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SCALE_DOWN_EXECUTE_URL</emphasis></td>
+                            <td>Specifies the URI for the scale-down webhook that you create in
+                                    <link linkend="Configure_auto_scale">Configure Auto
+                                Scale</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SCALE_UP_NOTIFICATION_ID</emphasis></td>
+                            <td>Specifies the resource ID for the scale-up notification you create
+                                in <link
+                                    linkend="Create_webhook_notifications_and_update_notification_plan"
+                                    >Create webhook notifications and update the notification
+                                    plan</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">SCALE_DOWN_NOTIFICATION_ID</emphasis></td>
+                            <td>Specifies the resource ID for the scale-down notification you create
+                                in <link
+                                    linkend="Create_webhook_notifications_and_update_notification_plan"
+                                    >Create webhook notifications and update the notification
+                                    plan</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                        <tr>
+                            <td><emphasis role="italic">EMAIL_NOTIFICATION_ID</emphasis></td>
+                            <td>Specifies the resource ID for the email notification you create in
+                                    <link
+                                    linkend="Create_webhook_notifications_and_update_notification_plan"
+                                    >Create webhook notifications and update the notification
+                                    plan</link>.</td>
+                            <td>&lt;<replaceable>fill in the value here</replaceable>></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </para>
+        </section>
+    </section>
+    <section xml:id="DIY_part1">
+        <title>Step 1: Authenticate, export tokens, generate SSH keys</title>
+        <para>Before you can run any calls, you need to obtain an authentication token. You also
+            need to generate a set of SSH keys to use.</para>
+        <section xml:id="Authenticate">
+            <title>Authenticate</title>
+            <para>Before you begin, you need an authentication token. To obtain a 24-hour
+                authentication token, you use your Cloud account username and API key. </para>
+            <para xmlns:svg="http://www.w3.org/2000/svg">You can obtain the key from the Rackspace
+                    <link xlink:href="http://mycloud.rackspace.com/">Cloud Control Panel</link> by
+                selecting <emphasis role="bold">Account Settings</emphasis> from the <emphasis
+                    role="italic">yourAccount</emphasis> menu in the top-right corner of the window. </para>
+            <para>You also need your 6-digit account number referred to as the
+                <code>tenantID</code>.</para>
+            <para>Open a shell window and make the following request, replacing the italicized text: </para>
+            <para>
+                <programlisting>  curl -s https://identity.api.rackspacecloud.com/v2.0/tokens -X 'POST' \ 
+       -d '{
+             "auth":{
+                      "RAX-KSKEY:apiKeyCredentials":
+                          {            
+                            "username":"<replaceable>YOUR_ACCOUNT_USER_NAME</replaceable>",
+                            "apiKey":"<replaceable>YOUR_API_KEY</replaceable>"
+                          }
+                    }
+            }'\
+       -H "Content-Type: application/json" | python -m json.tool</programlisting>
+            </para>
+            <para>A successful request returns a list of all service access API endpoints that are
+                allowed for your account. It also returns a tenant-related section similar to the
+                following example. The <code>authToken</code> is shown highlighted:</para>
+            <para>
+                <programlisting>{
+  "access": {
+    "user": {...},
+    "serviceCatalog": [...],
+    "token": {
+       "RAX-AUTH:authenticatedBy": ["APIKEY"],
+       "expires": "2014-12-30T22:22:50.457Z",
+    "id": "<emphasis role="bold">e4aa72f87d174d7abefb290dabc90</emphasis>",
+    "tenant": {
+    "id": "90000",
+    "name": "90000"
+    }
+ }    </programlisting>
+            </para>
+        </section>
+        <section xml:id="Export_tokens">
+            <title>Export tokens</title>
+            <para>In this step, you export your <code>tenantId</code> and <code>authToken</code>
+                values to your bash profile. Exporting these values allows you to use the commands
+                in this procedure with the placeholders, <code>$account</code> (for
+                    <code>tenantID</code>) and <code>$token</code> (for <code>authToken</code>) left
+                as placeholders. The system will fill them in with your information. To export your
+                    <code>tenantId</code> and <code>authToken</code>, type the following:</para>
+            <programlisting>export account="<replaceable>tenantId</replaceable>"
+export token="<replaceable>authToken</replaceable>"</programlisting>
+        </section>
+        <section xml:id="Generate_SSH_keys">
+            <title>Generate SSH keys</title>
+            <para>
+                <orderedlist>
+                    <listitem>
+                        <para>Generate a pair of SSH keys for use with the servers. The following
+                            example uses the ssh-keygen tool. Replace the italicized text with a
+                            name for the key file. In your shell window, run this command: </para>
+                        <para>
+                            <programlisting>ssh-keygen -q -t rsa -f <replaceable>SSH_KEYS</replaceable> -N ""</programlisting>
+                        </para>
+                        <para>This command generates two files in your home directory, one with the
+                            “.pub” extension, which is the public SSH key. You can use the SSH keys
+                            that you have previously generated, however you also have to modify the
+                            path to them in some of the following commands, if they are not in your
+                            home directory. You also need to base 64 encode them at some point for
+                            use in the create scaling group command. </para>
+                        <para><emphasis role="bold">NOTE</emphasis> the SSH keys filename in your
+                            worksheet.</para>
+                        <para>You can check for the keys in your home directory use the following
+                            commands:</para>
+                        <para>
+                            <programlisting>cd ~ 
+ls</programlisting>
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para> As a next step, base64-encode the public key file by typing the
+                            following, replacing the italicized text: </para>
+                        <para><programlisting> base64 <replaceable>SSH_KEYS</replaceable>.pub</programlisting><emphasis
+                                role="bold">NOTE</emphasis> the result as
+                                <replaceable>PUBKEY</replaceable> in your worksheet (it is a long
+                            number).</para>
+                    </listitem>
+                </orderedlist>
+            </para>
+        </section>
+    </section>
+    <section xml:id="Create_cloud_server">
+        <title>Create a Cloud Server</title>
+        <para>The first part in creating the Auto Scale deployment is to create a master cloud
+            server from an existing server image. Your Rackspace Cloud Server account already
+            provides a set of preconfigured server images that you can use to create your image
+            from. </para>
+        <para>In this deployment, you create an Ubuntu 14.10 server with the flavor
+            “performance1-1”. </para>
+        <para>
+            <orderedlist>
+                <listitem>
+                    <para> Create the json server file locally, this example uses nano:</para>
+                    <para>
+                        <programlisting> nano server_build.json</programlisting>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>Add these details to the server_build.json file to create the Ubuntu
+                        server: </para>
+                    <para>
+                        <programlisting>{
+ "server":
+   {
+     "name": "myDIYServer",
+     "imageRef": "8f569a31-ee74-409b-9dcb-fb7576e307e9",
+     "flavorRef": "performance1-1",
+     "metadata":
+       {
+         "My Server Name": "DIY Ubuntu 14.10 server" 
+       }
+    }
+} </programlisting>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>Create the server by issuing the following cURL command:</para>
+                    <programlisting>curl -s "https://dfw.servers.api.rackspacecloud.com/v2/$account/servers \
+     -X POST" \
+     -H "Content-Type: application/json" \
+     -H "X-Auth-Token:$token" \
+     -T server_build.json | python -m json.tool
+</programlisting>
+                    <para><emphasis role="bold">NOTE</emphasis> the
+                            <replaceable>SERVER_ID</replaceable> and
+                            <replaceable>ADMIN_PASSWORD</replaceable> that you receive in the
+                        response. </para>
+                </listitem>
+                <listitem>
+                    <para>Get server details so you have the IP address by issuing the following
+                        cURL command:</para>
+                    <para><programlisting>curl -s "https://dfw.servers.api.rackspacecloud.com/v2/$account/servers/<replaceable>SERVER_ID</replaceable>" \
+     -H "X-Auth-Token:$token" | python -m json.tool</programlisting><emphasis
+                            role="bold">NOTE</emphasis> the IP “public: v4” address of the newly
+                        created Cloud Server. The server status must be <emphasis role="italic"
+                            >Active</emphasis> in order to proceed to the next step.</para>
+                </listitem>
+                <listitem>
+                    <para>Log into the new Cloud Server by typing the following in a shell window,
+                        replacing <replaceable>SSH_KEYS</replaceable> with the name of your SSH key
+                        file and <replaceable>SERVER_IP_ADDRESS</replaceable> accordingly:</para>
+                    <para>
+                        <programlisting>ssh -i <replaceable>SSH_KEYS</replaceable> root@<replaceable>SERVER_IP_ADDRESS</replaceable></programlisting>
+                    </para>
+                    <para>(without ssh keys, you can log in with ssh
+                            root@<replaceable>SERVER_IP_ADDRESS</replaceable>)</para>
+                </listitem>
+            </orderedlist>
+        </para>
+    </section>
+    <section xml:id="Create_server_image">
+        <title>Configure the server and create a server image</title>
+        <para>While logged into your cloud server, follow these steps to install the Cloud
+            Monitoring agent and the agent boot script. After the server is configured, you have to
+            log out and create the server image.</para>
+        <section xml:id="Install_apache">
+            <title>Install Apache 2</title>
+            <para>While logged into the Cloud server, install apache2 by typing the following at the
+                root prompt: </para>
+            <programlisting>apt-get update
+apt-get --yes install apache2
+apt-get install apache2-utils</programlisting>
+            <para>You can test this by opening a browser page to the IP address of the
+                server.</para>
+        </section>
+        <section xml:id="Add_apache_boot_script">
+            <title>Add the Apache boot script</title>
+            <para>While logged into the server, </para>
+            <para>
+                <orderedlist>
+                    <listitem>
+                        <para> Create the agent boot script, by typing the following at the command
+                            line (ignore warnings): </para>
+                        <para>
+                            <programlisting>echo "service apache2 start &amp;&amp; service rackspace-monitoring-agent start"  /etc/init.d/apache_on_start</programlisting>
+                        </para>
+                        <para>
+                            <programlisting>cd /etc/init.d &amp;&amp; sudo chmod +x /etc/init.d/apache_on_start &amp;&amp; sudo update-rc.d apache_on_start defaults</programlisting>
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>Exit the server by typing the following command:</para>
+                        <para>
+                            <programlisting>sudo reboot</programlisting>
+                        </para>
+                        <para>The system reboots.</para>
+                    </listitem>
+                    <listitem>
+                        <para>Wait for a moment and SSH back into the server, replacing the
+                            italicized text with the appropriate value:</para>
+                        <para>
+                            <programlisting>ssh -i <replaceable>SSH_KEYS</replaceable> root@<replaceable>SERVER_IP_ADDRESS</replaceable></programlisting>
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para> Check if Apache2 is running once you log back in by typing: </para>
+                        <para>
+                            <programlisting> sudo netstat –tnlp</programlisting>
+                        </para>
+                        <para>Apache should be listening on port 80.</para>
+                    </listitem>
+                </orderedlist>
+            </para>
+        </section>
+        <section xml:id="Install_and_set_up_monitoring_agent">
+            <title>Install and set up the monitoring agent</title>
+            <para>In this step you install and set up the Rackspace monitoring agent.</para>
+            <section xml:id="Install_monitoring_agent">
+                <title>Install the monitoring agent</title>
+                <para>While logged into your cloud server, install the monitoring agent. </para>
+                <para>
+                    <orderedlist>
+                        <listitem>
+                            <para> For the Ubuntu 14.10 server you created, install the monitoring
+                                package with this command: </para>
+                            <para>
+                                <programlisting>sudo sh -c 'echo "deb
+          http://stable.packages.cloudmonitoring.rackspace.com/ubuntu-14.10-x86_64 cloudmonitoring
+          main" > /etc/apt/sources.list.d/rackspace-monitoring-agent.list'</programlisting>
+                            </para>
+                        </listitem>
+                        <listitem>
+                            <para> Download the signing key for the agent repository and add it by
+                                issuing the following cURL command: </para>
+                            <para>
+                                <programlisting>curl https://monitoring.api.rackspacecloud.com/pki/agent/linux.asc | sudo apt-key add -</programlisting>
+                            </para>
+                            <para>A successful request returns the signing key information for the
+                                agent.</para>
+                        </listitem>
+                        <listitem>
+                            <para>Issue the following command to get package information for the new
+                                repository: </para>
+                            <para>
+                                <programlisting>sudo apt-get update</programlisting>
+                            </para>
+                        </listitem>
+                        <listitem>
+                            <para>Install the agent by running the following command:</para>
+                            <para>
+                                <programlisting>sudo apt-get install rackspace-monitoring-agent</programlisting>
+                            </para>
+                        </listitem>
+                    </orderedlist>
+                </para>
+            </section>
+            <section xml:id="Set_up_monitoring_agent">
+                <title>Set up the monitoring agent</title>
+                <para>The agent setup program performs the following tasks: </para>
+                <para>
+                    <itemizedlist>
+                        <listitem>
+                            <para>Creates an agent token, which performs authentication with Cloud
+                                Monitoring.</para>
+                        </listitem>
+                        <listitem>
+                            <para>Creates an agent configuration file.</para>
+                        </listitem>
+                        <listitem>
+                            <para>Runs a test connection to verify connectivity with the Rackspace
+                                data centers. </para>
+                        </listitem>
+                        <listitem>
+                            <para>Associates the agent ID with the server's entity ID in Cloud
+                                Monitoring. </para>
+                        </listitem>
+                    </itemizedlist>
+                </para>
+                <para>To set up the agent:</para>
+                <para>
+                    <orderedlist>
+                        <listitem>
+                            <para> Run the agent setup command for Ubuntu 14.10, which starts the
+                                agent setup interface: </para>
+                            <para>
+                                <programlisting>sudo rackspace-monitoring-agent --setup</programlisting>
+                            </para>
+                       
+                            
+                        </listitem>
+                        <listitem>     <para>Enter your Rackspace Cloud user name when prompted.</para></listitem>
+                        <listitem><para>Enter your API key when prompted.</para></listitem>
+                        <listitem>
+                            <para>Select the "<emphasis role="bold">Create New Token</emphasis>"
+                                option by typing the associated number. </para>
+                            <para>You receive a message saying that the agent is successfully
+                                connected. </para>
+                            <para><emphasis role="bold">NOTE</emphasis> the
+                                    <replaceable>Entity_ID</replaceable>, near the bottom of the
+                                output. That is the monitoring entity that represents your cloud
+                                server and with which the agent is associated. The entity name
+                                starts with the letters "en". You use this entity ID in the next
+                                section to configure monitoring. </para>
+                        </listitem>
+                        <listitem>
+                            <para>You can now start the agent by typing the following
+                                command;</para>
+                            <para>
+                                <programlisting>service rackspace-monitoring-agent start</programlisting>
+                            </para>
+                        </listitem>
+                    </orderedlist>
+                </para>
+                <para>For more details, see <link
+                        xlink:href="http://www.rackspace.com/knowledge_center/article/install-the-cloud-monitoring-agent"
+                        >Install the Cloud Monitoring Agent</link></para>
+            </section>
+        </section>
+        <section xml:id="Configure_Cloud_monitoring_check_and_alarm">
+            <title>Configure the Cloud Monitoring check and alarm</title>
+            <para>In this section you configure the Cloud Monitoring check and alarm by completing
+                the following steps:</para>
+            <para>
+                <itemizedlist>
+                    <listitem>
+                        <para>Create a notification plan</para>
+                    </listitem>
+                    <listitem>
+                        <para>Create a monitoring check and alarm</para>
+                    </listitem>
+                </itemizedlist>
+            </para>
+            <section xml:id="Create_notification_plan">
+                <title>Create a notification plan</title>
+                <para>Create a notification plan (with placeholder notifications. You will update
+                    them later). </para>
+                <para>
+                    <orderedlist>
+                        <listitem>
+                            <para> On the cloud server, make sure pip is installed (respond “y” to
+                                prompts as needed): </para>
+                            <para>
+                                <programlisting>sudo apt-gt install python-pip</programlisting>
+                            </para>
+                        </listitem>
+                        <listitem>
+                            <para> On your local computer, create a notification plan with
+                                placeholder notifications. Later, after creating the scaling group
+                                and webhooks, you will create notifications for that plan. This
+                                command follows the convention of naming the notification plan after
+                                the server name with the extension “_NP.” Use “$Notification” as-is
+                                (a placeholder) </para>
+                            <para>
+                                <programlisting>   curl -i -X POST --data-binary '{"label": "myDIYServer_NP", "critical_state":
+          ["$Notification"],  "ok_state":
+        ["$Notification "] }' -H "X-Auth-Token:$token" -H 'Content-Type: application/json' -H
+        'Accept: application/json'
+        "https://monitoring.api.rackspacecloud.com/v1.0/$account/notification_plans"</programlisting>
+                            </para>
+                            <para>A successful request returns the notification plan.</para>
+                            <para><emphasis role="bold">NOTE:</emphasis> The
+                                    <replaceable>NOTIFICATION_PLAN_ID</replaceable> value that is
+                                returned.</para>
+                        </listitem>
+                    </orderedlist>
+                </para>
+            </section>
+            <section xml:id="Create-monitoring_check_and_alarm">
+                <title>Create a monitoring check and alarm</title>
+                <para>
+                    <orderedlist>
+                        <listitem>
+                            <para>Create a monitoring check by typing the following and correctly
+                                replacing the value for <replaceable>ENTITY_ID</replaceable> with
+                                the entity ID you generated during <link
+                                    linkend="Set_up_monitoring_agent">Set up the Monitoring
+                                    agent</link>. This check sets the timeout at 60 and the period
+                                at 150.
+                                <programlisting>curl -i --data-binary
+          '{"details":{ }, "label":"apache_check", "period":"60", "timeout":30,
+          "type":"agent.apache"}' -H "X-Auth-Token:$token" -H "Content-Type:
+          application/json" -H "Accept: application/json" "https://monitoring.api.rackspacecloud.com/v1.0/$account/entities/<replaceable>ENTITY_ID</replaceable>/checks" </programlisting>
+                            </para>
+                            <para><emphasis role="bold">NOTE:</emphasis> The
+                                    <replaceable>CHECK_ID</replaceable> value that is
+                                returned.</para>
+                        </listitem>
+                        <listitem>
+                            <para> Create an alarm for the check, replacing italicized text: </para>
+                            <para>
+                                <programlisting>   curl -i -X POST --data-binary '{"check_id": "<replaceable>CHECK_ID</replaceable>", "notification_plan_id": "<replaceable>NOTIFICATION_PLAN_ID</replaceable>", "criteria: ":set consecutiveCount=1 if
+        (metric[\"busy_workers\"] &gt; 1) {return new AlarmStatus(CRITICAL);} return new
+        AlarmStatus(OK)" -H "X-Auth-Token:$token" -H 'Content-Type: application/json' -H 'Accept: application/json' "https://monitoring.api.rackspacecloud.com/v1.0/$account/entities/<replaceable>ENTITY_ID</replaceable>/alarms"  </programlisting>
+                            </para>
+                        </listitem>
+                        <listitem>
+                            <para>Test that the check works by typing the following and replacing
+                                    <replaceable>ENTITY_ID</replaceable>, and
+                                    <replaceable>CHECK_ID</replaceable> with the appropriate values:
+                                <programlisting>curl -i --data-binary
+          '{"details" : {  }, "label" : "<replaceable>CHECK_ID</replaceable>", 
+          "monitoring_zones_poll": [ "mzdfw" ], "period" : "60", "target_alias":
+            "default",  "timeout": 30, "type":
+          "agent.apache"}' -H "X-Auth-Token: $token" -H 'Content-Type: application/json' -H
+          'Accept: application/json'
+            "https://monitoring.api.rackspacecloud.com/v1.0/$account/entities/<replaceable>ENTITY_ID</replaceable>/test-check/"</programlisting>
+                            </para>
+                        </listitem>
+                    </orderedlist>
+                </para>
+            </section>
+        </section>
+    </section>
+    <section xml:id="Create_Cloud_server_image">
+        <title>Create the Cloud Server image</title>
+        <para>Now that you have configured your cloud server, create an image for it by using a
+            shell window on your local workstation. The image will be used by Auto Scale to add new
+            servers as needed. This command follows the convention of naming the server image with
+            the extension “snap.”</para>
+        <para>
+            <orderedlist>
+                <listitem>
+                    <para>Create the server image, replacing italicized text: </para>
+                    <para>
+                        <programlisting>  curl -s -d '{"createImage": {"name": "myDIYServer_IMAGE"} }' -X POST -H "X-Auth-Token:$token" -H "Content-Type: application/json" "https://dfw.servers.api.rackspacecloud.com/v2/$account/servers/<replaceable>SERVER_ID</replaceable>/action"  </programlisting>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>Verify the image creation and get the server image ID. This command prints
+                        out to your home directory (example follows): </para>
+                    <para>
+                        <programlisting>curl -s "https://dfw.servers.api.rackspacecloud.com/v2/$account/images/detail" -H "X-Auth-Token:$token" | python -m json.tool > output.txt</programlisting>
+                    </para>
+                    <para><emphasis role="bold">NOTE: </emphasis>The
+                            <replaceable>SERVER_IMAGE_ID</replaceable> of the newly created server
+                        image..</para>
+                </listitem>
+            </orderedlist>
+        </para>
+        <para>The response body includes several entries similar to the following example; the image
+            ID is highlighted (your image ID, and other data, will be different).</para>
+        <para>
+            <programlisting> {
+   "image":
+           {
+             "status": "ACTIVE",
+             "updated": "2015-01-29T00:13:09Z",
+             "links": 
+                      [
+                        { 
+                          "href": "https://dfw.servers.api.rackspacecloud.com/v2/820712/images/126a6674-6308-421f-801e-fc302ab4f53f",
+                          "rel": "self"
+                        },
+                        {
+                          "href": "https://dfw.servers.api.rackspacecloud.com/820712/images/126a6674-6308-421f-801e-fc302ab4f53f",
+                          "rel": "bookmark" 
+                        },
+                      ],
+            "OS-DCF:diskConfig": "AUTO",
+            "id": "126a6674-6308-421f-801e-fc302ab4f53f",
+            "OS-EXT-IMG-SIZE:size": 758777106,
+            "name": "myDIYServer_IMAGE"
+            "created": "2015-01-28T19:31:37Z",
+            "minDisk": 20,
+            "minRam": 512,
+            "visibility":"public",
+            "tags":
+                      [
+                       "ping",
+                       "pong" 
+                      ],
+            "metadata":
+                      {
+                        "flavor_classes": "*,!onmetal",
+                        "auto_disk_config": "disabled"
+                      },
+            "schema":"/v2/schemas/image" 
+            }
+}  </programlisting>
+        </para>
+    </section>
+    <section xml:id="Create_load_balancer">
+        <title>Create a load balancer</title>
+        <para> The load balancer allows Auto Scale to add (and remove) servers without affecting
+            your server’s IP address. </para>
+        <para>
+            <orderedlist>
+                <listitem>
+                    <para>Create a load balancer and add the Cloud Server you created to the load
+                        balancer by typing the following at a shell window, replacing the italicized
+                        text. This command follows the convention of naming the load balancer after
+                        the server name with the extension “LB.” </para>
+                    <para>
+                        <programlisting>curl -s -d '{"loadBalancer": {"name":
+          " myDIYServer_LB", "port":
+          80, "protocol": "HTTP", "virtualIps": [ {"type": "PUBLIC"} ],"nodes": [
+          {"address`": "<replaceable>SERVER_IP_ADDRESS</replaceable>", "port":
+          80, "condition": "ENABLED" } ] }}' -H "X-Auth-Token:$token" -H "Content-Type: application/json"
+          "https://dfw.loadbalancers.api.rackspacecloud.com/v1.0/account/loadbalancers" | python -m json.tool</programlisting>
+                    </para>
+                    <para>A successful request returns the load balancer ID
+                            (<replaceable>LOAD_BALANCER_ID</replaceable>) and
+                            <replaceable>VIP_IP</replaceable>
+                            (<replaceable>LOAD_BALANCER_IP_ADDRESS</replaceable>).</para>
+                    <para>
+                        <emphasis role="bold">NOTE</emphasis> the
+                            <replaceable>LOAD_BALANCER_ID</replaceable> and load balancer
+                            <replaceable>VIP_IP</replaceable> that you receive in the response. </para>
+                </listitem>
+                <listitem>
+                    <para>Wait until the load balancer is active. You can check the status of the
+                        load balancer by typing the following, replacing italic text: </para>
+                    <para>
+                        <programlisting>curl -s -H "X-Auth-Token:$token" -H "Accept: application/json" "https://dfw.loadbalancers.api.rackspacecloud.com/v1.0/$account/loadbalancers/<replaceable>LOAD_BALANCER_ID</replaceable>" | python -m json.tool </programlisting>
+                    </para>
+                    <para>Verify that the load balancer is active by looking at the
+                            <code>status:</code> section in the response.</para>
+                </listitem>
+                <listitem>
+                    <para>Change the algorithm to “Least Connections” by typing the following,
+                        replacing <replaceable>LOAD_BALANCER_ID</replaceable>: </para>
+                    <para>
+                        <programlisting> curl -s -d '{"loadBalancer":{"algorithm": "LEAST_CONNECTIONS"}}' -H "X-Auth-Token:$token " -H "Content-Type: application/json" -X PUT "https://dfw.loadbalancers.api.rackspacecloud.com/v1.0/$account/loadbalancers/<replaceable>LOAD_BALANCER_ID</replaceable>" </programlisting>
+                    </para>
+                    <para> You can verify the change by repeating the status command from Step 2. </para>
+                </listitem>
+                <listitem>
+                    <para> Test the connectivity by typing the following, replacing
+                            <replaceable>SERVER_IP_ADDRESS</replaceable>: </para>
+                    <para>
+                        <programlisting>curl http://<replaceable>SERVER_IP_ADDRESS</replaceable>/</programlisting>
+                    </para>
+                    <para>This request should return the initial Apache web page, at the command
+                        line. You can also use a Web browser and type the
+                            <replaceable>SERVER_IP_ADDRESS</replaceable> in the address bar.</para>
+                </listitem>
+            </orderedlist>
+        </para>
+    </section>
+    <section xml:id="Configure_auto_scale">
+        <title>Configure Auto Scale</title>
+        <para>This section describes the Auto Scale configurations needed for a deployment with an
+            Apache website. You create a scaling group with a launch configuration that specifies
+            the server image to use when scaling up new servers. You also create the folowing 2
+            scaling policies:</para>
+        <para>
+            <itemizedlist>
+                <listitem>
+                    <para>scale up by 2 servers</para>
+                </listitem>
+                <listitem>
+                    <para>scale down by 2 servers</para>
+                </listitem>
+            </itemizedlist>
+        </para>
+        <para>
+            <orderedlist>
+                <listitem>
+                    <para>Run the following at a shell window (<emphasis role="italic">replace
+                            endpoint region if needed</emphasis>), replacing
+                            <replaceable>LOAD_BALANCER_ID</replaceable>,
+                            <replaceable>SERVER_IMAGE_ID</replaceable>, and
+                            <replaceable>PUBKEY</replaceable> with appropriate values. This command
+                        follows the convention of naming the Scaling Group after the server name
+                        with the extension “_SG.”</para>
+                    <para>
+                        <programlisting>curl -i "https://dfw.autoscale.api.rackspacecloud.com/v1.0/$account/groups" \
+-X POST \
+-H 'Content-Type: application/json' \
+-H <emphasis role="bold">"</emphasis>Accept: application/json" \
+-H "X-Auth-Token:$token" --data-binary '{"launchConfiguration": {"args": {"loadBalancers": [{"port": 80, "loadBalancerId": <replaceable>LOAD_BALANACER_ID</replaceable>}], "server": {"name": "myDIYServer", "imageRef": "<replaceable>SERVER_IMAGE_ID</replaceable>", "flavorRef": "performance1-1", "OS-DCF:diskConfig": "AUTO", "networks": [{"uuid": "11111111-1111-1111-1111-111111111111"},{"uuid":"00000000-0000-0000-0000-000000000000"}], "personality": [{ "path": "/root/.ssh/authorized_keys", "contents": "<replaceable>PUBKEY</replaceable>" } ]}}, "type": "launch_server"}, "groupConfiguration": {"maxEntities": 5, "cooldown": 300, "name": " myDIYServer_SG", "minEntities": 1}, "scalingPolicies": [ {"cooldown": 600, "type": "webhook", "name": "scaleUpBy2", "change": 2}, { "cooldown": 600, "type": "webhook", "name": "scaleDownBy2", "change": -2  } ]}'</programlisting>
+                    </para>
+                    <para>A successful response will look something like this:</para>
+                    <para>
+                        <programlisting>{
+  "group": 
+          {
+            "links":
+                     [
+                       {
+                         "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/905240/groups/b7c6a3b1-c7c5-4c0c-b6d2-b3b7d4e123fc/",
+                         "rel": "self"
+                       }
+                     ],
+            "scalingPolicies": 
+                     [
+                       {
+                         "name": "scale up by 2",
+                         "links": 
+                        [
+                          {
+                            "href": "<emphasis role="bold">https://dfw.autoscale.api.rackspacecloud.com/v1.0/905240/groups/b7c6a3b1-c7c5-4c0c-b6d2-b3b7d4e123fc/policies/4cb356cb-f90c-4a4d-907f-c5ae64dc7075/</emphasis>",
+                            "rel": "self"
+                          }
+                        ],
+                         "cooldown": 600,
+                         "type": "webhook",
+                         "id": "4cb356cb-f90c-4a4d-907f-c5ae64dc7075",
+                         "change": 2
+                      },
+                      {
+                        "name": "scale down by 2",
+                        "links":
+                       [
+                         {
+                           "href": "<emphasis role="bold">https://dfw.autoscale.api.rackspacecloud.com/v1.0/905240/groups/b7c6a3b1-c7c5-4c0c-b6d2-b3b7d4e123fc/policies/123da0fa-d6ea-4625-807a-4563eab549d5/</emphasis>",
+                           "rel": "self"
+                         }
+                       ],
+                        "cooldown": 600,
+                        "type": "webhook",
+                        "id": "123da0fa-d6ea-4625-807a-4563eab549d5",
+                        "change": -2
+                      }
+                    ],
+            "scalingPolicies_links":
+                    [
+                      {
+                        "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/905240/groups/b7c6a3b1-c7c5-4c0c-b6d2-b3b7d4e123fc/policies/",
+                        "rel": "policies"
+                      }
+                    ],
+            "state":
+                   {
+                      "desiredCapacity": 0,
+                      "paused": false,
+                      "active": [],
+                      "pendingCapacity": 0,
+                      "activeCapacity": 0,
+                      "name": "DIY-CS-3-3-15-SG-2"
+                   },
+           "launchConfiguration": 
+                   {
+                      "args": 
+                          {
+                            "loadBalancers": 
+                               [
+                                 {
+                                   "port": 80, 
+                                   "loadBalancerId": 440551
+                                 }
+                               ],
+                            "server":
+                                {
+                                   "name": "DIY-CS-3-3-15",
+                                   "imageRef": "2eb7be80-37c0-46bf-ae68-2019484ddfe2",
+                                   "flavorRef": "performance1-1",
+                                   "OS-DCF:diskConfig": "AUTO",
+                                   "networks":
+                                      [
+                                        {
+                                          "uuid": "11111111-1111-1111-1111-111111111111"
+                                        },
+                                        {
+                                          "uuid": "00000000-0000-0000-0000-000000000000"
+                                        }
+                                      ],
+                                  "personality":
+                                      [
+                                        {
+                                          "path": "/root/.ssh/authorized_keys",
+                                          "contents": "c3NoLXJzYSBBQUFBQjNOemFDMXljMkVBQUFBREFRQUJBQUFCQVFEc1hxOEhtVGRGMHRxQkkzQ3YxNFNGQ29ZcURyaHFNbVFwbkJ0RlBoUzkwZkJTU2FZNS9UVUd0TVBpWEdmTkMrU2NSQmxocitmdThQYlBNSDR3VmM1RzJMaEJyQTJXZ1FHTk1hT0VrOUFFTE5vdnY0L09QUTUwZTBYQWZqdlpYYTlGUGNpdmVsR3ZkVGV0bUtjRWFpdnRUZGk5dDR5Qmc3UmZUWjZLaG14dDVCTUpKSUVHQ3pSbU5rSWhRRVRzdzZlQlZqQlpKWmZBQStPZzFqK29rL2VKYytzd0hzVytrQWtXczh4enZ6OHJBR1RpQkNBNnpsNko2Y2syZ3kwckNrcGI3STdVYU9XY3lod1R1T3FyZ1p6OWNjSG5BdG1yNnRlMXlCcXdUV0tIZUUwd085dDNaMkFmNVNWVWRTZTN4MFFIdTRHQTM2WERKMkhRMGM5Vk5PbzkgbWFyaWFhYnJhaG1zQFNGT3MtTWFjQm9vay1Qcm8tNy5sb2NhbAo="
+                                        }
+                                      ]
+                               }
+                          },
+                              "type": "launch_server"
+                      },
+            "groupConfiguration":
+                      {
+                        "maxEntities": 5,
+                        "cooldown": 300,
+                        "name": "DIY-CS-3-3-15-SG-2",
+                        "minEntities": 1,
+                        "metadata": {}
+                      },
+           "id": "<emphasis role="bold">b7c6a3b1-c7c5-4c0c-b6d2-b3b7d4e123fc</emphasis>"
+   }
+}</programlisting>
+                    </para>
+                    <para><emphasis role="bold">NOTE</emphasis> the
+                            <replaceable>SCALE_UP_POLICY_ID</replaceable> and
+                            <replaceable>SCALE_UP_POLICY_LINK</replaceable>, and the
+                            <replaceable>SCALE_DOWN_POLICY_ID</replaceable> and
+                            <replaceable>SCALE_DOWN_POLICY_LINK</replaceable>, and the
+                            <replaceable>GROUP_ID</replaceable>, which are all highlighted.</para>
+                </listitem>
+                <listitem>
+                    <para>Add a webhook for each of the policies by typing the following and passing
+                        the appropriate values for italic text. BE CAREFUL of inserting an extra
+                        slash (/) before “webhooks.”</para>
+                    <para>
+                        <programlisting>curl -i <replaceable>SCALE_UP_POLICY_LINK</replaceable>/webhooks -X POST -H "Content-Type: application/json" -H "Accept: application/json" -H "X-Auth-Token:$token" --data-binary '[{"name": "scaleUpBy2", "metadata": {"owner": "<replaceable>YOUR_NAME</replaceable>"}}]'</programlisting>
+                    </para>
+                    <para><emphasis role="bold">NOTE</emphasis> the
+                            <replaceable>SCALE_UP_WEBHOOK_ID</replaceable>, and the
+                            <replaceable>SCALE_UP_EXECUTE_URL</replaceable> that is returned in the
+                        response.</para>
+                </listitem>
+                <listitem>
+                    <para>Run the following to add a webhook for the scale-down policy, replace
+                        italic text: </para>
+                    <para>
+                        <programlisting>curl -i <replaceable>SCALE_DOWN_POLICY_LINK</replaceable>/webhooks -X POST -H <emphasis role="bold">"</emphasis>Content-Type: application/json"-H "Accept: application/json" -H "X-Auth-Token:$token" --data-binary '[{"name": "scaleDownBy2", "metadata": {"owner": "<replaceable>YOUR_NAME</replaceable>"}}]'</programlisting>
+                    </para>
+                    <para><emphasis role="bold">NOTE</emphasis> the
+                            <replaceable>SCALE_DOWN_WEBHOOK_ID</replaceable>, and the
+                            <replaceable>SCALE_DOWN_EXECUTE_URL</replaceable> that is returned in
+                        the response.</para>
+                </listitem>
+            </orderedlist>
+        </para>
+        <para> Here is an example response. The “execute” webhook ID, URL and Auto Scale group name
+            are highlighted: </para>
+        <para>
+            <programlisting>HTTP/1.1 201 Created
+Content-Type: application/json
+Via: 1.1 Repose (Repose/2.12)
+x-response-id: 68059065-80ab-41e7-8a74-db91070408cb
+Location: https://dfw.autoscale.api.rackspacecloud.com/v1.0/905240/groups/aa6a20cc-4267-403c-a6d6-c076868533fa/policies/b6fb711e-af22-4cf7-988f-78587a5921b3/webhooks/ 
+Date: Tue, 30 Dec 2014 02:01:12 GMT Transfer-Encoding: chunked Server: Jetty(8.0.y.z-SNAPSHOT)
+   {
+     "webhooks":
+       [
+        {"metadata":
+           {"owner": "mabrahms"
+           },
+        "id": "<emphasis role="bold">2f36bd3b-8167-4850-bf78-80eddbaa3ba2</emphasis>",
+        "links":
+            [
+              {
+               "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/905240/groups/aa6a20cc-4267-403c-a6d6-c076868533fa/policies/b6fb711e-af22-4cf7-988f-78587a5921b3/webhooks/2f36bd3b-8167-4850-bf78-80eddbaa3ba2/",
+               "rel": "self"
+              },
+              {
+               "href": "<emphasis role="bold">https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/eae662ef28fa1253d839231425eabc7a4d1b9106b84906d028cd05a32d227c8e/</emphasis>",
+               "rel": "capability"
+              }
+            ],
+        "name": "<emphasis role="bold">scaleUpBy2</emphasis>"
+       }
+      ]
+} </programlisting>
+        </para>
+    </section>
+    <section xml:id="Create_webhook_notifications_and_update_notification_plan">
+        <title>Create webhook notifications and update the notification plan</title>
+        <para>Now that you have the webhooks created in Auto Scale, you can use them to create
+            webhook notifications in Cloud Monitoring. Then you update your existing notification
+            plan with the webhook notifications.</para>
+        <para>Create webhook and email-based notifications using the values that you recorded in the
+            previous step.    </para>
+        <para>Use the appropriate values for <replaceable>SCALE_UP_EXECUTE_URL</replaceable>, and
+                <replaceable>SCALE_DOWN_EXECUTE_URL</replaceable>.</para>
+        <para>
+            <orderedlist>
+                <listitem>
+                    <para>Create a webhook-based notification for the scale-up webhook by typing the
+                        following: </para>
+                    <para>
+                        <programlisting>curl -i -X POST
+          --data-binary '{ "details": {"address": "<replaceable>SCALE_UP_EXECUTE_URL</replaceable>" }, "label": "DIY-scaleup-notification",  "type" : "webhook"}' -H "X-Auth-Token:$token"
+          -H 'Content-Type: application/json' "https://monitoring.api.rackspacecloud.com/v1.0/$account/notifications"<emphasis role="italic"> </emphasis></programlisting>
+                    </para>
+                    <para><emphasis role="bold">NOTE</emphasis> the Notification Resource ID for
+                            <replaceable>SCALE_UP_NOTIFICATION_ID</replaceable>.</para>
+                </listitem>
+                <listitem>
+                    <para> Create a webhook-based notification for the scale-down webhook by typing
+                        the following: </para>
+                    <para>
+                        <programlisting>curl -i -X POST
+          --data-binary '{"details" : {"address": "<replaceable>SCALE_DOWN_EXECUTE_URL</replaceable>"}, "label": "DIY-scaledown-notification",  "type": "webhook"}' -H "X-Auth-Token:$token" -H
+          'Content-Type: application/json'
+          https://monitoring.api.rackspacecloud.com/v1.0/$account/notifications</programlisting>
+                    </para>
+                    <para><emphasis role="bold">NOTE</emphasis> the Notification Resource ID for
+                            <replaceable>SCALE_DOWN_NOTIFICATION_ID</replaceable>.</para>
+                </listitem>
+                <listitem>
+                    <para> Create an email notification by typing the following and using your email
+                        address: </para>
+                    <para>
+                        <programlisting>curl -i -X POST --data-binary '{"details": { "address" : "<replaceable>YOUR_EMAIL_ADDRESS</replaceable>"}, "label": "DIY-email-notification", "type": "email"}' -H "X-Auth-Token:$token" -H 'Content-Type: application/json' https://monitoring.api.rackspacecloud.com/v1.0/$account/notifications</programlisting>
+                    </para>
+                    <para><emphasis role="bold">NOTE</emphasis> the Notification Resource ID for
+                            <replaceable>EMAIL_NOTIFICATION_ID</replaceable>.</para>
+                </listitem>
+                <listitem>
+                    <para>Update the notification plan you used in the monitoring check by typing
+                        the following,
+                        replacing <replaceable>SCALE_UP_NOTIFICATION_ID</replaceable>,
+                            <replaceable>SCALE_DOWN_NOTIFICATION_ID</replaceable> and
+                            <replaceable>EMAIL_NOTIFICATION_ID</replaceable>
+                        with the appropriate values</para>
+                    <programlisting>curl -i -X PUT --data-binary '{"label": "myDIYServer_NP", "critical_state": [
+          "<replaceable>SCALE_UP_NOTIFATION_ID</replaceable>,<replaceable>EMAIL_NOTIFICATION_ID</replaceable>" ], "ok_state": [ "<replaceable>SCALE_DOWN_NOTIFICATION_ID</replaceable>,<replaceable>EMAIL_NOTIFICATION_ID</replaceable>" ] }' -H "X-Auth-Token:$token" -H 'Content-Type: application/json' -H 'Accept:
+          application/json'
+          "https://monitoring.api.rackspacecloud.com/v1.0/$account/notification_plans"</programlisting>
+                </listitem>
+            </orderedlist>
+        </para>
+    </section>
+    <section xml:id="Install_testing_tool">
+        <title>Install the testing tool and test</title>
+        <para>In this section you install the load-generating testing tool and observe Auto Scale
+            respond to Cloud Monitoring alerts. You should also receive Cloud Monitoring
+            notifications to the configured email address. </para>
+        <section xml:id="Install_website_traffice_tool">
+            <title>Install the website traffic tool</title>
+            <para>
+                <orderedlist>
+                    <listitem>
+                        <para> Log into your cloud server: </para>
+                        <para>
+                            <programlisting>ssh -i <emphasis role="italic">ssh-keys</emphasis> root@<replaceable>SERVER_IP_ADDRESS</replaceable></programlisting>
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para> Modify the Apache configuration file, this example uses nano:</para>
+                        <para>
+                            <programlisting>nano /etc/apache2/apache2.conf</programlisting>
+                        </para>
+                        <para> Add the server name to the bottom of the file, like this:</para>
+                        <para>
+                            <programlisting>ServerName MyDIYServer</programlisting>
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para> Stop and then start the tool:</para>
+                        <programlisting>sudo /usr/sbin/apachectl stop sudo /usr/sbin/apachectl start</programlisting>
+                    </listitem>
+                    <listitem>
+                        <para> Verify that apache is installed.</para>
+                        <para>
+                            <programlisting>cd /usr/sbin ls -l apache*</programlisting>
+                        </para>
+                    </listitem>
+                </orderedlist>
+            </para>
+        </section>
+        <section xml:id="Test_deployment">
+            <title>Test the deployment</title>
+            <para><emphasis role="bold">Step 1</emphasis>: This example uses the <link
+                    xlink:href="http://httpd.apache.org/docs/2.2/programs/ab.html">apache
+                    benchmarking tool</link> to load the load balancer, but you can use your
+                favorite URL load test framework, for example, <emphasis role="bold">ab</emphasis>
+                or <emphasis role="bold">jmeter</emphasis> to pump load. </para>
+            <para>Run the Apache Benchmarking command given, as often as needed, where <emphasis
+                    role="bold">LB_VIP_IP</emphasis> is the VIP IPv4 of the load balancer created
+                earlier. Issue this command as needed (not from your server). Sometimes the first
+                couple of times fail, just keep trying the command until the <emphasis role="bold"
+                    >Be Patient</emphasis> message starts ticking off load numbers.</para>
+            <para>Once you get the CRITICAL notifications, cease loading the site. Wait 10 minutes
+                or so. You should next receive an OK notification and Auto Scale should shortly
+                afterwards delete the two servers that it added in the scale-up operation.</para>
+            <para>
+                <programlisting> ab -n 1000000 -c 30 http://<replaceable>VIP_IP</replaceable>/</programlisting>
+            </para>
+            <para> Notice how the servers are added using this command:  </para>
+            <para>
+                <programlisting>curl -s "https://dfw.servers.api.rackspacecloud.com/v2/$account/servers/detail" -H "X-Auth-Token:$token" | python -m json.tool</programlisting>
+            </para>
+            <para><emphasis role="bold">Step 2</emphasis>: After the load subsides, the new servers
+                may not be deleted automatically based on the timing as to when the alarm fires
+                notification. This is due to alarm suppression in MaaS. It is possible that while
+                the scaling group policy is in the cool down phase, that MaaS might send a scale
+                down notification that will be ignored. MaaS is going to suppress additional
+                notifications due to already being in OK state. You can manually scale down by
+                executing the command directly. </para>
+            <programlisting>curl -i -X POST <replaceable>SCALE-DOWN_EXECUTE_URL</replaceable></programlisting>
+        </section>
+    </section>
+    <section xml:id="Tear_down_deployment">
+        <title>Tear down the deployment</title>
+        <para>
+            <orderedlist>
+                <listitem>
+                    <para> Locate the scaling group ID, highlighted in the following example (or
+                        check worksheet): </para>
+                    <para>
+                        <programlisting> curl -i "https://dfw.autoscale.api.rackspacecloud.com/v1.0/$account/groups" -H "X-Auth-Token:$token"</programlisting>
+                    </para>
+                    <para> The response looks something like this, the group ID is highlighted: </para>
+                    <para>
+                        <programlisting> {"groups_links": [], "groups": [{"state": {"desiredCapacity": 1, "paused": false, "active": [{"id": "a0f619c4-645c-4f97-95b9-3d7e3382e71d", "links": [{"href": "https://dfw.servers.api.rackspacecloud.com/v2/905240/servers/a0f619c4-645c-4f97-95b9-3d7e3382e71d", "rel": "self"}, {"href": "https://dfw.servers.api.rackspacecloud.com/905240/servers/a0f619c4-645c-4f97-95b9-3d7e3382e71d", "rel": "bookmark"}]}], "pendingCapacity": 0, "activeCapacity": 1, "name": "DIY-CS-1-6-15-sg"}, "id": "1d1468e1-229f-49c1-96c2-b97cd216b2b8", "links": [{"hrefSFOSFOSFOSFOSFOs-MacBookSFOSFOSFOSFOSFOSFOSFOSFOs-MacBook-Pro-7SFOs-M </programlisting>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para> Optional. Find group details (or check worksheet for the group name and
+                        ID): </para>
+                    <para>
+                        <programlisting> curl -i "https://dfw.autoscale.api.rackspacecloud.com/v1.0/$account/groups/<replaceable>GROUP_ID</replaceable>" -H "X-Auth-Token:$token"</programlisting>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para> Set min and max entities to zero: </para>
+                    <para>
+                        <programlisting> curl -i -d '{"name": "<replaceable>GROUP_NAME</replaceable>","cooldown": 600,"minEntities": 0,"maxEntities": 0,"metadata": {}}' -H "X-Auth-Token:$token" -H "Content-Type: application/json" -X PUT "https://dfw.autoscale.api.rackspacecloud.com/v1.0/$account/groups/<emphasis role="italic">GROUP_ID</emphasis>/config"</programlisting>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para> Delete the group: </para>
+                    <para>
+                        <programlisting> curl -i "https://dfw.autoscale.api.rackspacecloud.com/v1.0/$account/groups/<replaceable>GROUP_ID</replaceable>" -H "X-Auth-Token:$token" -X DELETE</programlisting>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para> Delete server (get server ID from worksheet):</para>
+                    <para>
+                        <programlisting> curl -i "https://dfw.servers.api.rackspacecloud.com/v2/$account/servers/<replaceable>SERVER_ID</replaceable>" -H "X-Auth-Token:$token" -X DELETE</programlisting>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>Delete the cloud server image (obtain image ID from worsheet):</para>
+                    <para>
+                        <programlisting> curl -i "https://dfw.servers.api.rackspacecloud.com/v2/$account/images/<replaceable>SERVER_IMAGE_ID</replaceable>" -H "X-Auth-Token:$token" -X DELETE</programlisting>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para> Delete entities (get ID from worksheet; some entities cannot be deleted): </para>
+                    <para>
+                        <programlisting>   curl -i "https://monitoring.api.rackspacecloud.com/v1.0/$account/entities/<replaceable>ENTITY_ID</replaceable>" -H "X-Auth-Token:$token" -X DELETE</programlisting>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para> Delete load balancers (get load balancer ID from worksheet): </para>
+                    <para>
+                        <programlisting> curl -i "https://dfw.loadbalancers.api.rackspacecloud.com/v1.0/$account/loadbalancers/<replaceable>LOAD_BALANCER_ID</replaceable>" -H "X-Auth-Token:$token" -X DELETE</programlisting>
+                    </para>
+                </listitem>
+            </orderedlist>
+        </para>
+
+    </section>
+</appendix>
