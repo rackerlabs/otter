@@ -169,8 +169,8 @@ This table shows the body parameters for the request:
 |                               |             |Rackspace Support after they configure your load   |
 |                               |             |balancer pool.                                     |
 +-------------------------------+-------------+---------------------------------------------------+
-|args.draining_timeout          |Integer      |Number of seconds deleting server's associated     |
-|                               |*(Optional)  |cloud load balancer node will be put in DRAINING   |
+|args.**draining_timeout**      |Integer      |Number of seconds deleting server's associated     |
+|                               |*(Optional)* |cloud load balancer node will be put in DRAINING   |
 |                               |             |before deleting the node followed by the server.   |
 |                               |             |Must be between 30 and 3600 inclusive.             |
 +-------------------------------+-------------+---------------------------------------------------+
