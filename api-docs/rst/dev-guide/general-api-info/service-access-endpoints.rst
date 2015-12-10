@@ -19,45 +19,17 @@ regional endpoint where the Cloud Auto Scale service is provisioned.
 | Region                 | Endpoint                                                |
 +========================+=========================================================+
 | Chicago (ORD)          | https://ord.autoscale.api.rackspacecloud.com/v1.0/      |
-|                        +---------------------------------------------------------+
-|                        | https://snet-ord.autoscale.api.rackspacecloud.com/v1.0/ |
 +------------------------+---------------------------------------------------------+
 | Dallas/Ft. Worth (DFW) | https://dfw.autoscale.api.rackspacecloud.com/v1.0/      |
-|                        +---------------------------------------------------------+
-|                        | https://snet-dfw.autoscale.api.rackspacecloud.com/v1.0/ |
 +------------------------+---------------------------------------------------------+
 | Hong Kong (HKG)        | https://hkg.autoscale.api.rackspacecloud.com/v1.0/      |
-|                        +---------------------------------------------------------+
-|                        | https://snet-hkg.autoscale.api.rackspacecloud.com/v1.0/ |
 +------------------------+---------------------------------------------------------+
 | London (LON)           | https://lon.autoscale.api.rackspacecloud.com/v1.0/      |
-|                        +---------------------------------------------------------+
-|                        | https://snet-lon.autoscale.api.rackspacecloud.com/v1.0/ |
 +------------------------+---------------------------------------------------------+
 | Northern Virginia (IAD)| https://iad.autoscale.api.rackspacecloud.com/v1.0/      |
-|                        +---------------------------------------------------------+
-|                        | https://snet-iad.autoscale.api.rackspacecloud.com/v1.0/ |
 +------------------------+---------------------------------------------------------+
 | Sydney (SYD)           | https://syd.autoscale.api.rackspacecloud.com/v1.0/      |
-|                        +---------------------------------------------------------+
-|                        | https://snet-syd.autoscale.api.rackspacecloud.com/v1.0/ |
 +------------------------+---------------------------------------------------------+
-
-If you are working with cloud servers that are in one of the
-Rackspace data centers, using the ServiceNet endpoint in the same
-data center has no network costs and provides a faster connection.
-ServiceNet endpoints are prefixed with ``snet`` in the "Regionalized service
-endpoints" table above. ServiceNet is the data center internet network.
-In your authentication response (see :ref:`authentication-ovw`),
-it is listed as InternalURL.
-
-If you are working with servers that are not in one of the
-Rackspace data centers, you must use a public endpoint to connect.
-In your authentication response, public endpoints are listed as publicURL.
-If you are working with servers in multiple data centers or have a
-mixed environment where you have servers in your data centers and in
-Rackspace data centers, use a public endpoint because it is accessible
-from all the servers in the different environments.
 
 .. note::
    You should copy the base URLs directly from the catalog rather than
