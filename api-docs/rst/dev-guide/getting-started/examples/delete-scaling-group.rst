@@ -9,12 +9,12 @@ depend on whether your scaling group has active entities or not.
 When a group contains no servers, you can eliminate the group by
 sending a DELETE request to its group ID.
 
-The following three options are possible for deleting a scaling group:
+The following two options are possible for deleting a scaling group:
 
   * If there are no active entities in your configuration, use the
     DELETE request to delete the scaling group.
 
-  * If there are active entities, then force delete your group by submitting 
+  * If there are active entities, then force delete the group by submitting
     a DELETE request with `force` parameter to true.
 
 
