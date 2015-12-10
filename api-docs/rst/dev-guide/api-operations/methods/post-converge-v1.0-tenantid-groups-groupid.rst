@@ -1,6 +1,6 @@
 
 
-.. _post-create-scaling-group-v1.1-tenantid-convergence:
+.. _post-converge-v1.0-tenantid-groups-groupid:
 
 Trigger convergence
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -12,9 +12,7 @@ Trigger convergence
 This operation triggers convergence for a specific scaling group. Convergence implies that Autoscale attempts to continuously converge to the desired state of the scaling group, instead of manipulating servers only once.
 When the convergence process starts, it will continue until the desired number of servers are in the ACTIVE state.
 
-If the request succeeds, the response body describes the created group in JSON format. The response includes an ID and links for the group.
-
-If the operation succeeds, a 204 response code is returned.
+This operation does not take any data and does not return any data. If it succeeds, a 204 response code is returned.
 
 
 
@@ -27,25 +25,12 @@ This table shows the possible response codes for this operation:
 |204                       |Success                  |Convergence has been     |
 |                          |                         |successfully triggered.  |
 +--------------------------+-------------------------+-------------------------+
-|400                       |InvalidJsonError         |The request is refused   |
-|                          |                         |because the body was     |
-|                          |                         |invalid JSON".           |
-+--------------------------+-------------------------+-------------------------+
-|400                       |ValidationError          |The request body had     |
-|                          |                         |valid JSON but with      |
-|                          |                         |unexpected properties or |
-|                          |                         |values in it. There can  |
-|                          |                         |be many combinations that|
-|                          |                         |can cause this error.    |
-+--------------------------+-------------------------+-------------------------+
 |401                       |InvalidCredentials       |The X-Auth-Token the     |
 |                          |                         |user supplied is bad.    |
 +--------------------------+-------------------------+-------------------------+
-|403                       |CannotExecutePolicyError |The policy was not       |
-|                          |                         |executed because a       |
-|                          |                         |scaling policy or        |
-|                          |                         |scaling group cooldown   |
-|                          |                         |was still in effect.     |
+|403                       |GroupPausedError         |Convergence was not      |
+|                          |                         |triggered because group  |
+|                          |                         |is paused.               |
 +--------------------------+-------------------------+-------------------------+
 |403                       |CannotExecutePolicyError |The policy was not       |
 |                          |                         |executed because         |
@@ -76,11 +61,6 @@ This table shows the possible response codes for this operation:
 +--------------------------+-------------------------+-------------------------+
 |413                       |RateLimitError           |The user has surpassed   |
 |                          |                         |their rate limit.        |
-+--------------------------+-------------------------+-------------------------+
-|415                       |UnsupportedMediaType     |The request is refused   |
-|                          |                         |because the content type |
-|                          |                         |of the request is not    |
-|                          |                         |"application/json".      |
 +--------------------------+-------------------------+-------------------------+
 |500                       |InternalError            |An error internal to the |
 |                          |                         |application has          |
