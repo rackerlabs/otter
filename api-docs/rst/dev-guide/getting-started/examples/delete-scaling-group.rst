@@ -9,17 +9,13 @@ depend on whether your scaling group has active entities or not.
 When a group contains no servers, you can eliminate the group by
 sending a DELETE request to its group ID.
 
-The following three options are possible for deleting a scaling group:
+The following two options are possible for deleting a scaling group:
 
   * If there are no active entities in your configuration, use the
     DELETE request to delete the scaling group.
 
-  * If there are active entities in your configuration, update your scaling
-    group configuration by submitting a PUT request and setting
-    the `minEntities` and `maxEntities` parameters to 0.
-
-  * Force the deletion of your group by submitting a DELETE request and
-    setting the `force` parameter to true.
+  * If there are active entities, then force delete the group by submitting
+    a DELETE request with `force` parameter to true.
 
 
 **Delete a scaling group with no active entities**
@@ -40,43 +36,6 @@ entities as shown in the following example:
 .. code::
 
      Group d5f5f3ad-faef-4c8f-99c4-0e931189c521 for tenant 829409 still has entities.
-
-
-**Delete a scaling group with active entities**
-
-If you have submitted a DELETE request and received a response saying that
-your group still has active entities, go through the following steps:
-
-  1. Update the scaling group configuration by submitting a PUT request
-     that sets the `minEntities` and `maxEntities` parameters to 0 as
-     shown in the following example:
-
-     .. code::
-
-          PUT /{tenantId}/groups/{groupId}/config
-
-     .. code::
-
-          {
-               "name": "workers",
-               "cooldown": 60,
-               "minEntities": 0,
-               "maxEntities": 0,
-               "metadata": {
-                   "firstkey": "this is a string",
-                   "secondkey": "1"
-               }
-          }
-
-  2. Submit a DELETE request with the `tenantId` and `groupId` parameters
-     specified in the request URL:
-
-     .. code::
-
-          DELETE /{tenantId}/groups/{groupId}
-
-If the DELETE request is successful, a 204 response code with an empty
-response body will be returned.
 
 
 **Delete a scaling group using FORCE DELETE**
