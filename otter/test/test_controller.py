@@ -23,7 +23,13 @@ from otter.cloud_client import (
     TenantScope,
     get_server_details,
     set_nova_metadata_item)
+<<<<<<< HEAD
 from otter.convergence.planning import DRAINING_METADATA
+=======
+from otter.convergence.model import DRAINING_METADATA
+from otter.convergence.service import (
+    ConvergenceStarter, get_convergence_starter, set_convergence_starter)
+>>>>>>> FETCH_HEAD
 from otter.log.intents import BoundFields, Log
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
 from otter.models.interface import (
@@ -39,9 +45,11 @@ from otter.test.utils import (
     matches,
     mock_group as util_mock_group,
     mock_log,
+    nested_parallel,
     nested_sequence,
     noop,
     patch,
+    perform_sequence,
     raise_,
     test_dispatcher)
 from otter.util.config import set_config_data
@@ -49,13 +57,21 @@ from otter.util.fp import assoc_obj
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN
+<<<<<<< HEAD
 from otter.util.zk import CreateOrSet, DeleteNode
+=======
+from otter.util.zk import DeleteNode
+>>>>>>> FETCH_HEAD
 from otter.worker_intents import EvictServerFromScalingGroup
 
 
 class PauseGroupTests(SynchronousTestCase):
     """
+<<<<<<< HEAD
     Tests for pausing and resuming group functions
+=======
+    Tests for `conv_pause_group_eff`
+>>>>>>> FETCH_HEAD
     """
 
     def setUp(self):
@@ -73,12 +89,20 @@ class PauseGroupTests(SynchronousTestCase):
                                         tenant_id="tid",
                                         scaling_group_id="gid")),
              nested_sequence([
+<<<<<<< HEAD
                  parallel_sequence([
                      [(ModifyGroupStatePaused(self.group, True), noop)],
                      [(DeleteNode(path="/groups/divergent/tid_gid",
                                   version=-1),
                        noop),
                       (Log("mark-clean-success", {}), noop)],
+=======
+                 nested_parallel([
+                     (ModifyGroupStatePaused(self.group, True), noop),
+                     (DeleteNode(path="/groups/divergent/tid_gid", version=-1),
+                      noop),
+                     (Log("mark-clean-success", {}), noop)
+>>>>>>> FETCH_HEAD
                  ])
              ]))
         ]
@@ -106,6 +130,7 @@ class PauseGroupTests(SynchronousTestCase):
             NotImplementedError, controller.pause_scaling_group, self.log,
             "transid", self.group, object())
 
+<<<<<<< HEAD
     def test_resume_group_eff(self):
         """
         `conv_resume_group_eff` returns Effect to update group state paused
@@ -150,6 +175,8 @@ class PauseGroupTests(SynchronousTestCase):
             NotImplementedError, controller.resume_scaling_group, self.log,
             "transid", self.group, object())
 
+=======
+>>>>>>> FETCH_HEAD
 
 class CalculateDeltaTestCase(SynchronousTestCase):
     """
@@ -959,18 +986,34 @@ class DeleteGroupTests(SynchronousTestCase):
         self.addCleanup(set_config_data, {})
         self.mock_tcd.return_value = defer.succeed('tcd')
 
+<<<<<<< HEAD
     def test_convergence_tenant_force(self):
+=======
+    def test_convergence_tenant_force(self, paused=False):
+>>>>>>> FETCH_HEAD
         """
         Updates DELETED status for convergence tenant and starts convergence
         """
         self.setup_conv()
+<<<<<<< HEAD
         d = controller.delete_group(
             "disp", self.log, 'transid', self.group, True)
+=======
+        self.state.paused = paused
+        d = controller.delete_group(self.log, 'transid', self.group, True)
+>>>>>>> FETCH_HEAD
         self.assertEqual(self.successResultOf(d), 'tcd')
         self.mock_tcd.assert_called_once_with("disp", self.group, 'transid')
         # delete_group() or modify_state() not called
         self.assertFalse(self.group.delete_group.called)
         self.assertFalse(self.group.modify_state.called)
+
+    def test_convergence_tenant_force_group_paused(self):
+        """
+        Updates DELETED status for convergence tenant and starts convergence
+        even if group is paused
+        """
+        self.test_convergence_tenant_force(True)
 
     def test_convergence_tenant_no_force(self):
         """
@@ -998,20 +1041,25 @@ class DeleteGroupTests(SynchronousTestCase):
         # delete_group() not called
         self.assertFalse(self.group.delete_group.called)
 
-    def test_convergence_tenant_no_force_with_servers(self):
+    def assert_raises_in_modify_state(self, excp_type):
         """
-        When deleting convergence group without force, `delete_group` raises
-        `GroupNotEmptyError` if desired > 0. This desired check is done
-        under lock using `modify_state`
+        Assert that given exception occurs inside modify_state
         """
+<<<<<<< HEAD
         self.setup_conv()
         self.state.desired = 1
+=======
+>>>>>>> FETCH_HEAD
         self.group.pause_modify_state = True
 
         d = controller.delete_group(
             "disp", self.log, 'transid', self.group, False)
 
+<<<<<<< HEAD
         # trigger_convergence_deletion has not been called because
+=======
+        # trigger_convergence has not been called and no result because
+>>>>>>> FETCH_HEAD
         # modify_state is paused
         self.assertNoResult(d)
         self.assertTrue(self.group.modify_state.called)
@@ -1023,10 +1071,30 @@ class DeleteGroupTests(SynchronousTestCase):
 
         # unpause modify_state
         self.group.modify_state_pause_d.callback(None)
-        self.failureResultOf(d, GroupNotEmptyError)
+        self.failureResultOf(d, excp_type)
 
         # delete_group() not called
         self.assertFalse(self.group.delete_group.called)
+
+    def test_convergence_tenant_no_force_with_servers(self):
+        """
+        When deleting convergence group without force, `delete_group` raises
+        `GroupNotEmptyError` if desired > 0. This desired check is done
+        under lock using `modify_state`
+        """
+        self.setup_conv()
+        self.state.desired = 1
+        self.assert_raises_in_modify_state(GroupNotEmptyError)
+
+    def test_convergence_tenant_no_force_group_paused(self):
+        """
+        When deleting convergence group without force, `delete_group` raises
+        `GroupPausedError` if group is paused. This check is done
+        under lock using `modify_state`
+        """
+        self.setup_conv()
+        self.state.paused = True
+        self.assert_raises_in_modify_state(controller.GroupPausedError)
 
 
 class EmptyGroupTests(SynchronousTestCase):

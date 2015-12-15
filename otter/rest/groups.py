@@ -677,11 +677,19 @@ class OtterGroup(object):
         if tenant_is_enabled(self.tenant_id, config_value):
             group = self.store.get_scaling_group(
                 self.log, self.tenant_id, self.group_id)
+<<<<<<< HEAD
             return controller.modify_and_trigger(
                 self.dispatcher,
                 group,
                 bound_log_kwargs(log),
                 is_group_paused)
+=======
+            cs = get_convergence_starter()
+            d = group.modify_state(is_group_paused)
+            return d.addCallback(
+                lambda _: cs.start_convergence(self.log, self.tenant_id,
+                                               self.group_id))
+>>>>>>> FETCH_HEAD
         else:
             request.setResponseCode(404)
 

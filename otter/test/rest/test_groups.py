@@ -1160,6 +1160,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         """
         set_config_data({'convergence-tenants': ['11111']})
         self.addCleanup(set_config_data, {})
+<<<<<<< HEAD
         self.mock_state = GroupState(
             '11111', 'one', '', {}, {}, None, {}, False,
             ScalingGroupStatus.ACTIVE)
@@ -1178,9 +1179,29 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_state = GroupState(
             '11111', 'one', '', {}, {}, None, {}, True,  # group paused
             ScalingGroupStatus.ACTIVE)
+=======
+        cs = mock_gcs.return_value
+        cs.start_convergence.return_value = defer.succeed(None)
+        self.mock_state = GroupState(
+            '11111', 'one', '', {}, {}, None, {}, False,
+            ScalingGroupStatus.ACTIVE)
+>>>>>>> FETCH_HEAD
         self.assert_status_code(
             403, endpoint='{}converge'.format(self.endpoint), method='POST')
         self.assertTrue(self.mock_controller.modify_and_trigger.called)
+
+    def test_group_paused_converge(self):
+        """
+        Calling `../converge` on paused group will return 403 GroupPausedError
+        for convergence tenant
+        """
+        set_config_data({'convergence-tenants': ['11111']})
+        self.addCleanup(set_config_data, {})
+        self.mock_state = GroupState(
+            '11111', 'one', '', {}, {}, None, {}, True,  # group paused
+            ScalingGroupStatus.ACTIVE)
+        self.assert_status_code(
+            403, endpoint='{}converge'.format(self.endpoint), method='POST')
 
     def test_group_converge_worker_tenant(self):
         """

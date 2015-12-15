@@ -388,6 +388,7 @@ def delete_divergent_flag(tenant_id, group_id, version):
         yield err(None, 'mark-clean-failure', **fields)
     else:
         yield msg('mark-clean-success')
+<<<<<<< HEAD
 
 
 @curry
@@ -406,6 +407,8 @@ def trigger_convergence(tenant_id, group_id):
     eff = mark_divergent(tenant_id, group_id)
     return eff.on(success=lambda _: msg("mark-dirty-success"),
                   error=log_and_raise("mark-dirty-failure"))
+=======
+>>>>>>> FETCH_HEAD
 
 
 class ConvergenceStarter(object):

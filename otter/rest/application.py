@@ -28,7 +28,10 @@ class Otter(object):
         self.health_check_function = health_check_function
         self.scheduler = None
         self.treq = _treq
+<<<<<<< HEAD
         # Effect dispatcher for all otter intents
+=======
+>>>>>>> FETCH_HEAD
         self.dispatcher = None
 
     @app.route('/', methods=['GET'])
@@ -67,8 +70,12 @@ class Otter(object):
         """
         execute route handled by OtterExecute
         """
+<<<<<<< HEAD
         return OtterExecute(self.store, cap_version, cap_hash,
                             self.dispatcher).app.resource()
+=======
+        return OtterExecute(self.store, cap_version, cap_hash).app.resource()
+>>>>>>> FETCH_HEAD
 
     @app.route('/v1.0/<string:tenant_id>/limits')
     def limits(self, request, tenant_id):
