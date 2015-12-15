@@ -270,7 +270,10 @@ class ScalingGroup(object):
 
         return self.replace_group_config(rcs, new_config)
 
+<<<<<<< HEAD
     @diagnose("AS", "Triggering convergence")
+=======
+>>>>>>> FETCH_HEAD
     def trigger_convergence(self, rcs, success_codes=None):
         """
         Trigger convergence on a group
@@ -297,7 +300,12 @@ class ScalingGroup(object):
         if getattr(self, 'group_id', None):
             return self.delete_scaling_group(rcs)
 
+<<<<<<< HEAD
     @diagnose("AS", "Deleting scaling group")
+=======
+        return self.delete_scaling_group(rcs)
+
+>>>>>>> FETCH_HEAD
     def delete_scaling_group(self, rcs, force="true", success_codes=None):
         """Unconditionally delete the scaling group.  You may call this only
         once.
@@ -444,7 +452,10 @@ class ScalingGroup(object):
         ids = extract_active_ids(body)
         returnValue(random.sample(ids, n))
 
+<<<<<<< HEAD
     @diagnose("AS", "Pausing scaling group")
+=======
+>>>>>>> FETCH_HEAD
     def pause(self, rcs):
         """
         Pause group
@@ -454,6 +465,7 @@ class ScalingGroup(object):
             headers=headers(str(rcs.token)), pool=self.pool)
         return d.addCallback(check_success, [204])
 
+<<<<<<< HEAD
     @diagnose("AS", "Resume scaling group")
     def resume(self, rcs):
         """
@@ -476,6 +488,8 @@ class ScalingGroup(object):
         return d.addCallback(check_success, [202])
 
     @diagnose("AS", "Wait for scaling group state to reach a particular point")
+=======
+>>>>>>> FETCH_HEAD
     def wait_for_state(self, rcs, matcher, timeout=600, period=10, clock=None):
         """
         Wait for the state on the scaling group to match the provided matchers,

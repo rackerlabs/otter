@@ -16,8 +16,11 @@ from twisted.internet import reactor
 
 from twisted.internet.defer import (
     Deferred, gatherResults, inlineCallbacks, returnValue)
+<<<<<<< HEAD
 
 from twisted.python.log import addObserver, removeObserver
+=======
+>>>>>>> FETCH_HEAD
 
 from twisted.web.client import HTTPConnectionPool
 
@@ -59,9 +62,14 @@ endpoint = os.environ['AS_IDENTITY']
 flavor_ref = os.environ['AS_FLAVOR_REF']
 image_ref = os.environ['AS_IMAGE_REF']
 region = os.environ['AS_REGION']
+<<<<<<< HEAD
 scheduler_interval = float(os.environ.get("AS_SCHEDULER_INTERVAL", "10"))
 otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
 convergence_interval = float(os.environ.get("AS_CONVERGENCE_INTERVAL", "10"))
+=======
+scheduler_interval = os.environ.get("AS_SCHEDULER_INTERVAL", 10)
+otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
+>>>>>>> FETCH_HEAD
 
 # Get vs dict lookup because it will return None if not found,
 # not throw an exception.  None is a valid value for convergence_tenant.
@@ -111,6 +119,7 @@ def get_resource_mapping():
     return res
 
 
+<<<<<<< HEAD
 def filter_logs(observer):
     """
     Filter out logs like
@@ -181,6 +190,8 @@ def setup_test_log_observer(testcase):
     testcase.addCleanup(logfile.close)
 
 
+=======
+>>>>>>> FETCH_HEAD
 def get_utcstr_from_now(seconds):
     """ Get UTC timestamp from now in ISO 8601 format """
     return "{}Z".format(

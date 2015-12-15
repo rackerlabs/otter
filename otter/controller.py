@@ -48,6 +48,7 @@ from otter.cloud_client import (
     get_server_details,
     set_nova_metadata_item)
 from otter.convergence.composition import tenant_is_enabled
+<<<<<<< HEAD
 from otter.convergence.model import group_id_from_metadata
 from otter.convergence.planning import DRAINING_METADATA
 from otter.convergence.service import (
@@ -55,6 +56,14 @@ from otter.convergence.service import (
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
 from otter.log.intents import BoundFields, msg, with_log
+=======
+from otter.convergence.model import DRAINING_METADATA, group_id_from_metadata
+from otter.convergence.service import (
+    delete_divergent_flag, get_convergence_starter)
+from otter.json_schema.group_schemas import MAX_ENTITIES
+from otter.log import audit
+from otter.log.intents import with_log
+>>>>>>> FETCH_HEAD
 from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
 from otter.models.interface import GroupNotEmptyError, ScalingGroupStatus
 from otter.supervisor import (
@@ -120,6 +129,7 @@ def pause_scaling_group(log, transaction_id, scaling_group, dispatcher):
     :return: None
     """
     if not tenant_is_enabled(scaling_group.tenant_id, config_value):
+<<<<<<< HEAD
         raise NotImplementedError("Pause is not implemented for legay groups")
     return perform(dispatcher,
                    conv_pause_group_eff(scaling_group, transaction_id))
@@ -135,8 +145,6 @@ def conv_resume_group_eff(trans_id, group):
             lambda _: msg("mark-dirty-success"))])
     return with_log(eff, transaction_id=trans_id, tenant_id=group.tenant_id,
                     scaling_group_id=group.uuid).on(lambda _: None)
-
-
 def resume_scaling_group(log, transaction_id, scaling_group, dispatcher):
     """
     Resumes the scaling group, causing all scaling policy executions to be
@@ -221,6 +229,10 @@ def delete_group(dispatcher, log, trans_id, group, force):
     """
 
     def check_and_delete(_group, state):
+        if state.paused:
+            raise GroupPausedError(
+                _group.tenant_id, _group.uuid, "delete group",
+                "Please use ?force=true to delete paused group")
         if state.desired == 0:
             d = trigger_convergence_deletion(dispatcher, group, trans_id)
             return d.addCallback(lambda _: state)

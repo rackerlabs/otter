@@ -4,10 +4,15 @@ endpoints
 """
 from testtools.matchers import ContainsDict, Equals
 
+<<<<<<< HEAD
 import treq
 
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, returnValue
+=======
+from twisted.internet import reactor
+from twisted.internet.defer import inlineCallbacks
+>>>>>>> FETCH_HEAD
 from twisted.trial import unittest
 
 from otter.integration.lib.autoscale import ScalingPolicy
@@ -15,6 +20,7 @@ from otter.integration.lib.mimic import MimicNova
 from otter.integration.lib.resources import TestResources
 from otter.integration.lib.trial_tools import (
     TestHelper,
+<<<<<<< HEAD
     convergence_interval,
     get_identity,
     get_resource_mapping,
@@ -23,6 +29,14 @@ from otter.integration.lib.trial_tools import (
     region,
     scheduler_interval,
     skip_if,
+=======
+    get_identity,
+    get_resource_mapping,
+    get_utcstr_from_now,
+    otter_build_timeout,
+    region,
+    scheduler_interval,
+>>>>>>> FETCH_HEAD
     sleep
 )
 
@@ -30,6 +44,7 @@ from otter.integration.lib.trial_tools import (
 timeout_default = 600
 
 
+<<<<<<< HEAD
 class PauseResumeTests(unittest.TestCase):
     """
     Tests for `../groups/groupId/pause` and `../groups/groupId/resume` endpoint
@@ -38,6 +53,13 @@ class PauseResumeTests(unittest.TestCase):
     # Some of the tests do some extra waiting
     timeout = 300
 
+=======
+class PauseTests(unittest.TestCase):
+    """
+    Tests for `../groups/groupId/pause` endpoint
+    """
+
+>>>>>>> FETCH_HEAD
     def setUp(self):
         self.helper = TestHelper(self)
         self.rcs = TestResources()
@@ -61,7 +83,10 @@ class PauseResumeTests(unittest.TestCase):
         yield self.helper.assert_group_state(
             group, ContainsDict({"paused": Equals(True)}))
 
+<<<<<<< HEAD
     @skip_if(not_mimic, "This requires mimic for long builds")
+=======
+>>>>>>> FETCH_HEAD
     @inlineCallbacks
     def test_pause_stops_convergence(self):
         """
@@ -73,18 +98,26 @@ class PauseResumeTests(unittest.TestCase):
         5. Notice that group continues to think that server is building
         """
         mimic_nova = MimicNova(pool=self.helper.pool, test_case=self)
+<<<<<<< HEAD
         server_build_time = convergence_interval + 5
+=======
+>>>>>>> FETCH_HEAD
         yield mimic_nova.sequenced_behaviors(
             self.rcs,
             criteria=[{"server_name": "pause-stops-convergence" + ".*"}],
             behaviors=[
                 {"name": "build",
+<<<<<<< HEAD
                  "parameters": {"duration": server_build_time}}
+=======
+                 "parameters": {"duration": otter_build_timeout - 5}}
+>>>>>>> FETCH_HEAD
             ])
         group, _ = self.helper.create_group(min_entities=1)
         yield group.start(self.rcs, self)
         one_building = ContainsDict({"pendingCapacity": Equals(1),
                                      "activeCapacity": Equals(0),
+<<<<<<< HEAD
                                      "desiredCapacity": Equals(1),
                                      "status": Equals("ACTIVE")})
         yield self.helper.assert_group_state(group, one_building)
@@ -141,6 +174,13 @@ class PauseResumeTests(unittest.TestCase):
 
         # can trigger convergence
         yield group.trigger_convergence(self.rcs)
+=======
+                                     "status": Equals("ACTIVE")})
+        yield self.helper.assert_group_state(group, one_building)
+        yield group.pause(self.rcs)
+        yield sleep(reactor, otter_build_timeout)
+        yield self.helper.assert_group_state(group, one_building)
+>>>>>>> FETCH_HEAD
 
     @inlineCallbacks
     def test_pause_and_execute_policy(self):
@@ -164,6 +204,7 @@ class PauseResumeTests(unittest.TestCase):
         yield group.pause(self.rcs)
         policy = ScalingPolicy(set_to=1, scaling_group=group)
         yield policy.start(self.rcs, self)
+<<<<<<< HEAD
         returnValue((group, policy))
 
     @inlineCallbacks
@@ -184,6 +225,8 @@ class PauseResumeTests(unittest.TestCase):
             ContainsDict({"pendingCapacity": Equals(0),
                           "desiredCapacity": Equals(0),
                           "activeCapacity": Equals(0)}))
+=======
+>>>>>>> FETCH_HEAD
 
     @inlineCallbacks
     def test_pause_and_converge(self):
@@ -215,3 +258,26 @@ class PauseResumeTests(unittest.TestCase):
                 "pendingCapacity": Equals(0),
                 "activeCapacity": Equals(0),
                 "desiredCapacity": Equals(0)}))
+<<<<<<< HEAD
+=======
+
+    @inlineCallbacks
+    def test_delete_paused_group(self):
+        """
+        Deleting a paused group with force=false results in 403
+        """
+        group, _ = self.helper.create_group()
+        yield group.start(self.rcs, self)
+        yield group.pause(self.rcs)
+        yield group.delete_scaling_group(self.rcs, "false", [403])
+
+    @inlineCallbacks
+    def test_force_delete_paused_group(self):
+        """
+        Deleting a paused froup with force=true succeeds
+        """
+        group, _ = self.helper.create_group()
+        yield group.start(self.rcs, self)
+        yield group.pause(self.rcs)
+        yield group.delete_scaling_group(self.rcs, "true")
+>>>>>>> FETCH_HEAD

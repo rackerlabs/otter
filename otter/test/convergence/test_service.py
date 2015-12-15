@@ -429,6 +429,23 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         ]
         self._verify_sequence(sequence)
 
+    def test_delete_node_not_found(self):
+        """
+        When DeleteNode raises a NoNodeError, a message is logged and nothing
+        else is cleaned up.
+        """
+        sequence = SequenceDispatcher([
+            (('ec', self.tenant_id, self.group_id, 3600),
+             lambda i: (StepResult.SUCCESS, ScalingGroupStatus.ACTIVE)),
+            (DeleteNode(path='/groups/divergent/tenant-id_g1',
+                        version=self.version),
+             lambda i: raise_(NoNodeError())),
+            (Log('mark-clean-not-found',
+                 dict(path='/groups/divergent/tenant-id_g1',
+                      dirty_version=self.version)), lambda i: None)
+        ])
+        self._verify_sequence(sequence)
+
     def test_delete_node_other_error(self):
         """When marking clean raises arbitrary errors, an error is logged."""
         sequence = [
