@@ -7,12 +7,18 @@ config file containing region, identity and cassandra info
 Examples:
 `python trigger_convergence -c config.json -g "tenantid:groupId"`
 will trigger convergence on given group(s)
-`python trigger_convergence -c config.json`
+`python trigger_convergence -c config.json --all`
 will trigger convergence on all groups got from cassandra
 """
 
+from __future__ import print_function
+
 import json
 from argparse import ArgumentParser
+from datetime import datetime
+
+from effect import Effect, Func, parallel
+from effect.do import do, do_return
 
 from toolz.curried import keyfilter
 from toolz.itertoolz import concat
@@ -23,11 +29,18 @@ from twisted.internet import task
 from twisted.internet.defer import (
     DeferredSemaphore, gatherResults, inlineCallbacks, succeed)
 
+from txeffect import perform
+
 from otter.auth import generate_authenticator, public_endpoint_url
+from otter.cloud_client import TenantScope
+from otter.constants import get_service_configs
+from otter.convergence.service import convergence_exec_data, get_executor
+from otter.effect_dispatcher import get_full_dispatcher
 from otter.metrics import connect_cass_servers
 from otter.models.cass import CassScalingGroupCollection
 from otter.test.utils import mock_log
 from otter.util.http import append_segments, headers
+from otter.util.timestamp import datetime_to_epoch
 
 
 @inlineCallbacks
@@ -123,6 +136,35 @@ def get_groups(parsed, store, conf):
     return d
 
 
+@do
+def group_steps(group):
+    """
+    Return Effect of list of steps that would be performed on the group
+    if convergence is triggered on it with desired=actual
+    """
+    now_dt = yield Effect(Func(datetime.utcnow))
+    all_data_eff = convergence_exec_data(
+        group["tenantId"], group["groupId"], now_dt, get_executor)
+    all_data = yield Effect(TenantScope(all_data_eff, group["tenantId"]))
+    (executor, scaling_group, group_state, desired_group_state,
+     resources) = all_data
+    desired_group_state.desired = len(resources['servers'])
+    steps = executor.plan(desired_group_state, datetime_to_epoch(now_dt),
+                          3600, **resources)
+    yield do_return(steps)
+
+
+def groups_steps(groups, reactor, store, cass_client, authenticator, conf):
+    """
+    Return [(group, steps)] list
+    """
+    eff = parallel(map(group_steps, groups))
+    disp = get_full_dispatcher(
+        reactor, authenticator, mock_log(), get_service_configs(conf),
+        "kzclient", store, "supervisor", cass_client)
+    return perform(disp, eff).addCallback(lambda steps: zip(groups, steps))
+
+
 @inlineCallbacks
 def main(reactor):
     parser = ArgumentParser(
@@ -130,6 +172,10 @@ def main(reactor):
     parser.add_argument(
         "-c", dest="config", required=True,
         help="Config file containing identity and cassandra info")
+    parser.add_argument(
+        "--steps", action="store_true",
+        help=("Return steps that would be taken if convergence was triggered "
+              "with desired set to current actual. No convergence triggered"))
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
@@ -163,9 +209,14 @@ def main(reactor):
     store = CassScalingGroupCollection(cass_client, reactor, 1000)
 
     groups = yield get_groups(parsed, store, conf)
-    yield trigger_convergence_groups(
-        authenticator, conf["region"], groups, parsed.limit,
-        parsed.no_error_group)
+    if parsed.steps:
+        steps = yield groups_steps(groups, reactor, store, cass_client,
+                                   authenticator, conf)
+        print(*steps, sep='\n')
+    else:
+        yield trigger_convergence_groups(
+            authenticator, conf["region"], groups, parsed.limit,
+            parsed.no_error_group)
     yield cass_client.disconnect()
 
 
