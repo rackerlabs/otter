@@ -831,18 +831,20 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
         If a server's destiny is WAIT, we won't provision more servers to take
         up the slack, but rather just wait for it to come back.
         """
+        msg1 = ErrorReason.UserMessage(
+            'Waiting for server abc to transition to ACTIVE from HARD_REBOOT')
+        msg2 = ErrorReason.UserMessage(
+            'Waiting for server def to transition to ACTIVE from PASSWORD')
         self.assertEqual(
             converge_launch_server(
-                DesiredServerGroupState(server_config={}, capacity=1),
-                set([server('abc', ServerState.HARD_REBOOT)]),
+                DesiredServerGroupState(server_config={}, capacity=2),
+                set([server('abc', ServerState.HARD_REBOOT),
+                     server('def', ServerState.PASSWORD)]),
                 set(),
-                0),
-            pbag([
-                ConvergeLater(
-                    reasons=[ErrorReason.UserMessage(
-                        'Waiting for temporarily unavailable server to become '
-                        'ACTIVE')],
-                    limited=True)]))
+                0
+            ),
+            pbag([ConvergeLater(reasons=[msg1, msg2], limited=True)])
+        )
 
     def test_count_AVOID_REPLACING_as_meeting_capacity(self):
         """
@@ -1015,11 +1017,16 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
             if after == Destiny.WAIT:
                 # If we're waiting for some other servers we need to also
                 # expect a ConvergeLater
-                also = [ConvergeLater(reasons=[
-                    ErrorReason.UserMessage(
-                        'Waiting for temporarily unavailable server to become '
-                        'ACTIVE')],
-                    limited=True)]
+                also = [
+                    ConvergeLater(reasons=[
+                        ErrorReason.UserMessage(
+                            'Waiting for server abc to transition to ACTIVE '
+                            'from HARD_REBOOT'),
+                        ErrorReason.UserMessage(
+                            'Waiting for server ghi to transition to ACTIVE '
+                            'from HARD_REBOOT')],
+                        limited=True)
+                ]
 
             self.assertEqual(
                 converge_launch_server(

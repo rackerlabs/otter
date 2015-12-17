@@ -1294,7 +1294,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         When we've been waiting too long for a LIMITED_RETRY step, we'll
         give up and put the group into ERROR.
         """
-        reasons = [ErrorReason.UserMessage('foo')]
+        reasons = [ErrorReason.UserMessage('foo'),
+                   ErrorReason.UserMessage("bar")]
         self.waiting = Reference(pmap({self.group_id: 44}))
 
         def plan(*args, **kwargs):
@@ -1313,9 +1314,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
              noop),
             (Log('group-status-error',
                  dict(isError=True, cloud_feed=True, status='ERROR',
-                      reasons=['foo'])),
+                      reasons=['Timed out: bar', "Timed out: foo"])),
              noop),
-            (UpdateGroupErrorReasons(self.group, ['foo']), noop),
+            (UpdateGroupErrorReasons(
+                self.group, ['Timed out: bar', "Timed out: foo"]), noop),
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
