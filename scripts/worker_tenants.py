@@ -43,7 +43,7 @@ def main(reactor):
     token, catalog = yield authenticator.authenticate_tenant("764771")
     all_tenants = set((yield get_tenant_ids(token, catalog)))
     worker_tenants = all_tenants - set(conf["convergence-tenants"])
-    print(worker_tenants, sep='\n')
+    print(*worker_tenants, sep='\n')
 
 
 if __name__ == '__main__':
