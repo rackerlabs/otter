@@ -907,16 +907,19 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
         patch(self, 'otter.util.http.treq', new=self.treq)
 
-        launch_server_v1._create_server_sem = None
-
         self.generate_server_name = patch(
             self,
             'otter.worker.launch_server_v1.generate_server_name')
         self.generate_server_name.return_value = 'as000000'
 
+        # reset it to empty in beginning of test as it is module-wise
+        # info retained in every test
+        launch_server_v1._semaphores = {}
+
         self.scaling_group_uuid = '1111111-11111-11111-11111111'
 
-        self.scaling_group = mock.Mock(uuid=self.scaling_group_uuid, tenant_id='1234')
+        self.scaling_group = mock.Mock(uuid=self.scaling_group_uuid,
+                                       tenant_id='1234')
 
         self.undo = iMock(IUndoStack)
 
@@ -2217,6 +2220,10 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
             self, 'otter.worker.launch_server_v1.remove_from_load_balancer')
         self.remove_from_load_balancer.return_value = succeed(None)
 
+        # reset it to empty in beginning of test as it is module-wise
+        # info retained in every test
+        launch_server_v1._semaphores = {}
+
         self.clock = Clock()
         self.url = 'http://url'
         self.server_id = 'serverId'
@@ -2227,7 +2234,6 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         """
         d = delete_server(self.log, self.request_bag, instance_details,
                           clock=self.clock)
-        self.clock.advance(0.4)
         return d
 
     def test_delete_server_no_lbs(self):
@@ -2382,7 +2388,6 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
     def _delete_and_verify(self):
         d = delete_and_verify(self.log, self.url, self.request_bag,
                               self.server_id, self.clock)
-        self.clock.advance(0.4)
         return d
 
     def test_delete_and_verify_does_not_verify_if_404(self):
@@ -2416,6 +2421,9 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         :func:`delete_and_verify` limits the number of delete server requests
         to 1. It also delays response by 1 second
         """
+        set_config_data({"worker": {"delete_server_limit": 1}})
+        self.addCleanup(set_config_data, None)
+
         deferreds = [Deferred() for i in range(3)]
         delete_ds = deferreds[:]
         self.treq.delete.side_effect = lambda *a, **kw: deferreds.pop(0)

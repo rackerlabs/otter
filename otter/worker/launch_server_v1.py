@@ -152,23 +152,23 @@ def wait_for_active(log,
         deferred_description=timeout_description)
 
 
-# single global instance of create server semaphore
-_create_server_sem = None
+# single global instance of semaphores
+_semaphores = {}
 
 
-def get_create_server_sempahore():
+def get_sempahore(operation, conf_name):
     """
-    Get global instance of create server semaphore if configured. Otherwise
-    return None
+    Get global semaphore of given operation if configured based on conf_name.
+    Otherwise return None
     """
-    global _create_server_sem
-    if _create_server_sem is not None:
-        return _create_server_sem
-    conf = config_value("worker.create_server_limit")
+    sem = _semaphores.get(operation)
+    if sem is not None:
+        return sem
+    conf = config_value(conf_name)
     if conf is None:
         return None
-    _create_server_sem = DeferredSemaphore(conf)
-    return _create_server_sem
+    _semaphores[operation] = DeferredSemaphore(conf)
+    return _semaphores[operation]
 
 
 class ServerCreationRetryError(Exception):
@@ -340,9 +340,9 @@ def create_server(server_endpoint, auth_token, server_config, log=None,
 
         If not, and if no further errors occur, server creation can be retried.
         """
-        create_server_sem = get_create_server_sempahore()
-        if create_server_sem is not None:
-            d = create_server_sem.run(_create_with_delay, True)
+        sem = get_sempahore("create_server", "worker.create_server_limit")
+        if sem is not None:
+            d = sem.run(_create_with_delay, True)
         else:
             d = _create_with_delay(False)
         d.addCallback(check_success, [202], _treq=_treq)
@@ -885,11 +885,6 @@ def _as_new_style_instance_details(maybe_old_style):
     return server_id, updated_lb_specs
 
 
-# Allow only 1 delete server request at a time
-MAX_DELETE_SERVER = 1
-delete_server_sem = DeferredSemaphore(MAX_DELETE_SERVER)
-
-
 def delete_and_verify(log, server_endpoint, request_bag, server_id, clock):
     """
     Check the status of the server to see if it's actually been deleted.
@@ -902,13 +897,17 @@ def delete_and_verify(log, server_endpoint, request_bag, server_id, clock):
     """
     path = append_segments(server_endpoint, 'servers', server_id)
 
-    def delete_with_delay(_bag):
+    def delete_with_delay(_bag, to_delay):
         d = treq.delete(path, headers=headers(_bag.auth_token), log=log)
         # Add 0.4 seconds delay to allow 150 requests per minute
-        return d.addCallback(delay, clock, 0.4)
+        return d.addCallback(delay, clock, 0.4) if to_delay else d
 
     def delete(_bag):
-        del_d = delete_server_sem.run(delete_with_delay, _bag)
+        sem = get_sempahore("delete_server", "worker.delete_server_limit")
+        if sem is not None:
+            del_d = sem.run(delete_with_delay, _bag, True)
+        else:
+            del_d = delete_with_delay(_bag, False)
         del_d.addCallback(check_success, [404])
         del_d.addCallback(treq.content)
         return del_d.addErrback(verify, request_bag.auth_token)
