@@ -1,4 +1,4 @@
-API v1.1 release, December 08, 2015
+API v1.0 release, December 08, 2015
 -----------------------------------
 
 What's new
@@ -18,7 +18,15 @@ What's new
 *  Added support for "resume". Resuming a scaling group ends the "pause" state. When a scaling group is resumed,
    policy executions and convergence triggering resume. The group state returns `"paused": false`.
 
+Behavioral changes
+~~~~~~~~~~~~~~~~~~
 
+* If a user makes manual load balancer changes to autoscaled servers (such as moving them to a different load balancer,
+  or just adding them to a load balancer autoscale does not know about), autoscale will will revert said change and
+  make sure they are ONLY on the load balancers they were configured to be on.
+
+* If a CLB configured in the group is not found / deleted, the group will be put in ERROR and server that was supposed to be added to CLB *will remain*.
+  This is unlike current behavior where the server that couldn't be added to CLB gets deleted.
 
 Known issues
 ~~~~~~~~~~~~
