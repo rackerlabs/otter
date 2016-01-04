@@ -1,4 +1,4 @@
-API v1.1 release, December 09, 2014
+API v1.0 release, December 09, 2014
 -----------------------------------
 
 What's new
