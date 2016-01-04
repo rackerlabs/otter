@@ -13,15 +13,18 @@ How Autoscale works
 ~~~~~~~~~~~~~~~~~~~~~
 
 Rackspace Autoscale is an API-based tool that automatically scales
-resources in response to an increase or decrease in overall workload
-based on user-defined thresholds.
+resources ("scaling units", which can be cloud servers or cloud
+orchestration stacks) in response to an increase or decrease in overall
+workload based on user-defined thresholds.
 
 Autoscale calls the Rackspace Cloud Servers,
-Rackspace Cloud Load Balancers, and Rackspace RackConnect v3 APIs. All
-Rackspace Cloud Server create server configuration parameters can be
-used with Autoscale. For more information, see the following documentation:
+Rackspace Cloud Load Balancers, Rackspace RackConnect v3, and Rackspace
+Cloud Orchestration APIs. All Rackspace Cloud Server create server
+configuration parameters can be used with Autoscale. For more
+information, see the following documentation:
 
 -  `Rackspace Cloud Servers documentation`_
+-  `Rackspace Cloud Orchestration documentation`_
 -  `public Autoscale github documentation`_
 -  `public Autoscale github Wiki`_
 
@@ -31,9 +34,11 @@ Autoscale functions by linking these services:
 
 -  Load-balanced Cloud Servers. Learn more at `Load Balancers Getting Started Guide`_.
 
+-  Rackspace Cloud Orchestration. Learn more at `Cloud Orchestration Getting Started Guide`_.
+
 You can set up a schedule for launching Autoscale or define an event
 that triggers a webhook. You can also specify a minimum and maximum
-number of cloud servers for your scaling group, the amount of resources
+number of scaling units for your scaling group, the amount of resources
 you want to increase or decrease, and policies based on percentage or
 real numbers.
 
@@ -49,7 +54,9 @@ real numbers.
 .. _public Autoscale github Wiki: https://github.com/rackerlabs/otter/wiki
 .. _public Autoscale github documentation: https://github.com/rackerlabs/otter/tree/master/doc
 .. _Rackspace Cloud Servers documentation: http://docs.rackspace.com/
+.. _Rackspace Cloud Orchestration documentation: https://developer.rackspace.com/docs/cloud-orchestration/v1/developer-guide/
 .. _Load Balancers Getting Started Guide: http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/LB_Overview.html
+.. _Cloud Orchestration Getting Started Guide: https://developer.rackspace.com/docs/cloud-orchestration/v1/developer-guide/#getting-started
 .. _Chef: http://www.opscode.com/chef/
 .. _Create servers: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html
 
@@ -61,9 +68,9 @@ Scaling groups
 
 The scaling group is at the heart of an Autoscale deployment. The
 scaling group specifies the basic elements of the Autoscale
-configuration. It manages how many servers can participate in the
-scaling group. It also specifies information related to load balancers
-if your configuration uses a load balancer.
+configuration. It manages how many scaling units can participate in
+the scaling group. It also specifies information related to load
+balancers if your configuration uses a load balancer.
 
 When you create a scaling group, you specify the details for group
 configurations and launch configurations.
@@ -73,18 +80,24 @@ configurations and launch configurations.
 +======================+======================================================+
 | Group Configuration  | Outlines the basic elements of the Autoscale         |
 |                      | configuration. The group configuration manages how   |
-|                      | many servers can participate in the scaling group.   |
-|                      | It sets a minimum and maximum limit for the number   |
-|                      | of entities that can be used in the scaling process. |
-|                      | It also specifies information related to load        |
-|                      | balancers.                                           |
+|                      | many servers or stacks can participate in the        |
+|                      | scaling group. It sets a minimum and maximum limit   |
+|                      | for the number of entities that can be used in the   |
+|                      | scaling process. It also specifies information       |
+|                      | related to load balancers.                           |
 +----------------------+------------------------------------------------------+
-| Launch Configuration | Creates a blueprint for how new servers will be      |
-|                      | created. The launch configuration specifies what     |
+| Launch Configuration | Creates a blueprint for how new servers or stacks    |
+|                      | will be created.                                     |
+|                      |                                                      |
+|                      | For servers, the launch configuration specifies what |
 |                      | type of server image will be started on launch, what |
 |                      | flavor the new server is, and which cloud load       |
 |                      | balancer or RackConnect v3 load balancer pool the    |
 |                      | new server connects to.                              |
+|                      |                                                      |
+|                      | For stacks, the launch configuration specifies what  |
+|                      | template the stack will use and what parameters to   |
+|                      | pass to the template.                                |
 |                      |                                                      |
 |                      | Note: The launchConfiguration uses the admin user to |
 |                      | scale up, usually the first admin user found on the  |
@@ -95,23 +108,25 @@ configurations and launch configurations.
 |                      | overwrites all launchConfiguration settings.         |
 +----------------------+------------------------------------------------------+
 
-The launch configuration specifies the launch type along with server and load balancer configuration for the components to start. Most launch configurations have both a server and a load balancer (can be RackConnect v3) configured as shown in the `Launch configuration examples`_ .
+The launch configuration specifies the launch type along with either server and load balancer or stack configuration for the components to start. Most ``launch_server`` configurations have both a server and a load balancer (can be RackConnect v3) configured as shown in the `Launch configuration examples`_ .
 
 ``type``
-     Set the type parameter to this value: ``launch_server``.
+     Set the type parameter to ``launch_server`` or ``launch_stack``.
 
 ``args``
-        Specifies the configuration for server and load balancers. Most launch
-        configurations have both a server and a
-        load balancer (can be RackConnect v3) configured. The following items can be configured:
+        Specifies the configuration for either the servers and load
+        balancers or stacks. Most ``launch_server`` launch
+        configurations have both a server and a load balancer (can be
+        RackConnect v3) configured.  The following items can be
+        configured:
 
-        ``server``
+        ``server`` (``launch_server`` only)
              Specifies configuration information for the Cloud server
              image that will be created during the scaling process. If you are using Boot From
              Volume, the ``server`` args are where you specify your create server
              template. See :ref:`Server parameters <server-parameters>`.
 
-        ``loadbalancers``
+        ``loadbalancers`` (``launch_server`` only)
              Specifies the configuration information for the load balancer(s) used in
              the cloud server deployment, including a RackConnect v3 load balancer
              pool. For background information and an example configuration, see :ref:`Cloud Bursting with RackConnect
@@ -120,7 +135,12 @@ The launch configuration specifies the launch type along with server and load ba
              .. note::
                 You must include the ``ServiceNet`` network in your configuration
                 if you use a load balancer so the load balancer can retrieve the IP address of new
-                servers. See :ref:`Load balancer parameters <load-balancers-parameters>`.
+                servers. See :ref:`Load balancer parameters <load-balancers-parameters>.
+
+        ``stack`` (``launch_stack`` only)
+            Specifies the configuration information for the stacks that
+            will be launched. See :ref:`Stack parameters
+            <stack-parameters>`.
 
 
 .. _server-parameters:
@@ -232,6 +252,51 @@ servers.
 
 
  .. _List Load Balancer Details: http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/List_LB_Details.html
+
+
+.. _stack-parameters:
+
+Stack parameters
+^^^^^^^^^^^^^^^^
+
+Stack parameters specify the configuration of the stacks that will be
+created during the scaling process. Note the ``stack`` arguments are
+directly passed to heat when creating a stack. Note the stack arguments
+are directly passed to Heat when creating a stack. For more information,
+see `Create Stack<http://api.rackspace.com/api-ref-orchestration.html#stack_create>`__.
+
+``template``
+    The template that describes the stack. Either template or
+    template_url must be specified. See `Create
+    Stack<http://api.rackspace.com/api-
+    ref-orchestration.html#stack_create>`__.
+
+``template_url``
+    A URI to a template. Either template or template_url must be
+    specified.
+
+``disable_rollback``
+    Set to `True` (or `False`) to keep (or delete) the resources that
+    have been created if the stack fails to create. Defaults to `True`.
+
+``environment``
+    The JSON environment for the stack. See `Environments<http://
+    docs.openstack.org/developer/heat/template_guide/
+    environment.html>`__ for more information.
+
+``files``
+    The contents of files that the template references. See `Create
+    Stack<http://api.  rackspace.com/api-ref-orchestration.html
+    #stack_create>`__ for information on the structure of the Object.
+
+``parameters``
+    Key/value pairs of the parameters and their values to pass to the
+    parameters in the template. See `Create
+    Stack<http://api.rackspace.com/
+    api-ref-orchestration.html#stack_create>`__ for information.
+
+``timeout_mins``
+    The stack creation timeout, in minutes.
 
 
 .. _launch-config-examples:
@@ -363,6 +428,31 @@ and runs a shell command.
     }
 
 
+**Example: Launch configuration of type ``launch_stack``**
+
+.. code::  sh
+
+                                  "launchConfiguration": {
+        "args": {
+          "stack": {
+            "template": {
+              "heat_template_version": "2015-10-15",
+              "resources": {
+                "the_server": {
+                  "type": "OS::Nova::Server",
+                  "flavor": {"get_param": "the_flavor"},
+                  "image": "Ubuntu 14.04 LTS (Trusty Tahr) (PVHVM)"
+                }
+              }
+            },
+            "parameters": {
+                "the_flavor": "4 GB Performance"
+            }
+          }
+        },
+        "type": "launch_stack"
+
+
 Learn more
 ***********
 
@@ -383,6 +473,11 @@ See these topics for information about configuring Cloud Load Balancers through 
 
 -   `Rackspace Cloud Load Balancers Developer
     Guide <http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/Overview-d1e82.html>`__
+
+See these topics for information about configuring Cloud Orchestration stacks through an API:
+
+-   `Rackspace Cloud Orchestration Getting
+    Started <https://developer.rackspace.com/docs/cloud-orchestration/v1/developer-guide/#getting-started>`__
 
 .. _webhooks-and-capabilities:
 
@@ -493,23 +588,23 @@ To configure a webhook-based policy, you set the ``type`` parameter to
 
 ``change``
      Specifies the number of entities to add or remove, for example "1"
-     implies that 1 server needs to be added. Use to change the number of
-     servers to a specific number. If a positive number is used, servers are
-     added; if a negative number is used, servers are removed.
+     implies that 1 unit needs to be added. Use to change the number of
+     units to a specific number. If a positive number is used, units are
+     added; if a negative number is used, units are removed.
 
 ``changePercent``
      Specifies the change value in per cent. Use to change the percentage of
-     servers relative to the current number of servers. If a positive number
-     is used, servers are added; if a negative number is used, servers are
-     removed. The absolute change in the number of servers is always rounded
-     up. For example, if -X% of the current number of servers translates to
-     -0.5 or -0.25 or -0.75 servers, the actual number of servers that
+     units relative to the current number of units. If a positive number
+     is used, units are added; if a negative number is used, units are
+     removed. The absolute change in the number of units is always rounded
+     up. For example, if -X% of the current number of units translates to
+     -0.5 or -0.25 or -0.75 units, the actual number of units that
      will be shut down is 1.
 
 ``desiredCapacity``
      Specifies the final capacity that is desired by the scale up event. Note
-     that this value is always rounded up. Use to specify a number of servers
-     for the policy to implement—by either adding or removing servers as
+     that this value is always rounded up. Use to specify a number of units
+     for the policy to implement—by either adding or removing units as
      needed.
 
 The webhook object takes no ``args`` parameter.
@@ -536,23 +631,23 @@ To configure a schedule-based policy, set the ``type`` parameter to
 
 ``change``
     Specifies the number of entities to add or remove, for example "1"
-    implies that 1 server needs to be added. Use to change the number of
-    servers to a specific number. If a positive number is used, servers are
-    added; if a negative number is used, servers are removed.
+    implies that 1 unit needs to be added. Use to change the number of
+    units to a specific number. If a positive number is used, units are
+    added; if a negative number is used, units are removed.
 
 ``changePercent``
     Specifies the change value, in incremental stages or per cent. Use to
-    change the percentage of servers relative to the current number of
-    servers. If a positive number is used, servers are added; if a negative
-    number is used, servers are removed. The absolute change in the number
-    of servers is always rounded up. For example, if -X% of the current
-    number of servers translates to -0.5 or -0.25 or -0.75 servers, the
-    actual number of servers that will be shut down is 1.
+    change the percentage of units relative to the current number of
+    units. If a positive number is used, units are added; if a negative
+    number is used, units are removed. The absolute change in the number
+    of units is always rounded up. For example, if -X% of the current
+    number of units translates to -0.5 or -0.25 or -0.75 units, the
+    actual number of units that will be shut down is 1.
 
 ``desiredCapacity``
     Specifies final capacity that is desired by the scale up event. Use to
-    specify a number of servers for the policy to implement—by either adding
-    or removing servers as needed.
+    specify a number of units for the policy to implement—by either adding
+    or removing units as needed.
 
 ``args``
     Provide information related to the time when the policy is supposed to
@@ -606,7 +701,7 @@ is shown in the following example:
 Scaling by percentage
 ^^^^^^^^^^^^^^^^^^^^^^
 
-You can define a policy that scales your server resources up and down by
+You can define a policy that scales your resources up and down by
 a predefined percentage. For example, you can define a policy to
 increase your resources by 20% if a certain predefined event occurs as illustrated in
 the following figure.
@@ -647,7 +742,8 @@ Deleting resources
 You can set a policy to specify when to delete resources,
 and how many resources to delete.
 
-When deleting servers, Autoscale follows these rules:
+When deleting servers, Autoscale follows these rules (deletion of stacks
+is similar):
 
 -  If no new servers are in the process of being built, the oldest
    servers are deleted first.
@@ -672,7 +768,7 @@ Autoscale supports a cooldown feature. A cooldown is a configured
 period of time that must pass between actions. Cooldowns only apply to
 webhook-based configurations. By configuring group cooldowns, you
 control how often a group can have a policy applied, which can help
-servers scaling up to complete the scale up before another policy is
+units scaling up to complete the scale up before another policy is
 executed. By configuring policy cooldowns, you control how often a
 policy can be executed, which can help provide quick scale-ups and
 gradual scale-downs.
@@ -700,14 +796,14 @@ Schedule-based configurations
 You can configure Autoscale to be triggered based on a user-defined
 schedule that is specified in one or more policies.
 
-This configuration option is helpful if you know that your Cloud Servers
-deployment will need additional resources during certain peak times. For
-example, if you need additional server resources during the weekend, you
-can define a policy that adds 50 servers on Friday evening and then
-removes these servers again on Sunday evening to return to a regular
+This configuration option is helpful if you know that your scaling group
+will need additional resources during certain peak times. For
+example, if you need additional resources during the weekend, you
+can define a policy that adds 50 units on Friday evening and then
+removes these units again on Sunday evening to return to a regular
 operational state.
 
-**Scale servers by schedule**
+**Scale units by schedule**
 
 .. image::  _images/scaleby-schedule.png
    :alt: Scale by schedule policy
@@ -731,7 +827,7 @@ monitoring service. Event-based configuration works the following way:
 
 #. The webhook launches the Autoscale service, which looks up the
    policy that has been defined in accordance with the webhook. This
-   policy determines the amount of cloud servers that need to be added
+   policy determines the amount of units that need to be added
    or removed.
 
 ..  note::
