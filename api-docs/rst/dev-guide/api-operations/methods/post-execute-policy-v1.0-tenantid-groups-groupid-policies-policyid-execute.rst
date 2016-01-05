@@ -55,7 +55,7 @@ This table shows the possible response codes for this operation:
 |                          |                         |applying the changes     |
 |                          |                         |would not result in the  |
 |                          |                         |addition or deletion of  |
-|                          |                         |any servers.             |
+|                          |                         |any scaling units.       |
 +--------------------------+-------------------------+-------------------------+
 |403                       |Forbidden                |The user does not have   |
 |                          |                         |permission to perform    |
