@@ -52,7 +52,7 @@ This table shows the possible response codes for this operation:
 |                          |                         |applying the changes          |
 |                          |                         |would not result in the       |
 |                          |                         |addition or deletion of       |
-|                          |                         |any servers.                  |
+|                          |                         |any scaling units.            |
 +--------------------------+-------------------------+------------------------------+
 |403                       |GroupPausedError         |The policy did not run        |
 |                          |                         |because the group is          |
