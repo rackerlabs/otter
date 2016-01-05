@@ -11,7 +11,7 @@ Update launch configuration
 
 This operation updates an existing launch configuration for the specified scaling group.
 
-To change the launch configuration, specify the new configuration in the request body in JSON format. Configuration elements include from which image to create a server, which load balancers to join the server to, which networks to add the server to, and other metadata. If the update is successful, no response body is returned.
+To change the launch configuration, specify the new configuration in the request body in JSON format. Configuration elements include from which image to create a server, which load balancers to join the server to, which networks to add the server to, which template to use to create a stack, and other metadata. If the update is successful, no response body is returned.
 
 .. note::
    All Rackspace Auto Scale update (**PUT**) operations completely replace the configuration being updated. Empty values (for example, { } )in the update are accepted and overwrite previously specified parameters. New parameters can be specified. All create (**POST**) parameters, even optional ones, are required for the update operation. 
@@ -141,13 +141,15 @@ This table shows the body parameters for the request:
 +-------------------------------+-------------+---------------------------------------------------+
 |Name                           |Type         |Description                                        |
 +===============================+=============+===================================================+
-|\ **args**                     |Object       |The configuration used to create new servers in    |
-|                               |*(Optional)* |the scaling group. You must specify ``server``     |
+|\ **args**                     |Object       |The configuration used to create new servers or    |
+|                               |*(Optional)* |stacks in the scaling group. For ``launch_server`` |
+|                               |             |configurations, you must specify the ``server``    |
 |                               |             |attribute, and can also specify the optional       |
 |                               |             |``loadBalancers`` attribute. Most launch           |
 |                               |             |configurations have both a server and a cloud load |
 |                               |             |balancer or RackConnectV3 load balancer pool       |
-|                               |             |configured.                                        |
+|                               |             |configured. For ``launch_stack`` configurations,   |
+|                               |             |you must specify the ``stack`` attribute.          |
 +-------------------------------+-------------+---------------------------------------------------+
 |args.\ **loadBalancers**       |Array        |One or more load balancers to which to add         |
 |                               |*(Optional)* |servers. All servers are added to these load       |
