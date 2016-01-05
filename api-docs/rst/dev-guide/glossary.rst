@@ -36,14 +36,14 @@ Glossary 
     is mapped directly to an individual computer or a virtual machine.
 
 **Convergence**
-    The act of Auto Scale adding or removing enough servers or stacks to
+    The act of Auto Scale adding or removing enough units to
     satisfy the needed capacity.
 
 **Convergence Delta**
-    The change in the number of servers or stacks that the system makes
+    The change in the number of units that the system makes
     when a scaling policy is executed. For example, if the convergence
-    delta is 2, then the system adds 2 servers. If it is -10, the system removes
-    10 servers.
+    delta is 2, then the system adds 2 units. If it is -10, the system removes
+    10 units.
 
 **Cooldown**
     There are two types of cooldown: group and policy. A group cooldown
@@ -71,7 +71,7 @@ Glossary 
 
 **Launch Configuration**
     A configuration that contains the necessary details for adding and
-    removing servers or stacks from a scaling group in the Rackspace
+    removing units from a scaling group in the Rackspace
     Auto Scale API. The ``launchConfiguration`` object specifies
     whether you are creating a server, load balancer, or stack and the
     necessary details about the configuration.
@@ -95,11 +95,14 @@ Glossary 
     in response to variations in workload.
 
 **Scaling Group**
-    A scaling group identifies servers and load balancers or stacks
-    that are managed by a scaling policy.
+    A scaling group identifies units that are managed by a scaling policy.
 
 **Scaling Policy**
     A scaling policy manages a scaling group.
+
+**Scaling Unit**
+    Either a server or stack, depending on the launch configuration of a
+    scaling group. Added or removed during a scaling event.
 
 **Session persistence**
     A feature of the load balancing service that attempts to force
@@ -117,6 +120,9 @@ Glossary 
     Orchestration service. Many resource types can be managed in a
     stack, including servers, load balancers, databases, software
     configurations, monitoring entities, and even Auto Scale groups.
+
+**Unit**
+    See *Scaling Unit*
 
 **Virtual IP**
     An Internet Protocol (IP) address that is configured on the load
