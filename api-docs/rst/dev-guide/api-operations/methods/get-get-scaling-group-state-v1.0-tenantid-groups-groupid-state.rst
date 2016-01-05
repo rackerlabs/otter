@@ -21,11 +21,11 @@ The *GroupState* object consists of the following properties:
    operations return a ``403 GroupPausedError`` response.
    If ``paused=FALSE``, all group scaling and convergence operations resume and
    scheduled or API-generated policy exectuions are allowed.
-*  *pendingCapacity*. Integer. Specifies the number of servers that are in a "building" state.
+*  *pendingCapacity*. Integer. Specifies the number of scaling units that are in a "building" state.
 *  *name*. Specifies the name of the group.
-*  *active*. Specifies an array of active servers in the group. This array includes the server Id, as well as other data.
-*  *activeCapacity*. Integer. Specifies the number of active servers in the group.
-*  *desiredCapacity*. Integer. Specifies the number of servers that are desired in the scaling group.
+*  *active*. Specifies an array of active scaling units in the group. This array includes the scaling unit ID, as well as other data.
+*  *activeCapacity*. Integer. Specifies the number of active scaling units in the group.
+*  *desiredCapacity*. Integer. Specifies the number of scaling units that are desired in the scaling group.
 *  *status*. String. Indicates the scaling group status. If ``status=ACTIVE``,
    the scaling group is healthy and actively scaling up and down on request.
    If ``status=ERROR``, the scaling group cannot complete scaling operation
