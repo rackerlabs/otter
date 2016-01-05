@@ -9,6 +9,8 @@ Core Concepts
 
 Autoscale is an API based tool that enables you to scale your application by adding or removing servers based on monitoring events, a schedule, or arbitrary webhooks.
 
+Note: Autoscale can also scale Cloud Orchestration stacks, but this is not covered in this document. See :ref:`Autoscale Concepts <concepts>` for more information.
+
 Autoscale functions by linking three services:
 
 - Monitoring (such as Monitoring as a Service)
@@ -63,8 +65,8 @@ This configuration specifies what to do when we want to create a new server. Wha
 
 The Launch Configuration Contains:
 
-- Launch Configuration Type (Only type currently supported is "launch_server")
-- Arguments:
+- Launch Configuration Type
+- Arguments (specific to launch configuration type, below are for launch_server):
 
   - Server
 
