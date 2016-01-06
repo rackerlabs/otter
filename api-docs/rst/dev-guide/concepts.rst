@@ -277,9 +277,9 @@ Stack parameters
 
 Stack parameters specify the configuration of the stacks that will be
 created during the scaling process. Note the ``stack`` arguments are
-directly passed to heat when creating a stack. Note the stack arguments
-are directly passed to Heat when creating a stack. For more information,
-see `Create Stack<http://api.rackspace.com/api-ref-orchestration.html#stack_create>`__.
+directly passed to Cloud Orchestration when creating a stack. For more
+information, see
+`Create Stack<http://api.rackspace.com/api-ref-orchestration.html#stack_create>`__.
 
 ``template``
     The template that describes the stack. Either template or

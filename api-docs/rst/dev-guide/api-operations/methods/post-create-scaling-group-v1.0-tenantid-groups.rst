@@ -284,7 +284,7 @@ This table shows the body parameters for the request:
 |                                                   |*(Optional)* |to pass to the parameters in the template. See     |
 |                                                   |             |`Create Stack<http://api.rackspace.com/            |
 |                                                   |             |api-ref-orchestration.html#stack_create>`__ for    |
-|                                                   |             |information.                                       |
+|                                                   |             |more information.                                  |
 +---------------------------------------------------+-------------+---------------------------------------------------+
 |launchConfiguration.args.stack.\ **timeout_mins**  |Integer      |The stack creation timeout, in minutes.            |
 |                                                   |*(Optional)* |                                                   |
@@ -391,7 +391,7 @@ This table shows the body parameters for the request:
 |                                                   |             |integer, the number of units decreases.            |
 +---------------------------------------------------+-------------+---------------------------------------------------+
 |scalingPolicies.[*].\ **desiredCapacity**          |Integer      |The desired scaling unit capacity of the scaling   |
-|                                                   |*(Optional)* |the group; that is, how many unit should be in     |
+|                                                   |*(Optional)* |the group; that is, how many units should be in    |
 |                                                   |             |the scaling group. This value must be an absolute  |
 |                                                   |             |number, greater than or equal to zero. For         |
 |                                                   |             |example, if this parameter is set to ten,          |

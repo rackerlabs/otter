@@ -11,7 +11,13 @@ Update launch configuration
 
 This operation updates an existing launch configuration for the specified scaling group.
 
-To change the launch configuration, specify the new configuration in the request body in JSON format. Configuration elements include from which image to create a server, which load balancers to join the server to, which networks to add the server to, which template to use to create a stack, and other metadata. If the update is successful, no response body is returned.
+To change the launch configuration, specify the new configuration in the
+request body in JSON format. For ``launch_server`` launch configurations, the
+details include arguments supplied to Cloud Servers when creating a server and
+which cloud load balancers to join it to. For ``launch_stack`` launch
+configurations, the details include arguments supplied to Cloud Orchestration
+when creating a stack. If the update is successful, no response body is
+returned.
 
 .. note::
    All Rackspace Auto Scale update (**PUT**) operations completely replace the configuration being updated. Empty values (for example, { } )in the update are accepted and overwrite previously specified parameters. New parameters can be specified. All create (**POST**) parameters, even optional ones, are required for the update operation. 
