@@ -71,7 +71,7 @@ Glossary 
 
 **Launch Configuration**
     A configuration that contains the necessary details for adding and
-    removing units from a scaling group in the Rackspace
+    removing resources from a scaling group in the Rackspace
     Auto Scale API. The ``launchConfiguration`` object specifies
     whether you are creating a server, load balancer, or stack and the
     necessary details about the configuration.
@@ -102,7 +102,7 @@ Glossary 
 
 **Scaling Unit**
     Either a server or stack, depending on the launch configuration of a
-    scaling group. Added or removed during a scaling event.
+    scaling group. A unit is added or removed during a scaling event.
 
 **Session persistence**
     A feature of the load balancing service that attempts to force

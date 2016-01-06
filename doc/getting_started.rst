@@ -66,7 +66,7 @@ This configuration specifies what to do when we want to create a new server. Wha
 The Launch Configuration Contains:
 
 - Launch Configuration Type
-- Arguments (specific to launch configuration type, below are for launch_server):
+- Arguments (specific to the launch configuration type, the example below shows the arguments for a ``launch_server`` configuration type):
 
   - Server
 
