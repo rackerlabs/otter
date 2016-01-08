@@ -32,7 +32,8 @@ from otter.test.utils import (
     matches,
     mock_log,
     mock_treq,
-    patch)
+    patch,
+    set_config_for_test)
 from otter.test.worker.test_rcv3 import _rcv3_add_response_body
 from otter.undo import IUndoStack
 from otter.util.config import set_config_data
@@ -890,6 +891,14 @@ def _get_server_info(metadata=None, created=None):
     return config
 
 
+def reset_semaphores(testcase):
+    """
+    reset global sempahores to empty in beginning of test as it is module-wise
+    info retained in every test
+    """
+    testcase.patch(launch_server_v1, "_semaphores", {})
+
+
 class ServerTests(RequestBagTestMixin, SynchronousTestCase):
     """
     Test server manipulation functions.
@@ -912,9 +921,12 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
             'otter.worker.launch_server_v1.generate_server_name')
         self.generate_server_name.return_value = 'as000000'
 
+        reset_semaphores(self)
+
         self.scaling_group_uuid = '1111111-11111-11111-11111111'
 
-        self.scaling_group = mock.Mock(uuid=self.scaling_group_uuid, tenant_id='1234')
+        self.scaling_group = mock.Mock(uuid=self.scaling_group_uuid,
+                                       tenant_id='1234')
 
         self.undo = iMock(IUndoStack)
 
@@ -1143,11 +1155,6 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         d = create_server('http://url/', 'my-auth-token', {'some': 'stuff'},
                           _treq=_treq, clock=self.clock)
 
-        # No result initially. Will be avail after 1 second due to
-        # injected delay
-        self.assertNoResult(d)
-        self.clock.advance(1)
-
         result = self.successResultOf(d)
         self.assertEqual(result, {"server": "created"})
         self.assertFalse(fs.called)
@@ -1155,7 +1162,7 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
     def test_create_server_limits(self):
         """
         create_server when called many times will post only 1 request at
-        a time
+        a time if configured with limit of 1
         """
         deferreds = [Deferred() for i in range(3)]
         post_ds = deferreds[:]
@@ -1166,6 +1173,7 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
             'imageRef': '1',
             'flavorRef': '3'
         }
+        set_config_for_test(self, {"worker": {"create_server_limit": 1}})
 
         ret_ds = [create_server('http://url/', 'my-auth-token',
                                 server_config, clock=self.clock)
@@ -1194,11 +1202,6 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
         self.successResultOf(ret_ds[1])
         self.successResultOf(ret_ds[2])
 
-    def _create_server(self, url, token, conf, **kwargs):
-        d = create_server(url, token, conf, clock=self.clock, **kwargs)
-        self.clock.advance(1)
-        return d
-
     @mock.patch('otter.worker.launch_server_v1.find_server')
     def test_create_server_propagates_api_failure_from_create(self, fs):
         """
@@ -1217,9 +1220,9 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
 
         fs.return_value = fail(APIError(401, '', {}))
 
-        d = self._create_server(
+        d = create_server(
             'http://url/', 'my-auth-token', {}, log=self.log, retries=0,
-            _treq=_treq, create_failure_delay=5)
+            _treq=_treq, create_failure_delay=5, clock=self.clock)
         self.clock.advance(5)
 
         failure = self.failureResultOf(d, RequestError)
@@ -1248,9 +1251,9 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
 
         fs.return_value = succeed("I'm a server!")
 
-        d = self._create_server(
+        d = create_server(
             'http://url/', 'my-auth-token', {'some': 'stuff'}, _treq=_treq,
-            create_failure_delay=5)
+            create_failure_delay=5, clock=self.clock)
         self.assertNoResult(d)
 
         self.clock.advance(5)
@@ -1276,9 +1279,9 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
 
         fs.return_value = succeed(None)
 
-        d = self._create_server(
+        d = create_server(
             'http://url/', 'my-auth-token', {}, log=self.log, retries=0,
-            _treq=_treq, create_failure_delay=5)
+            _treq=_treq, create_failure_delay=5, clock=self.clock)
         self.assertNoResult(d)
         self.clock.advance(5)
 
@@ -1337,7 +1340,7 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
 
         _treq = StubTreq([(req, resp)], [(resp, "User error!")])
 
-        d = self._create_server(
+        d = create_server(
             'http://url/', 'my-auth-token', {}, log=self.log, _treq=_treq)
         self.clock.advance(15)
 
@@ -2224,6 +2227,8 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
             self, 'otter.worker.launch_server_v1.remove_from_load_balancer')
         self.remove_from_load_balancer.return_value = succeed(None)
 
+        reset_semaphores(self)
+
         self.clock = Clock()
         self.url = 'http://url'
         self.server_id = 'serverId'
@@ -2234,7 +2239,6 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         """
         d = delete_server(self.log, self.request_bag, instance_details,
                           clock=self.clock)
-        self.clock.advance(0.4)
         return d
 
     def test_delete_server_no_lbs(self):
@@ -2389,7 +2393,6 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
     def _delete_and_verify(self):
         d = delete_and_verify(self.log, self.url, self.request_bag,
                               self.server_id, self.clock)
-        self.clock.advance(0.4)
         return d
 
     def test_delete_and_verify_does_not_verify_if_404(self):
@@ -2423,6 +2426,8 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         :func:`delete_and_verify` limits the number of delete server requests
         to 1. It also delays response by 1 second
         """
+        set_config_for_test(self, {"worker": {"delete_server_limit": 1}})
+
         deferreds = [Deferred() for i in range(3)]
         delete_ds = deferreds[:]
         self.treq.delete.side_effect = lambda *a, **kw: deferreds.pop(0)

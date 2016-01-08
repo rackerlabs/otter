@@ -42,6 +42,7 @@ from otter.convergence.model import HeatStack, NovaServer, ServerState
 from otter.log.bound import BoundLog, bound_log_kwargs
 from otter.models.interface import IScalingGroup, IScalingGroupServersCache
 from otter.supervisor import ISupervisor
+from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
 from otter.util.fp import set_in
 from otter.util.retry import Retry, ShouldDelayAndRetry, perform_retry
@@ -579,6 +580,14 @@ class DummyException(Exception):
     """
     Fake exception
     """
+
+
+def set_config_for_test(testcase, data):
+    """
+    Set config data for test. Will reset to {} after test is run
+    """
+    set_config_data(data)
+    testcase.addCleanup(set_config_data, {})
 
 
 @implementer(ISupervisor)
