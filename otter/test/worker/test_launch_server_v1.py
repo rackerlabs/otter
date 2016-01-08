@@ -32,7 +32,8 @@ from otter.test.utils import (
     matches,
     mock_log,
     mock_treq,
-    patch)
+    patch,
+    set_config_for_test)
 from otter.test.worker.test_rcv3 import _rcv3_add_response_body
 from otter.undo import IUndoStack
 from otter.util.config import set_config_data
@@ -1172,7 +1173,7 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
             'imageRef': '1',
             'flavorRef': '3'
         }
-        set_config_data({"worker": {"create_server_limit": 1}})
+        set_config_for_test(self, {"worker": {"create_server_limit": 1}})
 
         ret_ds = [create_server('http://url/', 'my-auth-token',
                                 server_config, clock=self.clock)
@@ -2425,8 +2426,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
         :func:`delete_and_verify` limits the number of delete server requests
         to 1. It also delays response by 1 second
         """
-        set_config_data({"worker": {"delete_server_limit": 1}})
-        self.addCleanup(set_config_data, None)
+        set_config_for_test(self, {"worker": {"delete_server_limit": 1}})
 
         deferreds = [Deferred() for i in range(3)]
         delete_ds = deferreds[:]
