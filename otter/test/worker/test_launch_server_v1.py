@@ -890,6 +890,14 @@ def _get_server_info(metadata=None, created=None):
     return config
 
 
+def reset_semaphores(testcase):
+    """
+    reset global sempahores to empty in beginning of test as it is module-wise
+    info retained in every test
+    """
+    testcase.patch(launch_server_v1, "_semaphores", {})
+
+
 class ServerTests(RequestBagTestMixin, SynchronousTestCase):
     """
     Test server manipulation functions.
@@ -912,9 +920,7 @@ class ServerTests(RequestBagTestMixin, SynchronousTestCase):
             'otter.worker.launch_server_v1.generate_server_name')
         self.generate_server_name.return_value = 'as000000'
 
-        # reset it to empty in beginning of test as it is module-wise
-        # info retained in every test
-        launch_server_v1._semaphores = {}
+        reset_semaphores(self)
 
         self.scaling_group_uuid = '1111111-11111-11111-11111111'
 
@@ -2220,9 +2226,7 @@ class DeleteServerTests(RequestBagTestMixin, SynchronousTestCase):
             self, 'otter.worker.launch_server_v1.remove_from_load_balancer')
         self.remove_from_load_balancer.return_value = succeed(None)
 
-        # reset it to empty in beginning of test as it is module-wise
-        # info retained in every test
-        launch_server_v1._semaphores = {}
+        reset_semaphores(self)
 
         self.clock = Clock()
         self.url = 'http://url'
