@@ -160,6 +160,12 @@ def get_sempahore(operation, conf_name):
     """
     Get global semaphore of given operation if configured based on conf_name.
     Otherwise return None
+
+    :param str operation: Operation for which semaphore is required. Must be
+        same each time it is called for that operation
+    :param str conf_name: Semaphore is returned only if this config exists
+
+    :return: A :obj:`DeferredSemaphore` object corresponding to the operation
     """
     sem = _semaphores.get(operation)
     if sem is not None:
