@@ -43,7 +43,6 @@ from otter.log.bound import BoundLog, bound_log_kwargs
 from otter.models.interface import IScalingGroup, IScalingGroupServersCache
 from otter.supervisor import ISupervisor
 from otter.util.config import set_config_data, update_config_data
-from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
 from otter.util.fp import set_in
 from otter.util.retry import Retry, ShouldDelayAndRetry, perform_retry
