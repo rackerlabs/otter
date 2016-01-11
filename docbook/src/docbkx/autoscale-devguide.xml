@@ -1745,14 +1745,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 </note>
             </para>
         </section>
-        <section xml:id="audit-log" security="writerOnly">
-            <title>Audit logs</title>
-            <para>Because of the deferred nature of Auto Scale, most
-                errors occur outside of the user's session. Errors are
-                logged to a user's cloud feed as an audit log. The
-                audit log contains all the events that have occurred
-                within a user's scaling group. </para>
-        </section>
         <section xml:id="faults-dle101">
             <title>Faults</title>
             <para>If any &PRODNAME; request results in an error, the
@@ -1817,4 +1809,5 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
         <xi:include href="chapters/glossary.xml" xpointer="element(Glossary-000)"/>
         <!-- -->
     </chapter>
+    <xi:include href="chapters/appendix-diy.xml"/>
 </book>

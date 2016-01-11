@@ -381,16 +381,39 @@ class ValidateLaunchConfigTests(SupervisorTests):
             return_value=succeed(None))
         self.launch_config = {'type': 'launch_server', 'args': 'launch_args'}
 
-    def test_valid(self):
+    def test_valid_launch_server(self):
         """
-        It authenticates and calls validate_launch_server_config with correct args
+        It authenticates and calls validate_launch_server_config with correct
+        args when a launch_server launch config is given.
         """
-        d = self.supervisor.validate_launch_config(self.log, self.group.tenant_id,
+        d = self.supervisor.validate_launch_config(self.log,
+                                                   self.group.tenant_id,
                                                    self.launch_config)
         self.successResultOf(d)
         self.auth_function.assert_called_once_with(
             self.group.tenant_id, log=self.log.bind.return_value)
         self.validate_launch_server_config.assert_called_once_with(
+            self.log.bind.return_value, 'ORD', self.service_catalog,
+            self.auth_tokens[0], 'launch_args')
+
+    def test_valid_launch_stack(self):
+        """
+        It authenticates and calls validate_launch_stack_config with correct
+        args when a launch_server launch config is given.
+        """
+        self.validate_launch_stack_config = patch(
+            self,
+            'otter.supervisor.validate_config.validate_launch_stack_config',
+            return_value=succeed(None))
+        launch_config = {'type': 'launch_stack', 'args': 'launch_args'}
+
+        d = self.supervisor.validate_launch_config(self.log,
+                                                   self.group.tenant_id,
+                                                   launch_config)
+        self.successResultOf(d)
+        self.auth_function.assert_called_once_with(
+            self.group.tenant_id, log=self.log.bind.return_value)
+        self.validate_launch_stack_config.assert_called_once_with(
             self.log.bind.return_value, 'ORD', self.service_catalog,
             self.auth_tokens[0], 'launch_args')
 

@@ -381,6 +381,38 @@ class AutoscaleMetadataTests(SynchronousTestCase):
                          expected)
 
 
+def sample_servers():
+    """
+    Return sample Nova servers JSON
+    """
+    return [
+        {
+            'id': 'a',
+            'status': 'ACTIVE',
+            'created': '2020-10-10T10:00:00Z',
+            'image': {'id': 'valid_image'},
+            'flavor': {'id': 'valid_flavor'},
+            'links': [
+                {'href': 'link1', 'rel': 'self'},
+                {'href': 'otherlink1', 'rel': 'bookmark'}
+            ]
+        },
+        {
+            'id': 'b',
+            'status': 'BUILD',
+            'image': {'id': 'valid_image'},
+            'flavor': {'id': 'valid_flavor'},
+            'created': '2020-10-20T11:30:00Z',
+            'addresses': {'private': [{'addr': u'10.0.0.1',
+                                       'version': 4}]},
+            'links': [
+                {'href': 'link2', 'rel': 'self'},
+                {'href': 'otherlink2', 'rel': 'bookmark'}
+            ]
+        }
+    ]
+
+
 class NovaServerTests(SynchronousTestCase):
     """
     Tests for :func:`NovaServer.from_server_details_json` and
@@ -390,28 +422,8 @@ class NovaServerTests(SynchronousTestCase):
         """
         Sample servers
         """
-        self.createds = [('2020-10-10T10:00:00Z', 1602324000),
-                         ('2020-10-20T11:30:00Z', 1603193400)]
-        self.links = [
-            [{'href': 'link1', 'rel': 'self'},
-             {'href': 'otherlink1', 'rel': 'bookmark'}],
-            [{'href': 'link2', 'rel': 'self'},
-             {'href': 'otherlink2', 'rel': 'bookmark'}]
-        ]
-        self.servers = [{'id': 'a',
-                         'status': 'ACTIVE',
-                         'created': self.createds[0][0],
-                         'image': {'id': 'valid_image'},
-                         'flavor': {'id': 'valid_flavor'},
-                         'links': self.links[0]},
-                        {'id': 'b',
-                         'status': 'BUILD',
-                         'image': {'id': 'valid_image'},
-                         'flavor': {'id': 'valid_flavor'},
-                         'created': self.createds[1][0],
-                         'addresses': {'private': [{'addr': u'10.0.0.1',
-                                                    'version': 4}]},
-                         'links': self.links[1]}]
+        self.createds = [1602324000, 1603193400]
+        self.servers = sample_servers()
 
     def test_without_address(self):
         """
@@ -423,9 +435,9 @@ class NovaServerTests(SynchronousTestCase):
                        state=ServerState.ACTIVE,
                        image_id='valid_image',
                        flavor_id='valid_flavor',
-                       created=self.createds[0][1],
+                       created=self.createds[0],
                        servicenet_address='',
-                       links=freeze(self.links[0]),
+                       links=freeze(self.servers[0]['links']),
                        json=freeze(self.servers[0])))
 
     def test_without_private(self):
@@ -439,9 +451,9 @@ class NovaServerTests(SynchronousTestCase):
                        state=ServerState.ACTIVE,
                        image_id='valid_image',
                        flavor_id='valid_flavor',
-                       created=self.createds[0][1],
+                       created=self.createds[0],
                        servicenet_address='',
-                       links=freeze(self.links[0]),
+                       links=freeze(self.servers[0]['links']),
                        json=freeze(self.servers[0])))
 
     def test_with_servicenet(self):
@@ -454,9 +466,9 @@ class NovaServerTests(SynchronousTestCase):
                        state=ServerState.BUILD,
                        image_id='valid_image',
                        flavor_id='valid_flavor',
-                       created=self.createds[1][1],
+                       created=self.createds[1],
                        servicenet_address='10.0.0.1',
-                       links=freeze(self.links[1]),
+                       links=freeze(self.servers[1]['links']),
                        json=freeze(self.servers[1])))
 
     def test_without_image_id(self):
@@ -464,7 +476,7 @@ class NovaServerTests(SynchronousTestCase):
         Create server that has missing image in it in various ways.
         (for the case of BFV)
         """
-        for image in ({}, {'id': None}):
+        for image in ({}, {'id': None}, ""):
             self.servers[0]['image'] = image
             self.assertEqual(
                 NovaServer.from_server_details_json(self.servers[0]),
@@ -472,9 +484,9 @@ class NovaServerTests(SynchronousTestCase):
                            state=ServerState.ACTIVE,
                            image_id=None,
                            flavor_id='valid_flavor',
-                           created=self.createds[0][1],
+                           created=self.createds[0],
                            servicenet_address='',
-                           links=freeze(self.links[0]),
+                           links=freeze(self.servers[0]['links']),
                            json=freeze(self.servers[0])))
         del self.servers[0]['image']
         self.assertEqual(
@@ -483,9 +495,9 @@ class NovaServerTests(SynchronousTestCase):
                        state=ServerState.ACTIVE,
                        image_id=None,
                        flavor_id='valid_flavor',
-                       created=self.createds[0][1],
+                       created=self.createds[0],
                        servicenet_address='',
-                       links=freeze(self.links[0]),
+                       links=freeze(self.servers[0]['links']),
                        json=freeze(self.servers[0])))
 
     def test_with_lb_metadata(self):
@@ -517,13 +529,13 @@ class NovaServerTests(SynchronousTestCase):
                        state=ServerState.ACTIVE,
                        image_id='valid_image',
                        flavor_id='valid_flavor',
-                       created=self.createds[0][1],
+                       created=self.createds[0],
                        desired_lbs=pset([
                            CLBDescription(lb_id='1', port=80),
                            CLBDescription(lb_id='1', port=90),
                            RCv3Description(lb_id='1')]),
                        servicenet_address='',
-                       links=freeze(self.links[0]),
+                       links=freeze(self.servers[0]['links']),
                        json=freeze(self.servers[0])))
 
     def test_lbs_from_metadata_ignores_unsupported_lb_types(self):
@@ -541,10 +553,10 @@ class NovaServerTests(SynchronousTestCase):
                        state=ServerState.ACTIVE,
                        image_id='valid_image',
                        flavor_id='valid_flavor',
-                       created=self.createds[0][1],
+                       created=self.createds[0],
                        desired_lbs=pset(),
                        servicenet_address='',
-                       links=freeze(self.links[0]),
+                       links=freeze(self.servers[0]['links']),
                        json=freeze(self.servers[0])))
 
     def test_deleting_server(self):
@@ -559,10 +571,10 @@ class NovaServerTests(SynchronousTestCase):
                        state=ServerState.DELETED,
                        image_id='valid_image',
                        flavor_id='valid_flavor',
-                       created=self.createds[0][1],
+                       created=self.createds[0],
                        desired_lbs=pset(),
                        servicenet_address='',
-                       links=freeze(self.links[0]),
+                       links=freeze(self.servers[0]['links']),
                        json=freeze(self.servers[0])))
 
     def test_repr_nova(self):
@@ -575,7 +587,7 @@ class NovaServerTests(SynchronousTestCase):
         server_json.update({
             'metadata': {'some': 'stuff'},
             'OS-EXT-STS:task_state': None,
-            'updated': self.createds[0][0],
+            'updated': '2020-10-10T10:00:00Z',
             'user': '12345',
             'hostId': '12356773526246'
         })
@@ -583,7 +595,7 @@ class NovaServerTests(SynchronousTestCase):
         expected_json = {
             'status': server_json['status'],
             'OS-EXT-STS:task_state': None,
-            'updated': self.createds[0][0],
+            'updated': '2020-10-10T10:00:00Z',
             'metadata': {'some': 'stuff'}
         }
         self.assertEqual(
@@ -591,9 +603,9 @@ class NovaServerTests(SynchronousTestCase):
             "<NovaServer(id={0}, state={1}, created={2}, image_id={3}, "
             "flavor_id={4}, links={5}, desired_lbs={6}, "
             "servicenet_address={7}, json={8})>".format(*[repr(i) for i in [
-                'a', ServerState.ACTIVE, float(self.createds[0][1]),
-                'valid_image', 'valid_flavor', self.links[0], set(), '',
-                expected_json]]))
+                'a', ServerState.ACTIVE, float(self.createds[0]),
+                'valid_image', 'valid_flavor', self.servers[0]['links'], set(),
+                '', expected_json]]))
 
     def test_unknown_state(self):
         """
@@ -688,8 +700,8 @@ class HeatStackTests(SynchronousTestCase):
                 'FAILED':      SS.CREATE_UPDATE_FAILED},
             'DELETE': {
                 'COMPLETE':    SS.DELETED,
-                'IN_PROGRESS': SS.DELETED,
-                'FAILED':      SS.DELETED},
+                'IN_PROGRESS': SS.DELETE_IN_PROGRESS,
+                'FAILED':      SS.DELETE_FAILED},
             'UPDATE': {
                 'COMPLETE':    SS.CREATE_UPDATE_COMPLETE,
                 'IN_PROGRESS': SS.IN_PROGRESS,

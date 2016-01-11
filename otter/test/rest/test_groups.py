@@ -24,6 +24,7 @@ from otter.json_schema import rest_schemas, validate
 from otter.json_schema.group_examples import (
     config as config_examples,
     launch_server_config as launch_examples,
+    launch_stack_config as launch_stack_examples,
     policy as policy_examples,
 )
 from otter.json_schema.group_schemas import MAX_ENTITIES
@@ -704,6 +705,16 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
             'launchConfiguration': launch_examples()[0],
         })
 
+    def test_create_launch_stack_config(self):
+        """
+        A scaling group with a launch_stack config is created successfully.
+        """
+        self._test_successful_create({
+            'groupConfiguration': config_examples()[0],
+            'launchConfiguration': launch_stack_examples()['all_options'],
+            'scalingPolicies': [policy_examples()[0]]
+        })
+
     def test_group_create_calls_obey_config_changes(self):
         """
         If the group creation succeeds, ``obey_config_change`` is called with
@@ -1168,7 +1179,13 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assert_status_code(
             204, endpoint='{}converge'.format(self.endpoint),
             method='POST')
-        self.assertTrue(self.mock_controller.modify_and_trigger.called)
+        self.mock_controller.modify_and_trigger.assert_called_once_with(
+            'disp', self.mock_group,
+            {'tenant_id': '11111',
+             'system': 'otter.rest.groups.converge_scaling_group',
+             'transaction_id': 'transaction-id',
+             'scaling_group_id': 'one'},
+            mock.ANY)
 
     def test_group_paused_converge(self):
         """
@@ -1183,6 +1200,24 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
         self.assert_status_code(
             403, endpoint='{}converge'.format(self.endpoint), method='POST')
         self.assertTrue(self.mock_controller.modify_and_trigger.called)
+
+    def test_error_group_converge(self):
+        """
+        Calling `../converge?on_error=False` will not trigger convergence
+        on ERROR group
+        """
+        set_config_data({'convergence-tenants': ['11111']})
+        self.addCleanup(set_config_data, {})
+        self.mock_state = GroupState(
+            '11111', 'one', '', {}, {}, None, {}, False,
+            ScalingGroupStatus.ERROR)  # error group
+        response_wrapper = self.request(
+            endpoint='{}converge?on_error=false'.format(self.endpoint),
+            method='POST')
+        self.assert_response(response_wrapper, 204)
+        values = response_wrapper.response.headers.getRawHeaders(
+            'x-not-converging')
+        self.assertEqual(values, ["true"])
 
     def test_group_converge_worker_tenant(self):
         """

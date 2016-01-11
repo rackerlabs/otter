@@ -1,0 +1,23 @@
+API v1.0 release, December 09, 2014
+-----------------------------------
+
+What's new
+~~~~~~~~~~
+* Added `purge` argument to **DELETE server from scaling group** operation.
+  Defaults to `true`. Setting this to `false` allows you to keep the deleted
+  server in your account for investigation.
+
+* Added detailed information on configuring **RackConnectV3** for Auto Scale
+  using the UUID for a load balancer pool created for you by Rackspace
+  Support.
+
+* Added detailed information on configuring **Boot from Volume** for
+  Auto Scale using the `user_data` create server argument.
+
+Resolved issues
+~~~~~~~~~~~~~~~
+Repaired broken links in the RBAC section.
+
+Known issues
+~~~~~~~~~~~~
+|no changes|

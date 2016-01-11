@@ -1,5 +1,66 @@
 """Code related to creating a plan for convergence."""
 
+# # Note [Converging stacks]
+# The process for converging a group of stacks involves calling stack check [1]
+# to make sure a stack is healthy. This operation changes the status of the
+# stack asynchronously so it cannot be a part of gathering. Instead, stack
+# check steps must be generated during planning and then the results will be
+# picked up by the stack list that happens during gathering. This means
+# converge_launch_stack must know when stacks need to be checked and when they
+# need actual work done on them.
+#
+# To keep the convergence engine as stateless as possible, planning steps are
+# derived from the states of the stacks themselves. This table lists the
+# actions that generally result from the various stack states:
+#
+# CREATE_COMPLETE    | *
+# UPDATE_COMPLETE    | * Explained below
+# CHECK_COMPLETE     | *
+# CREATE_FAILED      | Delete stack, create another stack to replace it
+# UPDATE_FAILED      | Delete stack, create another stack to replace it
+# CHECK_FAILED       | Update stack to have Heat fix problems
+# DELETE_COMPLETE    | (Ignored)
+# *_IN_PROGRESS      | Wait (run another convergence cycle)
+# DELETE_FAILED      | Set the entire group to error
+#
+# Care must be taken to not get caught in an infinite loop of stack checking
+# and creating/updating/deleting, so all of the states together are used to
+# determine if the current convergence cycle is the first, (should be) the
+# last, or somewhere in the middle.
+#
+# The planner essentially follows one of these paths:
+# 1. If there is a stack in DELETE_FAILED, stop converging and set the group to
+#    error. Multiple attempts can be made to delete the stack but without
+#    information about the number of attempts convergence can run forever if it
+#    never succeeds, so this is treated as an unrecoverable error.
+# 2. If all stacks are healthy, but unchecked (e.g. all CREATE_COMPLETE or
+#    UPDATE_COMPLETE), then it assumed to be the first convergence cycle and
+#    stack check is run for all stacks.
+# 3. If there are some unhealthy stacks (*_FAILED) or stacks in progress
+#    (*_IN_PROGRESS), then it assumed that this convergence cycle is not the
+#    first (and more are needed) so work will be planned out and another cycle
+#    will be required.
+# 4. If all stacks are healthy and there are some stacks that have been checked
+#    (e.g. CREATE_COMPLETE, UPDATE_COMPLETE, and at least one CHECK_COMPLETE),
+#    then it is decided that this should be the last convergence cycle. All
+#    stacks in CHECK_COMPLETE have stack update run on them to get rid of their
+#    status [2]. This has the effect of setting the group up to be checked in
+#    (2) whenever convergence begins again. The stack updates in this case
+#    purposefully do not cause another convergence cycle, so convergence will
+#    end.
+#
+# There are a few edge cases that cause more than one round of stack checking
+# to occur in a set of convergence cycles, but these cases are unlikely and
+# will eventually converge. For example, if stack check is run on a set of
+# stacks and they all end up in CHECK_FAILED, when all of them are fixed they
+# will be "healthy", but none of them will be in CHECK_COMPLETE, so another
+# round of stack checking will be done. Assuming that succeeds, the next cycle
+# will run stack update on all of the stacks and end convergence.
+#
+# [1] http://developer.openstack.org/api-ref-orchestration-v1.html#stack_action_check # noqa
+# [2] Updating a stack in CHECK_COMPLETE is essentially a no-op. The only thing
+#     Heat does is update the status to UPDATE_COMPLETE.
+
 from collections import defaultdict
 
 from pyrsistent import pbag, pset
@@ -17,17 +78,23 @@ from otter.convergence.model import (
     IDrainable,
     RCv3Description,
     RCv3Node,
-    ServerState)
+    ServerState,
+    StackState)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
     ChangeCLBNode,
+    CheckStack,
     ConvergeLater,
     CreateServer,
+    CreateStack,
     DeleteServer,
+    DeleteStack,
+    FailConvergence,
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
+    UpdateStack,
 )
 from otter.convergence.transforming import limit_steps_by_count, optimize_steps
 from otter.util.fp import partition_bool
@@ -262,10 +329,10 @@ def converge_launch_server(desired_state, servers_with_cheese,
                            load_balancer_contents, now, timeout=3600):
     """
     Create steps that indicate how to transition from the state provided
-    by the given parameters to the :obj:`DesiredGroupState` described by
+    by the given parameters to the :obj:`DesiredServerGroupState` described by
     ``desired_state``.
 
-    :param DesiredGroupState desired_state: The desired group state.
+    :param DesiredServerGroupState desired_state: The desired group state.
     :param set servers_with_cheese: a list of :obj:`NovaServer` instances.
         This must only contain servers that are being managed for the specified
         group.
@@ -352,11 +419,13 @@ def converge_launch_server(desired_state, servers_with_cheese,
         converge_later = [
             ConvergeLater(reasons=[ErrorReason.String('waiting for servers')])]
 
-    if any((s not in servers_to_delete for s in servers[Destiny.WAIT])):
-        converge_later.append(
-            ConvergeLater(limited=True, reasons=[ErrorReason.UserMessage(
-                'Waiting for temporarily unavailable server to become ACTIVE'
-            )]))
+    unavail_fmt = ('Waiting for server {server_id} to transition to ACTIVE '
+                   'from {status}')
+    reasons = [ErrorReason.UserMessage(unavail_fmt.format(server_id=s.id,
+                                                          status=s.state.name))
+               for s in servers[Destiny.WAIT] if s not in servers_to_delete]
+    if reasons:
+        converge_later.append(ConvergeLater(limited=True, reasons=reasons))
 
     return pbag(create_steps +
                 scale_down_steps +
@@ -364,6 +433,98 @@ def converge_launch_server(desired_state, servers_with_cheese,
                 cleanup_errored_and_deleted_steps +
                 delete_timeout_steps +
                 lb_converge_steps +
+                converge_later)
+
+
+def converge_launch_stack(desired_state, stacks):
+    """
+    Create steps that indicate how to transition from the state provided
+    by the given parameters to the :obj:`DesiredStackGroupState` described by
+    ``desired_state``.
+
+    See note [Converging stacks] for more information.
+
+    :param DesiredStackGroupState desired_state: The desired group state.
+    :param set stacks: a set of :obj:`HeatStack` instances.
+        This must only contain stacks that are being managed for the specified
+        group.
+    :rtype: :obj:`pbag` of `IStep`
+
+    """
+    config = desired_state.stack_config
+
+    by_state = groupby(lambda stack: stack.get_state(), stacks)
+
+    stacks_complete = by_state.get(StackState.CREATE_UPDATE_COMPLETE, [])
+    stacks_failed = by_state.get(StackState.CREATE_UPDATE_FAILED, [])
+    stacks_check_complete = by_state.get(StackState.CHECK_COMPLETE, [])
+    stacks_check_failed = by_state.get(StackState.CHECK_FAILED, [])
+    stacks_in_progress = by_state.get(StackState.IN_PROGRESS, [])
+    stacks_delete_in_progress = by_state.get(StackState.DELETE_IN_PROGRESS, [])
+    stacks_delete_failed = by_state.get(StackState.DELETE_FAILED, [])
+
+    stacks_good = stacks_complete + stacks_check_complete
+    stacks_amiss = (stacks_failed +
+                    stacks_check_failed +
+                    stacks_in_progress +
+                    stacks_delete_in_progress)
+
+    if stacks_delete_failed:
+        reasons = [ErrorReason.String("Stacks in DELETE_FAILED found.")]
+        return pbag([FailConvergence(reasons)])
+
+    # If there are no stacks in CHECK_* or other work to be done, we assume
+    # we're at the beginning of a convergence cycle and need to perform stack
+    # checks.
+    if stacks_complete and not (stacks_check_complete or stacks_amiss):
+        return pbag([CheckStack(stack) for stack in stacks_complete])
+
+    # Otherwise, if all stacks are in a good state and we have the right number
+    # of stacks, we call update on the stacks in CHECK_COMPLETE and return
+    # SUCCESS without waiting for it to finish (calling update on a stack in
+    # CREATE_COMPLETE is essentially a no-op) so that there will be no stacks
+    # in CREATE_* the next time otter tries to converge this group. This will
+    # cause all of the stacks to be checked at that time and let otter know
+    # if there are any stacks that have fallen into an error state.
+    elif not stacks_amiss and len(stacks_good) == desired_state.capacity:
+        return pbag([UpdateStack(stack=stack, stack_config=config, retry=False)
+                     for stack in stacks_check_complete])
+
+    def get_create_steps():
+        create_stack = CreateStack(stack_config=config)
+        good_or_fixable_stack_count = (len(stacks_good) +
+                                       len(stacks_in_progress) +
+                                       len(stacks_check_failed))
+        return [create_stack] * (desired_state.capacity -
+                                 good_or_fixable_stack_count)
+
+    def get_scale_down_steps():
+        stacks_in_preferred_order = (
+            stacks_good + stacks_in_progress + stacks_check_failed)
+        unneeded_stacks = stacks_in_preferred_order[desired_state.capacity:]
+        return map(DeleteStack, unneeded_stacks)
+
+    def get_fix_steps(scale_down_steps):
+        num_stacks_to_update = len(stacks_check_failed) - len(scale_down_steps)
+        stacks_to_update = (stacks_check_failed[:num_stacks_to_update]
+                            if num_stacks_to_update > 0 else [])
+        return [UpdateStack(stack=s, stack_config=config)
+                for s in stacks_to_update]
+
+    create_steps = get_create_steps()
+    scale_down_steps = get_scale_down_steps()
+    fix_steps = get_fix_steps(scale_down_steps)
+    delete_stacks_failed_steps = map(DeleteStack, stacks_failed)
+
+    converge_later = (
+        [ConvergeLater([ErrorReason.String("Waiting for stacks to finish.")])]
+        if stacks_delete_in_progress or stacks_in_progress
+        else [])
+
+    return pbag(create_steps +
+                fix_steps +
+                scale_down_steps +
+                delete_stacks_failed_steps +
                 converge_later)
 
 
@@ -376,6 +537,19 @@ def plan_launch_server(desired_group_state, now, build_timeout, servers,
     """
     steps = converge_launch_server(desired_group_state, servers, lb_nodes, now,
                                    timeout=build_timeout)
+    steps = limit_steps_by_count(steps)
+    return optimize_steps(steps)
+
+
+def plan_launch_stack(desired_group_state, now, build_timeout, stacks):
+    """
+    Get an optimized convergence plan.
+
+    The arguments `now` and `build_timeout` are ignored and only necessary to
+    match those of `plan_launch_server`. The arguments `desired_group_state`
+    and `stacks` are the same as in `converge_launch_stack`.
+    """
+    steps = converge_launch_stack(desired_group_state, stacks)
     steps = limit_steps_by_count(steps)
     return optimize_steps(steps)
 

@@ -55,7 +55,7 @@ setup(
     packages=packages,
     license="Apache 2.0",
     data_files=data_files,
-    scripts=['scripts/load_cql.py']
+    scripts=['scripts/load_cql.py', 'scripts/trigger_convergence.py']
 )
 
 # Make Twisted regenerate the dropin.cache, if possible.  This is necessary

@@ -53,6 +53,7 @@ from otter.convergence.steps import (
     CreateStack,
     DeleteServer,
     DeleteStack,
+    FailConvergence,
     RemoveNodesFromCLB,
     SetMetadataItemOnServer,
     UnexpectedServerStatus,
@@ -1189,6 +1190,16 @@ class ConvergeLaterTests(SynchronousTestCase):
             (StepResult.RETRY, ['building']))
 
 
+class FailConvergenceTests(SynchronousTestCase):
+    """Tests for FailConvergence."""
+
+    def test_returns_failure(self):
+        """`FailConvergence.as_effect` returns effect with FAILURE."""
+        eff = FailConvergence(reasons=['fail reason']).as_effect()
+        self.assertEqual(sync_perform(base_dispatcher, eff),
+                         (StepResult.FAILURE, ['fail reason']))
+
+
 class CreateStackTests(SynchronousTestCase):
     """Tests for CreateStack."""
 
@@ -1295,8 +1306,7 @@ class DeleteStackTests(SynchronousTestCase):
         ]
         foo_stack = stack(id='foo', name='bar')
         delete = DeleteStack(foo_stack)
-        reason = ('Must re-gather after stack deletion in order to update the '
-                  'active cache')
+        reason = ('Waiting for stack to delete')
         result = perform_sequence(seq, delete.as_effect())
         self.assertEqual(result,
                          (StepResult.RETRY, [ErrorReason.String(reason)]))

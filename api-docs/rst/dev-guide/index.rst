@@ -1,21 +1,35 @@
 .. _index:
 
-================================
-Rackspace Autoscale API, 1.0
-================================
+===========================================
+Rackspace Autoscale |contract version|
+===========================================
 
-Learn how to use Autoscale by using the Autoscale ReST API.
+*Last updated:* |today|
 
-- See the :ref:`Developer Guide <developer-guide>` for details about using the API.
-- See the :ref:`API Reference <api-reference>` for details about API resources, operations, requests and responses.
+Use the following links to learn about using the Rackspace Autoscale service
+REST API and to find additional resources and tools for advanced configuration and use
+of the Autoscale service.
+
+- :ref:`Getting Started <getting-started>`
+
+- :ref:`Developer Guide <developer-guide>`
+
+- :ref:`API reference <api-reference>`
+
+- :ref:`Release notes <release-notes>`
+
 
 .. toctree:: :hidden:
    :maxdepth: 2
 
-   overview/index
+   Rackspace Auto Scale 1.0 <self>
+   API Status <http://www.rackspacestatus.com/>
+   About the API <overview/index>
+   getting-started
+   getting-started/index
    developer-guide
    concepts
    general-api-info/index
    api-reference
    api-operations/index
-   glossary
+   release-notes

@@ -8,11 +8,13 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence.composition import (
     get_desired_server_group_state,
+    get_desired_stack_group_state,
     json_to_LBConfigs,
     tenant_is_enabled)
 from otter.convergence.model import (
     CLBDescription,
     DesiredServerGroupState,
+    DesiredStackGroupState,
     RCv3Description
 )
 
@@ -127,6 +129,23 @@ class GetDesiredServerGroupStateTests(SynchronousTestCase):
                 desired_lbs=pset(),
                 draining_timeout=0.0))
         self.assert_server_config_hashable(state)
+
+
+class GetDesiredStackGroupStateTests(SynchronousTestCase):
+    """Tests for :func:`get_desired_stack_group_state`."""
+    def test_normal_use(self):
+        """
+        A :obj:`DesiredStackGroupState` is returned with the correct capacity
+        and the updated stack section of the launch_configuration.
+        """
+        config = {'args': {'stack': {'foo': 'bar'}}}
+        expected_config = {'foo': 'bar',
+                           'stack_name': 'autoscale_the_group_id',
+                           'tags': 'autoscale_the_group_id'}
+        state = get_desired_stack_group_state('the_group_id', config, 314)
+        self.assertEqual(
+            state,
+            DesiredStackGroupState(stack_config=expected_config, capacity=314))
 
 
 class FeatureFlagTest(SynchronousTestCase):

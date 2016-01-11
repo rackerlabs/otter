@@ -393,7 +393,8 @@ class OtterGroups(object):
             raise InvalidMinEntities(
                 "minEntities must be less than or equal to maxEntities")
 
-        validate_launch_config_servicenet(data['launchConfiguration'])
+        if data['launchConfiguration']['type'] == 'launch_server':
+            validate_launch_config_servicenet(data['launchConfiguration'])
 
         deferred = get_supervisor().validate_launch_config(
             self.log, self.tenant_id, data['launchConfiguration'])
@@ -669,10 +670,20 @@ class OtterGroup(object):
         Trigger convergence on given scaling group
         """
 
-        def is_group_paused(group, state):
+        class ConvergeErrorGroup(Exception):
+            pass
+
+        def can_converge(group, state):
             if state.paused:
                 raise GroupPausedError(group.tenant_id, group.uuid, "converge")
+            conv_on_error = extract_bool_arg(request, 'on_error', True)
+            if not conv_on_error and state.status == ScalingGroupStatus.ERROR:
+                raise ConvergeErrorGroup()
             return state
+
+        def converge_error_group_header(f):
+            f.trap(ConvergeErrorGroup)
+            request.setHeader("x-not-converging", "true")
 
         if tenant_is_enabled(self.tenant_id, config_value):
             group = self.store.get_scaling_group(
@@ -680,8 +691,8 @@ class OtterGroup(object):
             return controller.modify_and_trigger(
                 self.dispatcher,
                 group,
-                bound_log_kwargs(log),
-                is_group_paused)
+                bound_log_kwargs(self.log),
+                can_converge).addErrback(converge_error_group_header)
         else:
             request.setResponseCode(404)
 

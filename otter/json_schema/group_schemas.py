@@ -87,6 +87,10 @@ _bfv_server = {
     }
 }
 
+_bfv2_server = deepcopy(_bfv_server)
+_bdm = _bfv2_server["properties"].pop("block_device_mapping")
+_bfv2_server["properties"]["block_device_mapping_v2"] = _bdm
+
 _non_bfv_server = {
     "type": "object",
     "properties": {
@@ -159,7 +163,7 @@ _clb_lb = {
 
 
 server = {
-    "type": [_bfv_server, _non_bfv_server],
+    "type": [_bfv_server, _bfv2_server, _non_bfv_server],
     # The schema for the create server attributes should come
     # from Nova, or Nova should provide some no-op method to
     # validate creating a server. Autoscale should not
@@ -259,9 +263,90 @@ launch_server = {
     }
 }
 
+_stack_template_url = {
+    "type": "object",
+    "properties": {
+        "template": {
+            "disallow": "any"
+        },
+        "template_url": {
+            "required": True
+        },
+    }
+}
+
+_stack_template_inline = {
+    "type": "object",
+    "properties": {
+        "template": {
+            "required": True
+        },
+        "template_url": {
+            "disallow": "any"
+        }
+    }
+}
+
+stack = {
+    "type": [_stack_template_url, _stack_template_inline],
+    "properties": {
+        "disable_rollback": {
+            "type": "boolean",
+            "required": False
+        },
+        "environment": {
+            "type": ["string", "object"],
+            "required": False
+        },
+        "files": {
+            "type": "object",
+            "required": False
+        },
+        "parameters": {
+            "type": "object",
+            "required": False
+        },
+        "template": {
+            "type": ["string", "object"],
+            "required": False
+        },
+        "template_url": {
+            "type": "string",
+            "required": False
+        },
+        "timeout_mins": {
+            "type": "number",
+            "required": False
+        },
+    },
+    "additionalProperties": False
+}
+
+launch_stack = {
+    "type": "object",
+    "description": ("'Launch Stack' launch configuration options.  This type "
+                    "of launch configuration will spin up a Heat stack "
+                    "directly with the provided arguments, and add the IP the "
+                    "stack outputs to one or more load balancers (if load "
+                    "balancer arguments are specified."),
+    "properties": {
+        "type": {
+            "enum": ["launch_stack"],
+        },
+        "args": {
+            "type": "object",
+            "properties": {
+                "stack": stack
+            },
+            "additionalProperties": False
+        }
+    },
+    "additionalProperties": False
+}
+
 # base launch config
 launch_config = {
-    "type": [launch_server],
+    "type": [launch_server, launch_stack],
     "properties": {
         "type": {
             "type": "string",

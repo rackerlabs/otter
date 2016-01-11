@@ -1107,8 +1107,9 @@ def check_stack(stack_name, stack_id):
         ServiceType.CLOUD_ORCHESTRATION,
         'POST', append_segments('stacks', stack_name, stack_id, 'actions'),
         data={'check': None},
-        success_pred=has_code(201),
-        reauth_codes=(401,))
+        success_pred=has_code(200, 201),
+        reauth_codes=(401,),
+        json_response=False)
 
     return (eff.on(log_success_response('request-check-stack', identity,
                                         log_as_json=False))
@@ -1131,7 +1132,8 @@ def update_stack(stack_name, stack_id, stack_args):
         'PUT', append_segments('stacks', stack_name, stack_id),
         data=stack_args,
         success_pred=has_code(202),
-        reauth_codes=(401,))
+        reauth_codes=(401,),
+        json_response=False)
 
     return (eff.on(log_success_response('request-update-stack', identity,
                                         log_as_json=False))
@@ -1151,7 +1153,8 @@ def delete_stack(stack_name, stack_id):
         ServiceType.CLOUD_ORCHESTRATION,
         'DELETE', append_segments('stacks', stack_name, stack_id),
         success_pred=has_code(204),
-        reauth_codes=(401,))
+        reauth_codes=(401,),
+        json_response=False)
 
     return (eff.on(log_success_response('request-delete-stack', identity,
                                         log_as_json=False))
