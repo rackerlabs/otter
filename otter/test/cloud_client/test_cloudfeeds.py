@@ -1,13 +1,13 @@
 """Tests for otter.cloud_client.cloudfeeds"""
 
-from twisted.trial.unittest import SynchronousTestCase
-
 from effect import sync_perform
 from effect.testing import EQFDispatcher
 
-from otter.constants import ServiceType
+from twisted.trial.unittest import SynchronousTestCase
+
 from otter.cloud_client import service_request
 from otter.cloud_client.cloudfeeds import publish_autoscale_event
+from otter.constants import ServiceType
 from otter.test.cloud_client.test_init import service_request_eqf
 from otter.test.utils import stub_pure_response
 from otter.util.pure_http import APIError, has_code
@@ -43,4 +43,3 @@ class CloudFeedsTests(SynchronousTestCase):
             expected.intent,
             service_request_eqf(stub_pure_response('<this is xml>', 202)))])
         self.assertRaises(APIError, sync_perform, dispatcher, eff)
-
