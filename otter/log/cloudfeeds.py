@@ -11,7 +11,8 @@ from toolz.dicttoolz import keyfilter
 
 from txeffect import perform
 
-from otter.cloud_client import TenantScope, publish_autoscale_event
+from otter.cloud_client import TenantScope
+from otter.cloud_client.cloudfeeds import publish_autoscale_event
 from otter.effect_dispatcher import get_legacy_dispatcher
 from otter.log import log as otter_log
 from otter.log.formatters import LogLevel
