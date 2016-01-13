@@ -11,6 +11,7 @@ jsonfig==0.1.1
 testtools==0.9.32
 croniter==0.3.5
 txkazoo==0.0.6b2
+kazoo==2.2.1
 effect==0.10
 txeffect==0.9
 characteristic==14.3.0
