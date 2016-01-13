@@ -11,7 +11,7 @@ from toolz.dicttoolz import keyfilter
 
 from txeffect import perform
 
-from otter.cloud_client import TenantScope, publish_to_cloudfeeds
+from otter.cloud_client import TenantScope, publish_autoscale_event
 from otter.effect_dispatcher import get_legacy_dispatcher
 from otter.log import log as otter_log
 from otter.log.formatters import LogLevel
@@ -160,7 +160,7 @@ def add_event(event, admin_tenant_id, region, log):
                           event_tenant_id, event_id)
 
     eff = retry_effect(
-        publish_to_cloudfeeds(req, log=log),
+        publish_autoscale_event(req, log=log),
         compose_retries(
             lambda f: (not f.check(APIError) or
                        f.value.code < 400 or
