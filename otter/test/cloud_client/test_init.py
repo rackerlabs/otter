@@ -509,7 +509,7 @@ class GetCloudClientDispatcherTests(SynchronousTestCase):
         set_config_data(
             {"cloud_client": {"throttling": {"create_server_delay": 1,
                                              "delete_server_delay": 0.4}}})
-        self.addCleanup(set_config_data, None)
+        self.addCleanup(set_config_data, {})
         clock = Clock()
         authenticator = object()
         log = object()

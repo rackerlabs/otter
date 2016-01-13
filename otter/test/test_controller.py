@@ -43,6 +43,7 @@ from otter.test.utils import (
     noop,
     patch,
     raise_,
+    set_non_conv_tenant,
     test_dispatcher)
 from otter.util.config import set_config_data
 from otter.util.fp import assoc_obj
@@ -91,8 +92,6 @@ class PauseGroupTests(SynchronousTestCase):
         `pause_scaling_group` performs effect got from conv_pause_group_eff
         for convergence tenants
         """
-        set_config_data({"convergence-tenants": ["tid"]})
-        self.addCleanup(set_config_data, None)
         dispatcher = SequenceDispatcher([("pause", lambda i: "paused")])
         d = controller.pause_scaling_group(
             self.log, "transid", self.group, dispatcher)
@@ -102,6 +101,7 @@ class PauseGroupTests(SynchronousTestCase):
         """
         `pause_scaling_group` is not implemented for worker tenants
         """
+        set_non_conv_tenant("tid", self)
         self.assertRaises(
             NotImplementedError, controller.pause_scaling_group, self.log,
             "transid", self.group, object())
@@ -135,8 +135,7 @@ class PauseGroupTests(SynchronousTestCase):
         `resume_scaling_group` performs effect got from conv_resume_group_eff
         for convergence tenants
         """
-        set_config_data({"convergence-tenants": ["tid"]})
-        self.addCleanup(set_config_data, None)
+        self.addCleanup(set_config_data, {})
         dispatcher = SequenceDispatcher([("resume", lambda i: "resumed")])
         d = controller.resume_scaling_group(
             self.log, "transid", self.group, dispatcher)
@@ -146,6 +145,7 @@ class PauseGroupTests(SynchronousTestCase):
         """
         `resume_scaling_group` is not implemented for worker tenants
         """
+        set_non_conv_tenant("tid", self)
         self.assertRaises(
             NotImplementedError, controller.resume_scaling_group, self.log,
             "transid", self.group, object())
@@ -743,6 +743,7 @@ class ObeyConfigChangeTestCase(SynchronousTestCase):
         }
 
         self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
+        set_non_conv_tenant("tenant", self)
 
     def test_parameters_bound_to_log(self):
         """
@@ -925,6 +926,7 @@ class DeleteGroupTests(SynchronousTestCase):
         """
         First empties and then deletes the group for worker tenant
         """
+        set_non_conv_tenant("tid", self)
         egd = defer.Deferred()
         mock_eg = patch(self, 'otter.controller.empty_group',
                         return_value=egd)
@@ -947,6 +949,8 @@ class DeleteGroupTests(SynchronousTestCase):
         """
         Calls group.delete_group() for worker tenant when deleting normally
         """
+        set_non_conv_tenant("tid", self)
+        self.addCleanup(set_config_data, {})
         d = controller.delete_group(
             "disp", self.log, 'transid', self.group, False)
         self.assertIsNone(self.successResultOf(d))
@@ -955,8 +959,6 @@ class DeleteGroupTests(SynchronousTestCase):
         self.assertFalse(self.mock_tcd.called)
 
     def setup_conv(self):
-        set_config_data({'convergence-tenants': ['tid']})
-        self.addCleanup(set_config_data, {})
         self.mock_tcd.return_value = defer.succeed('tcd')
 
     def test_convergence_tenant_force(self):
@@ -1142,10 +1144,11 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
         self.mocks = mock_controller_utilities(self)
         self.mock_log = mock.MagicMock()
         self.mock_state = GroupState(
-            "tid", "gid", "g", {"a": "a", "b": "b", "c": "c"},
+            "tenant", "group", "g", {"a": "a", "b": "b", "c": "c"},
             {"d": "d", "e": "e"}, None, {}, False, ScalingGroupStatus.ACTIVE,
             desired=5, now=mock.Mock(return_value="now"))
         self.group = mock_group()
+        set_non_conv_tenant("tenant", self)
 
     def test_maybe_execute_scaling_policy_no_such_policy(self):
         """
@@ -1377,6 +1380,7 @@ class ConvergeTestCase(SynchronousTestCase):
         self.mock_log = mock.MagicMock()
         self.mock_state = mock_group_state()
         self.group = mock_group()
+        set_non_conv_tenant("tenant", self)
 
     def test_no_change_returns_none(self):
         """
@@ -1467,7 +1471,7 @@ class ConvergeTestCase(SynchronousTestCase):
                            False, ScalingGroupStatus.ACTIVE)
         group_config = {'maxEntities': 100, 'minEntities': 0}
         policy = {'change': 5}
-        config_data = {'convergence-tenants': ['tenant']}
+        config_data = {'non-convergence-tenants': []}
 
         result = controller.converge(log, 'txn-id', group_config, self.group,
                                      state, 'launch', policy,
@@ -1488,7 +1492,7 @@ class ConvergeTestCase(SynchronousTestCase):
                            False, ScalingGroupStatus.ACTIVE)
         group_config = {'maxEntities': 100, 'minEntities': 0}
         policy = {'change': 0}
-        config_data = {'convergence-tenants': ['tenant']}
+        config_data = {'non-convergence-tenants': []}
 
         result = controller.converge(log, 'txn-id', group_config, self.group,
                                      state, 'launch', policy,
@@ -1507,8 +1511,7 @@ class ModifyAndTriggerTests(SynchronousTestCase):
 
     def setUp(self):
         self.group = util_mock_group("state", "t", "g")
-        set_config_data({"convergence-tenants": ["t"]})
-        self.addCleanup(set_config_data, None)
+        self.addCleanup(set_config_data, {})
         self.mock_tg = patch(self, "otter.controller.trigger_convergence",
                              side_effect=intent_func("tg"))
         self.logargs = {"a": "b"}
@@ -1543,7 +1546,7 @@ class ModifyAndTriggerTests(SynchronousTestCase):
         Only calls group.modify_state() for worker tenants. Does not trigger
         convergence
         """
-        set_config_data(None)
+        set_non_conv_tenant("t", self)
         d = controller.modify_and_trigger(
             self.disp, self.group, self.logargs, self.modify)
         self.assertIsNone(self.successResultOf(d))
@@ -1587,7 +1590,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         """
         Fake supervisor, group and state
         """
-        self.config_data = {'convergence-tenants': ['tenant_id']}
+        self.config_data = {'non-convergence-tenants': []}
 
         self.trans_id = 'trans_id'
         self.log = mock_log()
@@ -1882,7 +1885,7 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
         d = controller.remove_server_from_group(
             "disp", self.log, self.trans_id, 'server_id', False, False,
             self.group, self.state,
-            config_value={'convergence-tenants': []}.get)
+            config_value={'non-convergence-tenants': ['tenant_id']}.get)
 
         self.assertEqual(self.successResultOf(d), 'worker success')
 

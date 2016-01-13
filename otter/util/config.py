@@ -13,7 +13,10 @@ def set_config_data(data):
     :param dict data: The configuration data, probably loaded from some JSON.
     """
     global _config_data
-    _config_data = data
+    if data is None:
+        _config_data = {}
+    else:
+        _config_data = data
 
 
 def update_config_data(name, value):
