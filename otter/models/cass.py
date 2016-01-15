@@ -1827,7 +1827,10 @@ class CassScalingGroupServersCache(object):
         See :method:`IScalingGroupServersCache.insert_servers`
         """
         if len(servers) == 0:
-            return Effect(Constant(None))
+            if clear_others:
+                return self.delete_servers()
+            else:
+                return Effect(Constant(None))
         query = ('INSERT INTO {cf} ("tenantId", "groupId", last_update, '
                  'server_id, server_blob, server_as_active) '
                  'VALUES(:tenantId, :groupId, :last_update, :server_id{i}, '

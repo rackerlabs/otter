@@ -3862,6 +3862,16 @@ class CassGroupServersCacheTests(SynchronousTestCase):
             self.cache.insert_servers(self.dt, [], False),
             Effect(Constant(None)))
 
+    def test_insert_empty_delete(self):
+        """
+        `insert_servers` deletes servers when clear_others=True and does
+        nothing if passed list is empty
+        """
+        self.cache.delete_servers = lambda: Effect("delete")
+        eff = self.cache.insert_servers(self.dt, [], True)
+        self.assertEqual(eff.intent, "delete")
+        self.assertIsNone(resolve_effect(eff, None))
+
     def test_delete_servers(self):
         """
         `delete_servers` issues query to delete the whole cache
