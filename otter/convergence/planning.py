@@ -186,9 +186,9 @@ def _converge_lb_state(server, current_lb_nodes):
         if desired.equivalent_definition(node.description)]
 
     if desired_matching_existing:
-        met_desireds, good_nodes = zip(*desired_matching_existing)
+        met_desireds, _ = zip(*desired_matching_existing)
     else:
-        met_desireds = good_nodes = ()
+        met_desireds = ()
 
     adds = [
         add_server_to_lb(server=server, description=desired)
