@@ -195,20 +195,13 @@ def _converge_lb_state(server, current_lb_nodes):
         for desired in server.desired_lbs - set(met_desireds)
     ]
 
-    # Removes could be replaced with _remove_from_lb_with_draining if
-    # we wanted to support draining for moving load balancers too
-    removes = [
-        remove_node_from_lb(node=node)
-        for node in set(current_lb_nodes) - set(good_nodes)
-    ]
-
     changes = [
         change_lb_node(node=node, description=desired)
         for desired, node in desired_matching_existing
         if node.description != desired
     ]
 
-    return [step for step in (adds + removes + changes) if step is not None]
+    return [step for step in (adds + changes) if step is not None]
 
 
 def _drain_and_delete(server, timeout, current_lb_nodes, now):
