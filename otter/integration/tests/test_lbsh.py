@@ -139,7 +139,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         Server node moved from LB1 to LB2
         Assert: Server put back on LB1
-        Assert: Server removed from LB2
+        Assert: Server remains in LB2
         """
         clb_as = self.helper.clbs[0]
         clb_other = yield self.create_another_clb()
@@ -167,85 +167,24 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         yield group.trigger_convergence(self.rcs)
 
-        yield clb_as.wait_for_nodes(
-            self.rcs,
-            MatchesAll(
-                HasLength(1),
-                ContainsAllIPs([the_node["address"]])
+        yield gatherResults([
+            clb_as.wait_for_nodes(
+                self.rcs,
+                MatchesAll(
+                    HasLength(1),
+                    ContainsAllIPs([the_node["address"]])
+                ),
+                timeout=timeout_default
             ),
-            timeout=timeout_default
-        )
-
-        yield clb_other.wait_for_nodes(
-            self.rcs,
-            HasLength(0),
-            timeout=timeout_default
-        )
-
-    @inlineCallbacks
-    def test_oob_copy_node_to_oob_lb(self):
-        """
-        This is a slight variation of :func:`test_move_node_to_oob_lb`, with
-        the node copied to the second load balancer instead of moved.
-
-        Confirm that when convergence is triggered, nodes copied to
-        non-autoscale loadbalancers are removed.
-
-        1 group, LB1 in config, LB2 not in any autoscale configs:
-            - Server node added to LB2 (now on both)
-            - Trigger convergence
-            - Assert: Server still on LB1
-            - Assert: Server removed from LB2
-        """
-        clb_as = self.helper.clbs[0]
-        clb_other = yield self.create_another_clb()
-        yield self.confirm_clb_nodecounts([(clb_as, 0), (clb_other, 0)])
-
-        group, _ = self.helper.create_group(min_entities=1)
-        yield self.helper.start_group_and_wait(group, self.rcs)
-
-        # One node should have been added to clb_as, none to clb_other
-        nodes = yield self.confirm_clb_nodecounts([(clb_as, 1),
-                                                   (clb_other, 0)])
-        nodes_as = nodes[0]
-
-        the_node = nodes_as[0]
-        node_info = {
-            "address": the_node["address"],
-            "port": the_node["port"],
-            "condition": the_node["condition"],
-            "weight": the_node["weight"]
-        }
-
-        yield clb_other.add_nodes(self.rcs, [node_info])
-
-        yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
-        yield clb_other.wait_for_nodes(
-            self.rcs,
-            MatchesAll(
-                HasLength(1),
-                ContainsAllIPs([the_node["address"]])
-            ),
-            timeout=timeout_default
-        )
-
-        yield group.trigger_convergence(self.rcs)
-
-        yield clb_as.wait_for_nodes(
-            self.rcs,
-            MatchesAll(
-                HasLength(1),
-                ContainsAllIPs([the_node["address"]])
-            ),
-            timeout=timeout_default
-        )
-
-        yield clb_other.wait_for_nodes(
-            self.rcs,
-            HasLength(0),
-            timeout=timeout_default
-        )
+            clb_other.wait_for_nodes(
+                self.rcs,
+                MatchesAll(
+                    HasLength(1),
+                    ContainsAllIPs([the_node["address"]])
+                ),
+                timeout=timeout_default
+            )
+        ])
 
     @inlineCallbacks
     def test_only_autoscale_nodes_are_modified(self):
@@ -506,7 +445,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         1. Create an AS group with 2 servers.
         2. Disown 1 server.
-        3. Move both servers to a different CLB.
+        3. Add both servers to a different CLB.
         4. Converge group.
         6. Assert that the group's server is back on its CLB, and that the
            disowned server's remains on the wrong CLB.
