@@ -18,6 +18,7 @@ from otter.convergence.steps import (
     CreateServer,
     CreateStack,
     RemoveNodesFromCLB)
+from otter.util.config import config_value
 
 
 _optimizers = {}
@@ -92,7 +93,7 @@ def optimize_steps(steps):
 
 
 _DEFAULT_STEP_LIMITS = pmap({
-    CreateServer: 10,
+    CreateServer: config_value("converger.create_server_steps_limit") or 10,
     CreateStack: 10
 })
 
