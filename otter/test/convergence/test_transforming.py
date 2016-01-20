@@ -20,6 +20,7 @@ from otter.convergence.transforming import (
     _limit_step_count,
     limit_steps_by_count,
     optimize_steps)
+from otter.test.utils import set_config_for_test
 
 
 class LimitStepCount(SynchronousTestCase):
@@ -84,6 +85,17 @@ class LimitStepCount(SynchronousTestCase):
         """
         limits = limit_steps_by_count.keywords["step_limits"]
         self.assertEqual(limits, pmap({CreateServer: 10, CreateStack: 10}))
+
+    def test_default_step_limit_config(self):
+        """
+        The default limit limits server creation to up to 10 steps.
+        """
+        set_config_for_test(
+            self, {"converger": {"create_server_steps_limit": 100}})
+        from otter.convergence import transforming as t
+        reload(t)
+        limits = t.limit_steps_by_count.keywords["step_limits"]
+        self.assertEqual(limits, pmap({CreateServer: 100, CreateStack: 10}))
 
 
 class OptimizerTests(SynchronousTestCase):
