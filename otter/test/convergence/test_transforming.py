@@ -86,9 +86,9 @@ class LimitStepCount(SynchronousTestCase):
         limits = limit_steps_by_count.keywords["step_limits"]
         self.assertEqual(limits, pmap({CreateServer: 10, CreateStack: 10}))
 
-    def test_default_step_limit_config(self):
+    def test_create_server_step_limit_configurable(self):
         """
-        The default limit limits server creation to up to 10 steps.
+        The create server steps limit is configurable
         """
         set_config_for_test(
             self, {"converger": {"create_server_steps_limit": 100}})
