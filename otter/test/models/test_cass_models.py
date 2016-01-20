@@ -3838,7 +3838,8 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         `insert_servers` issues query to insert server as json blobs
         """
         eff = self.cache.insert_servers(
-            self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}], False)
+            self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}],
+            clear_others=False)
         self._test_insert_servers(eff)
 
     def test_insert_servers_delete(self):
@@ -3848,7 +3849,8 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         """
         self.cache.delete_servers = lambda: Effect("delete")
         eff = self.cache.insert_servers(
-            self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}], True)
+            self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}],
+            clear_others=True)
         self.assertEqual(eff.intent, "delete")
         self.clock.advance(1)
         eff = resolve_effect(eff, None)
@@ -3859,7 +3861,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         `insert_servers` does nothing if called with empty servers list
         """
         self.assertEqual(
-            self.cache.insert_servers(self.dt, [], False),
+            self.cache.insert_servers(self.dt, [], clear_others=False),
             Effect(Constant(None)))
 
     def test_insert_empty_delete(self):
@@ -3868,7 +3870,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         nothing if passed list is empty
         """
         self.cache.delete_servers = lambda: Effect("delete")
-        eff = self.cache.insert_servers(self.dt, [], True)
+        eff = self.cache.insert_servers(self.dt, [], clear_others=True)
         self.assertEqual(eff.intent, "delete")
         self.assertIsNone(resolve_effect(eff, None))
 
