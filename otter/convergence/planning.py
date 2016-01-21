@@ -533,7 +533,8 @@ def plan_launch_server(desired_group_state, now, build_timeout, step_limits,
     """
     Get an optimized convergence plan.
 
-    Takes the same arguments as :func:`converge_launch_server`.
+    Takes the same arguments as :func:`converge_launch_server`
+    except `step_limits` which is dict of step class -> limit
     """
     steps = converge_launch_server(desired_group_state, servers, lb_nodes, now,
                                    timeout=build_timeout)
@@ -548,7 +549,8 @@ def plan_launch_stack(desired_group_state, now, build_timeout, step_limits,
 
     The arguments `now` and `build_timeout` are ignored and only necessary to
     match those of `plan_launch_server`. The arguments `desired_group_state`
-    and `stacks` are the same as in `converge_launch_stack`.
+    and `stacks` are the same as in `converge_launch_stack`. `step_limits` is
+    dict of step class -> limit
     """
     steps = converge_launch_stack(desired_group_state, stacks)
     steps = limit_steps_by_count(steps, step_limits)
