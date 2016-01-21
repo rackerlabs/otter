@@ -286,9 +286,9 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
     :param Reference waiting: pmap of waiting groups
     :param int limited_retry_iterations: number of iterations to wait for
         LIMITED_RETRY steps
-    :param callable get_all_convergence_data: like
-        :func`get_all_convergence_data`, used for testing.
-    :param callable plan: like :func:`plan`, to be used for test injection only
+    :param dict step_limits: Mapping of step class to number of executions
+        allowed in a convergence cycle
+    :param callable get_executor: like :func`get_executor`, used for testing.
 
     :return: Effect of :obj:`ConvergenceIterationStatus`.
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
@@ -568,6 +568,8 @@ def converge_one_group(currently_converging, recently_converged, waiting,
         building before it's is timed out and deleted
     :param int limited_retry_iterations: number of iterations to wait for
         LIMITED_RETRY steps
+    :param dict step_limits: Mapping of step class to number of executions
+        allowed in a convergence cycle
     :param callable execute_convergence: like :func`execute_convergence`, to
         be used for test injection only
     """
@@ -757,6 +759,8 @@ class Converger(MultiService):
             to be used for test injection only
         :param int limited_retry_iterations: number of iterations to wait for
             LIMITED_RETRY steps
+        :param dict step_limits: Mapping of step name to number of executions
+            allowed in a convergence cycle
         """
         MultiService.__init__(self)
         self.log = log.bind(otter_service='converger')
