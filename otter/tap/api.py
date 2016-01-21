@@ -318,7 +318,7 @@ def setup_converger(parent, kz_client, dispatcher, interval, build_timeout,
         kz_client=kz_client,
         interval=interval,
         partitioner_path=CONVERGENCE_PARTITIONER_PATH,
-        time_boundary=1,  # time boundary
+        time_boundary=15,  # time boundary
     )
     cvg = Converger(log, dispatcher, 10, partitioner_factory, build_timeout,
                     interval / 2, limited_retry_iterations, step_limits)
