@@ -126,6 +126,7 @@ from otter.convergence.model import (
     ServerState,
     StepResult)
 from otter.convergence.planning import plan_launch_server, plan_launch_stack
+from otter.convergence.transforming import get_step_limits_from_conf
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, msg_with_time, with_log
 from otter.models.intents import (
@@ -272,7 +273,8 @@ def _clean_waiting(waiting, group_id):
 
 @do
 def execute_convergence(tenant_id, group_id, build_timeout, waiting,
-                        limited_retry_iterations, get_executor=get_executor):
+                        limited_retry_iterations, step_limits,
+                        get_executor=get_executor):
     """
     Gather data, plan a convergence, save active and pending servers to the
     group state, and then execute the convergence.
@@ -304,7 +306,7 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
 
     # prepare plan
     steps = executor.plan(desired_group_state, datetime_to_epoch(now_dt),
-                          build_timeout, **resources)
+                          build_timeout, step_limits, **resources)
     yield log_steps(steps)
 
     # Execute plan
@@ -550,7 +552,7 @@ def eff_finally(eff, after_eff):
 @do
 def converge_one_group(currently_converging, recently_converged, waiting,
                        tenant_id, group_id, version,
-                       build_timeout, limited_retry_iterations,
+                       build_timeout, limited_retry_iterations, step_limits,
                        execute_convergence=execute_convergence):
     """
     Converge one group, non-concurrently, and clean up the dirty flag when
@@ -574,7 +576,7 @@ def converge_one_group(currently_converging, recently_converged, waiting,
             lambda rcg: rcg.set(group_id, time_done)))
     cvg = eff_finally(
         execute_convergence(tenant_id, group_id, build_timeout, waiting,
-                            limited_retry_iterations),
+                            limited_retry_iterations, step_limits),
         mark_recently_converged)
 
     try:
@@ -612,7 +614,7 @@ def converge_all_groups(
         currently_converging, recently_converged, waiting,
         my_buckets, all_buckets,
         divergent_flags, build_timeout, interval,
-        limited_retry_iterations,
+        limited_retry_iterations, step_limits,
         converge_one_group=converge_one_group):
     """
     Check for groups that need convergence and which match up to the
@@ -635,6 +637,8 @@ def converge_all_groups(
         passed since the end of its last convergence.
     :param int limited_retry_iterations: number of iterations to wait for
         LIMITED_RETRY steps
+    :param dict step_limits: Mapping of step class to number of executions
+        allowed in a convergence cycle
     :param callable converge_one_group: function to use to converge a single
         group - to be used for test injection only
     """
@@ -664,7 +668,7 @@ def converge_all_groups(
                                      waiting,
                                      tenant_id, group_id,
                                      stat.version, build_timeout,
-                                     limited_retry_iterations)
+                                     limited_retry_iterations, step_limits)
             result = yield Effect(TenantScope(eff, tenant_id))
             yield do_return(result)
 
@@ -734,7 +738,7 @@ class Converger(MultiService):
 
     def __init__(self, log, dispatcher, num_buckets, partitioner_factory,
                  build_timeout, interval,
-                 limited_retry_iterations,
+                 limited_retry_iterations, step_limits,
                  converge_all_groups=converge_all_groups):
         """
         :param log: a bound log
@@ -766,6 +770,7 @@ class Converger(MultiService):
         self._converge_all_groups = converge_all_groups
         self.interval = interval
         self.limited_retry_iterations = limited_retry_iterations
+        self.step_limits = get_step_limits_from_conf(step_limits)
 
         # ephemeral mutable state
         self.currently_converging = Reference(pset())
@@ -779,7 +784,7 @@ class Converger(MultiService):
             self.currently_converging, self.recently_converged,
             self.waiting,
             my_buckets, self._buckets, divergent_flags, self.build_timeout,
-            self.interval, self.limited_retry_iterations)
+            self.interval, self.limited_retry_iterations, self.step_limits)
         return eff.on(
             error=lambda e: err(
                 exc_info_to_failure(e), 'converge-all-groups-error'))

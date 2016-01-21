@@ -685,11 +685,12 @@ class APIMakeServiceTests(SynchronousTestCase):
         kz_client = mock.Mock(spec=['start', 'stop'])
         kz_client.start.return_value = defer.succeed(None)
         mock_txkz.return_value = kz_client
+        config["converger"] = {"step_limits": {"step": 10}}
 
         parent = makeService(config)
 
         mock_setup_converger.assert_called_once_with(
-            parent, kz_client, mock.ANY, 10, 3600, 10)
+            parent, kz_client, mock.ANY, 10, 3600, 10, {"step": 10})
 
         dispatcher = mock_setup_converger.call_args[0][2]
 
@@ -703,8 +704,10 @@ class APIMakeServiceTests(SynchronousTestCase):
 class ConvergerSetupTests(SynchronousTestCase):
     """Tests for :func:`setup_converger`."""
 
+    @mock.patch("otter.convergence.service.get_step_limits_from_conf",
+                return_value="limits")
     @mock.patch('otter.tap.api.watch_children')
-    def test_setup_converger(self, mock_watch_children):
+    def test_setup_converger(self, mock_watch_children, mock_gslfc):
         """
         Puts a :obj:`Converger` with a :obj:`Partitioner` in the given parent
         service.
@@ -713,13 +716,15 @@ class ConvergerSetupTests(SynchronousTestCase):
         kz_client = object()
         dispatcher = object()
         interval = 50
-        setup_converger(ms, kz_client, dispatcher, interval, 35, 52)
+        setup_converger(ms, kz_client, dispatcher, interval, 35, 52, {"a": 3})
         [converger] = ms.services
         self.assertIs(converger.__class__, Converger)
         self.assertEqual(converger.build_timeout, 35)
         self.assertEqual(converger._dispatcher, dispatcher)
         self.assertEqual(converger.interval, interval / 2)
         self.assertEqual(converger.limited_retry_iterations, 52)
+        self.assertEqual(converger.step_limits, "limits")
+        mock_gslfc.assert_called_once_with({"a": 3})
         [partitioner] = converger.services
         [timer] = partitioner.services
         self.assertIs(partitioner.__class__, Partitioner)

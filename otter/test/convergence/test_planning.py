@@ -1114,6 +1114,7 @@ class PlanLaunchServerTests(SynchronousTestCase):
             desired_group_state,
             0,
             build_timeout=3600,
+            step_limits={CreateServer: 10},
             servers=set([server('server1', state=ServerState.ACTIVE,
                                 servicenet_address='1.1.1.1',
                                 desired_lbs=desired_lbs),
@@ -1139,6 +1140,7 @@ class PlanLaunchServerTests(SynchronousTestCase):
             desired_group_state,
             now=1,
             build_timeout=1,
+            step_limits={},
             servers=set([server('server1', state=ServerState.BUILD,
                         servicenet_address='1.1.1.1', created=0)]),
             lb_nodes=set())
@@ -1608,6 +1610,7 @@ class PlanLaunchStackTests(SynchronousTestCase):
             desired_group_state=desired_group_state,
             now=0,
             build_timeout=3600,
+            step_limits={CreateStack: 10},
             stacks=set([stack('stack1'),
                         stack('stack2', action='CHECK', status='COMPLETE')]))
 

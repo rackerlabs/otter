@@ -528,8 +528,8 @@ def converge_launch_stack(desired_state, stacks):
                 converge_later)
 
 
-def plan_launch_server(desired_group_state, now, build_timeout, servers,
-                       lb_nodes):
+def plan_launch_server(desired_group_state, now, build_timeout, step_limits,
+                       servers, lb_nodes):
     """
     Get an optimized convergence plan.
 
@@ -537,11 +537,12 @@ def plan_launch_server(desired_group_state, now, build_timeout, servers,
     """
     steps = converge_launch_server(desired_group_state, servers, lb_nodes, now,
                                    timeout=build_timeout)
-    steps = limit_steps_by_count(steps)
+    steps = limit_steps_by_count(steps, step_limits)
     return optimize_steps(steps)
 
 
-def plan_launch_stack(desired_group_state, now, build_timeout, stacks):
+def plan_launch_stack(desired_group_state, now, build_timeout, step_limits,
+                      stacks):
     """
     Get an optimized convergence plan.
 
@@ -550,7 +551,7 @@ def plan_launch_stack(desired_group_state, now, build_timeout, stacks):
     and `stacks` are the same as in `converge_launch_stack`.
     """
     steps = converge_launch_stack(desired_group_state, stacks)
-    steps = limit_steps_by_count(steps)
+    steps = limit_steps_by_count(steps, step_limits)
     return optimize_steps(steps)
 
 
