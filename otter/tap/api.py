@@ -298,7 +298,8 @@ def makeService(config):
                 parent, kz_client, dispatcher,
                 config_value('converger.interval') or 10,
                 config_value('converger.build_timeout') or 3600,
-                config_value('converger.limited_retry_iterations') or 10)
+                config_value('converger.limited_retry_iterations') or 10,
+                config_value('converger.step_limits') or {})
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
@@ -307,7 +308,7 @@ def makeService(config):
 
 
 def setup_converger(parent, kz_client, dispatcher, interval, build_timeout,
-                    limited_retry_iterations):
+                    limited_retry_iterations, step_limits):
     """
     Create a Converger service, which has a Partitioner as a child service, so
     that if the Converger is stopped, the partitioner is also stopped.
@@ -320,8 +321,7 @@ def setup_converger(parent, kz_client, dispatcher, interval, build_timeout,
         time_boundary=15,  # time boundary
     )
     cvg = Converger(log, dispatcher, 10, partitioner_factory, build_timeout,
-                    interval / 2,
-                    limited_retry_iterations)
+                    interval / 2, limited_retry_iterations, step_limits)
     cvg.setServiceParent(parent)
     watch_children(kz_client, CONVERGENCE_DIRTY_DIR, cvg.divergent_changed)
 
