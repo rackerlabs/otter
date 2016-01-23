@@ -80,7 +80,7 @@ class TestLaunchStack(unittest.TestCase):
 
     def get_stack_list(self):
         return (self.treq.get(
-                    '%s/stacks' % str(self.rcs.endpoints['heat']),
+                    '{}/stacks'.format(self.rcs.endpoints['heat']),
                     headers=headers(str(self.rcs.token)),
                     params={
                         'tags': get_stack_tag_for_group(self.group.group_id)},
