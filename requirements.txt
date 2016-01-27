@@ -8,7 +8,7 @@ treq==0.2.1
 silverberg==0.1.12
 pyOpenSSL==0.14
 jsonfig==0.1.1
-testtools==0.9.32
+testtools==1.9.0
 croniter==0.3.5
 txkazoo==0.0.6b2
 kazoo==2.2.1
@@ -17,7 +17,7 @@ txeffect==0.9
 characteristic==14.3.0
 attrs==15.0.0
 toolz==0.7.4
-pyrsistent==0.10.3
+pyrsistent==0.11.10
 singledispatch==3.4.0.3
 six==1.9.0
 sumtypes==0.1a4
