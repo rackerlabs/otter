@@ -18,7 +18,7 @@ Contributions are welcome!
 
 * To suggest changes or report a problem, submit an [issue](https://github.com/rackerlabs/otter/issues). 
 
-* To make changes to a project, create your own fork of the repository. Then, submit a [pull 
+* To make changes to the documentation, create your own fork of the repository. Then, submit a [pull 
 request](https://github.com/rackerlabs/otter/compare?expand=1) to have your changes reviewed 
 and merged into the master branch as appropriate.
 
