@@ -12,13 +12,15 @@ from characteristic import Attribute, attributes
 
 from testtools.matchers import MatchesPredicateWithParams
 
+from toolz.dicttoolz import get_in, update_in
+
 import treq
 
 from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 from twisted.python.log import msg
 
-from otter.integration.lib.nova import NovaServer
+from otter.integration.lib.nova import NovaServer, fetch_image_id
 from otter.integration.lib.utils import diagnose
 
 from otter.util.deferredutils import retry_and_timeout
@@ -59,8 +61,7 @@ def create_scaling_group_dict(
     payload.  Note: this function does NOT create a scaling group.
 
     :param str image_ref: An OpenStack image reference ID (typically a UUID).
-        If not provided, the content of the AS_IMAGE_REF environment variable
-        will be taken as default.  If that doesn't exist, "" will be used.
+        If not provided, "" will be used.
     :param str flavor_ref: As with image_ref above, but for the launch config's
         flavor setting.
     :param int min_entities: The minimum number of servers to bring up when
@@ -87,8 +88,6 @@ def create_scaling_group_dict(
         flavor and image IDs.
     """
 
-    if not image_ref:
-        image_ref = os.environ['AS_IMAGE_REF']
     if not flavor_ref:
         flavor_ref = os.environ['AS_FLAVOR_REF']
     if not name:
@@ -100,7 +99,7 @@ def create_scaling_group_dict(
             "args": {
                 "server": {
                     "flavorRef": flavor_ref,
-                    "imageRef": image_ref,
+                    "imageRef": "" if image_ref is None else image_ref,
                     "networks": [
                         {
                             "uuid": "11111111-1111-1111-1111-111111111111"
@@ -360,6 +359,14 @@ class ScalingGroup(object):
             .addCallback(debug_print)
         )
 
+    def _image_ref(self):
+        """
+        Get group config's imageRef
+        """
+        return get_in(
+            self.group_config,
+            ["launchConfiguration", "args", "server", "imageRef"])
+
     @diagnose("AS", "Creating scaling group")
     def start(self, rcs, test):
         """Create a scaling group.
@@ -380,17 +387,26 @@ class ScalingGroup(object):
                 pp.pprint(rcs.groups)
             return rcs
 
-        return (
-            self.treq.post(
+        def send(image_id):
+            if image_id is not None:
+                self.group_config = update_in(
+                    self.group_config,
+                    ["launchConfiguration", "args", "server", "imageRef"],
+                    lambda _: image_id)
+            d = self.treq.post(
                 "%s/groups" % str(rcs.endpoints["otter"]),
                 json.dumps(self.group_config),
                 headers=headers(str(rcs.token)),
-                pool=self.pool
-            )
-            .addCallback(check_success, [201])
-            .addCallback(self.treq.json_content)
-            .addCallback(record_results)
-        )
+                pool=self.pool)
+            d.addCallback(check_success, [201])
+            d.addCallback(self.treq.json_content)
+            return d.addCallback(record_results)
+
+        # If image_ref is not configured, get it from nova
+        if self._image_ref() is None:
+            return fetch_image_id(rcs, self.pool).addCallback(send)
+        else:
+            return send(None)
 
     @diagnose("AS+Nova", "Getting the servicenet IPs of the active servers")
     def get_servicenet_ips(self, rcs, server_ids=None):

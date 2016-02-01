@@ -141,6 +141,34 @@ def list_servers(rcs, pool, _treq=treq):
     ).addCallback(check_success, [200]).addCallback(_treq.json_content)
 
 
+@diagnose("nova", "Listing all images")
+def list_images(rcs, pool, _treq=treq):
+    """
+    Get a list of all images.
+    """
+    params = {'limit': 10000}
+    return _treq.get(
+        "{}/images".format(rcs.endpoints['nova']),
+        params=params,
+        headers=headers(str(rcs.token)),
+        pool=pool
+    ).addCallback(check_success, [200]).addCallback(_treq.json_content)
+
+
+@inlineCallbacks
+def fetch_image_id(rcs, pool):
+    """
+    Get image ID from nova that can be used in creating servers or
+    scaling group
+    """
+    images_resp = yield list_images(rcs, pool)
+    for image in images_resp["images"]:
+        if image["name"].startswith("Ubuntu"):
+            returnValue(image["id"])
+    else:
+        returnValue(images_resp["images"][0]["id"])
+
+
 @diagnose("nova", "Creating server")
 def create_server(rcs, pool, server_args, _treq=treq):
     """
