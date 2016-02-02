@@ -70,6 +70,7 @@ otter_key = os.environ.get('AS_AUTOSCALE_SC_KEY', 'autoscale')
 otter_local_url = os.environ.get('AS_AUTOSCALE_LOCAL_URL')
 nova_key = os.environ.get('AS_NOVA_SC_KEY', 'cloudServersOpenStack')
 clb_key = os.environ.get('AS_CLB_SC_KEY', 'cloudLoadBalancers')
+heat_key = os.environ.get('AS_HEAT_SC_KEY', 'cloudOrchestration')
 
 # these are the service names for mimic control planes
 mimic_nova_key = os.environ.get("MIMICNOVA_SC_KEY", 'cloudServersBehavior')
@@ -100,7 +101,9 @@ def get_resource_mapping():
     """
     Get resource mapping based on the environment settings
     """
-    res = {'nova': (nova_key,), 'loadbalancers': (clb_key,)}
+    res = {'nova': (nova_key,),
+           'loadbalancers': (clb_key,),
+           'heat': (heat_key,)}
     if otter_local_url is not None:
         res['otter'] = ("badkey", otter_local_url)
     else:
