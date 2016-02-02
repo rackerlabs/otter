@@ -9,6 +9,13 @@ import time
 from functools import partial
 from unittest import skip
 
+from autoscale_fixtures.behaviors import AutoscaleBehaviors
+from autoscale_fixtures.client import (
+    AutoscalingAPIClient, LbaasAPIClient, RackConnectV3APIClient
+)
+from autoscale_fixtures.config import AutoscaleConfig
+from autoscale_fixtures.otter_constants import OtterConstants
+
 from cafe.drivers.unittest.fixtures import BaseTestFixture
 
 from cloudcafe.auth.config import UserAuthConfig, UserConfig
@@ -16,14 +23,8 @@ from cloudcafe.auth.provider import AuthProvider
 
 from cloudcafe.common.resources import ResourcePool
 from cloudcafe.common.tools.datagen import rand_name
+from cloudcafe.compute.images_api.client import ImagesClient
 from cloudcafe.compute.servers_api.client import ServersClient
-
-from autoscale_fixtures.behaviors import AutoscaleBehaviors
-from autoscale_fixtures.client import (
-    AutoscalingAPIClient, LbaasAPIClient, RackConnectV3APIClient
-)
-from autoscale_fixtures.config import AutoscaleConfig
-from autoscale_fixtures.otter_constants import OtterConstants
 
 
 def _make_client(access_data, service_name, region, client_cls, debug_name):
@@ -89,6 +90,13 @@ def _set_up_clients():
         ServersClient,
         "Nova Compute")
 
+    _images_client = _make_client(
+        access_data,
+        autoscale_config.server_endpoint_name,
+        autoscale_config.region,
+        ImagesClient,
+        "Nova images")
+
     _lbaas_client = _make_client(
         access_data,
         autoscale_config.load_balancer_endpoint_name,
@@ -113,7 +121,8 @@ def _set_up_clients():
         raise Exception(
             "Unable to instantiate all necessary clients.")
 
-    return (_autoscale_client, _server_client, _lbaas_client, _rcv3_client)
+    return (_autoscale_client, _server_client, _images_client, _lbaas_client,
+            _rcv3_client)
 
 
 # Global testing state - unfortunate, but only needs to be done once and also
@@ -132,7 +141,24 @@ except Exception:
 
 _rcv3_cloud_network = autoscale_config.rcv3_cloud_network
 
-autoscale_client, server_client, lbaas_client, rcv3_client = _set_up_clients()
+(autoscale_client, server_client, images_client,
+ lbaas_client, rcv3_client) = _set_up_clients()
+
+
+def fetch_image_ids(images_client):
+    """
+    Fetch image IDs, from Nova that can be used as imageRef in tests
+    """
+    images = images_client.list_images().entity
+    ubuntu, other = None, None
+    for image in images:
+        if image.name.startswith("Ubuntu"):
+            ubuntu = image.id
+        else:
+            other = image.id
+    if ubuntu is None:
+        raise Exception("Couldn't get ubuntu image")
+    return ubuntu, other
 
 
 def only_run_if_mimic_is(should_mimic_be_available):
@@ -173,8 +199,6 @@ class AutoscaleFixture(BaseTestFixture):
         cls.gc_max_entities = int(cls.autoscale_config.gc_max_entities)
         cls.lc_name = cls.autoscale_config.lc_name
         cls.lc_flavor_ref = cls.autoscale_config.lc_flavor_ref
-        cls.lc_image_ref = cls.autoscale_config.lc_image_ref
-        cls.lc_image_ref_alt = cls.autoscale_config.lc_image_ref_alt
         cls.sp_name = rand_name(cls.autoscale_config.sp_name)
         cls.sp_cooldown = int(cls.autoscale_config.sp_cooldown)
         cls.sp_change = int(cls.autoscale_config.sp_change)
@@ -213,6 +237,10 @@ class AutoscaleFixture(BaseTestFixture):
         cls.server_client = server_client
         cls.lbaas_client = lbaas_client
         cls.rcv3_client = rcv3_client
+
+        cls.lc_image_ref, cls.lc_image_ref_alt = fetch_image_ids(images_client)
+        autoscale_config.lc_image_ref = cls.lc_image_ref
+        autoscale_config.lc_image_ref_alt = cls.lc_image_ref_alt
 
         cls.rcv3_load_balancer_pool = _rcv3_load_balancer_pool
         cls.rcv3_cloud_network = _rcv3_cloud_network
