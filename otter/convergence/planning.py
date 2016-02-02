@@ -186,7 +186,7 @@ def _converge_lb_state(server, current_lb_nodes):
         if desired.equivalent_definition(node.description)]
 
     if desired_matching_existing:
-        met_desireds, _ = zip(*desired_matching_existing)
+        met_desireds = next(iter(zip(*desired_matching_existing)))
     else:
         met_desireds = ()
 
