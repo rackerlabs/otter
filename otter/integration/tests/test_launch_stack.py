@@ -9,7 +9,6 @@ from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks
 from twisted.python.log import msg
 from twisted.trial import unittest
-from twisted.web.client import HTTPConnectionPool
 
 from otter.convergence.model import get_stack_tag_for_group
 
@@ -21,11 +20,8 @@ from otter.integration.lib.trial_tools import (
     get_resource_mapping,
     region)
 
-from otter.log import log
-
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import check_success, headers
-from otter.util.logging_treq import LoggingTreq
 from otter.util.retry import (
     TransientRetryError,
     repeating_interval,
@@ -45,8 +41,6 @@ class TestLaunchStack(unittest.TestCase):
         self.helper = TestHelper(self)
         self.rcs = TestResources()
         self.identity = get_identity(self.helper.pool)
-        self.pool = HTTPConnectionPool(reactor, False)
-        self.treq = LoggingTreq(log=log, log_response=True)
 
         scaling_group_config = {
             'launchConfiguration': {
@@ -72,21 +66,21 @@ class TestLaunchStack(unittest.TestCase):
         }
 
         self.group = ScalingGroup(group_config=scaling_group_config,
-                                  treq=self.treq,
-                                  pool=self.pool)
+                                  treq=self.helper.treq,
+                                  pool=self.helper.pool)
 
         return self.identity.authenticate_user(
             self.rcs, resources=get_resource_mapping(), region=region)
 
     def get_stack_list(self):
-        return (self.treq.get(
+        return (self.helper.treq.get(
                     '{}/stacks'.format(self.rcs.endpoints['heat']),
                     headers=headers(str(self.rcs.token)),
                     params={
                         'tags': get_stack_tag_for_group(self.group.group_id)},
-                    pool=self.pool)
+                    pool=self.helper.pool)
                 .addCallback(check_success, [200])
-                .addCallback(self.treq.json_content))
+                .addCallback(self.helper.treq.json_content))
 
     def wait_for_stack_list(self, expected_states, timeout=60, period=10):
         def check(content):
