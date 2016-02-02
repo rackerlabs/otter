@@ -18,7 +18,8 @@ from otter.integration.lib.trial_tools import (
     TestHelper,
     get_identity,
     get_resource_mapping,
-    region)
+    region,
+    skip_me)
 
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import check_success, headers
@@ -111,6 +112,7 @@ class TestLaunchStack(unittest.TestCase):
                 "Waiting for group {} to reach state {}".format(
                     self.group.group_id, str(expected_states))))
 
+    @skip_me('Due to https://github.com/rackerlabs/mimic/issues/513')
     @inlineCallbacks
     def test_create(self):
         """
