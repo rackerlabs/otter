@@ -67,9 +67,11 @@ from otter.convergence.steps import (
     delete_and_verify,
 )
 from otter.log.intents import Log
+from otter.test.cloud_client.test_init import log_intent
 from otter.test.utils import (
     StubResponse,
     matches,
+    noop,
     raise_,
     resolve_effect,
     stack,
@@ -891,6 +893,7 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
                      'cloud_server': {'id': node_b_id}}],
                 success_pred=has_code(201, 409)).intent,
              lambda _: (StubResponse(201, {}), None)),
+            (log_intent('request-rcv3-bulk', None), noop)
         ]
 
         body = {"errors":
@@ -1070,6 +1073,7 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                      'cloud_server': {'id': node_b_id}}],
                 success_pred=has_code(204, 409)).intent,
              lambda _: (StubResponse(204, {}), None)),
+            (log_intent("request-rcv3-bulk", None), noop)
         ]
 
         body = {"errors":

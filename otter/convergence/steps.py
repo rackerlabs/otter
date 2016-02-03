@@ -15,6 +15,7 @@ from pyrsistent import PMap, PSet, freeze, pset, thaw
 import six
 
 from toolz.dicttoolz import dissoc, get_in
+from toolz.functoolz import identity
 
 from twisted.python.constants import NamedConstant
 
@@ -33,6 +34,7 @@ from otter.cloud_client import (
     create_stack,
     delete_stack,
     has_code,
+    log_success_response,
     remove_clb_nodes,
     service_request,
     set_nova_metadata_item,
@@ -367,7 +369,8 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
         data=[{"cloud_server": {"id": node},
                "load_balancer_pool": {"id": lb}}
               for (lb, node) in lb_node_pairs],
-        success_pred=success_pred)
+        success_pred=success_pred).on(
+            log_success_response('request-rcv3-bulk', identity))
 
 
 _UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
