@@ -105,6 +105,12 @@ The launch configuration specifies the launch type along with server and load ba
                 if you use a load balancer so the load balancer can retrieve the IP address of new
                 servers. See :ref:`Load balancer parameters <load-balancers-parameters>`.
 
+        ``draining_timeout``
+             Specifies the number of seconds Autoscale will put the CLB node in DRAINING mode
+             before deleting the node and eventually the server. This is used when scaling down.
+             Not used when there is no ``loadbalancers`` configuration. Please note that
+             this feature only works with a cloud load balancer.
+
 
 .. _server-parameters:
 
