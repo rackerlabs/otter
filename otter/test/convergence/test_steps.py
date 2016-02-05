@@ -71,7 +71,6 @@ from otter.test.cloud_client.test_init import log_intent
 from otter.test.utils import (
     StubResponse,
     matches,
-    noop,
     raise_,
     resolve_effect,
     stack,
@@ -900,8 +899,7 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
 
         self.assertEqual(
             _rcv3_check_bulk_add(
-                [(lb_a_id, node_a_id),
-                (lb_b_id, node_b_id)],
+                [(lb_a_id, node_a_id), (lb_b_id, node_b_id)],
                 (StubResponse(409, {}), body)),
             (StepResult.RETRY,
              [ErrorReason.String(reason="Bulk addition partially succeeded")]))
@@ -1072,10 +1070,8 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
 
         self.assertEqual(
             _rcv3_check_bulk_delete(
-                [(lb_a_id, node_a_id),
-                (lb_b_id, node_b_id),
-                (lb_c_id, node_c_id),
-                (lb_d_id, node_d_id)],
+                [(lb_a_id, node_a_id), (lb_b_id, node_b_id),
+                 (lb_c_id, node_c_id), (lb_d_id, node_d_id)],
                 (StubResponse(409, {}), body)),
             (StepResult.RETRY,
              [ErrorReason.String("Bulk removal partially successful")]))
