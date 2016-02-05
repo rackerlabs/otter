@@ -840,8 +840,45 @@ class RCv3RegexTests(SynchronousTestCase):
 
 class RCv3CheckBulkAddTests(SynchronousTestCase):
     """
-    Tests for :func:`_rcv3_check_bulk_add`.
+    Tests for :obj:`BulkAddToRCv3`
     """
+    def setUp(self):
+        from otter.convergence.steps import rcv3
+        self.patch(rcv3, "bulk_add", intent_func("ba"))
+
+    def test_no_errors(self):
+        """
+        No errors occur when adding nodes
+        """
+
+    def test_no_bulk_errors(self):
+        """
+        When bulk adding does not raise BulkErrors then the error is just
+        propogated up
+        """
+
+    def test_failures(self):
+        """
+        Bulk adding fails with unrecoverable errors
+        """
+
+    def test_retries(self):
+        """
+        Bulk adding raises NodeAlreadyMember which results in retrying
+        for rest of the pairs
+        """
+
+    def test_retry_limits(self):
+        """
+        It does not retry forever and eventually gives up after a limit
+        """
+
+    def test_failures_and_retries(self):
+        """
+        If bulk adding results in unreconverable and retrying errors then
+        it fails and does not retry
+        """
+
     def test_good_response(self):
         """
         If the response code indicates success, the step returns a RETRY so

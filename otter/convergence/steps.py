@@ -15,6 +15,7 @@ from pyrsistent import PMap, PSet, freeze, pset, thaw
 import six
 
 from toolz.dicttoolz import dissoc, get_in
+from toolz.functoolz import curry
 
 from twisted.python.constants import NamedConstant
 
@@ -34,6 +35,7 @@ from otter.cloud_client import (
     delete_stack,
     has_code,
     remove_clb_nodes,
+    rcv3,
     service_request,
     set_nova_metadata_item,
     update_stack)
@@ -346,52 +348,12 @@ class ChangeCLBNode(object):
             error=_failure_reporter(CLBNotFoundError, NoSuchCLBNodeError))
 
 
-def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
-    """
-    Creates a bulk request for RackConnect v3.0 load balancers.
-
-    :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
-        connections to be made or broken.
-    :param str method: The method of the request ``"DELETE"`` or
-        ``"POST"``.
-    :param success_pred: Predicate that determines if a response was
-        successful.
-    :return: A bulk RackConnect v3.0 request for the given load balancer,
-        node pairs.
-    :rtype: :class:`Request`
-    """
-    return service_request(
-        ServiceType.RACKCONNECT_V3,
-        method,
-        append_segments("load_balancer_pools", "nodes"),
-        data=[{"cloud_server": {"id": node},
-               "load_balancer_pool": {"id": lb}}
-              for (lb, node) in lb_node_pairs],
-        success_pred=success_pred)
-
-
-_UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
-                "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
-
-
-def _rcv3_re(pattern):
-    return re.compile(pattern.format(uuid=_UUID4_REGEX), re.IGNORECASE)
-
-
-_RCV3_NODE_NOT_A_MEMBER_PATTERN = _rcv3_re(
-    "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
-    "(?P<lb_id>{uuid})")
-_RCV3_NODE_ALREADY_A_MEMBER_PATTERN = _rcv3_re(
-    "Cloud Server (?P<node_id>{uuid}) is already a member of Load Balancer "
-    "Pool (?P<lb_id>{uuid})")
-_RCV3_LB_INACTIVE_PATTERN = _rcv3_re(
-    "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state")
-_RCV3_LB_DOESNT_EXIST_PATTERN = _rcv3_re(
-    "Load Balancer Pool (?P<lb_id>{uuid}) does not exist")
+RCV3_BULK_MAX_RETRIES = 10
 
 
 @implementer(IStep)
-@attributes([Attribute('lb_node_pairs', instance_of=PSet)])
+@attributes([Attribute('lb_node_pairs', instance_of=PSet),
+             Attribute("max_retries", default_value=RCV3_BULK_MAX_RETRIES)])
 class BulkAddToRCv3(object):
     """
     Some connections must be made between some combination of servers
@@ -405,59 +367,48 @@ class BulkAddToRCv3(object):
     :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
         connections to be made.
     """
-    def _bare_effect(self):
-        """
-        Just the RCv3 bulk request effect, with no callbacks.
-        """
-        return _rackconnect_bulk_request(self.lb_node_pairs, "POST",
-                                         success_pred=has_code(201, 409))
-
     def as_effect(self):
         """
         Produce a :obj:`Effect` to add some nodes to some RCv3 load
         balancers.
         """
-        eff = self._bare_effect()
-        return eff.on(partial(_rcv3_check_bulk_add, self.lb_node_pairs))
+        eff = _rcv3_bulk_add(self.lb_node_pairs, self.max_retries)
+        return eff.on(
+            success=lambda _: (StepResult.RETRY, [ErrorReason.String(
+                'must re-gather after LB add in order to update the '
+                'active cache')]))
 
 
-def _rcv3_check_bulk_add(attempted_pairs, result):
-    """
-    Checks if the RCv3 bulk add command was successful.
-    """
-    response, body = result
+def _rcv3_bulk_add(lb_node_pairs, retry_attempt):
+    eff = rcv3.bulk_add(lb_node_pairs)
+    return eff.on(
+        error=catch(rcv3.BulkErrors,
+                    _rcv3_bulk_errors(lb_node_pairs, retry_attempt)))
 
-    if response.code == 201:  # All done!
-        return StepResult.RETRY, [
-            ErrorReason.String('must re-gather after adding to LB in order to '
-                               'update the active cache')]
 
-    failure_reasons = []
-    to_retry = pset(attempted_pairs)
-    for error in body["errors"]:
-        match = _RCV3_NODE_ALREADY_A_MEMBER_PATTERN.match(error)
-        if match is not None:
-            to_retry -= pset([match.groups()[::-1]])
-
-        match = _RCV3_LB_INACTIVE_PATTERN.match(error)
-        if match is not None:
-            failure_reasons.append(
-                "RCv3 LB {lb_id} was inactive".format(**match.groupdict()))
-
-        match = _RCV3_LB_DOESNT_EXIST_PATTERN.match(error)
-        if match is not None:
-            failure_reasons.append(
-                "RCv3 LB {lb_id} does not exist".format(**match.groupdict()))
-
-    if failure_reasons:
-        return StepResult.FAILURE, failure_reasons
-    elif to_retry:
-        next_step = BulkAddToRCv3(lb_node_pairs=to_retry)
-        return next_step.as_effect()
-    else:
-        # It's unclear when this condition is reached. Should we really be
-        # returning SUCCESS?
-        return StepResult.SUCCESS, []
+@curry
+def _rcv3_bulk_errors(attempted_pairs, retry_attempt, exc_info):
+    bulk_errors = exc_info[1]
+    failures = []
+    to_retry = attempted_pairs
+    for error in bulk_errors.errors:
+        if isinstance(error, (rcv3.LBInactive, rcv3.NoSuchLBError)):
+           failures.append(error)
+        if isinstance(error, rcv3.NodeAlreadyMember):
+            to_retry -= pset([(error.lb_id, error.node_id)])
+    if failures:
+        return StepResult.FAILURE, [
+            ErrorReason.String(f.message) for f in failures]
+    if to_retry:
+        if retry_attempt <= 0:
+            return StepResult.FAILURE, [
+                ErrorReason.String("Maximum bulk add retries reached")]
+        return _rcv3_bulk_add(to_retry, retry_attempt - 1)
+    # Should never reach here since above code handles all known error cases
+    # as of writing. However, it will be helpful if new error cases are added
+    # in client and not handled here
+    return StepResult.RETRY, [
+        ErrorReason.String("Unexpected bulk errors: {}".format(bulk_errors))]
 
 
 @implementer(IStep)
