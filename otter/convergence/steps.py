@@ -429,11 +429,14 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
     Checks if the RCv3 bulk add command was successful.
     """
     response, body = result
+    success_return = (
+        StepResult.RETRY,
+        [ErrorReason.String('must re-gather after adding to LB in order to '
+                            'update the active cache')]
+    )
 
     if response.code == 201:  # All done!
-        return StepResult.RETRY, [
-            ErrorReason.String('must re-gather after adding to LB in order to '
-                               'update the active cache')]
+        return success_return
 
     failure_reasons = []
     to_retry = pset(attempted_pairs)
@@ -455,12 +458,11 @@ def _rcv3_check_bulk_add(attempted_pairs, result):
     if failure_reasons:
         return StepResult.FAILURE, failure_reasons
     elif to_retry:
-        next_step = BulkAddToRCv3(lb_node_pairs=to_retry)
-        return next_step.as_effect()
+        return StepResult.RETRY, [
+            ErrorReason.String("Bulk addition partially succeeded")]
     else:
-        # It's unclear when this condition is reached. Should we really be
-        # returning SUCCESS?
-        return StepResult.SUCCESS, []
+        # no errors and nothing to retry
+        return success_return
 
 
 @implementer(IStep)
@@ -533,8 +535,8 @@ def _rcv3_check_bulk_delete(attempted_pairs, result):
                              if lb_id != bad_lb_id])
 
     if to_retry:
-        next_step = BulkRemoveFromRCv3(lb_node_pairs=to_retry)
-        return next_step.as_effect()
+        return StepResult.RETRY, [
+            ErrorReason.String("Bulk removal partially successful")]
     else:
         return StepResult.SUCCESS, []
 
