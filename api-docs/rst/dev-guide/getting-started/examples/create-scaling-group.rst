@@ -1,4 +1,4 @@
-.. _create-scaling-group:
+.. _create-a-scaling-group:
 
 Create a scaling group
 ~~~~~~~~~~~~~~~~~~~~~~
