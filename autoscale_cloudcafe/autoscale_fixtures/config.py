@@ -10,6 +10,10 @@ class AutoscaleConfig(ConfigSectionInterface):
     """
     SECTION_NAME = 'autoscale'
 
+    # Image ID to be used in group launch config
+    # This is not really in config any more but it still here as some
+    # tests use this instead of fetched imaged ids in AutoscaleFixture.
+    # See comment in AutoscaleFixture.setupClass
     lc_image_ref = None
     lc_image_ref_alt = None
 

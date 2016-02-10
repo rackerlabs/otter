@@ -145,20 +145,22 @@ _rcv3_cloud_network = autoscale_config.rcv3_cloud_network
  lbaas_client, rcv3_client) = _set_up_clients()
 
 
-def fetch_image_ids(images_client):
+def image_ids_with_and_without_name(images_client, name="Ubuntu"):
     """
     Fetch image IDs, from Nova that can be used as imageRef in tests
+    Note: Serves the same purpose as integration.lib.nova.fetch_ubuntu_image_id
+    in trial integration tests
     """
     images = images_client.list_images().entity
-    ubuntu, other = None, None
+    base, other = None, None
     for image in images:
-        if image.name.startswith("Ubuntu"):
-            ubuntu = image.id
+        if name in image.name:
+            base = image.id
         else:
             other = image.id
-    if ubuntu is None:
-        raise Exception("Couldn't get ubuntu image")
-    return ubuntu, other
+    if base is None:
+        raise Exception("Couldn't get {} image".format(name))
+    return base, other
 
 
 def only_run_if_mimic_is(should_mimic_be_available):
@@ -238,7 +240,12 @@ class AutoscaleFixture(BaseTestFixture):
         cls.lbaas_client = lbaas_client
         cls.rcv3_client = rcv3_client
 
-        cls.lc_image_ref, cls.lc_image_ref_alt = fetch_image_ids(images_client)
+        # ImageRefs of ununtu and non-ubuntu images that will be used
+        # when creating groups
+        image_refs = image_ids_with_and_without_name(images_client)
+        cls.lc_image_ref, cls.lc_image_ref_alt = image_refs
+        # Unfortunately some of the tests use imageRef from config instead of
+        # this class. So, storing the same in config too
         autoscale_config.lc_image_ref = cls.lc_image_ref
         autoscale_config.lc_image_ref_alt = cls.lc_image_ref_alt
 

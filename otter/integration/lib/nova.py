@@ -156,10 +156,12 @@ def list_images(rcs, pool, _treq=treq):
 
 
 @inlineCallbacks
-def fetch_image_id(rcs, pool):
+def fetch_ubuntu_image_id(rcs, pool):
     """
     Get image ID from nova that can be used in creating servers or
     scaling group
+    Note: Serves the same purpose as fixtures.image_ids_with_and_without_name
+    in cloudcafe tests
     """
     images_resp = yield list_images(rcs, pool)
     for image in images_resp["images"]:
