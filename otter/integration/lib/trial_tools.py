@@ -38,7 +38,7 @@ from otter.integration.lib.identity import IdentityV2
 from otter.integration.lib.nova import (
     create_server,
     delete_servers,
-    fetch_image_id,
+    fetch_ubuntu_image_id,
     wait_for_servers
 )
 
@@ -292,7 +292,7 @@ class TestHelper(object):
 
         :return: an iterable of server details JSON of the created servers.
         """
-        image_id = yield fetch_image_id(rcs, self.pool)
+        image_id = yield fetch_ubuntu_image_id(rcs, self.pool)
         as_args = create_scaling_group_dict(
             image_ref=image_id,
             flavor_ref=flavor_ref)

@@ -20,7 +20,7 @@ from twisted.internet import reactor
 from twisted.internet.defer import gatherResults, inlineCallbacks, returnValue
 from twisted.python.log import msg
 
-from otter.integration.lib.nova import NovaServer, fetch_image_id
+from otter.integration.lib.nova import NovaServer, fetch_ubuntu_image_id
 from otter.integration.lib.utils import diagnose
 
 from otter.util.deferredutils import retry_and_timeout
@@ -404,7 +404,7 @@ class ScalingGroup(object):
 
         # If image_ref is not configured, get it from nova
         if self._image_ref() is None:
-            return fetch_image_id(rcs, self.pool).addCallback(send)
+            return fetch_ubuntu_image_id(rcs, self.pool).addCallback(send)
         else:
             return send(None)
 
