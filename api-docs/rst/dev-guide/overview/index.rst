@@ -30,6 +30,5 @@ growth is justified.
 .. toctree:: :hidden:
    :maxdepth: 3
 
-   Pricing and terms of service <pricing-and-service-level>
    additional-resources
    getting-help
