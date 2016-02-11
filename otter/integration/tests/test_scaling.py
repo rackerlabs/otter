@@ -25,7 +25,9 @@ username = os.environ['AS_USERNAME']
 password = os.environ['AS_PASSWORD']
 endpoint = os.environ['AS_IDENTITY']
 flavor_ref = os.environ['AS_FLAVOR_REF']
-image_ref = os.environ['AS_IMAGE_REF']
+# Getting it to avoid errors when loading even though this module is skipped.
+# However this module needs to be updated to not use AS_IMAGE_REF
+image_ref = os.environ.get('AS_IMAGE_REF', "none")
 region = os.environ['AS_REGION']
 
 
