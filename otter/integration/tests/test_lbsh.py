@@ -139,7 +139,7 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         Server node moved from LB1 to LB2
         Assert: Server put back on LB1
-        Assert: Server removed from LB2
+        Assert: Server remains in LB2
         """
         clb_as = self.helper.clbs[0]
         clb_other = yield self.create_another_clb()
@@ -167,85 +167,24 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
 
         yield group.trigger_convergence(self.rcs)
 
-        yield clb_as.wait_for_nodes(
-            self.rcs,
-            MatchesAll(
-                HasLength(1),
-                ContainsAllIPs([the_node["address"]])
+        yield gatherResults([
+            clb_as.wait_for_nodes(
+                self.rcs,
+                MatchesAll(
+                    HasLength(1),
+                    ContainsAllIPs([the_node["address"]])
+                ),
+                timeout=timeout_default
             ),
-            timeout=timeout_default
-        )
-
-        yield clb_other.wait_for_nodes(
-            self.rcs,
-            HasLength(0),
-            timeout=timeout_default
-        )
-
-    @inlineCallbacks
-    def test_oob_copy_node_to_oob_lb(self):
-        """
-        This is a slight variation of :func:`test_move_node_to_oob_lb`, with
-        the node copied to the second load balancer instead of moved.
-
-        Confirm that when convergence is triggered, nodes copied to
-        non-autoscale loadbalancers are removed.
-
-        1 group, LB1 in config, LB2 not in any autoscale configs:
-            - Server node added to LB2 (now on both)
-            - Trigger convergence
-            - Assert: Server still on LB1
-            - Assert: Server removed from LB2
-        """
-        clb_as = self.helper.clbs[0]
-        clb_other = yield self.create_another_clb()
-        yield self.confirm_clb_nodecounts([(clb_as, 0), (clb_other, 0)])
-
-        group, _ = self.helper.create_group(min_entities=1)
-        yield self.helper.start_group_and_wait(group, self.rcs)
-
-        # One node should have been added to clb_as, none to clb_other
-        nodes = yield self.confirm_clb_nodecounts([(clb_as, 1),
-                                                   (clb_other, 0)])
-        nodes_as = nodes[0]
-
-        the_node = nodes_as[0]
-        node_info = {
-            "address": the_node["address"],
-            "port": the_node["port"],
-            "condition": the_node["condition"],
-            "weight": the_node["weight"]
-        }
-
-        yield clb_other.add_nodes(self.rcs, [node_info])
-
-        yield clb_as.wait_for_nodes(
-            self.rcs, HasLength(1), timeout=timeout_default)
-        yield clb_other.wait_for_nodes(
-            self.rcs,
-            MatchesAll(
-                HasLength(1),
-                ContainsAllIPs([the_node["address"]])
-            ),
-            timeout=timeout_default
-        )
-
-        yield group.trigger_convergence(self.rcs)
-
-        yield clb_as.wait_for_nodes(
-            self.rcs,
-            MatchesAll(
-                HasLength(1),
-                ContainsAllIPs([the_node["address"]])
-            ),
-            timeout=timeout_default
-        )
-
-        yield clb_other.wait_for_nodes(
-            self.rcs,
-            HasLength(0),
-            timeout=timeout_default
-        )
+            clb_other.wait_for_nodes(
+                self.rcs,
+                MatchesAll(
+                    HasLength(1),
+                    ContainsAllIPs([the_node["address"]])
+                ),
+                timeout=timeout_default
+            )
+        ])
 
     @inlineCallbacks
     def test_only_autoscale_nodes_are_modified(self):
@@ -362,19 +301,18 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         )
 
     @inlineCallbacks
-    def test_convergence_heals_two_groups_on_same_clb_1(
-            self, remove_from_clb=False):
+    def test_convergence_heals_two_groups_on_same_clb(self):
         """
-        Autoscale removes a server from a CLB if it's not supposed to be on
-        the CLB, not touching any other autoscale servers on the same CLB.
+        Autoscale puts a server back on the desired CLB, not touching any other
+        autoscale servers on the same CLB.
 
         1. Create 2 AS groups on the same CLB, both with min 1 server,
            each group mapped to different ports
-        2. Add group1's server to the CLB on group2's port without deleting
-           it from group1's port.
+        2. Add group1's server to the CLB on group2's port and remove it from
+           group1's port.
         3. Converge both groups.
-        4. Group1's servers should be only on group1's port, and group2's
-           servers should only be on group2's port.
+        4. Group1's servers will be put back in group1's port but not removed
+           from group2's port. group2 and its clb port will not be touched
         """
         clb = self.helper.clbs[0]
         group1, _ = self.helper.create_group(
@@ -390,7 +328,6 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         groups = yield gatherResults([
             group.get_servicenet_ips(self.rcs) for group in (group1, group2)])
         group1_ip, group2_ip = [g.values()[0] for g in groups]
-
         expected_nodes = [
             ContainsDict({'port': Equals(80),
                           'address': Equals(group1_ip)}),
@@ -398,7 +335,6 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
                           'address': Equals(group1_ip)}),
             ContainsDict({'port': Equals(8080),
                           'address': Equals(group2_ip)})]
-
         nodes = yield clb.wait_for_nodes(
             self.rcs,
             MatchesSetwise(expected_nodes[0], expected_nodes[2]),
@@ -410,47 +346,26 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             clb.add_nodes(self.rcs, [{'address': group1_ip,
                                       'port': 8080,
                                       'condition': 'ENABLED',
-                                      'type': 'PRIMARY'}])
+                                      'type': 'PRIMARY'}]),
+            clb.delete_nodes(self.rcs,
+                             [n['id'] for n in nodes
+                              if n['address'] == group1_ip])
         ]
-        if remove_from_clb:
-            perturb.append(
-                clb.delete_nodes(self.rcs,
-                                 [n['id'] for n in nodes
-                                  if n['address'] == group1_ip]))
         yield gatherResults(perturb)
-
-        node_matchers = expected_nodes
-        if remove_from_clb:
-            node_matchers = expected_nodes[1:]
         yield clb.wait_for_nodes(
-            self.rcs, MatchesSetwise(*node_matchers), timeout=timeout_default)
+            self.rcs, MatchesSetwise(*expected_nodes[1:]),
+            timeout=timeout_default)
 
+        # Trigger convergence on both groups
         yield gatherResults([group.trigger_convergence(self.rcs)
                              for group in (group1, group2)])
 
+        # Group1 server be back and group2 will have both
         yield clb.wait_for_nodes(
-            self.rcs,
-            MatchesSetwise(expected_nodes[0], expected_nodes[2]),
-            timeout=timeout_default
-        )
-
-    def test_convergence_heals_two_groups_on_same_clb_2(self):
-        """
-        Autoscale puts a server back on the desired CLB, not touching any other
-        autoscale servers on the same CLB.
-
-        1. Create 2 AS groups on the same CLB, both with min 1 server,
-           each group mapped to different ports
-        2. Add group1's server to the CLB on group2's port and remove it from
-           group1's port.
-        3. Converge both groups.
-        4. Group1's servers should be only on group1's port, and group2's
-           servers should only be on group2's port.
-        """
-        return self.test_convergence_heals_two_groups_on_same_clb_1(True)
+            self.rcs, MatchesSetwise(*expected_nodes), timeout=timeout_default)
 
     @inlineCallbacks
-    def _disown_change_and_converge(self, remove_from_clb=True):
+    def _disown_change_and_converge(self, remove_from_clb):
         """
         Test helper for
         :func:`test_changing_disowned_server_is_not_converged_1` and
@@ -498,21 +413,20 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
                      ips[remaining_server]))
 
     @inlineCallbacks
-    def test_changing_disowned_server_is_not_converged_1(
-            self, remove_from_clb=True):
+    def test_changing_disowned_server_is_not_converged_1(self):
         """
         Moving a disowned autoscale server to a different CLB and converging
         will not move the disowned server back on its intended CLB.
 
-        1. Create an AS group with 2 servers.
+        1. Create an AS group with CLB and 2 servers.
         2. Disown 1 server.
-        3. Move both servers to a different CLB.
+        3. Remove both servers from group CLB and add to a different CLB.
         4. Converge group.
-        6. Assert that the group's server is back on its CLB, and that the
-           disowned server's remains on the wrong CLB.
+        5. Assert that the group's server is back on its CLB and it is not
+           removed from other CLB. Disowned server remains on the other CLB.
         """
         group, clb_as, clb_other, gone_ip, stay_ip = (
-            yield self._disown_change_and_converge())
+            yield self._disown_change_and_converge(True))
 
         yield gatherResults([
             clb_as.wait_for_nodes(
@@ -527,9 +441,8 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             clb_other.wait_for_nodes(
                 self.rcs,
                 MatchesAll(
-                    ExcludesAllIPs([stay_ip]),
-                    ContainsAllIPs([gone_ip]),
-                    HasLength(1)
+                    ContainsAllIPs([stay_ip, gone_ip]),
+                    HasLength(2)
                 ),
                 timeout=timeout_default
             ),
@@ -545,7 +458,6 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
                 ),
                 timeout=timeout_default
             ),
-
         ])
 
     @inlineCallbacks
@@ -554,13 +466,12 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
         Copying a disowned autoscale server to a different CLB and converging
         will not move the disowned server back on its intended CLB.
 
-        1. Create an AS group with 2 servers.
+        1. Create an AS group with CLB and 2 servers.
         2. Disown 1 server.
-        3. Place both servers on a different CLB in addition to the original
-           CLB.
+        3. Place both servers on a different CLB
         4. Converge group.
-        6. Assert that the group's server is back on its CLB only, and that the
-           disowned server's remains on both CLBs.
+        6. Assert that the everything remains the same since group's server is
+           in its CLB and otter does not bother about other CLB
 
         This is slightly different than
         :func:`test_changing_disowned_server_is_not_converged_1` in that it
@@ -583,9 +494,8 @@ class TestLoadBalancerSelfHealing(unittest.TestCase):
             clb_other.wait_for_nodes(
                 self.rcs,
                 MatchesAll(
-                    ExcludesAllIPs([stay_ip]),
-                    ContainsAllIPs([gone_ip]),
-                    HasLength(1)
+                    ContainsAllIPs([gone_ip, stay_ip]),
+                    HasLength(2)
                 ),
                 timeout=timeout_default
             ),
