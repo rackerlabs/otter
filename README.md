@@ -11,7 +11,7 @@ within this repository.
 
 Talk with us! Join us in:
 
-irc.freenode.net #stretch-dev
+irc.freenode.net #rackerlabs/otter
 
 Otter Dev Hall of Fame (alphabetical):
 
