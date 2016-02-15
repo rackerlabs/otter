@@ -102,7 +102,8 @@ def get_resource_mapping():
     Get resource mapping based on the environment settings
     """
     res = {'nova': (nova_key,),
-           'loadbalancers': (clb_key,)}
+           'loadbalancers': (clb_key,),
+           'heat': (heat_key,)}
     if otter_local_url is not None:
         res['otter'] = ("badkey", otter_local_url)
     else:

@@ -388,7 +388,8 @@ class ScalingGroup(object):
             return rcs
 
         def send(image_id):
-            if image_id is not None:
+            lc_type = self.group_config["launchConfiguration"]["type"]
+            if image_id is not None and lc_type == "launch_server":
                 self.group_config = update_in(
                     self.group_config,
                     ["launchConfiguration", "args", "server", "imageRef"],
