@@ -67,6 +67,7 @@ from otter.convergence.steps import (
     delete_and_verify,
 )
 from otter.log.intents import Log
+from otter.test.cloud_client.test_init import log_intent
 from otter.test.utils import (
     StubResponse,
     matches,
@@ -669,7 +670,8 @@ class StepAsEffectTests(SynchronousTestCase):
                 self.assertEquals(sync_perform(seq, eff),
                                   (StepResult.SUCCESS, []))
 
-    def _generic_bulk_rcv3_step_test(self, step_class, expected_method):
+    def _generic_bulk_rcv3_step_test(self, step_class, expected_method,
+                                     exp_step_result):
         """
         A generic test for bulk RCv3 steps.
 
@@ -695,8 +697,10 @@ class StepAsEffectTests(SynchronousTestCase):
         success_pred = request.intent.success_pred
         if request.intent.method == "POST":
             self.assertEqual(success_pred, has_code(201, 409))
+            success_code = 201
         else:
             self.assertEqual(success_pred, has_code(204, 409))
+            success_code = 204
 
         self.assertEqual(request.intent.url, "load_balancer_pools/nodes")
         self.assertEqual(request.intent.headers, None)
@@ -726,13 +730,20 @@ class StepAsEffectTests(SynchronousTestCase):
         request_data = sorted(request.intent.data, key=key_fn)
         self.assertEqual(request_data, expected_data)
 
+        # Ensure that op is logged and same result is returned
+        eff = resolve_effect(request, (StubResponse(success_code, {}), {}))
+        self.assertEqual(eff.intent, log_intent('request-rcv3-bulk', {}))
+        self.assertEqual(
+            resolve_effect(eff, None), (exp_step_result, ANY))
+
     def test_add_nodes_to_rcv3_load_balancers(self):
         """
         :obj:`BulkAddToRCv3.as_effect` produces a request for
         adding any combination of nodes to any combination of RCv3 load
         balancers.
         """
-        self._generic_bulk_rcv3_step_test(BulkAddToRCv3, "POST")
+        self._generic_bulk_rcv3_step_test(BulkAddToRCv3, "POST",
+                                          StepResult.RETRY)
 
     def test_remove_nodes_from_rcv3_load_balancers(self):
         """
@@ -740,7 +751,8 @@ class StepAsEffectTests(SynchronousTestCase):
         for removing any combination of nodes from any combination of RCv3
         load balancers.
         """
-        self._generic_bulk_rcv3_step_test(BulkRemoveFromRCv3, "DELETE")
+        self._generic_bulk_rcv3_step_test(BulkRemoveFromRCv3, "DELETE",
+                                          StepResult.SUCCESS)
 
 
 _RCV3_TEST_DATA = {
@@ -870,8 +882,7 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
 
     def test_try_again(self):
         """
-        If a node is already on the load balancer, returns an effect that
-        removes the remaining load balancer pairs.
+        If a node is already on the load balancer, returns RETRY
         """
         # This little piggy is already on the load balancer
         node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
@@ -881,33 +892,17 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
         node_b_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
         lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
 
-        seq = [
-            (service_request(
-                service_type=ServiceType.RACKCONNECT_V3,
-                method="POST",
-                url='load_balancer_pools/nodes',
-                data=[
-                    {'load_balancer_pool': {'id': lb_b_id},
-                     'cloud_server': {'id': node_b_id}}],
-                success_pred=has_code(201, 409)).intent,
-             lambda _: (StubResponse(201, {}), None)),
-        ]
-
         body = {"errors":
                 ["Cloud Server {node_id} is already a member of Load "
                  "Balancer Pool {lb_id}"
                  .format(node_id=node_a_id, lb_id=lb_a_id)]}
 
-        eff = _rcv3_check_bulk_add(
-            [(lb_a_id, node_a_id),
-             (lb_b_id, node_b_id)],
-            (StubResponse(409, {}), body))
-
         self.assertEqual(
-            perform_sequence(seq, eff),
+            _rcv3_check_bulk_add(
+                [(lb_a_id, node_a_id), (lb_b_id, node_b_id)],
+                (StubResponse(409, {}), body)),
             (StepResult.RETRY,
-             [ErrorReason.String(reason="must re-gather after adding to LB in "
-                                        "order to update the active cache")]))
+             [ErrorReason.String(reason="Bulk addition partially succeeded")]))
 
     def test_node_already_a_member(self):
         """
@@ -923,7 +918,12 @@ class RCv3CheckBulkAddTests(SynchronousTestCase):
             "Cloud Server {node_id} is already a member of Load "
             "Balancer Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
         result = _rcv3_check_bulk_add(pairs, (resp, body))
-        self.assertEqual(result, (StepResult.SUCCESS, []))
+        self.assertEqual(
+            result,
+            (StepResult.RETRY,
+             [ErrorReason.String(
+                 'must re-gather after adding to LB in order to '
+                 'update the active cache')]))
 
     def test_lb_inactive(self):
         """
@@ -1060,18 +1060,6 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
         node_d_id = 'bc1e94c3-0c88-4828-9e93-d42259280987'
         lb_d_id = 'de52879e-1f84-4ecd-8988-91dfdc99570d'
 
-        seq = [
-            (service_request(
-                service_type=ServiceType.RACKCONNECT_V3,
-                method="DELETE",
-                url='load_balancer_pools/nodes',
-                data=[
-                    {'load_balancer_pool': {'id': lb_b_id},
-                     'cloud_server': {'id': node_b_id}}],
-                success_pred=has_code(204, 409)).intent,
-             lambda _: (StubResponse(204, {}), None)),
-        ]
-
         body = {"errors":
                 ["Node {node_id} is not a member of Load Balancer "
                  "Pool {lb_id}".format(node_id=node_a_id, lb_id=lb_a_id),
@@ -1080,14 +1068,13 @@ class RCv3CheckBulkDeleteTests(SynchronousTestCase):
                  "Load Balancer Pool {lb_id} does not exist"
                  .format(lb_id=lb_d_id)]}
 
-        eff = _rcv3_check_bulk_delete(
-            [(lb_a_id, node_a_id),
-             (lb_b_id, node_b_id),
-             (lb_c_id, node_c_id),
-             (lb_d_id, node_d_id)],
-            (StubResponse(409, {}), body))
-
-        self.assertEqual(perform_sequence(seq, eff), (StepResult.SUCCESS, []))
+        self.assertEqual(
+            _rcv3_check_bulk_delete(
+                [(lb_a_id, node_a_id), (lb_b_id, node_b_id),
+                 (lb_c_id, node_c_id), (lb_d_id, node_d_id)],
+                (StubResponse(409, {}), body)),
+            (StepResult.RETRY,
+             [ErrorReason.String("Bulk removal partially successful")]))
 
     def test_nothing_to_retry(self):
         """

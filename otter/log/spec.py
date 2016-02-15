@@ -176,6 +176,7 @@ msg_types = {
     "request-list-clbs": "Request to list CLBs succeeded",
     "request-list-clb-nodes": "Request to list a CLB's nodes succeeded",
     "request-add-clb-nodes": "Request to add nodes to a CLB succeeded.",
+    "request-rcv3-bulk": "RCv3 bulk request succeeded.",
 
     # CF-publishing failures
     "cf-add-failure": "Failed to add event to cloud feeds",
