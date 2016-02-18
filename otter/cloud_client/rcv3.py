@@ -115,10 +115,11 @@ def bulk_add(lb_node_pairs):
     """
     eff = _rackconnect_bulk_request(lb_node_pairs, "POST",
                                     success_pred=has_code(201, 409))
-    return eff.on(_check_bulk_add)
+    return eff.on(_check_bulk_add(lb_node_pairs))
 
 
-def _check_bulk_add(result):
+@curry
+def _check_bulk_add(attempted_pairs, result):
     """
     Checks if the RCv3 bulk add command was successful.
     """
@@ -128,6 +129,7 @@ def _check_bulk_add(result):
         return
 
     errors = []
+    to_retry = attempted_pairs
     for error in body["errors"]:
         match = _RCV3_NODE_ALREADY_A_MEMBER_PATTERN.match(error)
         if match is not None:
