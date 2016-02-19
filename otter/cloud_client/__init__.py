@@ -329,7 +329,8 @@ def get_cloud_client_dispatcher(reactor, authenticator, log, service_configs):
 # ----- Logging responses -----
 
 
-def log_success_response(msg_type, response_body_filter, log_as_json=True):
+def log_success_response(msg_type, response_body_filter, log_as_json=True,
+                         request_body=None):
     """
     :param str msg_type: A string representing the message type of the log
         message
@@ -351,12 +352,14 @@ def log_success_response(msg_type, response_body_filter, log_as_json=True):
         resp_body = (
             json.dumps(response_body_filter(json_body), sort_keys=True)
             if log_as_json else json_body)
-        eff = msg_effect(
-            msg_type,
+        kwargs = dict(
             method=resp.request.method,
             url=resp.request.absoluteURI,
             response_body=resp_body,
             request_id=request_id)
+        if request_body is not None:
+            dict["request_body"] = request_body
+        eff = msg_effect(msg_type, **kwargs)
         return eff.on(lambda _: result)
 
     return _log_it
