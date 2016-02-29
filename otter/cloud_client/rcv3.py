@@ -10,7 +10,7 @@ from pyrsistent import pset
 from toolz.functoolz import curry, identity
 
 from otter.cloud_client import (
-    ExceptionWithMessage, ServiceType, service_request, log_success_response)
+    ExceptionWithMessage, ServiceType, log_success_response, service_request)
 from otter.util.http import append_segments
 from otter.util.pure_http import has_code
 
@@ -46,21 +46,21 @@ _UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
                 "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
 
 
-def _rcv3_re(pattern):
+def _re(pattern):
     return re.compile(pattern.format(uuid=_UUID4_REGEX), re.IGNORECASE)
 
 
-_RCV3_NODE_NOT_A_MEMBER_PATTERN = _rcv3_re(
+_NODE_NOT_A_MEMBER_PATTERN = _re(
     "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
     "(?P<lb_id>{uuid})")
-_RCV3_NODE_ALREADY_A_MEMBER_PATTERN = _rcv3_re(
+_NODE_ALREADY_A_MEMBER_PATTERN = _re(
     "Cloud Server (?P<node_id>{uuid}) is already a member of Load Balancer "
     "Pool (?P<lb_id>{uuid})")
-_RCV3_LB_INACTIVE_PATTERN = _rcv3_re(
+_LB_INACTIVE_PATTERN = _re(
     "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state")
-_RCV3_LB_DOESNT_EXIST_PATTERN = _rcv3_re(
+_LB_DOESNT_EXIST_PATTERN = _re(
     "Load Balancer Pool (?P<lb_id>{uuid}) does not exist")
-_RCV3_SERVER_UNPROCESSABLE = _rcv3_re(
+_SERVER_UNPROCESSABLE = _re(
     "Cloud Server (?P<server_id>{uuid}) is unprocessable")
 
 
@@ -102,7 +102,7 @@ class BulkErrors(ExceptionWithMessage):
         super(BulkErrors, self).__init__(
             "Bulk API errors: {}".format(
                 "; ".join(e.message for e in exceptions)))
-        self.errors = exceptions
+        self.errors = pset(exceptions)
 
 
 class UnknownBulkResponse(ExceptionWithMessage):
@@ -141,20 +141,20 @@ def _check_bulk_add(attempted_pairs, result):
     errors = []
     exists = pset()
     for error in body["errors"]:
-        match = _RCV3_NODE_ALREADY_A_MEMBER_PATTERN.match(error)
+        match = _NODE_ALREADY_A_MEMBER_PATTERN.match(error)
         if match is not None:
             pair = match.groupdict()
             exists = exists.append((pair["lb_id"], pair["node_id"]))
 
-        match = _RCV3_LB_INACTIVE_PATTERN.match(error)
+        match = _LB_INACTIVE_PATTERN.match(error)
         if match is not None:
             errors.append(LBInactive(match.group("lb_id")))
 
-        match = _RCV3_LB_DOESNT_EXIST_PATTERN.match(error)
+        match = _LB_DOESNT_EXIST_PATTERN.match(error)
         if match is not None:
             errors.append(NoSuchLBError(match.group("lb_id")))
 
-        match = _RCV3_SERVER_UNPROCESSABLE.match(error)
+        match = _SERVER_UNPROCESSABLE.match(error)
         if match is not None:
             errors.append(ServerUnprocessableError(match.group("server_id")))
 

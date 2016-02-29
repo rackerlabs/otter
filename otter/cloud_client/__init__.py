@@ -93,8 +93,8 @@ def service_request(
 
     :raise APIError: Raised asynchronously when the response HTTP code is not
         in success_codes.
-    :return: Effect of :obj:`ServiceRequest`, resulting in a JSON-parsed HTTP
-        response body.
+    :return: Effect of :obj:`ServiceRequest`, resulting in a tuple of
+        (:obj:`twisted.web.client.Response`,  JSON-parsed HTTP response body).
     """
     return Effect(ServiceRequest(
         service_type=service_type,
@@ -339,6 +339,7 @@ def log_success_response(msg_type, response_body_filter, log_as_json=True,
         should not mutate the original response body.
     :param bool log_as_json: Should the body be logged as JSON string or
         as dict?
+    :param str request_body: Optional body of the request sent
     :return: a function that accepts success result from a `ServiceRequest` and
         log the response body.  This assumes a JSON response, which is a
         tuple of (response, response_content).  (non-JSON responses do not
@@ -358,7 +359,7 @@ def log_success_response(msg_type, response_body_filter, log_as_json=True,
             response_body=resp_body,
             request_id=request_id)
         if request_body is not None:
-            dict["request_body"] = request_body
+            kwargs["request_body"] = request_body
         eff = msg_effect(msg_type, **kwargs)
         return eff.on(lambda _: result)
 
