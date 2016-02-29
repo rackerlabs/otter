@@ -208,11 +208,13 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         mt3d = merge(m, {'metricValue': 5, 'metricName': 'ord.t3.desired'})
         mt3a = merge(m, {'metricValue': 3, 'metricName': 'ord.t3.actual'})
         mt3p = merge(m, {'metricValue': 0, 'metricName': 'ord.t3.pending'})
-        cd = merge(m, {'metricValue': 109, 'metricName': 'ord.conv.desired'})
-        ca = merge(m, {'metricValue': 27, 'metricName': 'ord.conv.actual'})
+        cd = merge(m, {'metricValue': 109, 'metricName': 'ord.conv_desired'})
+        ca = merge(m, {'metricValue': 27, 'metricName': 'ord.conv_actual'})
+        cdiv = merge(m, {'metricValue': 82,
+                         'metricName': 'ord.conv_divergence'})
 
         req_data = [md, ma, mp, mt, mg, mt1d, mt1a, mt1p, mt2d, mt2a, mt2p,
-                    mt3d, mt3a, mt3p, cd, ca]
+                    mt3d, mt3a, mt3p, cd, ca, cdiv]
         log = mock_log()
         seq = [
             (Func(time.time), const(100)),

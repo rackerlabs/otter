@@ -208,7 +208,8 @@ def add_to_cloud_metrics(ttl, region, group_metrics, no_tenants, log=None,
     conv_desired = sum(m.desired for m in conv_tenants.itervalues())
     conv_actual = sum(m.actual for m in conv_tenants.itervalues())
     metrics.extend(
-        [("conv.desired", conv_desired), ("conv.actual", conv_actual)])
+        [("conv_desired", conv_desired), ("conv_actual", conv_actual),
+         ("conv_divergence", conv_desired - conv_actual)])
 
     data = [merge(metric_part,
                   {'metricValue': value,
