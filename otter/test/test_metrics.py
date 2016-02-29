@@ -49,6 +49,7 @@ from otter.test.utils import (
     noop,
     patch,
     resolve_effect,
+    set_config_for_test
 )
 
 
@@ -189,20 +190,31 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         """
         metrics = [GroupMetrics('t1', 'g1', 3, 2, 0),
                    GroupMetrics('t2', 'g1', 4, 4, 1),
-                   GroupMetrics('t2', 'g', 100, 20, 0)]
+                   GroupMetrics('t2', 'g', 100, 20, 0),
+                   GroupMetrics('t3', 'g3', 5, 3, 0)]
+        set_config_for_test(self, {"non-convergence-tenants": ["t1"]})
         m = {'collectionTime': 100000, 'ttlInSeconds': 5 * 24 * 60 * 60}
-        md = merge(m, {'metricValue': 107, 'metricName': 'ord.desired'})
-        ma = merge(m, {'metricValue': 26, 'metricName': 'ord.actual'})
+        md = merge(m, {'metricValue': 112, 'metricName': 'ord.desired'})
+        ma = merge(m, {'metricValue': 29, 'metricName': 'ord.actual'})
         mp = merge(m, {'metricValue': 1, 'metricName': 'ord.pending'})
-        mt = merge(m, {'metricValue': 2, 'metricName': 'ord.tenants'})
-        mg = merge(m, {'metricValue': 3, 'metricName': 'ord.groups'})
+        mt = merge(m, {'metricValue': 3, 'metricName': 'ord.tenants'})
+        mg = merge(m, {'metricValue': 4, 'metricName': 'ord.groups'})
         mt1d = merge(m, {'metricValue': 3, 'metricName': 'ord.t1.desired'})
         mt1a = merge(m, {'metricValue': 2, 'metricName': 'ord.t1.actual'})
         mt1p = merge(m, {'metricValue': 0, 'metricName': 'ord.t1.pending'})
         mt2d = merge(m, {'metricValue': 104, 'metricName': 'ord.t2.desired'})
         mt2a = merge(m, {'metricValue': 24, 'metricName': 'ord.t2.actual'})
         mt2p = merge(m, {'metricValue': 1, 'metricName': 'ord.t2.pending'})
-        req_data = [md, ma, mp, mt, mg, mt1d, mt1a, mt1p, mt2d, mt2a, mt2p]
+        mt3d = merge(m, {'metricValue': 5, 'metricName': 'ord.t3.desired'})
+        mt3a = merge(m, {'metricValue': 3, 'metricName': 'ord.t3.actual'})
+        mt3p = merge(m, {'metricValue': 0, 'metricName': 'ord.t3.pending'})
+        cd = merge(m, {'metricValue': 109, 'metricName': 'ord.conv_desired'})
+        ca = merge(m, {'metricValue': 27, 'metricName': 'ord.conv_actual'})
+        cdiv = merge(m, {'metricValue': 82,
+                         'metricName': 'ord.conv_divergence'})
+
+        req_data = [md, ma, mp, mt, mg, mt1d, mt1a, mt1p, mt2d, mt2a, mt2p,
+                    mt3d, mt3a, mt3p, cd, ca, cdiv]
         log = mock_log()
         seq = [
             (Func(time.time), const(100)),
@@ -210,11 +222,11 @@ class AddToCloudMetricsTests(SynchronousTestCase):
                 ServiceType.CLOUD_METRICS_INGEST, "POST", "ingest",
                 data=req_data, log=log).intent, noop)
         ]
-        eff = add_to_cloud_metrics(m['ttlInSeconds'], 'ord', metrics, 2, log)
+        eff = add_to_cloud_metrics(m['ttlInSeconds'], 'ord', metrics, 3, log)
         self.assertIsNone(perform_sequence(seq, eff))
         log.msg.assert_called_once_with(
             'total desired: {td}, total_actual: {ta}, total pending: {tp}',
-            td=107, ta=26, tp=1)
+            td=112, ta=29, tp=1)
 
 
 class UnchangedDivergentGroupsTests(SynchronousTestCase):
