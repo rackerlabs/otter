@@ -330,7 +330,7 @@ class CollectMetricsTests(SynchronousTestCase):
                        'cloudLoadBalancers': 'clb',
                        'cloudOrchestration': 'orch',
                        'rackconnect': 'rc',
-                       "convergence-tenants": ["ct"]}
+                       "non-convergence-tenants": ["ct"]}
 
         self.sequence = SequenceDispatcher([
             (GetAllGroups(), const(self.groups)),
