@@ -20,7 +20,7 @@ from effect.do import do
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in
-from toolz.dicttoolz import merge
+from toolz.dicttoolz import keyfilter, merge
 from toolz.functoolz import compose, flip
 
 from twisted.application.internet import TimerService
@@ -34,6 +34,7 @@ from txeffect import exc_info_to_failure, perform
 from otter.auth import generate_authenticator
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType, get_service_configs
+from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.gathering import get_all_scaling_group_servers
 from otter.convergence.model import (
     NovaServer, ServerState, group_id_from_metadata)
@@ -41,6 +42,7 @@ from otter.effect_dispatcher import get_legacy_dispatcher, get_log_dispatcher
 from otter.log import log as otter_log
 from otter.models.cass import CassScalingGroupCollection
 from otter.models.intents import GetAllGroups, get_model_dispatcher
+from otter.util.config import config_value
 from otter.util.fp import partition_bool
 
 
@@ -198,6 +200,15 @@ def add_to_cloud_metrics(ttl, region, group_metrics, no_tenants, log=None,
         metrics.append(("{}.desired".format(tenant_id), metric.desired))
         metrics.append(("{}.actual".format(tenant_id), metric.actual))
         metrics.append(("{}.pending".format(tenant_id), metric.pending))
+
+    # convergence tenants desired and actual
+    conv_tenants = keyfilter(
+        partial(tenant_is_enabled, get_config_value=config_value),
+        tenanted_metrics)
+    conv_desired = sum(m.desired for m in conv_tenants.itervalues())
+    conv_actual = sum(m.actual for m in conv_tenants.itervalues())
+    metrics.extend(
+        [("conv.desired", conv_desired), ("conv.actual", conv_actual)])
 
     data = [merge(metric_part,
                   {'metricValue': value,
