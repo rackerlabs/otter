@@ -165,8 +165,8 @@ def calc_total(group_metrics):
 
 
 @do
-def add_to_cloud_metrics(ttl, region, group_metrics, no_tenants, log=None,
-                         _print=False):
+def add_to_cloud_metrics(ttl, region, group_metrics, no_tenants, config,
+                         log=None, _print=False):
     """
     Add total number of desired, actual and pending servers of a region
     to Cloud metrics.
@@ -174,6 +174,7 @@ def add_to_cloud_metrics(ttl, region, group_metrics, no_tenants, log=None,
     :param str region: which region's metric is collected
     :param group_metrics: List of :obj:`GroupMetric`
     :param int no_tenants: total number of tenants
+    :param dict config: Config json dict containing convergence tenants info
     :param log: Optional logger
     :param bool _print: Should it print activity on stdout? Useful when running
         as a script
@@ -203,7 +204,8 @@ def add_to_cloud_metrics(ttl, region, group_metrics, no_tenants, log=None,
 
     # convergence tenants desired and actual
     conv_tenants = keyfilter(
-        partial(tenant_is_enabled, get_config_value=config_value),
+        partial(tenant_is_enabled,
+                get_config_value=lambda k: get_in([k], config)),
         tenanted_metrics)
     conv_desired = sum(m.desired for m in conv_tenants.itervalues())
     conv_actual = sum(m.actual for m in conv_tenants.itervalues())
@@ -273,7 +275,7 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     if metr_conf is not None:
         eff = add_to_cloud_metrics(
             metr_conf['ttl'], config['region'], group_metrics,
-            len(tenanted_groups), log, _print)
+            len(tenanted_groups), config, log, _print)
         eff = Effect(TenantScope(eff, metr_conf['tenant_id']))
         yield perform(dispatcher, eff)
         log.msg('added to cloud metrics')
@@ -282,7 +284,8 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     if _print:
         group_metrics.sort(key=lambda g: abs(g.desired - g.actual),
                            reverse=True)
-        print('groups sorted as per divergence', *group_metrics, sep='\n')
+        print('groups sorted as per divergence')
+        print('\n'.join(map(str, group_metrics)))
 
     # Disconnect only if we created the client
     if not client:

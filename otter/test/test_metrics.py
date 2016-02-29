@@ -192,7 +192,7 @@ class AddToCloudMetricsTests(SynchronousTestCase):
                    GroupMetrics('t2', 'g1', 4, 4, 1),
                    GroupMetrics('t2', 'g', 100, 20, 0),
                    GroupMetrics('t3', 'g3', 5, 3, 0)]
-        set_config_for_test(self, {"non-convergence-tenants": ["t1"]})
+        config = {"non-convergence-tenants": ["t1"]}
         m = {'collectionTime': 100000, 'ttlInSeconds': 5 * 24 * 60 * 60}
         md = merge(m, {'metricValue': 112, 'metricName': 'ord.desired'})
         ma = merge(m, {'metricValue': 29, 'metricName': 'ord.actual'})
@@ -222,7 +222,8 @@ class AddToCloudMetricsTests(SynchronousTestCase):
                 ServiceType.CLOUD_METRICS_INGEST, "POST", "ingest",
                 data=req_data, log=log).intent, noop)
         ]
-        eff = add_to_cloud_metrics(m['ttlInSeconds'], 'ord', metrics, 3, log)
+        eff = add_to_cloud_metrics(m['ttlInSeconds'], 'ord', metrics, 3,
+                                   config, log)
         self.assertIsNone(perform_sequence(seq, eff))
         log.msg.assert_called_once_with(
             'total desired: {td}, total_actual: {ta}, total pending: {tp}',
@@ -335,7 +336,8 @@ class CollectMetricsTests(SynchronousTestCase):
             (GetAllGroups(), const(self.groups)),
             (TenantScope(mock.ANY, "tid"),
              nested_sequence([
-                 (("atcm", 200, "r", "metrics", 2, self.log, False), noop)
+                 (("atcm", 200, "r", "metrics", 2, self.config,
+                   self.log, False), noop)
              ]))
         ])
         self.get_dispatcher = patch(self, "otter.metrics.get_dispatcher",
