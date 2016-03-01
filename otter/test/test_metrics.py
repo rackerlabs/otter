@@ -48,8 +48,7 @@ from otter.test.utils import (
     nested_sequence,
     noop,
     patch,
-    resolve_effect,
-    set_config_for_test
+    resolve_effect
 )
 
 

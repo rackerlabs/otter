@@ -42,7 +42,6 @@ from otter.effect_dispatcher import get_legacy_dispatcher, get_log_dispatcher
 from otter.log import log as otter_log
 from otter.models.cass import CassScalingGroupCollection
 from otter.models.intents import GetAllGroups, get_model_dispatcher
-from otter.util.config import config_value
 from otter.util.fp import partition_bool
 
 
