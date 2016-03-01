@@ -30,7 +30,7 @@ You can delete and replace a server in a scaling group with a new server in that
 
 .. note::
 
-   Deleting and replacing the server takes some time. The time required depends on
+   Deleting and replacing servers in a scaling group takes some time. The time required depends on
    server type, size, and the complexity of the launch configuration settings for the replacement server.
 
 
