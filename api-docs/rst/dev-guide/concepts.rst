@@ -786,3 +786,11 @@ To get started with RackConnect v3 cloud bursting:
 
 .. _RackConnect product information: http://www.rackspace.com/cloud/hybrid/rackconnect
 .. _Knowledge Center articles for RackConnect: http://www.rackspace.com/knowledge_center/product-page/rackconnect
+
+
+.. _concergence-concept:
+
+Convergence
+~~~~~~~~~~~
+
+Autoscale now supports higher reliability using 
