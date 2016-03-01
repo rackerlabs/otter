@@ -222,7 +222,7 @@ class AddToCloudMetricsTests(SynchronousTestCase):
                 data=req_data, log=log).intent, noop)
         ]
         eff = add_to_cloud_metrics(m['ttlInSeconds'], 'ord', metrics,
-                                   3, # number of tenants
+                                   3,  # number of tenants
                                    config, log)
         self.assertIsNone(perform_sequence(seq, eff))
         log.msg.assert_called_once_with(
