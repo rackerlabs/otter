@@ -793,4 +793,28 @@ To get started with RackConnect v3 cloud bursting:
 Convergence
 ~~~~~~~~~~~
 
-Autoscale now supports higher reliability using 
+Convergence is completely rewritten orchestration layer of autoscale that provides
+higher reliability for scaling up and down by optimizing use of Nova API with retries
+as necessary. In addition, Convergence continuously keeps track of all the servers
+in autoscaling groups, notices when a server is deleted out-of-band or goes into
+an non-ACTIVE state (eg ERROR) and automatically replaces it.
+We call this capability “self-healing”.
+
+A new endpoint :ref:`**converge** endpoint <post-create-scaling-group-v1.1-tenantid-converge>`
+is added which triggers convergence on a group. This can be useful when autoscale's
+view of the resources is outdated. Ideally, this shouldn't be required since "self-healing"
+automatically triggers convergence when resources get changed out-of-band.
+
+With this change there are minor behavioral differences which should not impact
+any existing users:
+
+- If autoscaled server is manually removed from load balancer it is supposed
+  to be on as per scaling group config, then autoscale will revert that change
+  and put the server back in configured CLB. Note that autoscale does not care
+  if server is added to any other CLB. It only ensures that server is always
+  there in configured CLB.
+
+- If a CLB configured in the group is not found / deleted then the group will
+  be put in ERROR and server that was supposed to be added to CLB will remain.
+  This is unlike current behavior where the server that couldn't be added to CLB
+  gets deleted.

@@ -21,9 +21,11 @@ What's new
 Behavioral changes
 ~~~~~~~~~~~~~~~~~~
 
-* If a user makes manual load balancer changes to autoscaled servers (such as moving them to a different load balancer,
-  or just adding them to a load balancer autoscale does not know about), autoscale will will revert said change and
-  make sure they are ONLY on the load balancers they were configured to be on.
+* If autoscaled server is manually removed from load balancer it is supposed
+  to be on as per scaling group config, then autoscale will revert that change
+  and put the server back in configured CLB. Note that autoscale does not care
+  if server is added to any other CLB. It only ensures that server is always
+  there in configured CLB.
 
 * If a CLB configured in the group is not found / deleted, the group will be put in ERROR and server that was supposed to be added to CLB *will remain*.
   This is unlike current behavior where the server that couldn't be added to CLB gets deleted.
