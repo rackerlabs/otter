@@ -639,10 +639,17 @@ and how many resources to delete.
 When deleting servers, Autoscale follows these rules:
 
 -  If no new servers are in the process of being built, the oldest
-   servers are deleted first.
+   servers are chosen to be deleted first.
 
 -  If new servers are in the process of being built and in a "pending"
-   state, these servers are deleted first.
+   state, these servers are chosen to be deleted first.
+
+-  After choosing the servers to delete autoscale will put the server's
+   corresponding load balancer's node in DRAINING **if** the group launch
+   configuration has cloud load balancer and ``draining_timeout`` in it.
+   The server will be deleted after ``draining_timeout`` has expired. If the
+   group launch configuration doesn't have cloud load balancer and ``draining_timeout``
+   then server is just deleted
 
 The following diagram illustrates how the deletion process works.
 
