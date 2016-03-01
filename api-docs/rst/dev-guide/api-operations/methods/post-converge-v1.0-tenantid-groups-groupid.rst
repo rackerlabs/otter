@@ -32,13 +32,6 @@ This table shows the possible response codes for this operation:
 |                          |                         |triggered because group  |
 |                          |                         |is paused.               |
 +--------------------------+-------------------------+-------------------------+
-|403                       |CannotExecutePolicyError |The policy was not       |
-|                          |                         |executed because         |
-|                          |                         |applying the changes     |
-|                          |                         |would not result in the  |
-|                          |                         |addition or deletion of  |
-|                          |                         |any servers.             |
-+--------------------------+-------------------------+-------------------------+
 |403                       |Forbidden                |The user does not have   |
 |                          |                         |permission to perform    |
 |                          |                         |the resource; for        |
