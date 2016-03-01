@@ -321,9 +321,13 @@ class CollectMetricsTests(SynchronousTestCase):
              "launch_config": '{"type": "launch_server"}'},
             {"tenantId": "t1", "groupId": "g2",
              "launch_config": '{"type": "launch_server"}'},
+            {"tenantId": "t1", "groupId": "g12",
+             "launch_config": '{"type": "launch_stack"}'},
             {"tenantId": "t3", "groupId": "g3",
-             "launch_config": '{"type": "launch_stack"}'}]
-        self.lc_groups = {"t1": self.groups[:2]}
+             "launch_config": '{"type": "launch_stack"}'},
+            {"tenantId": "t2", "groupId": "g11",
+             "launch_config": '{"type": "launch_server"}'}]
+        self.lc_groups = {"t1": self.groups[:2], "t2": [self.groups[-1]]}
 
         self.add_to_cloud_metrics = patch(
             self, 'otter.metrics.add_to_cloud_metrics',
@@ -343,7 +347,7 @@ class CollectMetricsTests(SynchronousTestCase):
             (GetAllGroups(), const(self.groups)),
             (TenantScope(mock.ANY, "tid"),
              nested_sequence([
-                 (("atcm", 200, "r", "metrics", 1, self.config,
+                 (("atcm", 200, "r", "metrics", 2, self.config,
                    self.log, False), noop)
              ]))
         ])
