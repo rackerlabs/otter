@@ -42,7 +42,7 @@ from otter.convergence.model import (
 from otter.effect_dispatcher import get_legacy_dispatcher, get_log_dispatcher
 from otter.log import log as otter_log
 from otter.models.cass import CassScalingGroupCollection
-from otter.models.intents import GetAllGroups, get_model_dispatcher
+from otter.models.intents import GetAllValidGroups, get_model_dispatcher
 from otter.util.fp import partition_bool
 
 
@@ -266,7 +266,7 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
                                 get_service_configs(config), store)
 
     # calculate metrics on launch_server groups
-    groups = yield perform(dispatcher, Effect(GetAllGroups()))
+    groups = yield perform(dispatcher, Effect(GetAllValidGroups()))
     groups = [g for g in groups
               if json.loads(g["launch_config"]).get("type") == "launch_server"]
     tenanted_groups = groupby(lambda g: g["tenantId"], groups)

@@ -1710,9 +1710,9 @@ class CassScalingGroupCollection:
                               self.reactor.seconds() - start_time}))
         return d
 
-    def get_all_groups(self):
+    def get_all_valid_groups(self):
         """
-        Get *all* valid scaling groups, grouped by tenantId.
+        Get all *valid* scaling groups
 
         :return: `Deferred` fired with ``list`` of group ``dict``
         """

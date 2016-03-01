@@ -3953,7 +3953,7 @@ class CassAdminTestCase(SynchronousTestCase):
 
 
 class GetScalingGroupsTests(SynchronousTestCase):
-    """Tests for ``get_all_groups``."""
+    """Tests for ``get_all_valid_groups``."""
 
     @mock.patch("otter.models.cass.CassScalingGroupCollection"
                 ".get_scaling_group_rows")
@@ -3971,7 +3971,7 @@ class GetScalingGroupsTests(SynchronousTestCase):
             {'created_at': '0', 'desired': 'some', 'status': 'ERROR'}]
         rows = [assoc(row, "tenantId", "t1") for row in rows]
         mock_gsgr.return_value = defer.succeed(rows)
-        results = self.successResultOf(collection.get_all_groups())
+        results = self.successResultOf(collection.get_all_valid_groups())
         self.assertEqual(results, [rows[0], rows[3]])
         mock_gsgr.assert_called_once_with()
 

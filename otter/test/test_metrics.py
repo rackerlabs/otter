@@ -24,7 +24,7 @@ from otter.auth import IAuthenticator
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType
 from otter.metrics import (
-    GetAllGroups,
+    GetAllValidGroups,
     GroupMetrics,
     MetricsService,
     Options,
@@ -344,7 +344,7 @@ class CollectMetricsTests(SynchronousTestCase):
                        "non-convergence-tenants": ["ct"]}
 
         self.sequence = SequenceDispatcher([
-            (GetAllGroups(), const(self.groups)),
+            (GetAllValidGroups(), const(self.groups)),
             (TenantScope(mock.ANY, "tid"),
              nested_sequence([
                  (("atcm", 200, "r", "metrics", 2, self.config,
@@ -399,7 +399,7 @@ class CollectMetricsTests(SynchronousTestCase):
         Doesnt add metrics to blueflood if metrics config is not there
         """
         sequence = SequenceDispatcher([
-            (GetAllGroups(), const(self.groups))
+            (GetAllValidGroups(), const(self.groups))
         ])
         self.get_dispatcher.return_value = sequence
         del self.config["metrics"]
