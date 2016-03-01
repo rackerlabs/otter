@@ -164,7 +164,7 @@ def calc_total(group_metrics):
 
 
 @do
-def add_to_cloud_metrics(ttl, region, group_metrics, no_tenants, config,
+def add_to_cloud_metrics(ttl, region, group_metrics, num_tenants, config,
                          log=None, _print=False):
     """
     Add total number of desired, actual and pending servers of a region
@@ -172,7 +172,7 @@ def add_to_cloud_metrics(ttl, region, group_metrics, no_tenants, config,
 
     :param str region: which region's metric is collected
     :param group_metrics: List of :obj:`GroupMetric`
-    :param int no_tenants: total number of tenants
+    :param int num_tenants: total number of tenants
     :param dict config: Config json dict containing convergence tenants info
     :param log: Optional logger
     :param bool _print: Should it print activity on stdout? Useful when running
@@ -194,7 +194,7 @@ def add_to_cloud_metrics(ttl, region, group_metrics, no_tenants, config,
             total.desired, total.actual, total.pending))
 
     metrics = [('desired', total.desired), ('actual', total.actual),
-               ('pending', total.pending), ('tenants', no_tenants),
+               ('pending', total.pending), ('tenants', num_tenants),
                ('groups', len(group_metrics))]
     for tenant_id, metric in sorted(tenanted_metrics.items()):
         metrics.append(("{}.desired".format(tenant_id), metric.desired))
