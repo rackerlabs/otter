@@ -24,7 +24,7 @@ from otter.auth import IAuthenticator
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType
 from otter.metrics import (
-    GetAllGroups,
+    GetAllValidGroups,
     GroupMetrics,
     MetricsService,
     Options,
@@ -316,7 +316,18 @@ class CollectMetricsTests(SynchronousTestCase):
 
         self.get_all_metrics = patch(self, 'otter.metrics.get_all_metrics',
                                      return_value=succeed("metrics"))
-        self.groups = {"t": "t1group", "t2": "2 groups"}
+        self.groups = [
+            {"tenantId": "t1", "groupId": "g1",
+             "launch_config": '{"type": "launch_server"}'},
+            {"tenantId": "t1", "groupId": "g2",
+             "launch_config": '{"type": "launch_server"}'},
+            {"tenantId": "t1", "groupId": "g12",
+             "launch_config": '{"type": "launch_stack"}'},
+            {"tenantId": "t3", "groupId": "g3",
+             "launch_config": '{"type": "launch_stack"}'},
+            {"tenantId": "t2", "groupId": "g11",
+             "launch_config": '{"type": "launch_server"}'}]
+        self.lc_groups = {"t1": self.groups[:2], "t2": [self.groups[-1]]}
 
         self.add_to_cloud_metrics = patch(
             self, 'otter.metrics.add_to_cloud_metrics',
@@ -333,7 +344,7 @@ class CollectMetricsTests(SynchronousTestCase):
                        "non-convergence-tenants": ["ct"]}
 
         self.sequence = SequenceDispatcher([
-            (GetAllGroups(), const(self.groups)),
+            (GetAllValidGroups(), const(self.groups)),
             (TenantScope(mock.ANY, "tid"),
              nested_sequence([
                  (("atcm", 200, "r", "metrics", 2, self.config,
@@ -356,7 +367,7 @@ class CollectMetricsTests(SynchronousTestCase):
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
         self.get_all_metrics.assert_called_once_with(
-            self.get_dispatcher.return_value, self.groups, self.log,
+            self.get_dispatcher.return_value, self.lc_groups, self.log,
             _print=False)
         self.client.disconnect.assert_called_once_with()
 
@@ -388,7 +399,7 @@ class CollectMetricsTests(SynchronousTestCase):
         Doesnt add metrics to blueflood if metrics config is not there
         """
         sequence = SequenceDispatcher([
-            (GetAllGroups(), const(self.groups))
+            (GetAllValidGroups(), const(self.groups))
         ])
         self.get_dispatcher.return_value = sequence
         del self.config["metrics"]

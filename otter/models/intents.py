@@ -16,13 +16,13 @@ from otter.util.fp import assoc_obj
 
 
 @attr.s
-class GetAllGroups(object):
+class GetAllValidGroups(object):
     pass
 
 
 @deferred_performer
-def perform_get_all_groups(store, dispatcher, intent):
-    return store.get_all_groups()
+def perform_get_all_valid_groups(store, dispatcher, intent):
+    return store.get_all_valid_groups()
 
 
 @attributes(['tenant_id', 'group_id'])
@@ -138,5 +138,5 @@ def get_model_dispatcher(log, store):
         UpdateServersCache: perform_update_servers_cache,
         UpdateGroupErrorReasons: perform_update_error_reasons,
         ModifyGroupStatePaused: perform_modify_group_state_paused,
-        GetAllGroups: partial(perform_get_all_groups, store),
+        GetAllValidGroups: partial(perform_get_all_valid_groups, store),
     })

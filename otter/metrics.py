@@ -22,6 +22,7 @@ from silverberg.cluster import RoundRobinCassandraCluster
 from toolz.curried import filter, get_in
 from toolz.dicttoolz import keyfilter, merge
 from toolz.functoolz import compose, flip
+from toolz.itertoolz import groupby
 
 from twisted.application.internet import TimerService
 from twisted.application.service import Service
@@ -41,7 +42,7 @@ from otter.convergence.model import (
 from otter.effect_dispatcher import get_legacy_dispatcher, get_log_dispatcher
 from otter.log import log as otter_log
 from otter.models.cass import CassScalingGroupCollection
-from otter.models.intents import GetAllGroups, get_model_dispatcher
+from otter.models.intents import GetAllValidGroups, get_model_dispatcher
 from otter.util.fp import partition_bool
 
 
@@ -264,8 +265,11 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     dispatcher = get_dispatcher(reactor, authenticator, log,
                                 get_service_configs(config), store)
 
-    # calculate metrics
-    tenanted_groups = yield perform(dispatcher, Effect(GetAllGroups()))
+    # calculate metrics on launch_server groups
+    groups = yield perform(dispatcher, Effect(GetAllValidGroups()))
+    groups = [g for g in groups
+              if json.loads(g["launch_config"]).get("type") == "launch_server"]
+    tenanted_groups = groupby(lambda g: g["tenantId"], groups)
     group_metrics = yield get_all_metrics(
         dispatcher, tenanted_groups, log, _print=_print)
 
