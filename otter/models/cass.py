@@ -22,7 +22,7 @@ from pyrsistent import freeze
 
 from silverberg.client import ConsistencyLevel
 
-from toolz.curried import filter, groupby, map
+from toolz.curried import filter, map
 from toolz.dicttoolz import keymap, merge
 from toolz.functoolz import compose
 
@@ -1714,9 +1714,7 @@ class CassScalingGroupCollection:
         """
         Get *all* valid scaling groups, grouped by tenantId.
 
-        :return: `Deferred` fired with ``dict`` of the form
-            {"tenantId1": [{group_dict_1...}, {group_dict_2..}],
-             "tenantId2": [{group_dict_1...}, {group_dict_2..}, ...]}
+        :return: `Deferred` fired with ``list`` of group ``dict``
         """
         def _valid_group_row(row):
             return (row.get('created_at') is not None and
@@ -1724,17 +1722,15 @@ class CassScalingGroupCollection:
                     row.get('status') not in ('DISABLED', 'ERROR') and
                     not row.get('deleting', False))
 
-        d = self.get_scaling_group_rows(
-            props=["status", "deleting", "created_at"])
-        d.addCallback(filter(_valid_group_row))
-        return d.addCallback(groupby(lambda g: g["tenantId"]))
+        d = self.get_scaling_group_rows()
+        return d.addCallback(lambda gs: list(filter(_valid_group_row, gs)))
 
     @defer.inlineCallbacks
     def get_scaling_group_rows(self, props=None, batch_size=100):
         """
         Return scaling group rows from Cassandra as a list of ``dict`` where
-        each dict has 'tenantId', 'groupId', 'desired', 'active', 'pending' and
-        any other properties given in `props`
+        each dict has all columns in table if `props` is None. Otherwise
+        only columns given in `props` are retreived
 
         :param ``list`` props: List of extra properties to extract
         :param int batch_size: Number of groups to fetch at a time
@@ -1742,9 +1738,11 @@ class CassScalingGroupCollection:
         """
         # TODO: Currently returning all groups as one giant list for now.
         # Will try to use Twisted tubes to do streaming later
-        _props = set(['"tenantId"', '"groupId"', 'desired',
-                      'active', 'pending']) | set(props or [])
-        query = ('SELECT ' + ','.join(sorted(list(_props))) +
+        if props is None:
+            cols = "*"
+        else:
+            cols = ','.join(sorted(props))
+        query = ('SELECT ' + cols +
                  ' FROM scaling_group {where} LIMIT :limit;')
         where_key = 'WHERE "tenantId"=:tenantId AND "groupId">:groupId'
         where_token = 'WHERE token("tenantId") > token(:tenantId)'

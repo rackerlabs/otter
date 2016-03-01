@@ -3972,9 +3972,8 @@ class GetScalingGroupsTests(SynchronousTestCase):
         rows = [assoc(row, "tenantId", "t1") for row in rows]
         mock_gsgr.return_value = defer.succeed(rows)
         results = self.successResultOf(collection.get_all_groups())
-        self.assertEqual(results, {"t1": [rows[0], rows[3]]})
-        mock_gsgr.assert_called_once_with(
-            props=["status", "deleting", "created_at"])
+        self.assertEqual(results, [rows[0], rows[3]])
+        mock_gsgr.assert_called_once_with()
 
 
 class GetScalingGroupRowsTests(SynchronousTestCase):
@@ -3992,9 +3991,7 @@ class GetScalingGroupRowsTests(SynchronousTestCase):
             return defer.succeed(self.exec_args[freeze((query, params))])
 
         self.client.execute.side_effect = _exec
-        self.select = ('SELECT "groupId","tenantId",'
-                       'active,desired,pending '
-                       'FROM scaling_group ')
+        self.select = 'SELECT * FROM scaling_group '
 
     def _add_exec_args(self, query, params, ret):
         self.exec_args[freeze((query, params))] = ret
@@ -4013,15 +4010,14 @@ class GetScalingGroupRowsTests(SynchronousTestCase):
 
     def test_gets_props(self):
         """
-        If props arg is given then returns groups with that property in it
+        If props arg is given then returns groups with only that property in it
         """
         groups = [{'tenantId': 1, 'groupId': 2, 'desired': 3,
                    'created_at': 'c', 'launch': 'l'},
                   {'tenantId': 1, 'groupId': 3, 'desired': 2,
                    'created_at': 'c', 'launch': 'b'}]
         self._add_exec_args(
-            ('SELECT "groupId","tenantId",active,'
-             'desired,launch,pending '
+            ('SELECT launch '
              'FROM scaling_group  LIMIT :limit;'),
             {'limit': 5}, groups)
         d = self.collection.get_scaling_group_rows(props=['launch'],
