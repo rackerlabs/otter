@@ -801,9 +801,10 @@ an non-ACTIVE state (eg ERROR) and automatically replaces it.
 We call this capability “self-healing”.
 
 A new endpoint :ref:`**converge** endpoint <post-create-scaling-group-v1.1-tenantid-converge>`
-is added which triggers convergence on a group. This can be useful when autoscale's
-view of the resources is outdated. Ideally, this shouldn't be required since "self-healing"
-automatically triggers convergence when resources get changed out-of-band.
+is added which triggers convergence on a group. This can be useful when a group's
+status is ERROR which happens when group has invalid launch configuration
+(ex imageRef of deleted image). After correcting the launch configuration, one
+needs to invoke this endpoint to converge the group.
 
 With this change there are minor behavioral differences which should not impact
 any existing users:
@@ -815,6 +816,6 @@ any existing users:
   there in configured CLB.
 
 - If a CLB configured in the group is not found / deleted then the group will
-  be put in ERROR and server that was supposed to be added to CLB will remain.
+  be put in ERROR and server that was supposed to be added to CLB *will* remain.
   This is unlike current behavior where the server that couldn't be added to CLB
   gets deleted.
