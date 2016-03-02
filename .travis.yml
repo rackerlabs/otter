@@ -11,8 +11,7 @@ cache:
 
 install:
     - pip install -U pip wheel
-    - pip install -r requirements.txt -r dev_requirements.txt
-    - pip install coveralls
+    - pip install -r requirements.txt -r dev_requirements.txt coveralls
 
 script:
     - make lint-code
