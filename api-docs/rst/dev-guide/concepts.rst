@@ -105,6 +105,15 @@ The launch configuration specifies the launch type along with server and load ba
                 if you use a load balancer so the load balancer can retrieve the IP address of new
                 servers. See :ref:`Load balancer parameters <load-balancers-parameters>`.
 
+Each scaling group has an associated ``status`` that represents the health of the
+group. When the group is successfully able to launch servers and optionally add
+them to load balancers then the status is ``ACTIVE``. If it is not able to
+that due to some irrecoverable error that requires user attention then status
+will be ``ERROR``. In this case, the :ref:`group state <get-scaling-group-state`
+will contain list of human-readable texts describing the reasons why group has
+ERROR status. These errors will need to be fixed before group can become ACTIVE
+again.
+
 
 .. _server-parameters:
 
