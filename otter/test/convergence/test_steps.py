@@ -58,17 +58,12 @@ from otter.convergence.steps import (
     SetMetadataItemOnServer,
     UnexpectedServerStatus,
     UpdateStack,
-    _RCV3_LB_DOESNT_EXIST_PATTERN,
-    _RCV3_LB_INACTIVE_PATTERN,
-    _RCV3_NODE_ALREADY_A_MEMBER_PATTERN,
-    _RCV3_NODE_NOT_A_MEMBER_PATTERN,
-    _rcv3_check_bulk_add,
-    _rcv3_check_bulk_delete,
     delete_and_verify,
 )
 from otter.log.intents import Log
 from otter.test.utils import (
     StubResponse,
+    intent_func,
     matches,
     raise_,
     resolve_effect,
@@ -669,276 +664,50 @@ class StepAsEffectTests(SynchronousTestCase):
                 self.assertEquals(sync_perform(seq, eff),
                                   (StepResult.SUCCESS, []))
 
-    def _generic_bulk_rcv3_step_test(self, step_class, expected_method):
-        """
-        A generic test for bulk RCv3 steps.
 
-        :param step_class: The step class under test.
-        :param str method: The expected HTTP method of the request.
-        """
-        lb_node_pairs = pset([
-            ("lb-1", "node-a"),
-            ("lb-1", "node-b"),
-            ("lb-1", "node-c"),
-            ("lb-1", "node-d"),
-            ("lb-2", "node-a"),
-            ("lb-2", "node-b"),
-            ("lb-3", "node-c"),
-            ("lb-3", "node-d")
-        ])
-        step = step_class(lb_node_pairs=lb_node_pairs)
-        request = step.as_effect()
-        self.assertEqual(request.intent.service_type,
-                         ServiceType.RACKCONNECT_V3)
-        self.assertEqual(request.intent.method, expected_method)
-
-        success_pred = request.intent.success_pred
-        if request.intent.method == "POST":
-            self.assertEqual(success_pred, has_code(201, 409))
-        else:
-            self.assertEqual(success_pred, has_code(204, 409))
-
-        self.assertEqual(request.intent.url, "load_balancer_pools/nodes")
-        self.assertEqual(request.intent.headers, None)
-
-        expected_data = [
-            {'load_balancer_pool': {'id': 'lb-1'},
-             'cloud_server': {'id': 'node-a'}},
-            {'load_balancer_pool': {'id': 'lb-1'},
-             'cloud_server': {'id': 'node-b'}},
-            {'load_balancer_pool': {'id': 'lb-1'},
-             'cloud_server': {'id': 'node-c'}},
-            {'load_balancer_pool': {'id': 'lb-1'},
-             'cloud_server': {'id': 'node-d'}},
-            {'load_balancer_pool': {'id': 'lb-2'},
-             'cloud_server': {'id': 'node-a'}},
-            {'load_balancer_pool': {'id': 'lb-2'},
-             'cloud_server': {'id': 'node-b'}},
-            {'load_balancer_pool': {'id': 'lb-3'},
-             'cloud_server': {'id': 'node-c'}},
-            {'load_balancer_pool': {'id': 'lb-3'},
-             'cloud_server': {'id': 'node-d'}}
-        ]
-
-        def key_fn(e):
-            return (e["load_balancer_pool"]["id"], e["cloud_server"]["id"])
-
-        request_data = sorted(request.intent.data, key=key_fn)
-        self.assertEqual(request_data, expected_data)
-
-    def test_add_nodes_to_rcv3_load_balancers(self):
-        """
-        :obj:`BulkAddToRCv3.as_effect` produces a request for
-        adding any combination of nodes to any combination of RCv3 load
-        balancers.
-        """
-        self._generic_bulk_rcv3_step_test(BulkAddToRCv3, "POST")
-
-    def test_remove_nodes_from_rcv3_load_balancers(self):
-        """
-        :obj:`BulkRemoveFromRCv3.as_effect` produces a request
-        for removing any combination of nodes from any combination of RCv3
-        load balancers.
-        """
-        self._generic_bulk_rcv3_step_test(BulkRemoveFromRCv3, "DELETE")
-
-
-
-
-class RCv3CheckBulkAddTests(SynchronousTestCase):
+class RCv3BulkAddTests(SynchronousTestCase):
     """
-    Tests for :obj:`BulkAddToRCv3`
+    Tests for :obj:`BulkAddToRCv3
     """
+
     def setUp(self):
         from otter.convergence.steps import rcv3
         self.patch(rcv3, "bulk_add", intent_func("ba"))
+        self.lb_node_pairs = pset([("l1", "n1"), ("l2", "n2")])
+        self.step = BulkAddToRCv3(lb_node_pairs=self.lb_node_pairs)
 
-    def test_no_errors(self):
+    def test_success(self):
         """
-        No errors occur when adding nodes
+        A successful return from `rcv3.bulk_add` results in RETRY
         """
-
-    def test_no_bulk_errors(self):
-        """
-        When bulk adding does not raise BulkErrors then the error is just
-        propogated up
-        """
+        seq = [(("ba", self.lb_node_pairs), noop)]
+        self.assertEqual(
+            perform_sequence(seq, self.step.as_effect()),
+            (StepResult.RETRY, [
+                ErrorReason.String(
+                    'must re-gather after LB add in order to update the '
+                    'active cache')]
+            )
+        )
 
     def test_failures(self):
         """
-        Bulk adding fails with unrecoverable errors
+        If `rcv3.bulk_add` results in BulkErrors with only
+        non-ServerUnprocessableError errors in it then step returns FAILURE
         """
 
-    def test_good_response(self):
+    def test_retries(self):
         """
-        If the response code indicates success, the step returns a RETRY so
-        that another convergence cycle can be done to update the active server
-        list.
+        If `rcv3.bulk_add` results in BulkErrors with only
+        ServerUnprocessableError errors in it then step returns RETRY
         """
-        node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
-        lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
 
-        node_b_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
-        lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
-
-        pairs = [(lb_a_id, node_a_id), (lb_b_id, node_b_id)]
-
-        resp = StubResponse(201, {})
-        body = [{"cloud_server": {"id": node_id},
-                 "load_balancer_pool": {"id": lb_id}}
-                for (lb_id, node_id) in pairs]
-        res = _rcv3_check_bulk_add(pairs, (resp, body))
-        self.assertEqual(
-            res,
-            (StepResult.RETRY,
-             [ErrorReason.String(
-              'must re-gather after adding to LB in order to update the '
-              'active cache')]))
-
-    def test_try_again(self):
+    def test_failures_and_retries(self):
         """
-        If a node is already on the load balancer, returns an effect that
-        removes the remaining load balancer pairs.
+        If `rcv3.bulk_add` results in BulkErrors with only
+        ServerUnprocessableError and other errors in it then step returns
+        FAILURE
         """
-        # This little piggy is already on the load balancer
-        node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
-        lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
-
-        # This little piggy is going to be added to this load balancer
-        node_b_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
-        lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
-
-        seq = [
-            (service_request(
-                service_type=ServiceType.RACKCONNECT_V3,
-                method="POST",
-                url='load_balancer_pools/nodes',
-                data=[
-                    {'load_balancer_pool': {'id': lb_b_id},
-                     'cloud_server': {'id': node_b_id}}],
-                success_pred=has_code(201, 409)).intent,
-             lambda _: (StubResponse(201, {}), None)),
-        ]
-
-        body = {"errors":
-                ["Cloud Server {node_id} is already a member of Load "
-                 "Balancer Pool {lb_id}"
-                 .format(node_id=node_a_id, lb_id=lb_a_id)]}
-
-        eff = _rcv3_check_bulk_add(
-            [(lb_a_id, node_a_id),
-             (lb_b_id, node_b_id)],
-            (StubResponse(409, {}), body))
-
-        self.assertEqual(
-            perform_sequence(seq, eff),
-            (StepResult.RETRY,
-             [ErrorReason.String(reason="must re-gather after adding to LB in "
-                                        "order to update the active cache")]))
-
-    def test_node_already_a_member(self):
-        """
-        If all nodes were already member of the load balancers we were
-        trying to add them to, the request is successful.
-        """
-        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
-        lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
-        pairs = [(lb_id, node_id)]
-
-        resp = StubResponse(409, {})
-        body = {"errors": [
-            "Cloud Server {node_id} is already a member of Load "
-            "Balancer Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
-        result = _rcv3_check_bulk_add(pairs, (resp, body))
-        self.assertEqual(result, (StepResult.SUCCESS, []))
-
-    def test_lb_inactive(self):
-        """
-        If one of the LBs we tried to attach one or more nodes to is
-        inactive, the request fails.
-        """
-        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
-        lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
-        pairs = [(lb_id, node_id)]
-
-        resp = StubResponse(409, {})
-        body = {"errors": [
-            "Load Balancer Pool {lb_id} is not in an ACTIVE state"
-            .format(lb_id=lb_id)]}
-        result = _rcv3_check_bulk_add(pairs, (resp, body))
-        self.assertEqual(
-            result,
-            (StepResult.FAILURE,
-             ["RCv3 LB {lb_id} was inactive".format(lb_id=lb_id)]))
-
-    def test_multiple_lbs_inactive(self):
-        """
-        If multiple LBs we tried to attach one or more nodes to is
-        inactive, the request fails, and all of the inactive LBs are
-        reported.
-
-        By logging as much of the failure as we can see, we will
-        hopefully produce better audit logs.
-        """
-        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
-        lb_1_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
-        lb_2_id = 'fb32470f-6ebe-44a9-9360-3f48c9ac768c'
-        pairs = [(lb_1_id, node_id), (lb_2_id, node_id)]
-
-        resp = StubResponse(409, {})
-        body = {"errors": [
-            "Load Balancer Pool {lb_id} is not in an ACTIVE state"
-            .format(lb_id=lb_id) for lb_id in [lb_1_id, lb_2_id]]}
-        result = _rcv3_check_bulk_add(pairs, (resp, body))
-        self.assertEqual(
-            result,
-            (StepResult.FAILURE,
-             ["RCv3 LB {lb_id} was inactive".format(lb_id=lb_id)
-              for lb_id in [lb_1_id, lb_2_id]]))
-
-    def test_lb_does_not_exist(self):
-        """
-        If one of the LBs we tried to attach one or more nodes to does not
-        exist, the request fails.
-        """
-        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
-        lb_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
-        pairs = [(lb_id, node_id)]
-
-        resp = StubResponse(409, {})
-        body = {"errors": [
-            "Load Balancer Pool {lb_id} does not exist"
-            .format(lb_id=lb_id)]}
-        result = _rcv3_check_bulk_add(pairs, (resp, body))
-        self.assertEqual(
-            result,
-            (StepResult.FAILURE,
-             ["RCv3 LB {lb_id} does not exist".format(lb_id=lb_id)]))
-
-    def test_multiple_lbs_do_not_exist(self):
-        """
-        If multiple LBs we tried to attach one or more nodes to do not
-        exist, the request fails, and all of the nonexistent LBs are
-        reported.
-
-        By logging as much of the failure as we can see, we will
-        hopefully produce better audit logs.
-        """
-        node_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
-        lb_1_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
-        lb_2_id = 'fb32470f-6ebe-44a9-9360-3f48c9ac768c'
-        pairs = [(lb_1_id, node_id), (lb_2_id, node_id)]
-
-        resp = StubResponse(409, {})
-        body = {"errors": [
-            "Load Balancer Pool {lb_id} does not exist"
-            .format(lb_id=lb_id) for lb_id in [lb_1_id, lb_2_id]]}
-        result = _rcv3_check_bulk_add(pairs, (resp, body))
-        self.assertEqual(
-            result,
-            (StepResult.FAILURE,
-             ["RCv3 LB {lb_id} does not exist".format(lb_id=lb_id)
-              for lb_id in [lb_1_id, lb_2_id]]))
 
 
 class RCv3CheckBulkDeleteTests(SynchronousTestCase):

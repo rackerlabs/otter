@@ -348,12 +348,8 @@ class ChangeCLBNode(object):
             error=_failure_reporter(CLBNotFoundError, NoSuchCLBNodeError))
 
 
-RCV3_BULK_MAX_RETRIES = 10
-
-
 @implementer(IStep)
-@attributes([Attribute('lb_node_pairs', instance_of=PSet),
-             Attribute("max_retries", default_value=RCV3_BULK_MAX_RETRIES)])
+@attributes([Attribute('lb_node_pairs', instance_of=PSet)])
 class BulkAddToRCv3(object):
     """
     Some connections must be made between some combination of servers
@@ -372,43 +368,27 @@ class BulkAddToRCv3(object):
         Produce a :obj:`Effect` to add some nodes to some RCv3 load
         balancers.
         """
-        eff = _rcv3_bulk_add(self.lb_node_pairs, self.max_retries)
+        eff = rcv3.bulk_add(self.lb_node_pairs)
         return eff.on(
             success=lambda _: (StepResult.RETRY, [ErrorReason.String(
                 'must re-gather after LB add in order to update the '
-                'active cache')]))
+                'active cache')]),
+            error=catch(rcv3.BulkErrors, _handle_bulk_add_errors))
 
 
-def _rcv3_bulk_add(lb_node_pairs, retry_attempt):
-    eff = rcv3.bulk_add(lb_node_pairs)
-    return eff.on(
-        error=catch(rcv3.BulkErrors,
-                    _rcv3_bulk_errors(lb_node_pairs, retry_attempt)))
-
-
-@curry
-def _rcv3_bulk_errors(attempted_pairs, retry_attempt, exc_info):
-    bulk_errors = exc_info[1]
+def _handle_bulk_add_errors(exc_tuple):
+    error = exc_tuple[1]
     failures = []
-    to_retry = attempted_pairs
-    for error in bulk_errors.errors:
-        if isinstance(error, (rcv3.LBInactive, rcv3.NoSuchLBError)):
-           failures.append(error)
-        if isinstance(error, rcv3.NodeAlreadyMember):
-            to_retry -= pset([(error.lb_id, error.node_id)])
+    retries = []
+    for excp in error.exceptions:
+        if isinstance(excp, rcv3.ServerUnprocessableError):
+            retries.append(ErrorReason.String(excp.mesage))
+        else:
+            failures.append(ErrorReason.String(excp.message))
     if failures:
-        return StepResult.FAILURE, [
-            ErrorReason.String(f.message) for f in failures]
-    if to_retry:
-        if retry_attempt <= 0:
-            return StepResult.FAILURE, [
-                ErrorReason.String("Maximum bulk add retries reached")]
-        return _rcv3_bulk_add(to_retry, retry_attempt - 1)
-    # Should never reach here since above code handles all known error cases
-    # as of writing. However, it will be helpful if new error cases are added
-    # in client and not handled here
-    return StepResult.RETRY, [
-        ErrorReason.String("Unexpected bulk errors: {}".format(bulk_errors))]
+        return StepResult.FAILURE, failures
+    else:
+        return StepResult.RETRY, retries
 
 
 @implementer(IStep)

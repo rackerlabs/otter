@@ -43,5 +43,11 @@ def _generic_rcv3_request(step_class, request_bag, lb_id, server_id):
     return d.addCallback(itemgetter(1))
 
 
-add_to_rcv3 = partial(_generic_rcv3_request, BulkAddToRCv3)
 remove_from_rcv3 = partial(_generic_rcv3_request, BulkRemoveFromRCv3)
+
+
+def add_to_rcv3(request_bag, lb_id, server_id):
+    eff = rcv3.bulk_add(pset([(lb_id, server_id)]))
+    scoped = Effect(TenantScope(effect, request_bag.tenant_id))
+    d = perform(request_bag.dispatcher, scoped)
+    return d.addCallback(itemgetter(1))
