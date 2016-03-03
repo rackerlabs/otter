@@ -121,7 +121,8 @@ def bulk_add(lb_node_pairs):
     errors
 
     :param list lb_node_pairs: List of (lb_id, node_id) tuples
-    :return: Effect of None when succeeds otherwise raises above exceptions
+    :return: Effect of None when succeeds otherwise raises `BulkErrors` or
+        `UnknownBulkResponse`
     """
     eff = _rackconnect_bulk_request(lb_node_pairs, "POST",
                                     success_pred=has_code(201, 409))
@@ -144,19 +145,24 @@ def _check_bulk_add(attempted_pairs, result):
         match = _NODE_ALREADY_A_MEMBER_PATTERN.match(error)
         if match is not None:
             pair = match.groupdict()
-            exists = exists.append((pair["lb_id"], pair["node_id"]))
+            exists = exists.add((pair["lb_id"], pair["node_id"]))
+            continue
 
         match = _LB_INACTIVE_PATTERN.match(error)
         if match is not None:
             errors.append(LBInactive(match.group("lb_id")))
+            continue
 
         match = _LB_DOESNT_EXIST_PATTERN.match(error)
         if match is not None:
             errors.append(NoSuchLBError(match.group("lb_id")))
+            continue
 
         match = _SERVER_UNPROCESSABLE.match(error)
         if match is not None:
             errors.append(ServerUnprocessableError(match.group("server_id")))
+        else:
+            raise UnknownBulkResponse(body)
 
     if errors:
         raise BulkErrors(errors)

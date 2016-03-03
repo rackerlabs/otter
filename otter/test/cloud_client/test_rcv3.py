@@ -2,7 +2,6 @@
 Tests for otter.cloud_client.rcv3
 """
 
-import json
 from functools import partial
 
 from effect.testing import perform_sequence
@@ -16,7 +15,6 @@ from otter.cloud_client import rcv3 as r
 from otter.test.cloud_client.test_init import log_intent
 from otter.test.utils import (
     const, noop, patch, stub_json_response, transform_eq)
-from otter.util.http import append_segments
 from otter.util.pure_http import has_code
 
 
@@ -184,7 +182,8 @@ class BulkAddTests(SynchronousTestCase):
         """
         exp_data = self.data_eq(self.exp_data)
         seq = [
-            (self.svc_req_intent(exp_data), const(stub_json_response({}, 201))),
+            (self.svc_req_intent(exp_data),
+             const(stub_json_response({}, 201))),
             (log_intent(
                 "rcv3-bulk-request", {}, req_body=("jsonified", exp_data)),
              noop)
@@ -206,7 +205,8 @@ class BulkAddTests(SynchronousTestCase):
         }
         exp_data = self.data_eq(self.exp_data)
         seq = [
-            (self.svc_req_intent(exp_data), const(stub_json_response(errors, 409))),
+            (self.svc_req_intent(exp_data),
+             const(stub_json_response(errors, 409))),
             (log_intent(
                 "rcv3-bulk-request", errors, req_body=("jsonified", exp_data)),
              noop)
@@ -229,12 +229,17 @@ class BulkAddTests(SynchronousTestCase):
         If bulk adding only returns "lb node pair is already member" error with
         409 then other pairs are retried
         """
+        # lb node pair that will be retried
         lb_id = _TEST_DATA[r._NODE_ALREADY_A_MEMBER_PATTERN][0][1]['lb_id']
-        node_id = _TEST_DATA[r._NODE_ALREADY_A_MEMBER_PATTERN][0][1]['node_id'])
+        node_id = _TEST_DATA[r._NODE_ALREADY_A_MEMBER_PATTERN][0][1]['node_id']
         _lb_node_pairs = self.lb_node_pairs.add((lb_id, node_id))
-        _exp_data = self.exp_data[:] + [{'load_balancer_pool': {'id': lb_id},
-                                         'cloud_server': {'id': node_id}}]
+        # this must be sorted for data_eq to work on this. It will be sorted
+        # by adding the new pair in beginning since its LB starts with 'd' and
+        # all pairs in self.exp_data start with 'l'
+        _exp_data = [{'load_balancer_pool': {'id': lb_id},
+                      'cloud_server': {'id': node_id}}] + self.exp_data[:]
         _eq_exp_data = self.data_eq(_exp_data)
+        # retry will be without new lb node pair
         exp_data_retry = self.data_eq(self.exp_data)
         errors = {
             "errors": [
@@ -242,13 +247,17 @@ class BulkAddTests(SynchronousTestCase):
             ]
         }
         seq = [
-            (self.svc_req_intent(exp_data), const(stub_json_response(errors, 409))),
+            (self.svc_req_intent(_eq_exp_data),
+             const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors, req_body=("jsonified", exp_data)),
+                "rcv3-bulk-request", errors,
+                req_body=("jsonified", _eq_exp_data)),
              noop),
-            (self.svc_req_intent(exp_data_retry), const(stub_json_response({}, 201))),
+            (self.svc_req_intent(exp_data_retry),
+             const(stub_json_response({}, 201))),
             (log_intent(
-                "rcv3-bulk-request", {}, req_body=("jsonified", exp_data_retry)),
+                "rcv3-bulk-request", {},
+                req_body=("jsonified", exp_data_retry)),
              noop)
         ]
         self.assertIsNone(perform_sequence(seq, r.bulk_add(_lb_node_pairs)))
@@ -258,15 +267,64 @@ class BulkAddTests(SynchronousTestCase):
         If bulk adding returns "LB node already member" error along with other
         errors then there is no retry and BulkErrors is raised
         """
+        errors = {
+            "errors": [
+                _TEST_DATA[r._NODE_ALREADY_A_MEMBER_PATTERN][0][0],
+                _TEST_DATA[r._LB_INACTIVE_PATTERN][0][0]
+            ]
+        }
+        exp_data = self.data_eq(self.exp_data)
+        seq = [
+            (self.svc_req_intent(exp_data),
+             const(stub_json_response(errors, 409))),
+            (log_intent(
+                "rcv3-bulk-request", errors, req_body=("jsonified", exp_data)),
+             noop)
+        ]
+        with self.assertRaises(r.BulkErrors) as ec:
+            perform_sequence(seq, r.bulk_add(self.lb_node_pairs))
+        self.assertEqual(
+            ec.exception.errors,
+            pset([r.LBInactive(
+                    _TEST_DATA[r._LB_INACTIVE_PATTERN][0][1]["lb_id"])]))
 
     def test_unknown_errors(self):
         """
         If any of the errors returned with 409 are unknown then
         `UnknownBulkResponse` is raised
         """
+        errors = {
+            "errors": [
+                "unknown error",
+                _TEST_DATA[r._LB_INACTIVE_PATTERN][0][0]
+            ]
+        }
+        exp_data = self.data_eq(self.exp_data)
+        seq = [
+            (self.svc_req_intent(exp_data),
+             const(stub_json_response(errors, 409))),
+            (log_intent(
+                "rcv3-bulk-request", errors, req_body=("jsonified", exp_data)),
+             noop)
+        ]
+        self.assertRaises(
+            r.UnknownBulkResponse, perform_sequence, seq,
+            r.bulk_add(self.lb_node_pairs))
 
     def test_empty_errors(self):
         """
         If bulk add returns 409 with empty errors then `UnknownBulkResponse`
         is raised
         """
+        errors = {"errors": []}
+        exp_data = self.data_eq(self.exp_data)
+        seq = [
+            (self.svc_req_intent(exp_data),
+             const(stub_json_response(errors, 409))),
+            (log_intent(
+                "rcv3-bulk-request", errors, req_body=("jsonified", exp_data)),
+             noop)
+        ]
+        self.assertRaises(
+            r.UnknownBulkResponse, perform_sequence, seq,
+            r.bulk_add(self.lb_node_pairs))
