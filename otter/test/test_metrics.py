@@ -24,7 +24,7 @@ from otter.auth import IAuthenticator
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType
 from otter.metrics import (
-    GetAllGroups,
+    GetAllValidGroups,
     GroupMetrics,
     MetricsService,
     Options,
@@ -48,7 +48,7 @@ from otter.test.utils import (
     nested_sequence,
     noop,
     patch,
-    resolve_effect,
+    resolve_effect
 )
 
 
@@ -189,20 +189,31 @@ class AddToCloudMetricsTests(SynchronousTestCase):
         """
         metrics = [GroupMetrics('t1', 'g1', 3, 2, 0),
                    GroupMetrics('t2', 'g1', 4, 4, 1),
-                   GroupMetrics('t2', 'g', 100, 20, 0)]
+                   GroupMetrics('t2', 'g', 100, 20, 0),
+                   GroupMetrics('t3', 'g3', 5, 3, 0)]
+        config = {"non-convergence-tenants": ["t1"]}
         m = {'collectionTime': 100000, 'ttlInSeconds': 5 * 24 * 60 * 60}
-        md = merge(m, {'metricValue': 107, 'metricName': 'ord.desired'})
-        ma = merge(m, {'metricValue': 26, 'metricName': 'ord.actual'})
+        md = merge(m, {'metricValue': 112, 'metricName': 'ord.desired'})
+        ma = merge(m, {'metricValue': 29, 'metricName': 'ord.actual'})
         mp = merge(m, {'metricValue': 1, 'metricName': 'ord.pending'})
-        mt = merge(m, {'metricValue': 2, 'metricName': 'ord.tenants'})
-        mg = merge(m, {'metricValue': 3, 'metricName': 'ord.groups'})
+        mt = merge(m, {'metricValue': 3, 'metricName': 'ord.tenants'})
+        mg = merge(m, {'metricValue': 4, 'metricName': 'ord.groups'})
         mt1d = merge(m, {'metricValue': 3, 'metricName': 'ord.t1.desired'})
         mt1a = merge(m, {'metricValue': 2, 'metricName': 'ord.t1.actual'})
         mt1p = merge(m, {'metricValue': 0, 'metricName': 'ord.t1.pending'})
         mt2d = merge(m, {'metricValue': 104, 'metricName': 'ord.t2.desired'})
         mt2a = merge(m, {'metricValue': 24, 'metricName': 'ord.t2.actual'})
         mt2p = merge(m, {'metricValue': 1, 'metricName': 'ord.t2.pending'})
-        req_data = [md, ma, mp, mt, mg, mt1d, mt1a, mt1p, mt2d, mt2a, mt2p]
+        mt3d = merge(m, {'metricValue': 5, 'metricName': 'ord.t3.desired'})
+        mt3a = merge(m, {'metricValue': 3, 'metricName': 'ord.t3.actual'})
+        mt3p = merge(m, {'metricValue': 0, 'metricName': 'ord.t3.pending'})
+        cd = merge(m, {'metricValue': 109, 'metricName': 'ord.conv_desired'})
+        ca = merge(m, {'metricValue': 27, 'metricName': 'ord.conv_actual'})
+        cdiv = merge(m, {'metricValue': 82,
+                         'metricName': 'ord.conv_divergence'})
+
+        req_data = [md, ma, mp, mt, mg, mt1d, mt1a, mt1p, mt2d, mt2a, mt2p,
+                    mt3d, mt3a, mt3p, cd, ca, cdiv]
         log = mock_log()
         seq = [
             (Func(time.time), const(100)),
@@ -210,11 +221,13 @@ class AddToCloudMetricsTests(SynchronousTestCase):
                 ServiceType.CLOUD_METRICS_INGEST, "POST", "ingest",
                 data=req_data, log=log).intent, noop)
         ]
-        eff = add_to_cloud_metrics(m['ttlInSeconds'], 'ord', metrics, 2, log)
+        eff = add_to_cloud_metrics(m['ttlInSeconds'], 'ord', metrics,
+                                   3,  # number of tenants
+                                   config, log)
         self.assertIsNone(perform_sequence(seq, eff))
         log.msg.assert_called_once_with(
             'total desired: {td}, total_actual: {ta}, total pending: {tp}',
-            td=107, ta=26, tp=1)
+            td=112, ta=29, tp=1)
 
 
 class UnchangedDivergentGroupsTests(SynchronousTestCase):
@@ -303,7 +316,18 @@ class CollectMetricsTests(SynchronousTestCase):
 
         self.get_all_metrics = patch(self, 'otter.metrics.get_all_metrics',
                                      return_value=succeed("metrics"))
-        self.groups = {"t": "t1group", "t2": "2 groups"}
+        self.groups = [
+            {"tenantId": "t1", "groupId": "g1",
+             "launch_config": '{"type": "launch_server"}'},
+            {"tenantId": "t1", "groupId": "g2",
+             "launch_config": '{"type": "launch_server"}'},
+            {"tenantId": "t1", "groupId": "g12",
+             "launch_config": '{"type": "launch_stack"}'},
+            {"tenantId": "t3", "groupId": "g3",
+             "launch_config": '{"type": "launch_stack"}'},
+            {"tenantId": "t2", "groupId": "g11",
+             "launch_config": '{"type": "launch_server"}'}]
+        self.lc_groups = {"t1": self.groups[:2], "t2": [self.groups[-1]]}
 
         self.add_to_cloud_metrics = patch(
             self, 'otter.metrics.add_to_cloud_metrics',
@@ -317,13 +341,14 @@ class CollectMetricsTests(SynchronousTestCase):
                        'cloudLoadBalancers': 'clb',
                        'cloudOrchestration': 'orch',
                        'rackconnect': 'rc',
-                       "convergence-tenants": ["ct"]}
+                       "non-convergence-tenants": ["ct"]}
 
         self.sequence = SequenceDispatcher([
-            (GetAllGroups(), const(self.groups)),
+            (GetAllValidGroups(), const(self.groups)),
             (TenantScope(mock.ANY, "tid"),
              nested_sequence([
-                 (("atcm", 200, "r", "metrics", 2, self.log, False), noop)
+                 (("atcm", 200, "r", "metrics", 2, self.config,
+                   self.log, False), noop)
              ]))
         ])
         self.get_dispatcher = patch(self, "otter.metrics.get_dispatcher",
@@ -342,7 +367,7 @@ class CollectMetricsTests(SynchronousTestCase):
 
         self.connect_cass_servers.assert_called_once_with(_reactor, 'c')
         self.get_all_metrics.assert_called_once_with(
-            self.get_dispatcher.return_value, self.groups, self.log,
+            self.get_dispatcher.return_value, self.lc_groups, self.log,
             _print=False)
         self.client.disconnect.assert_called_once_with()
 
@@ -374,7 +399,7 @@ class CollectMetricsTests(SynchronousTestCase):
         Doesnt add metrics to blueflood if metrics config is not there
         """
         sequence = SequenceDispatcher([
-            (GetAllGroups(), const(self.groups))
+            (GetAllValidGroups(), const(self.groups))
         ])
         self.get_dispatcher.return_value = sequence
         del self.config["metrics"]

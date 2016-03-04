@@ -17,7 +17,7 @@ from otter.convergence.steps import (
     RemoveNodesFromCLB,
     )
 from otter.convergence.transforming import (
-    _limit_step_count,
+    get_step_limits_from_conf,
     limit_steps_by_count,
     optimize_steps)
 
@@ -49,7 +49,7 @@ class LimitStepCount(SynchronousTestCase):
         Create some steps, limit them, assert they were limited.
         """
         in_steps = self._create_some_steps(in_step_counts)
-        out_steps = _limit_step_count(in_steps, step_limits)
+        out_steps = limit_steps_by_count(in_steps, step_limits)
         expected_step_counts = {
             cls: step_limits.get(cls, in_step_count)
             for (cls, in_step_count)
@@ -78,12 +78,13 @@ class LimitStepCount(SynchronousTestCase):
         }
         self._test_limit_step_count(in_step_counts, step_limits)
 
-    def test_default_step_limit(self):
+    def test_get_limits_conf(self):
         """
-        The default limit limits server creation to up to 10 steps.
+        `get_step_limits_from_conf` will return configured limit along with
+        default limit
         """
-        limits = limit_steps_by_count.keywords["step_limits"]
-        self.assertEqual(limits, pmap({CreateServer: 10, CreateStack: 10}))
+        limits = get_step_limits_from_conf({"create_server": 100})
+        self.assertEqual(limits, {CreateServer: 100, CreateStack: 10})
 
 
 class OptimizerTests(SynchronousTestCase):

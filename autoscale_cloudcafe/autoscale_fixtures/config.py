@@ -10,6 +10,13 @@ class AutoscaleConfig(ConfigSectionInterface):
     """
     SECTION_NAME = 'autoscale'
 
+    # Image ID to be used in group launch config
+    # This is not really in config any more but it still here as some
+    # tests use this instead of fetched imaged ids in AutoscaleFixture.
+    # See comment in AutoscaleFixture.setupClass
+    lc_image_ref = None
+    lc_image_ref_alt = None
+
     @property
     def tenant_id(self):
         """
@@ -72,20 +79,6 @@ class AutoscaleConfig(ConfigSectionInterface):
         launch configuration server flavor
         """
         return self.get('lc_flavor_ref')
-
-    @property
-    def lc_image_ref(self):
-        """
-        launch configuration server image id
-        """
-        return self.get('lc_image_ref')
-
-    @property
-    def lc_image_ref_alt(self):
-        """
-        Alternate launch configuration server image id
-        """
-        return self.get('lc_image_ref_alt')
 
     @property
     def sp_name(self):

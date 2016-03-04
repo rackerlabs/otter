@@ -42,6 +42,7 @@ from otter.convergence.model import HeatStack, NovaServer, ServerState
 from otter.log.bound import BoundLog, bound_log_kwargs
 from otter.models.interface import IScalingGroup, IScalingGroupServersCache
 from otter.supervisor import ISupervisor
+from otter.util.config import set_config_data, update_config_data
 from otter.util.deferredutils import DeferredPool
 from otter.util.fp import set_in
 from otter.util.retry import Retry, ShouldDelayAndRetry, perform_retry
@@ -581,6 +582,14 @@ class DummyException(Exception):
     """
 
 
+def set_config_for_test(testcase, data):
+    """
+    Set config data for test. Will reset to {} after test is run
+    """
+    set_config_data(data)
+    testcase.addCleanup(set_config_data, {})
+
+
 @implementer(ISupervisor)
 class FakeSupervisor(Service, object):
     """
@@ -922,6 +931,14 @@ def intent_func(fname):
     in writing tests that expect intent based on args
     """
     return lambda *a: Effect((fname,) + a)
+
+
+def set_non_conv_tenant(tenant_id, testcase):
+    """
+    Set tenant_id as non convergence tenant
+    """
+    update_config_data("non-convergence-tenants", [tenant_id])
+    testcase.addCleanup(set_config_data, {})
 
 
 @implementer(IScalingGroupServersCache)

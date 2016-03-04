@@ -384,31 +384,6 @@ class ConvergeLBStateTests(SynchronousTestCase):
                               condition=CLBNodeCondition.ENABLED,
                               type=CLBNodeType.PRIMARY)]))
 
-    def test_remove_lb_node(self):
-        """
-        If a current lb config is not in the desired set of lb configs,
-        `converge_lb_state` returns a :class:`RemoveFromCLB` object for CLBs
-        and a :class:`BulkRemoveFromRCv3` for RCv3 load balancers.
-        """
-        current = [CLBNode(node_id='123', address='1.1.1.1',
-                           description=CLBDescription(
-                               lb_id='5', port=80, weight=5)),
-                   RCv3Node(node_id='234', cloud_server_id='abc',
-                            description=RCv3Description(
-                                lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7'))]
-
-        self.assertEqual(
-            converge_launch_server(
-                DesiredServerGroupState(server_config={}, capacity=1),
-                set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1',
-                            desired_lbs=pset())]),
-                set(current),
-                0),
-            pbag([RemoveNodesFromCLB(lb_id='5', node_ids=s('123')),
-                  BulkRemoveFromRCv3(lb_node_pairs=s(
-                      ('c6fe49fa-114a-4ea4-9425-0af8b30ff1e7', 'abc')))]))
-
     def test_do_nothing(self):
         """
         If the desired lb state matches the current lb state,
@@ -435,7 +410,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
 
     def test_all_changes(self):
         """
-        Remove, change, and add a node to a load balancer all together
+        Change and add a node to a load balancer all together
         """
         descs = [CLBDescription(lb_id='5', port=80),
                  CLBDescription(lb_id='6', port=80, weight=2),
@@ -467,11 +442,8 @@ class ConvergeLBStateTests(SynchronousTestCase):
                 ChangeCLBNode(lb_id='6', node_id='234', weight=2,
                               condition=CLBNodeCondition.ENABLED,
                               type=CLBNodeType.PRIMARY),
-                RemoveNodesFromCLB(lb_id='5', node_ids=s('123')),
                 BulkAddToRCv3(lb_node_pairs=s(
                     ('c6fe49fa-114a-4ea4-9425-0af8b30ff1e7', 'abc'))),
-                BulkRemoveFromRCv3(lb_node_pairs=s(
-                    ('e762e42a-8a4e-4ffb-be17-f9dc672729b2', 'abc')))
             ]))
 
     def test_same_clb_multiple_ports(self):
@@ -1114,6 +1086,7 @@ class PlanLaunchServerTests(SynchronousTestCase):
             desired_group_state,
             0,
             build_timeout=3600,
+            step_limits={CreateServer: 10},
             servers=set([server('server1', state=ServerState.ACTIVE,
                                 servicenet_address='1.1.1.1',
                                 desired_lbs=desired_lbs),
@@ -1139,6 +1112,7 @@ class PlanLaunchServerTests(SynchronousTestCase):
             desired_group_state,
             now=1,
             build_timeout=1,
+            step_limits={},
             servers=set([server('server1', state=ServerState.BUILD,
                         servicenet_address='1.1.1.1', created=0)]),
             lb_nodes=set())
@@ -1608,6 +1582,7 @@ class PlanLaunchStackTests(SynchronousTestCase):
             desired_group_state=desired_group_state,
             now=0,
             build_timeout=3600,
+            step_limits={CreateStack: 10},
             stacks=set([stack('stack1'),
                         stack('stack2', action='CHECK', status='COMPLETE')]))
 

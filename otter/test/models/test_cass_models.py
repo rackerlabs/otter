@@ -3838,7 +3838,8 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         `insert_servers` issues query to insert server as json blobs
         """
         eff = self.cache.insert_servers(
-            self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}], False)
+            self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}],
+            clear_others=False)
         self._test_insert_servers(eff)
 
     def test_insert_servers_delete(self):
@@ -3848,7 +3849,8 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         """
         self.cache.delete_servers = lambda: Effect("delete")
         eff = self.cache.insert_servers(
-            self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}], True)
+            self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}],
+            clear_others=True)
         self.assertEqual(eff.intent, "delete")
         self.clock.advance(1)
         eff = resolve_effect(eff, None)
@@ -3859,8 +3861,18 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         `insert_servers` does nothing if called with empty servers list
         """
         self.assertEqual(
-            self.cache.insert_servers(self.dt, [], False),
+            self.cache.insert_servers(self.dt, [], clear_others=False),
             Effect(Constant(None)))
+
+    def test_insert_empty_delete(self):
+        """
+        `insert_servers` deletes servers when clear_others=True and does
+        nothing if passed list is empty
+        """
+        self.cache.delete_servers = lambda: Effect("delete")
+        eff = self.cache.insert_servers(self.dt, [], clear_others=True)
+        self.assertEqual(eff.intent, "delete")
+        self.assertIsNone(resolve_effect(eff, None))
 
     def test_delete_servers(self):
         """
@@ -3941,7 +3953,7 @@ class CassAdminTestCase(SynchronousTestCase):
 
 
 class GetScalingGroupsTests(SynchronousTestCase):
-    """Tests for ``get_all_groups``."""
+    """Tests for ``get_all_valid_groups``."""
 
     @mock.patch("otter.models.cass.CassScalingGroupCollection"
                 ".get_scaling_group_rows")
@@ -3959,10 +3971,9 @@ class GetScalingGroupsTests(SynchronousTestCase):
             {'created_at': '0', 'desired': 'some', 'status': 'ERROR'}]
         rows = [assoc(row, "tenantId", "t1") for row in rows]
         mock_gsgr.return_value = defer.succeed(rows)
-        results = self.successResultOf(collection.get_all_groups())
-        self.assertEqual(results, {"t1": [rows[0], rows[3]]})
-        mock_gsgr.assert_called_once_with(
-            props=["status", "deleting", "created_at"])
+        results = self.successResultOf(collection.get_all_valid_groups())
+        self.assertEqual(results, [rows[0], rows[3]])
+        mock_gsgr.assert_called_once_with()
 
 
 class GetScalingGroupRowsTests(SynchronousTestCase):
@@ -3980,9 +3991,7 @@ class GetScalingGroupRowsTests(SynchronousTestCase):
             return defer.succeed(self.exec_args[freeze((query, params))])
 
         self.client.execute.side_effect = _exec
-        self.select = ('SELECT "groupId","tenantId",'
-                       'active,desired,pending '
-                       'FROM scaling_group ')
+        self.select = 'SELECT * FROM scaling_group '
 
     def _add_exec_args(self, query, params, ret):
         self.exec_args[freeze((query, params))] = ret
@@ -4001,15 +4010,14 @@ class GetScalingGroupRowsTests(SynchronousTestCase):
 
     def test_gets_props(self):
         """
-        If props arg is given then returns groups with that property in it
+        If props arg is given then returns groups with only that property in it
         """
         groups = [{'tenantId': 1, 'groupId': 2, 'desired': 3,
                    'created_at': 'c', 'launch': 'l'},
                   {'tenantId': 1, 'groupId': 3, 'desired': 2,
                    'created_at': 'c', 'launch': 'b'}]
         self._add_exec_args(
-            ('SELECT "groupId","tenantId",active,'
-             'desired,launch,pending '
+            ('SELECT launch '
              'FROM scaling_group  LIMIT :limit;'),
             {'limit': 5}, groups)
         d = self.collection.get_scaling_group_rows(props=['launch'],

@@ -1028,7 +1028,6 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             server_name_prefix="no-such-key",
             key_name="invalid_key_name"
         )
-        launch_config = deepcopy(group.group_config['launchConfiguration'])
 
         if not not_mimic():
             # if this is mimic, we have to make server creation fail.
@@ -1048,6 +1047,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
 
         # group should go into error
         yield group.start(self.rcs, self)
+        launch_config = deepcopy(group.group_config['launchConfiguration'])
         yield group.wait_for_state(
             self.rcs,
             ContainsDict({

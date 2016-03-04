@@ -507,6 +507,15 @@ class ConfigTest(SynchronousTestCase):
         self.assertEqual(config.config_value("baz.some.other"), "who")
         self.assertEqual(config.config_value("baz.bax"), "quux")
 
+    def test_set_config_None(self):
+        """
+        Setting `None` via :func:`config.set_config_data` also works
+        and does not raise exceptions on subsequent update or get
+        """
+        config.set_config_data(None)
+        self.assertIsNone(config.config_value("a"))
+        config.update_config_data("a.b", 2)
+
 
 class WithLockTests(SynchronousTestCase):
     """

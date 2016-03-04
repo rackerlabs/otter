@@ -135,8 +135,11 @@ Response
                ]
             },
             "loadBalancers":[
-   
-            ]
+                { "loadBalancerId": "35635",
+                  "port": 80
+                }
+            ],
+            "draining_timeout": 30
          }
       }
    }

@@ -158,12 +158,12 @@ class FeatureFlagTest(SynchronousTestCase):
         :obj:`convergence.tenant_is_enabled` should return ``True`` when a
         given tenant ID has convergence behavior turned on.
         """
-        enabled_tenant_id = "some-tenant"
+        disabled_tenant_id = "some-tenant"
 
         def get_config_value(config_key):
-            self.assertEqual(config_key, "convergence-tenants")
-            return [enabled_tenant_id]
-        self.assertEqual(tenant_is_enabled(enabled_tenant_id,
+            self.assertEqual(config_key, "non-convergence-tenants")
+            return [disabled_tenant_id]
+        self.assertEqual(tenant_is_enabled("some-other-tenant",
                                            get_config_value),
                          True)
 
@@ -172,25 +172,25 @@ class FeatureFlagTest(SynchronousTestCase):
         :obj:`convergence.tenant_is_enabled` should return ``False`` when a
         given tenant ID has convergence behavior turned off.
         """
-        enabled_tenant_id = "some-tenant"
+        disabled_tenant_id = "some-tenant"
 
         def get_config_value(config_key):
-            self.assertEqual(config_key, "convergence-tenants")
-            return [enabled_tenant_id + "-nope"]
-        self.assertEqual(tenant_is_enabled(enabled_tenant_id,
+            self.assertEqual(config_key, "non-convergence-tenants")
+            return [disabled_tenant_id]
+        self.assertEqual(tenant_is_enabled(disabled_tenant_id,
                                            get_config_value),
                          False)
 
     def test_unconfigured(self):
         """
-        When no `convergence-tenants` key is available in the config, False is
-        returned.
+        When no `non-convergence-tenants` key is available in the config,
+        every tenant has enabled convergence
         """
-        self.assertEqual(tenant_is_enabled('foo', lambda x: None), False)
+        self.assertEqual(tenant_is_enabled('foo', lambda x: None), True)
 
     def test_all(self):
-        """When the value is ``'all'``, True is returned for any tenant."""
+        """When the value is ``'none'``, True is returned for any tenant."""
         def get_config_value(config_key):
-            self.assertEqual(config_key, "convergence-tenants")
-            return 'all'
+            self.assertEqual(config_key, "non-convergence-tenants")
+            return 'none'
         self.assertEqual(tenant_is_enabled('foo', get_config_value), True)

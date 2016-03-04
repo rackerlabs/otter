@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 r"""
 Look through a directory full of otter logs (looks at files whose names start
 with "@4" and a file named "current") for specified log events.  This
@@ -63,8 +65,8 @@ def process_file(filename, filter_callable, previous_line=None):
         lines = f.readlines()
 
     for i, line in enumerate(lines):
-        line = re.sub("^2015-\d+-\d+_\d+:\d+:\d+\.\d+ \{", "{", line,
-                      flags=re.M)
+        line = re.sub("^\d{4}-\d{2}-\d{2}_\d{2}:\d{2}:\d{2}\.\d+ \{", "{",
+                      line, flags=re.M)
         event = None
         if i == 0 and previous_line:
             try:

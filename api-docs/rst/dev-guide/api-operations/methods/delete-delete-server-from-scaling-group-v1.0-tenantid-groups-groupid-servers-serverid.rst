@@ -9,22 +9,29 @@ Delete server from scaling group
     DELETE /v1.0/{tenantId}/groups/{groupId}/servers/{serverId}
 
 This operation deletes and replaces a specified server in a scaling group.
+If the group launch configuration specifies a ``draining_timeout`` value,
+then the load balancer node associated with this server is put in DRAINING mode
+for the specified number of seconds before the server is deleted.
 
 You can delete and replace a server in a scaling group with a new server in that scaling group. By default, the specified server is deleted and replaced. The replacement server has the current launch configuration settings and a different IP address.
 
 .. note::
 
-   The ``replace`` parameter is optional for this method. The default setting is ``replace=true``, even if this parameter is not passed. Use ``replace=false`` if you do not want the deleted server replaced.
+  The ``replace`` and ``purge`` parameters are optional for this method.
 
-   Similarly, the ``purge`` parameter is also optional. Default is ``purge=true``, which automatically deletes the server from the account. Use ``purge=false`` if you do not want the deleted server removed from the account. You may want to do this if you want to investigate the server.
+  - The *replace* parameter determines whether the server is replaced while it is being deleted.
+    If the parameter is not specified, the value defaults to ``replace=true``.
+    Specify ``replace=false`` if you do not want the deleted server to be replaced.
 
-..note::
-
-   This operation can be useful if you have deleted a server by using a nova command or another method that Auto Scale does not recognize. In those cases, even though the server is deleted, Auto Scale calculates that the server still exists. You can use this operation to rectify this error and bring Auto Scale in sync with the previously unrecognized delete server operation.
+  - The *purge* parameter determines whether the server is removed from the account.
+    If the parameter is not specified, the value defaults to  ``purge=true``.
+    Specify ``purge=false`` to leave the server on the account.
+    This setting is useful if you want to investigate the server image after deleting it.
 
 .. note::
 
-   Deleting and replacing the server takes some time, how long depends mainly on the server image and complexity of the launch configuration settings of the replacement server.
+   Deleting and replacing servers in a scaling group takes some time. The time required depends on
+   server type, size, and the complexity of the launch configuration settings for the replacement server.
 
 
 

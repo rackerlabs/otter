@@ -105,6 +105,12 @@ The launch configuration specifies the launch type along with server and load ba
                 if you use a load balancer so the load balancer can retrieve the IP address of new
                 servers. See :ref:`Load balancer parameters <load-balancers-parameters>`.
 
+        ``draining_timeout``
+             Specifies the number of seconds Autoscale will put the CLB node in DRAINING mode
+             before deleting the node and eventually the server. This is used when scaling down.
+             Not used when there is no ``loadbalancers`` configuration. Please note that
+             this feature only works with a cloud load balancer.
+
 Each scaling group has an associated ``status`` that represents the health of the
 group. When the group is successfully able to launch servers and optionally add
 them to load balancers then the status is ``ACTIVE``. If it is not able to
@@ -112,7 +118,8 @@ that due to some irrecoverable error that requires user attention then status
 will be ``ERROR``. In this case, the :ref:`group state <get-scaling-group-state`
 will contain list of human-readable texts describing the reasons why group has
 ERROR status. These errors will need to be fixed before group can become ACTIVE
-again.
+again which can be done by either :ref:`converging <converge>` or
+:ref:`executing policy <execute-policy>` after fixing the errors.
 
 
 .. _server-parameters:
@@ -642,10 +649,16 @@ and how many resources to delete.
 When deleting servers, Autoscale follows these rules:
 
 -  If no new servers are in the process of being built, the oldest
-   servers are deleted first.
+   servers are chosen to be deleted first.
 
 -  If new servers are in the process of being built and in a "pending"
-   state, these servers are deleted first.
+   state, these servers are chosen to be deleted first.
+
+- After selecting servers for deletion, the Autoscale process deletes each server
+  immediately, unless the server has an associated load balancer that has been
+  configured with a draining timeout period. In these cases, Autoscale puts the
+  load balancer node in DRAINING mode and waits for the draining_timeout period
+  to end before deleting the server from the scaling group.
 
 The following diagram illustrates how the deletion process works.
 
@@ -809,7 +822,7 @@ in autoscaling groups, notices when a server is deleted out-of-band or goes into
 an non-ACTIVE state (eg ERROR) and automatically replaces it.
 We call this capability “self-healing”.
 
-A new endpoint :ref:`**converge** endpoint <post-create-scaling-group-v1.1-tenantid-converge>`
+A new endpoint :ref:`**converge** <post-create-scaling-group-v1.1-tenantid-converge>`
 is added which triggers convergence on a group. This can be useful when a group's
 status is ERROR which happens when group has invalid launch configuration
 (ex imageRef of deleted image). After correcting the launch configuration, one

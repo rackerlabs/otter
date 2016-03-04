@@ -186,20 +186,13 @@ def _converge_lb_state(server, current_lb_nodes):
         if desired.equivalent_definition(node.description)]
 
     if desired_matching_existing:
-        met_desireds, good_nodes = zip(*desired_matching_existing)
+        met_desireds = next(iter(zip(*desired_matching_existing)))
     else:
-        met_desireds = good_nodes = ()
+        met_desireds = ()
 
     adds = [
         add_server_to_lb(server=server, description=desired)
         for desired in server.desired_lbs - set(met_desireds)
-    ]
-
-    # Removes could be replaced with _remove_from_lb_with_draining if
-    # we wanted to support draining for moving load balancers too
-    removes = [
-        remove_node_from_lb(node=node)
-        for node in set(current_lb_nodes) - set(good_nodes)
     ]
 
     changes = [
@@ -208,7 +201,7 @@ def _converge_lb_state(server, current_lb_nodes):
         if node.description != desired
     ]
 
-    return [step for step in (adds + removes + changes) if step is not None]
+    return [step for step in (adds + changes) if step is not None]
 
 
 def _drain_and_delete(server, timeout, current_lb_nodes, now):
@@ -528,29 +521,32 @@ def converge_launch_stack(desired_state, stacks):
                 converge_later)
 
 
-def plan_launch_server(desired_group_state, now, build_timeout, servers,
-                       lb_nodes):
+def plan_launch_server(desired_group_state, now, build_timeout, step_limits,
+                       servers, lb_nodes):
     """
     Get an optimized convergence plan.
 
-    Takes the same arguments as :func:`converge_launch_server`.
+    Takes the same arguments as :func:`converge_launch_server`
+    except `step_limits` which is dict of step class -> limit
     """
     steps = converge_launch_server(desired_group_state, servers, lb_nodes, now,
                                    timeout=build_timeout)
-    steps = limit_steps_by_count(steps)
+    steps = limit_steps_by_count(steps, step_limits)
     return optimize_steps(steps)
 
 
-def plan_launch_stack(desired_group_state, now, build_timeout, stacks):
+def plan_launch_stack(desired_group_state, now, build_timeout, step_limits,
+                      stacks):
     """
     Get an optimized convergence plan.
 
     The arguments `now` and `build_timeout` are ignored and only necessary to
     match those of `plan_launch_server`. The arguments `desired_group_state`
-    and `stacks` are the same as in `converge_launch_stack`.
+    and `stacks` are the same as in `converge_launch_stack`. `step_limits` is
+    dict of step class -> limit
     """
     steps = converge_launch_stack(desired_group_state, stacks)
-    steps = limit_steps_by_count(steps)
+    steps = limit_steps_by_count(steps, step_limits)
     return optimize_steps(steps)
 
 

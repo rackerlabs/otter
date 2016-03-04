@@ -6,11 +6,10 @@ Functions for transforming collections of steps.
 - limiting (by truncating the number of steps we take)
 """
 
-from functools import partial
-
 from pyrsistent import pbag, pmap, pset
 
 from toolz.curried import groupby
+from toolz.dicttoolz import merge
 from toolz.itertoolz import concat, concatv
 
 from otter.convergence.steps import (
@@ -97,7 +96,24 @@ _DEFAULT_STEP_LIMITS = pmap({
 })
 
 
-def _limit_step_count(steps, step_limits):
+step_conf_to_class = {"create_server": CreateServer}
+
+
+def get_step_limits_from_conf(limit_conf):
+    """
+    Get step limits along with defaults for steps not in limit_conf
+
+    :param dict limit_conf: step name -> limit mapping
+
+    :return: `dict` of step class -> limit
+    """
+    step_limits = {
+        step_conf_to_class[step_conf]: limit
+        for step_conf, limit in limit_conf.items()}
+    return merge(_DEFAULT_STEP_LIMITS, step_limits)
+
+
+def limit_steps_by_count(steps, step_limits):
     """
     Limits step count by type.
 
@@ -110,7 +126,3 @@ def _limit_step_count(steps, step_limits):
     return pbag(concat(typed_steps[:step_limits.get(cls)]
                        for (cls, typed_steps)
                        in groupby(type, steps).iteritems()))
-
-
-limit_steps_by_count = partial(
-    _limit_step_count, step_limits=_DEFAULT_STEP_LIMITS)
