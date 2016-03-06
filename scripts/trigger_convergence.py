@@ -120,13 +120,13 @@ def get_groups(parsed, store, conf):
         return succeed(
             [{"tenantId": tid, "groupId": gid} for tid, gid in groups])
     elif parsed.all:
-        d = store.get_all_groups()
+        d = store.get_all_valid_groups()
         d.addCallback(lambda tgs: concat(tgs.values()))
     elif parsed.tenant_id:
         d = get_groups_of_tenants(log, store, parsed.tenant_id)
     elif parsed.disabled_tenants:
         non_conv_tenants = conf["non-convergence-tenants"]
-        d = store.get_all_groups()
+        d = store.get_all_valid_groups()
         d.addCallback(keyfilter(lambda k: k not in set(non_conv_tenants)))
         d.addCallback(lambda tgs: concat(tgs.values()))
     elif parsed.conf_conv_tenants:
