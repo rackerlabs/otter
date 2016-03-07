@@ -20,7 +20,7 @@ from datetime import datetime
 from effect import Effect, Func, parallel
 from effect.do import do, do_return
 
-from toolz.curried import keyfilter
+from toolz.curried import filter
 from toolz.itertoolz import concat
 
 import treq
@@ -120,15 +120,15 @@ def get_groups(parsed, store, conf):
         return succeed(
             [{"tenantId": tid, "groupId": gid} for tid, gid in groups])
     elif parsed.all:
-        d = store.get_all_groups()
-        d.addCallback(lambda tgs: concat(tgs.values()))
+        d = store.get_all_valid_groups()
     elif parsed.tenant_id:
         d = get_groups_of_tenants(log, store, parsed.tenant_id)
     elif parsed.disabled_tenants:
         non_conv_tenants = conf["non-convergence-tenants"]
-        d = store.get_all_groups()
-        d.addCallback(keyfilter(lambda k: k not in set(non_conv_tenants)))
-        d.addCallback(lambda tgs: concat(tgs.values()))
+        d = store.get_all_valid_groups()
+        d.addCallback(
+            filter(lambda g: g["tenantId"] not in set(non_conv_tenants)))
+        d.addCallback(list)
     elif parsed.conf_conv_tenants:
         d = get_groups_of_tenants(log, store, conf["convergence-tenants"])
     else:
