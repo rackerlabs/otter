@@ -82,7 +82,7 @@ class TestLaunchStack(unittest.TestCase):
                 .addCallback(check_success, [200])
                 .addCallback(self.helper.treq.json_content))
 
-    def wait_for_stack_list(self, expected_states, timeout=60, period=10):
+    def wait_for_stack_list(self, expected_states, timeout=180, period=10):
         def check(content):
             states = pbag([s['stack_status'] for s in content['stacks']])
             if not (states == expected_states):
