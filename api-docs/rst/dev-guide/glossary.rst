@@ -36,14 +36,14 @@ Glossary 
     is mapped directly to an individual computer or a virtual machine.
 
 **Convergence**
-    The act of Auto Scale adding or removing enough servers to satisfy
-    the needed capacity.
+    The act of Auto Scale adding or removing enough units to
+    satisfy the needed capacity.
 
 **Convergence Delta**
-    The change in the number of servers that the system makes when a
-    scaling policy is executed. For example, if the convergence delta is
-    2, then the system adds 2 servers. If it is -10, the system removes
-    10 servers.
+    The change in the number of units that the system makes
+    when a scaling policy is executed. For example, if the convergence
+    delta is 2, then the system adds 2 units. If it is -10, the system removes
+    10 units.
 
 **Cooldown**
     There are two types of cooldown: group and policy. A group cooldown
@@ -71,10 +71,10 @@ Glossary 
 
 **Launch Configuration**
     A configuration that contains the necessary details for adding and
-    removing servers from a scaling group in the Rackspace Auto Scale
-    API. The ``launchConfiguration`` object specifies whether you are
-    creating a server or a load balancer and the necessary details about
-    the configuration.
+    removing resources from a scaling group in the Rackspace
+    Auto Scale API. The ``launchConfiguration`` object specifies
+    whether you are creating a server, load balancer, or stack and the
+    necessary details about the configuration.
 
 **Load Balancer**
     A logical device that belongs to a cloud account. A load balancer is
@@ -91,15 +91,18 @@ Glossary 
     an alarm is triggered.
 
 **Scaling**
-    Scaling is the process of adjusting a server configuration in
-    response to variations in workload.
+    Scaling is the process of adjusting a server or stack configuration
+    in response to variations in workload.
 
 **Scaling Group**
-    A scaling group identifies servers and load balancers that are
-    managed by a scaling policy.
+    A scaling group identifies units that are managed by a scaling policy.
 
 **Scaling Policy**
     A scaling policy manages a scaling group.
+
+**Scaling Unit**
+    Either a server or stack, depending on the launch configuration of a
+    scaling group. A unit is added or removed during a scaling event.
 
 **Session persistence**
     A feature of the load balancing service that attempts to force
@@ -111,6 +114,16 @@ Glossary 
     running on its system. A server is a virtual machine (VM) instance
     in the Cloud Servers environment. To create a server, you must
     specify a name, flavor reference, and image reference.
+
+**Stack**
+    A collection of infrastructure resources managed by the Cloud
+    Orchestration service. Many resource types can be managed in a
+    stack, including servers, load balancers, databases, software
+    configurations, monitoring entities, and even Auto Scale groups.
+
+**Unit**
+    See *Scaling Unit*
+
 **Virtual IP**
     An Internet Protocol (IP) address that is configured on the load
     balancer. Clients use the virtual IP to connect to a service that is

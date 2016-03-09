@@ -10,7 +10,7 @@ Delete scaling group
 
 This operation deletes a specified scaling group.
 
-The scaling group must be empty before it can be deleted. An empty group contains no entities. If deletion is successful, no response body is returned. If the group contains pending or active entities, deletion fails and a 409 error message is returned. If there are pending or active servers in the scaling group, pass ``force=true`` to force delete the group. Passing ``force=true`` immediately deletes all active servers in the group. Pending servers are deleted when they build and become active.
+The scaling group must be empty before it can be deleted. An empty group contains no entities. If deletion is successful, no response body is returned. If the group contains pending or active entities, deletion fails and a 409 error message is returned. If there are pending or active scaling units in the scaling group, pass ``force=true`` to force delete the group. Passing ``force=true`` immediately deletes all active units in the group. Pending units are deleted when they build and become active.
 
 
 
@@ -28,9 +28,9 @@ This table shows the possible response codes for this operation:
 |                          |                         |invalid. It must be      |
 |                          |                         |"true", any other value  |
 |                          |                         |is invalid. If there are |
-|                          |                         |servers in the group,    |
+|                          |                         |units in the group,      |
 |                          |                         |only "true" succeeds. If |
-|                          |                         |there are no servers in  |
+|                          |                         |there are no units in    |
 |                          |                         |the group, "true" and no |
 |                          |                         |value given succeed.     |
 +--------------------------+-------------------------+-------------------------+
@@ -52,7 +52,7 @@ This table shows the possible response codes for this operation:
 +--------------------------+-------------------------+-------------------------+
 |403                       |GroupNotEmptyError       |The scaling group cannot |
 |                          |                         |be deleted because it    |
-|                          |                         |has servers in it. Use   |
+|                          |                         |has units in it. Use     |
 |                          |                         |the "force=true" query   |
 |                          |                         |argument to force delete |
 |                          |                         |the group.               |

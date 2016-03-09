@@ -189,20 +189,20 @@ This table shows the body parameters for the request:
 |                            |             |exclusive with the ``cron`` parameter.     |
 +----------------------------+-------------+-------------------------------------------+
 |scalingPolicies.[*].\       |Number       |The percent change to make in the number   |
-|**changePercent**           |*(Optional)* |of servers in the scaling group. If this   |
-|                            |             |number is positive, the number of servers  |
+|**changePercent**           |*(Optional)* |of units in the scaling group. If this     |
+|                            |             |number is positive, the number of units    |
 |                            |             |increases by the given percentage. If this |
 |                            |             |parameter is set to a negative number, the |
-|                            |             |number of servers decreases by the given   |
+|                            |             |number of units decreases by the given     |
 |                            |             |percentage. The absolute change in the     |
-|                            |             |number of servers is rounded to the        |
+|                            |             |number of units is rounded to the          |
 |                            |             |nearest integer. This means that if -X% of |
-|                            |             |the current number of servers translates   |
-|                            |             |to -0.5 or -0.25 or -0.75 servers, the     |
-|                            |             |actual number of servers that are shut     |
+|                            |             |the current number of units translates     |
+|                            |             |to -0.5 or -0.25 or -0.75 units, the       |
+|                            |             |actual number of units that are shut       |
 |                            |             |down is 1. If X% of the current number of  |
-|                            |             |servers translates to 1.2 or 1.5 or 1.7    |
-|                            |             |servers, the actual number of servers that |
+|                            |             |units translates to 1.2 or 1.5 or 1.7      |
+|                            |             |units, the actual number of units that     |
 |                            |             |are launched is 2.                         |
 +----------------------------+-------------+-------------------------------------------+
 |scalingPolicies.[*].\       |Number       |The cooldown period, in seconds, before    |
@@ -218,20 +218,20 @@ This table shows the body parameters for the request:
 |                            |             |``schedule``.                              |
 +----------------------------+-------------+-------------------------------------------+
 |scalingPolicies.[*].\       |Integer      |The change to make in the number of        |
-|**change**                  |*(Optional)* |servers in the scaling group. This         |
+|**change**                  |*(Optional)* |units in the scaling group. This           |
 |                            |             |parameter must be an integer. If the value |
 |                            |             |is a positive integer, the number of       |
-|                            |             |servers increases. If the value is a       |
-|                            |             |negative integer, the number of servers    |
+|                            |             |units increases. If the value is a         |
+|                            |             |negative integer, the number of units      |
 |                            |             |decreases.                                 |
 +----------------------------+-------------+-------------------------------------------+
-|scalingPolicies.[*].\       |Integer      |The desired server capacity of the scaling |
-|**desiredCapacity**         |*(Optional)* |the group; that is, how many servers       |
+|scalingPolicies.[*].\       |Integer      |The desired scaling unit capacity of the   |
+|**desiredCapacity**         |*(Optional)* |scaling group; that is, how many units     |
 |                            |             |should be in the scaling group. This value |
 |                            |             |must be an absolute number, greater than   |
 |                            |             |or equal to zero. For example, if this     |
 |                            |             |parameter is set to ten, executing the     |
-|                            |             |policy brings the number of servers to     |
+|                            |             |policy brings the number of units to       |
 |                            |             |ten. The minimum allowed value is zero.    |
 |                            |             |Note that the configured group maxEntities |
 |                            |             |and minEntities takes precedence over this |
@@ -250,7 +250,7 @@ This table shows the body parameters for the request:
    {
       "change":1,
       "cooldown":1800,
-      "name":"scale up by one server",
+      "name":"scale up by one unit",
       "type":"webhook"
    }
 

@@ -9,9 +9,14 @@ Show launch configuration
 
     GET /v1.0/{tenantId}/groups/{groupId}/launch
 
-This operation retrieveslaunch configuration details for a specified scaling group.
+This operation retrieves launch configuration details for a specified
+scaling group.
 
-The details include from which image to create a server, which cloud load balancers to join the server to, which networks to add the server to, and other metadata.
+For ``launch_server`` launch configurations, the details include
+arguments supplied to Cloud Servers when creating a server and which
+cloud load balancers to join it to. For ``launch_stack`` launch
+configurations, the details include the arguments supplied when a stack
+is created through Cloud Orchestration.
 
 The details appear in the response body in JSON format.
 

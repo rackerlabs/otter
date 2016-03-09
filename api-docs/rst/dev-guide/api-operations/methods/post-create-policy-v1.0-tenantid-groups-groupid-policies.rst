@@ -207,21 +207,21 @@ This table shows the body parameters for the request:
 |                    |             |exclusive with the ``cron`` parameter.     |
 +--------------------+-------------+-------------------------------------------+
 |[*].\               |Number       |The percent change to make in the number   |
-|**changePercent**   |*(Optional)* |of servers in the scaling group. If this   |
-|                    |             |number is positive, the number of servers  |
+|**changePercent**   |*(Optional)* |of units in the scaling group. If this     |
+|                    |             |number is positive, the number of units    |
 |                    |             |will increase by the given percentage. If  |
 |                    |             |this parameter is set to a negative        |
-|                    |             |number, the number of servers decreases by |
+|                    |             |number, the number of units decreases by   |
 |                    |             |the given percentage. The absolute change  |
-|                    |             |in the number of servers will be rounded   |
+|                    |             |in the number of units will be rounded     |
 |                    |             |to the nearest integer. This means that if |
-|                    |             |-X% of the current number of servers       |
+|                    |             |-X% of the current number of units         |
 |                    |             |translates to -0.5 or -0.25 or -0.75       |
-|                    |             |servers, the actual number of servers that |
+|                    |             |units, the actual number of units that     |
 |                    |             |will be shut down is 1. If X% of the       |
-|                    |             |current number of servers translates to    |
-|                    |             |1.2 or 1.5 or 1.7 servers, the actual      |
-|                    |             |number of servers that will be launched is |
+|                    |             |current number of units translates to      |
+|                    |             |1.2 or 1.5 or 1.7 units, the actual        |
+|                    |             |number of units that will be launched is   |
 |                    |             |2                                          |
 +--------------------+-------------+-------------------------------------------+
 |[*].\ **cooldown**  |Number       |The cooldown period, in seconds, before    |
@@ -237,20 +237,20 @@ This table shows the body parameters for the request:
 |                    |             |either ``webhook`` or ``schedule``.        |
 +--------------------+-------------+-------------------------------------------+
 |[*].\ **change**    |Integer      |The change to make in the number of        |
-|                    |*(Optional)* |servers in the scaling group. This         |
+|                    |*(Optional)* |units in the scaling group. This           |
 |                    |             |parameter must be an integer. If the value |
 |                    |             |is a positive integer, the number of       |
-|                    |             |servers increases. If the value is a       |
-|                    |             |negative integer, the number of servers    |
+|                    |             |units increases. If the value is a         |
+|                    |             |negative integer, the number of units      |
 |                    |             |decreases.                                 |
 +--------------------+-------------+-------------------------------------------+
-|[*].\               |Integer      |The desired server capacity of the scaling |
-|**desiredCapacity** |*(Optional)* |the group; that is, how many servers       |
+|[*].\               |Integer      |The desired unit capacity of the scaling   |
+|**desiredCapacity** |*(Optional)* |the group; that is, how many units         |
 |                    |             |should be in the scaling group. This value |
 |                    |             |must be an absolute number, greater than   |
 |                    |             |or equal to zero. For example, if this     |
 |                    |             |parameter is set to ten, executing the     |
-|                    |             |policy brings the number of servers to     |
+|                    |             |policy brings the number of units to       |
 |                    |             |ten. The minimum allowed value is zero.    |
 |                    |             |Note that maxEntities and minEntities for  |
 |                    |             |the configured group take precedence over  |
@@ -269,17 +269,17 @@ The examples that are provided below show several methods for creating a scaling
 * A request to create a policy based on desired capacity
 * A request to create a policy based on incremental change
 * A request to create a policy based on change percentage
-* A request to create a policy based on change percentage scheduled daily, at                                a specific time of day
-* A request to create a policy based on change percentage scheduled once, for                                a specific date and time
+* A request to create a policy based on change percentage scheduled daily, at a specific time of day
+* A request to create a policy based on change percentage scheduled once, for a specific date and time
 * A request to create multiple policies,followed by the matching response
 
-The following example shows how to create a webhook-based policy specifying that                            the desired capacity be five servers and setting the cooldown period to 1800                            seconds.
+The following example shows how to create a webhook-based policy specifying that the desired capacity be five units and setting the cooldown period to 1800 seconds.
 
 .. code::
 
    [
       {
-         "name":"set group to 5 servers",
+         "name":"set group to 5 units",
          "desiredCapacity":5,
          "cooldown":1800,
          "type":"webhook"
@@ -291,7 +291,7 @@ The following example shows how to create a webhook-based policy specifying that
 
    [
       {
-         "name":"scale up by one server",
+         "name":"scale up by one unit",
          "change":1,
          "cooldown":1800,
          "type":"webhook"
@@ -349,7 +349,7 @@ The following example shows how to create a webhook-based policy specifying that
       {
          "change":1,
          "cooldown":1800,
-         "name":"scale up by one server",
+         "name":"scale up by one unit",
          "type":"webhook"
       },
       {
@@ -361,7 +361,7 @@ The following example shows how to create a webhook-based policy specifying that
       {
          "cooldown":1800,
          "desiredCapacity":5,
-         "name":"set group to 5 servers",
+         "name":"set group to 5 units",
          "type":"webhook"
       },
       {
@@ -433,7 +433,7 @@ Response
                   "rel":"self"
                }
             ],
-            "name":"set group to 5 servers",
+            "name":"set group to 5 units",
             "type":"webhook"
          },
          {
@@ -462,7 +462,7 @@ Response
                   "rel":"self"
                }
             ],
-            "name":"scale up by one server",
+            "name":"scale up by one unit",
             "type":"webhook"
          },
          {
