@@ -369,6 +369,18 @@ def skip_if(predicate, reason):
     return lambda f: f
 
 
+def timeout(seconds):
+    """
+    Decorator that sets test method's timeout
+
+    :param float seconds: timeout in seconds
+    """
+    def decorator(f):
+        f.timeout = seconds
+        return f
+    return decorator
+
+
 def copy_test_methods(from_class, to_class, filter_and_change=None):
     """
     Copy test methods (methods that start with `test_*`) from ``from_class`` to
