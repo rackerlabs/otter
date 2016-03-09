@@ -12,7 +12,7 @@ import pyrsistent as pyrs
 
 from txeffect import perform
 
-from otter.cloud_client import TenantScope
+from otter.cloud_client import TenantScope, rcv3
 from otter.convergence.steps import BulkAddToRCv3, BulkRemoveFromRCv3
 from otter.util.pure_http import has_code
 
@@ -48,6 +48,6 @@ remove_from_rcv3 = partial(_generic_rcv3_request, BulkRemoveFromRCv3)
 
 def add_to_rcv3(request_bag, lb_id, server_id):
     eff = rcv3.bulk_add(pyrs.s((lb_id, server_id)))
-    scoped = Effect(TenantScope(effect, request_bag.tenant_id))
+    scoped = Effect(TenantScope(eff, request_bag.tenant_id))
     d = perform(request_bag.dispatcher, scoped)
     return d.addCallback(itemgetter(1))
