@@ -8,7 +8,7 @@ from operator import itemgetter
 
 from effect import Effect
 
-from pyrsistent import s
+import pyrsistent as pyrs
 
 from txeffect import perform
 
@@ -29,7 +29,7 @@ def _generic_rcv3_request(step_class, request_bag, lb_id, server_id):
         firing with the parsed result of the request, or :data:`None` if the
         request has no body.
     """
-    effect = step_class(lb_node_pairs=s((lb_id, server_id)))._bare_effect()
+    effect = step_class(lb_node_pairs=pyrs.s((lb_id, server_id)))._bare_effect()
 
     if step_class is BulkAddToRCv3:
         svc_req = effect.intent
@@ -47,7 +47,7 @@ remove_from_rcv3 = partial(_generic_rcv3_request, BulkRemoveFromRCv3)
 
 
 def add_to_rcv3(request_bag, lb_id, server_id):
-    eff = rcv3.bulk_add(pset([(lb_id, server_id)]))
+    eff = rcv3.bulk_add(pyrs.s((lb_id, server_id)))
     scoped = Effect(TenantScope(effect, request_bag.tenant_id))
     d = perform(request_bag.dispatcher, scoped)
     return d.addCallback(itemgetter(1))
