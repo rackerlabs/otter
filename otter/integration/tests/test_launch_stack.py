@@ -112,7 +112,7 @@ class TestLaunchStack(unittest.TestCase):
                 "Waiting for group {} to reach state {}".format(
                     self.group.group_id, str(expected_states))))
 
-    @timeout(180)
+    @timeout(180 * 3 + 10)
     @inlineCallbacks
     def test_create(self):
         """
