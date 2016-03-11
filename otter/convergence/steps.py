@@ -380,9 +380,9 @@ def _handle_bulk_add_errors(exc_tuple):
     error = exc_tuple[1]
     failures = []
     retries = []
-    for excp in error.exceptions:
+    for excp in error.errors:
         if isinstance(excp, rcv3.ServerUnprocessableError):
-            retries.append(ErrorReason.String(excp.mesage))
+            retries.append(ErrorReason.String(excp.message))
         else:
             failures.append(ErrorReason.String(excp.message))
     if failures:

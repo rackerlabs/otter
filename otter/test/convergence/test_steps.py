@@ -34,6 +34,7 @@ from otter.cloud_client import (
     delete_stack,
     has_code,
     service_request,
+    rcv3,
     update_stack)
 from otter.constants import ServiceType
 from otter.convergence.model import (
@@ -65,6 +66,7 @@ from otter.test.utils import (
     StubResponse,
     intent_func,
     matches,
+    noop,
     raise_,
     resolve_effect,
     stack,
@@ -671,16 +673,19 @@ class RCv3BulkAddTests(SynchronousTestCase):
     """
 
     def setUp(self):
-        from otter.convergence.steps import rcv3
-        self.patch(rcv3, "bulk_add", intent_func("ba"))
-        self.lb_node_pairs = pset([("l1", "n1"), ("l2", "n2")])
-        self.step = BulkAddToRCv3(lb_node_pairs=self.lb_node_pairs)
+        from otter.convergence.steps import rcv3 as step_rcv3
+        self.patch(step_rcv3, "bulk_add", intent_func("ba"))
+        self.pairs = pset([("l1", "n1"), ("l2", "n2")])
+        self.step = BulkAddToRCv3(lb_node_pairs=self.pairs)
+
+    def ba_raiser(self, *errors):
+        return lambda i: raise_(rcv3.BulkErrors(errors))
 
     def test_success(self):
         """
         A successful return from `rcv3.bulk_add` results in RETRY
         """
-        seq = [(("ba", self.lb_node_pairs), noop)]
+        seq = [(("ba", self.pairs), noop)]
         self.assertEqual(
             perform_sequence(seq, self.step.as_effect()),
             (StepResult.RETRY, [
@@ -695,19 +700,48 @@ class RCv3BulkAddTests(SynchronousTestCase):
         If `rcv3.bulk_add` results in BulkErrors with only
         non-ServerUnprocessableError errors in it then step returns FAILURE
         """
+        excp1 = rcv3.LBInactive("l1")
+        excp2 = rcv3.NoSuchLBError("l2")
+        seq = [(("ba", self.pairs), self.ba_raiser(excp1, excp2))]
+        self.assertEqual(
+            perform_sequence(seq, self.step.as_effect()),
+            (StepResult.FAILURE,
+                transform_eq(pset, pset([
+                    ErrorReason.String(excp1.message),
+                    ErrorReason.String(excp2.message)]))
+            )
+        )
 
     def test_retries(self):
         """
         If `rcv3.bulk_add` results in BulkErrors with only
         ServerUnprocessableError errors in it then step returns RETRY
         """
+        excp1 = rcv3.ServerUnprocessableError("s1")
+        excp2 = rcv3.ServerUnprocessableError("s2")
+        seq = [(("ba", self.pairs), self.ba_raiser(excp1, excp2))]
+        self.assertEqual(
+            perform_sequence(seq, self.step.as_effect()),
+            (StepResult.RETRY,
+                transform_eq(pset, pset([
+                    ErrorReason.String(excp1.message),
+                    ErrorReason.String(excp2.message)]))
+            )
+        )
 
     def test_failures_and_retries(self):
         """
-        If `rcv3.bulk_add` results in BulkErrors with only
+        If `rcv3.bulk_add` results in BulkErrors with
         ServerUnprocessableError and other errors in it then step returns
         FAILURE
         """
+        excp1 = rcv3.LBInactive("l1")
+        excp2 = rcv3.ServerUnprocessableError("s2")
+        seq = [(("ba", self.pairs), self.ba_raiser(excp1, excp2))]
+        self.assertEqual(
+            perform_sequence(seq, self.step.as_effect()),
+            (StepResult.FAILURE, [ErrorReason.String(excp1.message)])
+        )
 
 
 class RCv3CheckBulkDeleteTests(SynchronousTestCase):
