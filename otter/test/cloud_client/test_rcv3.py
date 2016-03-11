@@ -2,11 +2,11 @@
 Tests for otter.cloud_client.rcv3
 """
 
-from functools import partial
-
 from effect.testing import perform_sequence
 
 from pyrsistent import pset
+
+from toolz.functoolz import curry
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -14,20 +14,20 @@ from otter.cloud_client import ServiceType, service_request
 from otter.cloud_client import rcv3 as r
 from otter.test.cloud_client.test_init import log_intent
 from otter.test.utils import (
-    const, noop, patch, stub_json_response, transform_eq)
+    const, noop, patch, stub_json_response)
 from otter.util.pure_http import has_code
 
 
 _TEST_DATA = {
-    r._NODE_NOT_A_MEMBER_PATTERN: [
-        ('Node d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is not a member of '
-         'Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2',
+    r._SERVER_NOT_A_MEMBER_PATTERN: [
+        ('Cloud Server d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is not a member of'
+         ' Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2',
          {'lb_id': 'd95ae0c4-6ab8-4873-b82f-f8433840cff2',
-          'node_id': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'}),
-        ('Node D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is not a member of '
-         'Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
+          'server_id': 'd6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2'}),
+        ('Cloud Server D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is not a member of'
+         ' Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
          {'lb_id': 'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
-          'node_id': 'D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2'})
+          'server_id': 'D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2'})
     ],
     r._NODE_ALREADY_A_MEMBER_PATTERN: [
         ('Cloud Server d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is already '
@@ -61,7 +61,7 @@ _TEST_DATA = {
         ("Cloud Server d95ae0c4-6ab8-4873-b82f-f8433840cff2 is unprocessable ",
          {"server_id": "d95ae0c4-6ab8-4873-b82f-f8433840cff2"}),
         ("Cloud Server D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is unprocessable ",
-         {"lb_id": "D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2"})
+         {"server_id": "D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2"})
     ]
 }
 
@@ -94,7 +94,7 @@ class RegexTests(SynchronousTestCase):
         load balancer parses those messages. It rejects other
         messages.
         """
-        self._regex_test(r._NODE_NOT_A_MEMBER_PATTERN)
+        self._regex_test(r._SERVER_NOT_A_MEMBER_PATTERN)
 
     def test_node_already_a_member_regex(self):
         """
@@ -126,70 +126,63 @@ class RegexTests(SynchronousTestCase):
         self._regex_test(r._SERVER_UNPROCESSABLE)
 
 
-class BulkAddTests(SynchronousTestCase):
+def node_already_member(lb_id, node_id):
+    return ("Cloud Server {} is already a member of "
+            "Load Balancer Pool {}").format(node_id, lb_id)
 
-    lb_node_pairs = pset([
-        ("lb-1", "node-a"),
-        ("lb-1", "node-b"),
-        ("lb-1", "node-c"),
-        ("lb-1", "node-d"),
-        ("lb-2", "node-a"),
-        ("lb-2", "node-b"),
-        ("lb-3", "node-c"),
-        ("lb-3", "node-d")
-    ])
 
-    exp_data = [
-        {'load_balancer_pool': {'id': 'lb-1'},
-            'cloud_server': {'id': 'node-a'}},
-        {'load_balancer_pool': {'id': 'lb-1'},
-            'cloud_server': {'id': 'node-b'}},
-        {'load_balancer_pool': {'id': 'lb-1'},
-            'cloud_server': {'id': 'node-c'}},
-        {'load_balancer_pool': {'id': 'lb-1'},
-            'cloud_server': {'id': 'node-d'}},
-        {'load_balancer_pool': {'id': 'lb-2'},
-            'cloud_server': {'id': 'node-a'}},
-        {'load_balancer_pool': {'id': 'lb-2'},
-            'cloud_server': {'id': 'node-b'}},
-        {'load_balancer_pool': {'id': 'lb-3'},
-            'cloud_server': {'id': 'node-c'}},
-        {'load_balancer_pool': {'id': 'lb-3'},
-            'cloud_server': {'id': 'node-d'}}
-    ]
+def lb_inactive(lb_id):
+    return "Load Balancer Pool {} is not in an ACTIVE state".format(lb_id)
 
-    def data_eq(self, d):
-        """
-        Return transform_eq object for service request data for easier testing
-        """
-        def key_fn(e):
-            return (e["load_balancer_pool"]["id"], e["cloud_server"]["id"])
-        return transform_eq(partial(sorted, key=key_fn), d)
 
-    def svc_req_intent(self, data):
-        return service_request(
-            ServiceType.RACKCONNECT_V3, "POST",
-            "load_balancer_pools/nodes", data=data,
-            success_pred=has_code(201, 409)).intent
+def server_not_member(lb_id, server_id):
+    return "Cloud Server {} is not a member of Load Balancer Pool {}".format(
+        server_id, lb_id)
+
+
+@curry
+def rcv3_svc_req_intent(method, code, self, data):
+    return service_request(
+        ServiceType.RACKCONNECT_V3, method,
+        "load_balancer_pools/nodes", data=data,
+        success_pred=has_code(code, 409)).intent
+
+
+class RCv3Tests(SynchronousTestCase):
+    """
+    Common data for bulk_add|delete functions
+    """
+
+    lbs = ["a6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2",
+           "b6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2",
+           "c6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"]
+    nodes = ["a95ae0c4-6ab8-4873-b82f-f8433840cff2",
+             "b95ae0c4-6ab8-4873-b82f-f8433840cff2",
+             "c95ae0c4-6ab8-4873-b82f-f8433840cff2"]
+    pairs = pset(zip(lbs, nodes))
+    data = r._sorted_data(pairs)
 
     def setUp(self):
         patch(self, "otter.cloud_client.json.dumps",
               side_effect=lambda d, **k: ("jsonified", d))
 
+
+class BulkAddTests(RCv3Tests):
+
+    svc_req_intent = rcv3_svc_req_intent("POST", 201)
+
     def test_success(self):
         """
         bulk add resulting in 201 returns Effect of None
         """
-        exp_data = self.data_eq(self.exp_data)
         seq = [
-            (self.svc_req_intent(exp_data),
+            (self.svc_req_intent(self.data),
              const(stub_json_response({}, 201))),
             (log_intent(
-                "rcv3-bulk-request", {}, req_body=("jsonified", exp_data)),
+                "rcv3-bulk-request", {}, req_body=("jsonified", self.data)),
              noop)
         ]
-        self.assertIsNone(
-            perform_sequence(seq, r.bulk_add(self.lb_node_pairs)))
+        self.assertIsNone(perform_sequence(seq, r.bulk_add(self.pairs)))
 
     def test_multiple_errors(self):
         """
@@ -198,30 +191,26 @@ class BulkAddTests(SynchronousTestCase):
         """
         errors = {
             "errors": [
-                _TEST_DATA[r._LB_INACTIVE_PATTERN][0][0],
-                _TEST_DATA[r._LB_DOESNT_EXIST_PATTERN][0][0],
-                _TEST_DATA[r._SERVER_UNPROCESSABLE][0][0]
+                lb_inactive(self.lbs[0]),
+                "Load Balancer Pool {} does not exist".format(self.lbs[1]),
+                "Cloud Server {} is unprocessable".format(self.nodes[2])
             ]
         }
-        exp_data = self.data_eq(self.exp_data)
         seq = [
-            (self.svc_req_intent(exp_data),
+            (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors, req_body=("jsonified", exp_data)),
+                "rcv3-bulk-request", errors,
+                req_body=("jsonified", self.data)),
              noop)
         ]
         with self.assertRaises(r.BulkErrors) as ec:
-            perform_sequence(seq, r.bulk_add(self.lb_node_pairs))
+            perform_sequence(seq, r.bulk_add(self.pairs))
         self.assertEqual(
             ec.exception.errors,
-            pset([r.LBInactive(
-                    _TEST_DATA[r._LB_INACTIVE_PATTERN][0][1]["lb_id"]),
-                  r.NoSuchLBError(
-                      _TEST_DATA[r._LB_DOESNT_EXIST_PATTERN][0][1]["lb_id"]),
-                  r.ServerUnprocessableError(
-                      _TEST_DATA[r._SERVER_UNPROCESSABLE][0][1]["server_id"])
-                  ])
+            pset([r.LBInactive(self.lbs[0]),
+                  r.NoSuchLBError(self.lbs[1]),
+                  r.ServerUnprocessableError(self.nodes[2])])
         )
 
     def test_retries(self):
@@ -229,38 +218,48 @@ class BulkAddTests(SynchronousTestCase):
         If bulk adding only returns "lb node pair is already member" error with
         409 then other pairs are retried
         """
-        # lb node pair that will be retried
-        lb_id = _TEST_DATA[r._NODE_ALREADY_A_MEMBER_PATTERN][0][1]['lb_id']
-        node_id = _TEST_DATA[r._NODE_ALREADY_A_MEMBER_PATTERN][0][1]['node_id']
-        _lb_node_pairs = self.lb_node_pairs.add((lb_id, node_id))
-        # this must be sorted for data_eq to work on this. It will be sorted
-        # by adding the new pair in beginning since its LB starts with 'd' and
-        # all pairs in self.exp_data start with 'l'
-        _exp_data = [{'load_balancer_pool': {'id': lb_id},
-                      'cloud_server': {'id': node_id}}] + self.exp_data[:]
-        _eq_exp_data = self.data_eq(_exp_data)
-        # retry will be without new lb node pair
-        exp_data_retry = self.data_eq(self.exp_data)
         errors = {
             "errors": [
-                _TEST_DATA[r._NODE_ALREADY_A_MEMBER_PATTERN][0][0]
+                node_already_member(self.lbs[0], self.nodes[0])
             ]
         }
+        retried_data = r._sorted_data(
+            self.pairs - pset([(self.lbs[0], self.nodes[0])]))
         seq = [
-            (self.svc_req_intent(_eq_exp_data),
+            (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
                 "rcv3-bulk-request", errors,
-                req_body=("jsonified", _eq_exp_data)),
+                req_body=("jsonified", self.data)),
              noop),
-            (self.svc_req_intent(exp_data_retry),
+            (self.svc_req_intent(retried_data),
              const(stub_json_response({}, 201))),
             (log_intent(
                 "rcv3-bulk-request", {},
-                req_body=("jsonified", exp_data_retry)),
+                req_body=("jsonified", retried_data)),
              noop)
         ]
-        self.assertIsNone(perform_sequence(seq, r.bulk_add(_lb_node_pairs)))
+        self.assertIsNone(perform_sequence(seq, r.bulk_add(self.pairs)))
+
+    def test_all_already_member(self):
+        """
+        If bulk_add returns 409 with all attempted pairs as "lb node already
+        member" then it will return None
+        """
+        errors = {
+            "errors": [
+                node_already_member(lb, node) for lb, node in self.pairs
+            ]
+        }
+        seq = [
+            (self.svc_req_intent(self.data),
+             const(stub_json_response(errors, 409))),
+            (log_intent(
+                "rcv3-bulk-request", errors,
+                req_body=("jsonified", self.data)),
+             noop)
+        ]
+        self.assertIsNone(perform_sequence(seq, r.bulk_add(self.pairs)))
 
     def test_bulk_and_retry_error(self):
         """
@@ -269,24 +268,22 @@ class BulkAddTests(SynchronousTestCase):
         """
         errors = {
             "errors": [
-                _TEST_DATA[r._NODE_ALREADY_A_MEMBER_PATTERN][0][0],
-                _TEST_DATA[r._LB_INACTIVE_PATTERN][0][0]
+                node_already_member(self.lbs[0], self.nodes[0]),
+                lb_inactive(self.lbs[1])
             ]
         }
-        exp_data = self.data_eq(self.exp_data)
         seq = [
-            (self.svc_req_intent(exp_data),
+            (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors, req_body=("jsonified", exp_data)),
+                "rcv3-bulk-request", errors,
+                req_body=("jsonified", self.data)),
              noop)
         ]
         with self.assertRaises(r.BulkErrors) as ec:
-            perform_sequence(seq, r.bulk_add(self.lb_node_pairs))
+            perform_sequence(seq, r.bulk_add(self.pairs))
         self.assertEqual(
-            ec.exception.errors,
-            pset([r.LBInactive(
-                    _TEST_DATA[r._LB_INACTIVE_PATTERN][0][1]["lb_id"])]))
+            ec.exception.errors, pset([r.LBInactive(self.lbs[1])]))
 
     def test_unknown_errors(self):
         """
@@ -296,20 +293,20 @@ class BulkAddTests(SynchronousTestCase):
         errors = {
             "errors": [
                 "unknown error",
-                _TEST_DATA[r._LB_INACTIVE_PATTERN][0][0]
+                lb_inactive(self.lbs[0])
             ]
         }
-        exp_data = self.data_eq(self.exp_data)
         seq = [
-            (self.svc_req_intent(exp_data),
+            (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors, req_body=("jsonified", exp_data)),
+                "rcv3-bulk-request", errors,
+                req_body=("jsonified", self.data)),
              noop)
         ]
         self.assertRaises(
             r.UnknownBulkResponse, perform_sequence, seq,
-            r.bulk_add(self.lb_node_pairs))
+            r.bulk_add(self.pairs))
 
     def test_empty_errors(self):
         """
@@ -317,14 +314,190 @@ class BulkAddTests(SynchronousTestCase):
         is raised
         """
         errors = {"errors": []}
-        exp_data = self.data_eq(self.exp_data)
         seq = [
-            (self.svc_req_intent(exp_data),
+            (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors, req_body=("jsonified", exp_data)),
+                "rcv3-bulk-request", errors,
+                req_body=("jsonified", self.data)),
              noop)
         ]
         self.assertRaises(
             r.UnknownBulkResponse, perform_sequence, seq,
-            r.bulk_add(self.lb_node_pairs))
+            r.bulk_add(self.pairs))
+
+
+class BulkDeleteTests(RCv3Tests):
+    """
+    Tests for :func:`bulk_delete"
+    """
+
+    svc_req_intent = rcv3_svc_req_intent("DELETE", 204)
+
+    def test_success(self):
+        """
+        bulk_delete resulting in 204 returns Effect of None
+        """
+        seq = [
+            (self.svc_req_intent(self.data),
+             const(stub_json_response({}, 204))),
+            (log_intent(
+                "rcv3-bulk-request", {}, req_body=("jsonified", self.data)),
+             noop)
+        ]
+        self.assertIsNone(perform_sequence(seq, r.bulk_delete(self.pairs)))
+
+    def test_lb_inactive(self):
+        """
+        If bulk_delete returns 409 with only LB inactive errors then it raises
+        `BulkErrors` with LBInActive errors in it
+        """
+        errors = {
+            "errors": [
+                lb_inactive(self.lbs[0]), lb_inactive(self.lbs[1])
+            ]
+        }
+        seq = [
+            (self.svc_req_intent(self.data),
+             const(stub_json_response(errors, 409))),
+            (log_intent(
+                "rcv3-bulk-request", errors,
+                req_body=("jsonified", self.data)),
+             noop)
+        ]
+        with self.assertRaises(r.BulkErrors) as ec:
+            perform_sequence(seq, r.bulk_delete(self.pairs))
+        self.assertEqual(
+            ec.exception.errors,
+            pset([r.LBInactive(self.lbs[0]), r.LBInactive(self.lbs[1])])
+        )
+
+    def test_retries(self):
+        """
+        If bulk_delete only returns "server not a member", lb or server deleted
+        error(s) with 409 then other pairs are retried
+        """
+        errors = {
+            "errors": [
+                server_not_member(self.lbs[0], self.nodes[0]),
+                "Cloud Server {} does not exist".format(self.nodes[1]),
+                "Load Balancer Pool {} does not exist".format(self.lbs[2])
+            ]
+        }
+        lbr1 = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        noder1 = "a95ae0c4-6ab8-4873-b82f-f8433840cff2"
+        lbr2 = "e6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        noder2 = "e95ae0c4-6ab8-4873-b82f-f8433840cff2"
+        pairs = pset(
+            [(self.lbs[0], self.nodes[1]),  # test same server pairs
+             (self.lbs[2], self.nodes[0]),  # test same lb pairs
+             (lbr1, noder1), (lbr2, noder2)])
+        pairs = self.pairs | pairs
+        data = r._sorted_data(pairs)
+        retried_data = r._sorted_data([(lbr1, noder1), (lbr2, noder2)])
+        seq = [
+            (self.svc_req_intent(data),
+             const(stub_json_response(errors, 409))),
+            (log_intent(
+                "rcv3-bulk-request", errors, req_body=("jsonified", data)),
+             noop),
+            (self.svc_req_intent(retried_data),
+             const(stub_json_response({}, 204))),
+            (log_intent(
+                "rcv3-bulk-request", {},
+                req_body=("jsonified", retried_data)),
+             noop)
+        ]
+        self.assertIsNone(perform_sequence(seq, r.bulk_delete(pairs)))
+
+    def test_all_retries(self):
+        """
+        If bulk_delete returns "server not a member", lb or server deleted
+        for all attempted pairs then there is no retry and returns None
+        """
+        errors = {
+            "errors": [
+                server_not_member(self.lbs[0], self.nodes[0]),
+                "Cloud Server {} does not exist".format(self.nodes[1]),
+                "Load Balancer Pool {} does not exist".format(self.lbs[2])
+            ]
+        }
+        pairs = pset([
+            (self.lbs[0], self.nodes[1]),  # test same server pairs
+            (self.lbs[2], self.nodes[0])   # test same lb pairs
+        ])
+        pairs = self.pairs | pairs
+        data = r._sorted_data(pairs)
+        seq = [
+            (self.svc_req_intent(data),
+             const(stub_json_response(errors, 409))),
+            (log_intent(
+                "rcv3-bulk-request", errors, req_body=("jsonified", data)),
+             noop)
+        ]
+        self.assertIsNone(perform_sequence(seq, r.bulk_delete(pairs)))
+
+    def test_lb_inactive_and_retry_error(self):
+        """
+        If bulk_delete returns lb inactive along with any other errors then
+        there is no retry and BulkErrors is raised
+        """
+        errors = {
+            "errors": [
+                lb_inactive(self.lbs[0]),
+                server_not_member(self.lbs[1], self.nodes[1])
+            ]
+        }
+        seq = [
+            (self.svc_req_intent(self.data),
+             const(stub_json_response(errors, 409))),
+            (log_intent(
+                "rcv3-bulk-request", errors,
+                req_body=("jsonified", self.data)),
+             noop)
+        ]
+        with self.assertRaises(r.BulkErrors) as ec:
+            perform_sequence(seq, r.bulk_delete(self.pairs))
+        self.assertEqual(
+            ec.exception.errors, pset([r.LBInactive(self.lbs[0])]))
+
+    def test_unknown_errors(self):
+        """
+        If any of the errors returned with 409 are unknown then
+        `UnknownBulkResponse` is raised
+        """
+        errors = {
+            "errors": [
+                "unknown error",
+                lb_inactive(self.lbs[0])
+            ]
+        }
+        seq = [
+            (self.svc_req_intent(self.data),
+             const(stub_json_response(errors, 409))),
+            (log_intent(
+                "rcv3-bulk-request", errors,
+                req_body=("jsonified", self.data)),
+             noop)
+        ]
+        self.assertRaises(
+            r.UnknownBulkResponse, perform_sequence, seq,
+            r.bulk_delete(self.pairs))
+
+    def test_empty_errors(self):
+        """
+        If bulk_delete returns 409 with empty errors then `UnknownBulkResponse`
+        is raised
+        """
+        errors = {"errors": []}
+        seq = [
+            (self.svc_req_intent(self.data),
+             const(stub_json_response(errors, 409))),
+            (log_intent(
+                "rcv3-bulk-request", errors,
+                req_body=("jsonified", self.data)),
+             noop)
+        ]
+        self.assertRaises(
+            r.UnknownBulkResponse, perform_sequence, seq,
+            r.bulk_delete(self.pairs))

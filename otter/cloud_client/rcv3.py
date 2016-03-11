@@ -15,6 +15,13 @@ from otter.util.http import append_segments
 from otter.util.pure_http import has_code
 
 
+def _sorted_data(lb_node_pairs):
+    return sorted(
+        [{"cloud_server": {"id": node}, "load_balancer_pool": {"id": lb}}
+         for (lb, node) in lb_node_pairs],
+        key=lambda e: (e["load_balancer_pool"]["id"], e["cloud_server"]["id"]))
+
+
 def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
     """
     Creates a bulk request for RackConnect v3.0 load balancers.
@@ -29,9 +36,7 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
         node pairs.
     :rtype: :class:`Request`
     """
-    req_body = [{"cloud_server": {"id": node},
-                 "load_balancer_pool": {"id": lb}}
-                for (lb, node) in lb_node_pairs]
+    req_body = _sorted_data(lb_node_pairs)  # predictability for testing
     return service_request(
         ServiceType.RACKCONNECT_V3,
         method,
@@ -50,8 +55,8 @@ def _re(pattern):
     return re.compile(pattern.format(uuid=_UUID4_REGEX), re.IGNORECASE)
 
 
-_NODE_NOT_A_MEMBER_PATTERN = _re(
-    "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
+_SERVER_NOT_A_MEMBER_PATTERN = _re(
+    "Cloud Server (?P<server_id>{uuid}) is not a member of Load Balancer Pool "
     "(?P<lb_id>{uuid})")
 _NODE_ALREADY_A_MEMBER_PATTERN = _re(
     "Cloud Server (?P<node_id>{uuid}) is already a member of Load Balancer "
@@ -62,6 +67,8 @@ _LB_DOESNT_EXIST_PATTERN = _re(
     "Load Balancer Pool (?P<lb_id>{uuid}) does not exist")
 _SERVER_UNPROCESSABLE = _re(
     "Cloud Server (?P<server_id>{uuid}) is unprocessable")
+_SERVER_DOES_NOT_EXIST = _re(
+    "Cloud Server (?P<server_id>{uuid}) does not exist")
 
 
 class LBInactive(ExceptionWithMessage):
@@ -91,6 +98,16 @@ class ServerUnprocessableError(ExceptionWithMessage):
     def __init__(self, server_id):
         fmt = "Cloud server {} cannot be accessed when adding to RCv3 LB"
         super(ServerUnprocessableError, self).__init__(fmt.format(server_id))
+        self.server_id = server_id
+
+
+class NoSuchServerError(ExceptionWithMessage):
+    """
+    Cloud server does not exist
+    """
+    def __init__(self, server_id):
+        super(NoSuchServerError, self).__init__(
+            "Cloud server {} does not exist".format(server_id))
         self.server_id = server_id
 
 
@@ -167,6 +184,78 @@ def _check_bulk_add(attempted_pairs, result):
     if errors:
         raise BulkErrors(errors)
     elif exists:
-        return bulk_add(pset(attempted_pairs) - exists)
+        to_retry = pset(attempted_pairs) - exists
+        return bulk_add(to_retry) if to_retry else None
+    else:
+        raise UnknownBulkResponse(body)
+
+
+def bulk_delete(lb_node_pairs):
+    """
+    Bulk delete RCv3 LB Nodes. If RCv3 returns error about a pair not being
+    a member or server or lb not existing it retries the remaining pairs
+    *provided* there are no other errors.
+
+    Note: Ideally its outside the scope of this function to decide whether
+    to retry on LB and Server does not exist error. It should probably be a
+    parameter for this: lb_deleted_ok, server_deleted_ok?
+
+    :param list lb_node_pairs: List of (lb_id, node_id) tuples
+    :return: Effect of None when succeeds otherwise raises `BulkErrors` or
+        `UnknownBulkResponse`
+    """
+    eff = _rackconnect_bulk_request(lb_node_pairs, "DELETE",
+                                    success_pred=has_code(204, 409))
+    return eff.on(_check_bulk_delete(lb_node_pairs))
+
+
+@curry
+def _check_bulk_delete(attempted_pairs, result):
+    """
+    Checks if the RCv3 bulk delete command was successful.
+    """
+    response, body = result
+
+    if response.code == 204:  # All done!
+        return
+
+    errors = []
+    non_members = pset()
+    for error in body["errors"]:
+        match = _SERVER_NOT_A_MEMBER_PATTERN.match(error)
+        if match is not None:
+            pair = match.groupdict()
+            non_members = non_members.add((pair["lb_id"], pair["server_id"]))
+            continue
+
+        match = _LB_INACTIVE_PATTERN.match(error)
+        if match is not None:
+            errors.append(LBInactive(match.group("lb_id")))
+            continue
+
+        match = _LB_DOESNT_EXIST_PATTERN.match(error)
+        if match is not None:
+            del_lb_id = match.group("lb_id")
+            # consider all pairs with this LB to be removed
+            removed = [(lb_id, node_id) for lb_id, node_id in attempted_pairs
+                       if lb_id == del_lb_id]
+            non_members |= pset(removed)
+            continue
+
+        match = _SERVER_DOES_NOT_EXIST.match(error)
+        if match is not None:
+            del_server_id = match.group("server_id")
+            # consider all pairs with this server to be removed
+            removed = [(lb_id, node_id) for lb_id, node_id in attempted_pairs
+                       if node_id == del_server_id]
+            non_members |= pset(removed)
+        else:
+            raise UnknownBulkResponse(body)
+
+    if errors:
+        raise BulkErrors(errors)
+    elif non_members:
+        to_retry = pset(attempted_pairs) - non_members
+        return bulk_delete(to_retry) if to_retry else None
     else:
         raise UnknownBulkResponse(body)
