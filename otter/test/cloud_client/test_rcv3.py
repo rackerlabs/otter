@@ -175,14 +175,15 @@ class BulkAddTests(RCv3Tests):
         """
         bulk add resulting in 201 returns Effect of None
         """
+        resp = {"resp": "yo"}
         seq = [
             (self.svc_req_intent(self.data),
-             const(stub_json_response({}, 201))),
+             const(stub_json_response(resp, 201))),
             (log_intent(
-                "rcv3-bulk-request", {}, req_body=("jsonified", self.data)),
+                "rcv3-bulk-request", resp, req_body=("jsonified", self.data)),
              noop)
         ]
-        self.assertIsNone(perform_sequence(seq, r.bulk_add(self.pairs)))
+        self.assertEqual(perform_sequence(seq, r.bulk_add(self.pairs)), resp)
 
     def test_multiple_errors(self):
         """
@@ -225,6 +226,7 @@ class BulkAddTests(RCv3Tests):
         }
         retried_data = r._sorted_data(
             self.pairs - pset([(self.lbs[0], self.nodes[0])]))
+        resp = {"response": "yo"}
         seq = [
             (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
@@ -233,13 +235,13 @@ class BulkAddTests(RCv3Tests):
                 req_body=("jsonified", self.data)),
              noop),
             (self.svc_req_intent(retried_data),
-             const(stub_json_response({}, 201))),
+             const(stub_json_response(resp, 201))),
             (log_intent(
-                "rcv3-bulk-request", {},
+                "rcv3-bulk-request", resp,
                 req_body=("jsonified", retried_data)),
              noop)
         ]
-        self.assertIsNone(perform_sequence(seq, r.bulk_add(self.pairs)))
+        self.assertEqual(perform_sequence(seq, r.bulk_add(self.pairs)), resp)
 
     def test_all_already_member(self):
         """
@@ -338,14 +340,16 @@ class BulkDeleteTests(RCv3Tests):
         """
         bulk_delete resulting in 204 returns Effect of None
         """
+        resp = {"response": "yo!"}
         seq = [
             (self.svc_req_intent(self.data),
-             const(stub_json_response({}, 204))),
+             const(stub_json_response(resp, 204))),
             (log_intent(
-                "rcv3-bulk-request", {}, req_body=("jsonified", self.data)),
+                "rcv3-bulk-request", resp, req_body=("jsonified", self.data)),
              noop)
         ]
-        self.assertIsNone(perform_sequence(seq, r.bulk_delete(self.pairs)))
+        self.assertEqual(
+            perform_sequence(seq, r.bulk_delete(self.pairs)), resp)
 
     def test_lb_inactive(self):
         """
@@ -395,6 +399,7 @@ class BulkDeleteTests(RCv3Tests):
         pairs = self.pairs | pairs
         data = r._sorted_data(pairs)
         retried_data = r._sorted_data([(lbr1, noder1), (lbr2, noder2)])
+        success_resp = {"good": "response"}
         seq = [
             (self.svc_req_intent(data),
              const(stub_json_response(errors, 409))),
@@ -402,13 +407,14 @@ class BulkDeleteTests(RCv3Tests):
                 "rcv3-bulk-request", errors, req_body=("jsonified", data)),
              noop),
             (self.svc_req_intent(retried_data),
-             const(stub_json_response({}, 204))),
+             const(stub_json_response(success_resp, 204))),
             (log_intent(
-                "rcv3-bulk-request", {},
+                "rcv3-bulk-request", success_resp,
                 req_body=("jsonified", retried_data)),
              noop)
         ]
-        self.assertIsNone(perform_sequence(seq, r.bulk_delete(pairs)))
+        self.assertEqual(
+            perform_sequence(seq, r.bulk_delete(pairs)), success_resp)
 
     def test_all_retries(self):
         """

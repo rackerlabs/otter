@@ -138,7 +138,8 @@ def bulk_add(lb_node_pairs):
     errors
 
     :param list lb_node_pairs: List of (lb_id, node_id) tuples
-    :return: Effect of None when succeeds otherwise raises `BulkErrors` or
+    :return: Effect of response body ``dict`` when succeeds with 201 or None
+        when all pairs are already members. Otherwise raises `BulkErrors` or
         `UnknownBulkResponse`
     """
     eff = _rackconnect_bulk_request(lb_node_pairs, "POST",
@@ -154,7 +155,7 @@ def _check_bulk_add(attempted_pairs, result):
     response, body = result
 
     if response.code == 201:  # All done!
-        return
+        return body
 
     errors = []
     exists = pset()
@@ -202,7 +203,8 @@ def bulk_delete(lb_node_pairs):
     for this: lb_deleted_ok, server_deleted_ok?
 
     :param list lb_node_pairs: List of (lb_id, node_id) tuples
-    :return: Effect of None when succeeds otherwise raises `BulkErrors` or
+    :return: Effect of response body dict when succeeds or Effect of None if
+        all nodes are already deleted. Otherwise raises `BulkErrors` or
         `UnknownBulkResponse`
     """
     eff = _rackconnect_bulk_request(lb_node_pairs, "DELETE",
@@ -218,7 +220,7 @@ def _check_bulk_delete(attempted_pairs, result):
     response, body = result
 
     if response.code == 204:  # All done!
-        return
+        return body
 
     errors = []
     non_members = pset()
