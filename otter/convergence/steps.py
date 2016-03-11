@@ -15,7 +15,6 @@ from pyrsistent import PMap, PSet, freeze, pset, thaw
 import six
 
 from toolz.dicttoolz import dissoc, get_in
-from toolz.functoolz import curry
 
 from twisted.python.constants import NamedConstant
 
@@ -404,67 +403,17 @@ class BulkRemoveFromRCv3(object):
     :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
         connections to be removed.
     """
-    def _bare_effect(self):
-        """
-        Just the RCv3 bulk request effect, with no callbacks.
-        """
-        # While 409 isn't success, that has to be introspected by
-        # _rcv3_check_bulk_delete in order to recover from it.
-        return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE",
-                                         success_pred=has_code(204, 409))
-
     def as_effect(self):
         """
         Produce a :obj:`Effect` to remove some nodes from some RCv3 load
         balancers.
         """
-        eff = self._bare_effect()
-        return eff.on(partial(_rcv3_check_bulk_delete, self.lb_node_pairs))
-
-
-def _rcv3_check_bulk_delete(attempted_pairs, result):
-    """Checks if the RCv3 bulk deletion command was successful.
-
-    The request is considered successful if the response code indicated
-    unambiguous success, or the nodes we're trying to remove aren't on the
-    respective load balancers we're trying to remove them from, or if the load
-    balancers we're trying to remove from aren't active.
-
-    If a node wasn't on the load balancer we tried to remove it from, or a
-    load balancer we were supposed to remove things from wasn't active,
-    returns the next step to try and remove the remaining pairs. This is
-    necessary because RCv3 bulk requests are atomic-ish.
-
-    :param attempted_pairs: The (lb, node) pairs that were attempted to be
-        removed. This is the :attr:`lb_node_pairs` attribute of
-        :class:`BulkRemoveFromRCv3` instances.
-    :param result: The result of the :class:`ServiceRequest`. This should be a
-        2-tuple of the response object and the (parsed) body.
-    """
-    response, body = result
-
-    if response.code == 204:  # All done!
-        return StepResult.SUCCESS, []
-
-    to_retry = pset(attempted_pairs)
-    for error in body["errors"]:
-        match = _RCV3_NODE_NOT_A_MEMBER_PATTERN.match(error)
-        if match is not None:
-            to_retry -= pset([match.groups()[::-1]])
-
-        match = (_RCV3_LB_INACTIVE_PATTERN.match(error)
-                 or _RCV3_LB_DOESNT_EXIST_PATTERN.match(error))
-        if match is not None:
-            bad_lb_id, = match.groups()
-            to_retry = pset([(lb_id, node_id)
-                             for (lb_id, node_id) in to_retry
-                             if lb_id != bad_lb_id])
-
-    if to_retry:
-        next_step = BulkRemoveFromRCv3(lb_node_pairs=to_retry)
-        return next_step.as_effect()
-    else:
-        return StepResult.SUCCESS, []
+        eff = rcv3.bulk_delete(self.lb_node_pairs)
+        return eff.on(
+            success=lambda _: (StepResult.RETRY, [ErrorReason.String(
+                'must re-gather after RCv3 LB change in order to update the '
+                'active cache')]),
+            error=_failure_reporter(rcv3.BulkErrors))
 
 
 @implementer(IStep)

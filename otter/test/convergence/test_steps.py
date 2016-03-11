@@ -691,8 +691,7 @@ class RCv3BulkAddTests(SynchronousTestCase):
             (StepResult.RETRY, [
                 ErrorReason.String(
                     'must re-gather after LB add in order to update the '
-                    'active cache')]
-            )
+                    'active cache')])
         )
 
     def test_failures(self):
@@ -708,8 +707,7 @@ class RCv3BulkAddTests(SynchronousTestCase):
             (StepResult.FAILURE,
                 transform_eq(pset, pset([
                     ErrorReason.String(excp1.message),
-                    ErrorReason.String(excp2.message)]))
-            )
+                    ErrorReason.String(excp2.message)])))
         )
 
     def test_retries(self):
@@ -725,8 +723,7 @@ class RCv3BulkAddTests(SynchronousTestCase):
             (StepResult.RETRY,
                 transform_eq(pset, pset([
                     ErrorReason.String(excp1.message),
-                    ErrorReason.String(excp2.message)]))
-            )
+                    ErrorReason.String(excp2.message)])))
         )
 
     def test_failures_and_retries(self):
@@ -744,165 +741,60 @@ class RCv3BulkAddTests(SynchronousTestCase):
         )
 
 
-class RCv3CheckBulkDeleteTests(SynchronousTestCase):
+class RCv3BulkRemoveTests(SynchronousTestCase):
     """
-    Tests for :func:`_rcv3_check_bulk_delete`.
+    Tests for :obj:`BulkRemoveFromRCv3`
     """
-    def test_good_response(self):
+
+    def setUp(self):
+        from otter.convergence.steps import rcv3 as step_rcv3
+        self.patch(step_rcv3, "bulk_delete", intent_func("bd"))
+        self.pairs = pset([("l1", "n1"), ("l2", "n2")])
+        self.step = BulkRemoveFromRCv3(lb_node_pairs=self.pairs)
+
+    def test_success(self):
         """
-        If the response code indicates success, the response was successful.
+        Returns RETRY if rcv3.bulk_delete succeeds
         """
-        node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
-        lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+        seq = [(("bd", self.pairs), noop)]
+        self.assertEqual(
+            perform_sequence(seq, self.step.as_effect()),
+            (StepResult.RETRY, [ErrorReason.String(
+                'must re-gather after RCv3 LB change in order to update the '
+                'active cache')])
+        )
 
-        node_b_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
-        lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
-
-        pairs = [(lb_a_id, node_a_id), (lb_b_id, node_b_id)]
-
-        resp = StubResponse(204, {})
-        body = [{"cloud_server": {"id": node_id},
-                 "load_balancer_pool": {"id": lb_id}}
-                for (lb_id, node_id) in pairs]
-        res = _rcv3_check_bulk_delete(pairs, (resp, body))
-        self.assertEqual(res, (StepResult.SUCCESS, []))
-
-    def test_try_again(self):
+    def test_failure(self):
         """
-        If a node was already removed (or maybe was never part of the load
-        balancer pool to begin with), or some load balancer was
-        inactive, or one of the load balancers doesn't exist, returns
-        an effect that removes the remaining load balancer pairs.
+        Returns FAILURE if rcv3.bulk_delete raises BulkErrors
         """
-        # This little piggy isn't even on this load balancer.
-        node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
-        lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
+        terminals = (rcv3.BulkErrors([rcv3.LBInactive("l1")]),
+                     APIError(code=403, body="You're out of luck."),
+                     APIError(code=422, body="Oh look another 422."))
+        eff = self.step.as_effect()
+        for exc in terminals:
+            seq = [(("bd", self.pairs), lambda i: raise_(exc))]
+            self.assertEqual(
+                perform_sequence(seq, eff),
+                (StepResult.FAILURE, [
+                    ErrorReason.Exception((type(exc), exc, ANY))])
+            )
 
-        # This little piggy is going to be removed from this load balancer.
-        node_b_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
-        lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
-
-        # This little piggy isn't active!
-        node_c_id = '08944038-80ba-4ae1-a188-c827444e02e2'
-        lb_c_id = '150895a5-1aa7-45b7-b7a4-98b9c282f800'
-
-        # This isn't even a little piggy!
-        node_d_id = 'bc1e94c3-0c88-4828-9e93-d42259280987'
-        lb_d_id = 'de52879e-1f84-4ecd-8988-91dfdc99570d'
-
-        seq = [
-            (service_request(
-                service_type=ServiceType.RACKCONNECT_V3,
-                method="DELETE",
-                url='load_balancer_pools/nodes',
-                data=[
-                    {'load_balancer_pool': {'id': lb_b_id},
-                     'cloud_server': {'id': node_b_id}}],
-                success_pred=has_code(204, 409)).intent,
-             lambda _: (StubResponse(204, {}), None)),
-        ]
-
-        body = {"errors":
-                ["Node {node_id} is not a member of Load Balancer "
-                 "Pool {lb_id}".format(node_id=node_a_id, lb_id=lb_a_id),
-                 "Load Balancer Pool {lb_id} is not in an ACTIVE state"
-                 .format(lb_id=lb_c_id),
-                 "Load Balancer Pool {lb_id} does not exist"
-                 .format(lb_id=lb_d_id)]}
-
-        eff = _rcv3_check_bulk_delete(
-            [(lb_a_id, node_a_id),
-             (lb_b_id, node_b_id),
-             (lb_c_id, node_c_id),
-             (lb_d_id, node_d_id)],
-            (StubResponse(409, {}), body))
-
-        self.assertEqual(perform_sequence(seq, eff), (StepResult.SUCCESS, []))
-
-    def test_nothing_to_retry(self):
+    def test_other_errors(self):
         """
-        If there are no further pairs to try and remove, the request was
-        successful.
-
-        This is similar to other tests, except that it tests the
-        combination of all of them, even if there are several (load
-        balancer, node) pairs for each reason.
+        Any error other than `BulkErrors` results in RETRY
         """
-        node_a_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
-        lb_a_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
-
-        node_b_id = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
-        lb_b_id = 'd95ae0c4-6ab8-4873-b82f-f8433840cff2'
-
-        node_c_id = '08944038-80ba-4ae1-a188-c827444e02e2'
-        lb_c_id = '150895a5-1aa7-45b7-b7a4-98b9c282f800'
-
-        node_d_id = 'bc1e94c3-0c88-4828-9e93-d42259280987'
-        lb_d_id = 'de52879e-1f84-4ecd-8988-91dfdc99570d'
-
-        not_a_member_pairs = [(lb_a_id, node_a_id), (lb_b_id, node_b_id)]
-        inactive_pairs = [(lb_c_id, node_c_id)]
-        nonexistent_lb_pairs = [(lb_d_id, node_d_id)]
-        all_pairs = not_a_member_pairs + inactive_pairs + nonexistent_lb_pairs
-
-        resp = StubResponse(409, {})
-        body = {"errors":
-                ["Node {node_id} is not a member of Load Balancer "
-                 "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)
-                 for (lb_id, node_id) in not_a_member_pairs] +
-                ["Load Balancer Pool {} is not in an ACTIVE state"
-                 .format(lb_id) for (lb_id, _node_id)
-                 in inactive_pairs] +
-                ["Load Balancer Pool {} does not exist"
-                 .format(lb_id) for (lb_id, _node_id)
-                 in nonexistent_lb_pairs]}
-        result = _rcv3_check_bulk_delete(all_pairs, (resp, body))
-        self.assertEqual(result, (StepResult.SUCCESS, []))
-
-    def test_inactive_lb(self):
-        """
-        If the load balancer pool is inactive, the response was successful.
-        """
-        node_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
-        inactive_lb_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
-        pairs = [(inactive_lb_id, node_id)]
-
-        resp = StubResponse(409, {})
-        body = {"errors": ["Load Balancer Pool {} is not in an ACTIVE state"
-                           .format(inactive_lb_id)]}
-        result = _rcv3_check_bulk_delete(pairs, (resp, body))
-        self.assertEqual(result, (StepResult.SUCCESS, []))
-
-    def test_lb_does_not_exist(self):
-        """
-        If the load balancer doesn't even exist, the delete was successful.
-        """
-        node_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
-        nonexistent_lb_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
-
-        pairs = [(nonexistent_lb_id, node_id)]
-
-        resp = StubResponse(409, {})
-        body = {"errors": ["Load Balancer Pool {} does not exist"
-                           .format(nonexistent_lb_id)]}
-        result = _rcv3_check_bulk_delete(pairs, (resp, body))
-        self.assertEqual(result, (StepResult.SUCCESS, []))
-
-    def test_node_not_a_member(self):
-        """
-        If the nodes are already not member of the load balancer pools
-        they're being removed from, the response was successful.
-        """
-        node_id = '825b8c72-9951-4aff-9cd8-fa3ca5551c90'
-        lb_id = '2b0e17b6-0429-4056-b86c-e670ad5de853'
-        pairs = [(lb_id, node_id)]
-
-        resp = StubResponse(409, {})
-        body = {"errors": [
-            "Node {node_id} is not a member of Load Balancer "
-            "Pool {lb_id}".format(node_id=node_id, lb_id=lb_id)]}
-        result = _rcv3_check_bulk_delete(pairs, (resp, body))
-        self.assertEqual(result, (StepResult.SUCCESS, []))
+        non_terminals = (ValueError("internal"),
+                         APIError(code=500, body="why?"),
+                         APIError(code=503, body="bad service"))
+        eff = self.step.as_effect()
+        for exc in non_terminals:
+            seq = [(("bd", self.pairs), lambda i: raise_(exc))]
+            self.assertEqual(
+                perform_sequence(seq, eff),
+                (StepResult.RETRY, [
+                    ErrorReason.Exception((type(exc), exc, ANY))])
+            )
 
 
 class ConvergeLaterTests(SynchronousTestCase):
