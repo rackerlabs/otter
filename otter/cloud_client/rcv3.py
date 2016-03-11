@@ -194,11 +194,12 @@ def bulk_delete(lb_node_pairs):
     """
     Bulk delete RCv3 LB Nodes. If RCv3 returns error about a pair not being
     a member or server or lb not existing it retries the remaining pairs
-    *provided* there are no other errors.
+    *provided* there are no LBInactive errors. Otherwise `BulkErrors` with
+    `LBInactive` errors in it is raised
 
-    Note: Ideally its outside the scope of this function to decide whether
-    to retry on LB and Server does not exist error. It should probably be a
-    parameter for this: lb_deleted_ok, server_deleted_ok?
+    TODO: Ideally its outside the scope of this function to decide whether
+    to retry on LB and Server does not exist error. There should be a parameter
+    for this: lb_deleted_ok, server_deleted_ok?
 
     :param list lb_node_pairs: List of (lb_id, node_id) tuples
     :return: Effect of None when succeeds otherwise raises `BulkErrors` or
