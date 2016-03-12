@@ -7,14 +7,11 @@ from effect import Effect
 
 from pyrsistent import pset
 
-from toolz.functoolz import curry
-
 from txeffect import perform
 
 from otter.cloud_client import TenantScope, rcv3 as cc_rcv3
 
 
-@curry
 def _generic_rcv3_request(operation, request_bag, lb_id, server_id):
     """
     Perform a generic RCv3 bulk operation on a single (lb, server) pair.
