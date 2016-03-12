@@ -1,6 +1,4 @@
 """Steps for convergence."""
-import re
-from functools import partial
 from uuid import uuid4
 
 import attr
