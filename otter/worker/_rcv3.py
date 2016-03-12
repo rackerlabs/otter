@@ -3,8 +3,6 @@
 
 At some point, this should just be moved into that module.
 """
-from operator import itemgetter
-
 from effect import Effect
 
 from pyrsistent import pset
@@ -13,7 +11,7 @@ from toolz.functoolz import curry
 
 from txeffect import perform
 
-from otter.cloud_client import TenantScope, rcv3
+from otter.cloud_client import TenantScope, rcv3 as cc_rcv3
 
 
 @curry
@@ -31,9 +29,14 @@ def _generic_rcv3_request(operation, request_bag, lb_id, server_id):
     """
     eff = operation(pset([(lb_id, server_id)]))
     scoped = Effect(TenantScope(eff, request_bag.tenant_id))
-    d = perform(request_bag.dispatcher, scoped)
-    return d.addCallback(itemgetter(1))
+    return perform(request_bag.dispatcher, scoped)
 
 
-add_to_rcv3 = _generic_rcv3_request(rcv3.bulk_add)
-remove_from_rcv3 = _generic_rcv3_request(rcv3.bulk_delete)
+def add_to_rcv3(request_bag, lb_id, server_id):
+    return _generic_rcv3_request(cc_rcv3.bulk_add, request_bag,
+                                 lb_id, server_id)
+
+
+def remove_from_rcv3(request_bag, lb_id, server_id):
+    return _generic_rcv3_request(cc_rcv3.bulk_delete, request_bag,
+                                 lb_id, server_id)

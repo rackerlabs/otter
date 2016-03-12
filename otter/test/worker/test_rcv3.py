@@ -5,20 +5,16 @@ from uuid import uuid4
 
 from characteristic import attributes
 
-from effect import Effect
 from effect.testing import SequenceDispatcher
 
 import mock
 
 from pyrsistent import pset
 
-from twisted.internet.defer import succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import TenantScope
-from otter.constants import ServiceType
-from otter.test.utils import StubResponse, intent_func, nested_sequence
-from otter.util.pure_http import has_code
+from otter.test.utils import intent_func, nested_sequence
 from otter.worker import _rcv3
 
 
@@ -55,27 +51,25 @@ class RCv3Tests(SynchronousTestCase):
         Set up :class:`RCv3Tests`.
         """
         self.reactor = object()
-        self.patch(_rcv3.rcv3, "bulk_add", intent_func("ba"))
-        self.patch(_rcv3.rcv3, "bulk_delete", intent_func("bd"))
-        disp = SequenceDispatcher([
+        self.patch(_rcv3.cc_rcv3, "bulk_add", intent_func("ba"))
+        self.patch(_rcv3.cc_rcv3, "bulk_delete", intent_func("bd"))
+
+    def dispatcher(self, operation, resp):
+        return SequenceDispatcher([
             (TenantScope(mock.ANY, "tid"),
              nested_sequence([
-                 (("ba", pset([("lb_id", "server_id")])),
-                  lambda i: (StubResponse(201, {}),
-                             _rcv3_add_response_body("lb_id", "server_id")))
-             ])
-            )
+                 ((operation, pset([("lb_id", "server_id")])), lambda i: resp)
+             ]))
         ])
-        self.request_bag = _RequestBag(dispatcher=disp, tenant_id="tid")
-        #self.post_result = (StubResponse(201, {}),
-        #                    _rcv3_add_response_body("lb_id", "server_id"))
-        self.del_result = StubResponse(204, {}), None
 
     def test_add_to_rcv3(self):
         """
         :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
         """
-        d = _rcv3.add_to_rcv3(self.request_bag, "lb_id", "server_id")
+        disp = self.dispatcher(
+            "ba", _rcv3_add_response_body("lb_id", "server_id"))
+        request_bag = _RequestBag(dispatcher=disp, tenant_id="tid")
+        d = _rcv3.add_to_rcv3(request_bag, "lb_id", "server_id")
         (add_result,) = self.successResultOf(d)
         self.assertEqual(add_result["cloud_server"], {"id": "server_id"})
         self.assertEqual(add_result["load_balancer_pool"], {"id": "lb_id"})
@@ -84,5 +78,7 @@ class RCv3Tests(SynchronousTestCase):
         """
         :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
         """
-        d = _rcv3.remove_from_rcv3(self.request_bag, "lb_id", "server_id")
+        disp = self.dispatcher("bd", None)
+        request_bag = _RequestBag(dispatcher=disp, tenant_id="tid")
+        d = _rcv3.remove_from_rcv3(request_bag, "lb_id", "server_id")
         self.assertIdentical(self.successResultOf(d), None)
