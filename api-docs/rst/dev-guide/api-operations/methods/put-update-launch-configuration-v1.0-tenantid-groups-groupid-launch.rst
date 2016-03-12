@@ -169,6 +169,13 @@ This table shows the body parameters for the request:
 |                               |             |Rackspace Support after they configure your load   |
 |                               |             |balancer pool.                                     |
 +-------------------------------+-------------+---------------------------------------------------+
+|args.\ **draining_timeout**    |Integer      |Specifies the number of seconds for which the      |
+|                               |*(Optional)* |cloud load balancer node associated with the server|
+|                               |             |that is being deleted will be put in DRAINING mode |
+|                               |             |before the node is actually being deleted followed |
+|                               |             |by the server. Must be between 30 and 3600         |
+|                               |             |inclusive.                                         |
++-------------------------------+-------------+---------------------------------------------------+
 |args.\ **server**              |Object       |The attributes that Auto Scale uses to create a    |
 |                               |*(Required)* |new server. For more information, see `Create      |
 |                               |             |Servers                                            |
@@ -230,7 +237,8 @@ This table shows the body parameters for the request:
                "loadBalancerId":2200,
                "port":8081
             }
-         ]
+         ],
+        "draining_timeout": 30
       }
    }
 

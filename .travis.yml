@@ -11,13 +11,10 @@ cache:
 
 install:
     - pip install -U pip wheel
-    - pip install -r dev_requirements.txt
-    - pip install -r requirements.txt
-    - pip install coveralls
+    - pip install -r requirements.txt -r dev_requirements.txt coveralls
 
 script:
     - make lint-code
-    - make docbook
     - make coverage
 
 after_script:

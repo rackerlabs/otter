@@ -19,7 +19,7 @@ from otter.integration.lib.trial_tools import (
     get_identity,
     get_resource_mapping,
     region,
-    skip_me)
+    timeout)
 
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.http import check_success, headers
@@ -83,7 +83,7 @@ class TestLaunchStack(unittest.TestCase):
                 .addCallback(check_success, [200])
                 .addCallback(self.helper.treq.json_content))
 
-    def wait_for_stack_list(self, expected_states, timeout=60, period=10):
+    def wait_for_stack_list(self, expected_states, timeout=180, period=10):
         def check(content):
             states = pbag([s['stack_status'] for s in content['stacks']])
             if not (states == expected_states):
@@ -112,7 +112,7 @@ class TestLaunchStack(unittest.TestCase):
                 "Waiting for group {} to reach state {}".format(
                     self.group.group_id, str(expected_states))))
 
-    @skip_me('Due to https://github.com/rackerlabs/mimic/issues/513')
+    @timeout(180 * 3 + 10)
     @inlineCallbacks
     def test_create(self):
         """

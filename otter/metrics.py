@@ -20,8 +20,9 @@ from effect.do import do
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in
-from toolz.dicttoolz import merge
+from toolz.dicttoolz import keyfilter, merge
 from toolz.functoolz import compose, flip
+from toolz.itertoolz import groupby
 
 from twisted.application.internet import TimerService
 from twisted.application.service import Service
@@ -34,13 +35,14 @@ from txeffect import exc_info_to_failure, perform
 from otter.auth import generate_authenticator
 from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType, get_service_configs
+from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.gathering import get_all_scaling_group_servers
 from otter.convergence.model import (
     NovaServer, ServerState, group_id_from_metadata)
 from otter.effect_dispatcher import get_legacy_dispatcher, get_log_dispatcher
 from otter.log import log as otter_log
 from otter.models.cass import CassScalingGroupCollection
-from otter.models.intents import GetAllGroups, get_model_dispatcher
+from otter.models.intents import GetAllValidGroups, get_model_dispatcher
 from otter.util.fp import partition_bool
 
 
@@ -163,15 +165,16 @@ def calc_total(group_metrics):
 
 
 @do
-def add_to_cloud_metrics(ttl, region, group_metrics, no_tenants, log=None,
-                         _print=False):
+def add_to_cloud_metrics(ttl, region, group_metrics, num_tenants, config,
+                         log=None, _print=False):
     """
     Add total number of desired, actual and pending servers of a region
     to Cloud metrics.
 
     :param str region: which region's metric is collected
     :param group_metrics: List of :obj:`GroupMetric`
-    :param int no_tenants: total number of tenants
+    :param int num_tenants: total number of tenants
+    :param dict config: Config json dict containing convergence tenants info
     :param log: Optional logger
     :param bool _print: Should it print activity on stdout? Useful when running
         as a script
@@ -192,12 +195,23 @@ def add_to_cloud_metrics(ttl, region, group_metrics, no_tenants, log=None,
             total.desired, total.actual, total.pending))
 
     metrics = [('desired', total.desired), ('actual', total.actual),
-               ('pending', total.pending), ('tenants', no_tenants),
+               ('pending', total.pending), ('tenants', num_tenants),
                ('groups', len(group_metrics))]
     for tenant_id, metric in sorted(tenanted_metrics.items()):
         metrics.append(("{}.desired".format(tenant_id), metric.desired))
         metrics.append(("{}.actual".format(tenant_id), metric.actual))
         metrics.append(("{}.pending".format(tenant_id), metric.pending))
+
+    # convergence tenants desired and actual
+    conv_tenants = keyfilter(
+        partial(tenant_is_enabled,
+                get_config_value=lambda k: get_in([k], config)),
+        tenanted_metrics)
+    conv_desired = sum(m.desired for m in conv_tenants.itervalues())
+    conv_actual = sum(m.actual for m in conv_tenants.itervalues())
+    metrics.extend(
+        [("conv_desired", conv_desired), ("conv_actual", conv_actual),
+         ("conv_divergence", conv_desired - conv_actual)])
 
     data = [merge(metric_part,
                   {'metricValue': value,
@@ -251,8 +265,11 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     dispatcher = get_dispatcher(reactor, authenticator, log,
                                 get_service_configs(config), store)
 
-    # calculate metrics
-    tenanted_groups = yield perform(dispatcher, Effect(GetAllGroups()))
+    # calculate metrics on launch_server groups
+    groups = yield perform(dispatcher, Effect(GetAllValidGroups()))
+    groups = [g for g in groups
+              if json.loads(g["launch_config"]).get("type") == "launch_server"]
+    tenanted_groups = groupby(lambda g: g["tenantId"], groups)
     group_metrics = yield get_all_metrics(
         dispatcher, tenanted_groups, log, _print=_print)
 
@@ -261,7 +278,7 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     if metr_conf is not None:
         eff = add_to_cloud_metrics(
             metr_conf['ttl'], config['region'], group_metrics,
-            len(tenanted_groups), log, _print)
+            len(tenanted_groups), config, log, _print)
         eff = Effect(TenantScope(eff, metr_conf['tenant_id']))
         yield perform(dispatcher, eff)
         log.msg('added to cloud metrics')
@@ -270,7 +287,8 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     if _print:
         group_metrics.sort(key=lambda g: abs(g.desired - g.actual),
                            reverse=True)
-        print('groups sorted as per divergence', *group_metrics, sep='\n')
+        print('groups sorted as per divergence')
+        print('\n'.join(map(str, group_metrics)))
 
     # Disconnect only if we created the client
     if not client:

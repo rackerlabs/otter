@@ -1,4 +1,4 @@
-.. _delete-scaling-group:
+.. _delete-a-scaling-group:
 
 Delete a scaling group
 ~~~~~~~~~~~~~~~~~~~~~~

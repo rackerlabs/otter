@@ -87,7 +87,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
             # ahead of time.  We don't actually use these servers for anything,
             # except to verify that Autoscale doesn't affect them in any way.
             # We create a group and some servers in that group here.
-            init_group_name = rand_name('as_rcv3_test-back')
+            init_group_name = rand_name('autoscale_rcv3_test-back')
             background_group_resp = (
                 cls.autoscale_behaviors.create_scaling_group_given(
                     gc_name=init_group_name,
@@ -819,7 +819,7 @@ class AutoscaleRackConnectFixture(AutoscaleFixture):
         """
         group_min = group_min or self.gc_min_entities
 
-        self.gc_name = rand_name('as_rcv3_test-group')
+        self.gc_name = rand_name('autoscale_rcv3_test-group')
         self.gc_max_entities = 10
         self.gc_metadata = {'gc_meta_key_1': 'gc_meta_value_1',
                             'gc_meta_key_2': 'gc_meta_value_2'}
