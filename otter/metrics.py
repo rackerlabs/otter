@@ -234,7 +234,6 @@ def connect_cass_servers(reactor, config):
 def get_dispatcher(reactor, authenticator, log, service_configs, store):
     return ComposedDispatcher([
         get_legacy_dispatcher(reactor, authenticator, log, service_configs),
-        get_log_dispatcher(log, {}),
         get_model_dispatcher(log, store)
     ])
 
