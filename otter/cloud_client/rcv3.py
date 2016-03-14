@@ -43,7 +43,7 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
         append_segments("load_balancer_pools", "nodes"),
         data=req_body,
         success_pred=success_pred).on(
-            log_success_response("rcv3-bulk-request", identity,
+            log_success_response("request-rcv3-bulk", identity,
                                  request_body=json.dumps(req_body)))
 
 

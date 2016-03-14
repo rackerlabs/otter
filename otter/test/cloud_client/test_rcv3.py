@@ -180,7 +180,7 @@ class BulkAddTests(RCv3Tests):
             (self.svc_req_intent(self.data),
              const(stub_json_response(resp, 201))),
             (log_intent(
-                "rcv3-bulk-request", resp, req_body=("jsonified", self.data)),
+                "request-rcv3-bulk", resp, req_body=("jsonified", self.data)),
              noop)
         ]
         self.assertEqual(perform_sequence(seq, r.bulk_add(self.pairs)), resp)
@@ -201,7 +201,7 @@ class BulkAddTests(RCv3Tests):
             (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors,
+                "request-rcv3-bulk", errors,
                 req_body=("jsonified", self.data)),
              noop)
         ]
@@ -231,13 +231,13 @@ class BulkAddTests(RCv3Tests):
             (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors,
+                "request-rcv3-bulk", errors,
                 req_body=("jsonified", self.data)),
              noop),
             (self.svc_req_intent(retried_data),
              const(stub_json_response(resp, 201))),
             (log_intent(
-                "rcv3-bulk-request", resp,
+                "request-rcv3-bulk", resp,
                 req_body=("jsonified", retried_data)),
              noop)
         ]
@@ -257,7 +257,7 @@ class BulkAddTests(RCv3Tests):
             (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors,
+                "request-rcv3-bulk", errors,
                 req_body=("jsonified", self.data)),
              noop)
         ]
@@ -278,7 +278,7 @@ class BulkAddTests(RCv3Tests):
             (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors,
+                "request-rcv3-bulk", errors,
                 req_body=("jsonified", self.data)),
              noop)
         ]
@@ -302,7 +302,7 @@ class BulkAddTests(RCv3Tests):
             (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors,
+                "request-rcv3-bulk", errors,
                 req_body=("jsonified", self.data)),
              noop)
         ]
@@ -320,7 +320,7 @@ class BulkAddTests(RCv3Tests):
             (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors,
+                "request-rcv3-bulk", errors,
                 req_body=("jsonified", self.data)),
              noop)
         ]
@@ -345,7 +345,7 @@ class BulkDeleteTests(RCv3Tests):
             (self.svc_req_intent(self.data),
              const(stub_json_response(resp, 204))),
             (log_intent(
-                "rcv3-bulk-request", resp, req_body=("jsonified", self.data)),
+                "request-rcv3-bulk", resp, req_body=("jsonified", self.data)),
              noop)
         ]
         self.assertEqual(
@@ -365,7 +365,7 @@ class BulkDeleteTests(RCv3Tests):
             (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors,
+                "request-rcv3-bulk", errors,
                 req_body=("jsonified", self.data)),
              noop)
         ]
@@ -404,12 +404,12 @@ class BulkDeleteTests(RCv3Tests):
             (self.svc_req_intent(data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors, req_body=("jsonified", data)),
+                "request-rcv3-bulk", errors, req_body=("jsonified", data)),
              noop),
             (self.svc_req_intent(retried_data),
              const(stub_json_response(success_resp, 204))),
             (log_intent(
-                "rcv3-bulk-request", success_resp,
+                "request-rcv3-bulk", success_resp,
                 req_body=("jsonified", retried_data)),
              noop)
         ]
@@ -438,7 +438,7 @@ class BulkDeleteTests(RCv3Tests):
             (self.svc_req_intent(data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors, req_body=("jsonified", data)),
+                "request-rcv3-bulk", errors, req_body=("jsonified", data)),
              noop)
         ]
         self.assertIsNone(perform_sequence(seq, r.bulk_delete(pairs)))
@@ -458,7 +458,7 @@ class BulkDeleteTests(RCv3Tests):
             (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors,
+                "request-rcv3-bulk", errors,
                 req_body=("jsonified", self.data)),
              noop)
         ]
@@ -482,7 +482,7 @@ class BulkDeleteTests(RCv3Tests):
             (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors,
+                "request-rcv3-bulk", errors,
                 req_body=("jsonified", self.data)),
              noop)
         ]
@@ -500,7 +500,7 @@ class BulkDeleteTests(RCv3Tests):
             (self.svc_req_intent(self.data),
              const(stub_json_response(errors, 409))),
             (log_intent(
-                "rcv3-bulk-request", errors,
+                "request-rcv3-bulk", errors,
                 req_body=("jsonified", self.data)),
              noop)
         ]
