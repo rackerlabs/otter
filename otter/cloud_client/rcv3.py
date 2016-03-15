@@ -50,13 +50,18 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
 _UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
                 "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
 
+# https://github.com/rackerlabs/mimic/issues/566
+_MIMIC_SERVER = "test-server[0-9]{10}-id-[0-9]{10}"
+
+_SERVER_REGEX = "{}|{}".format(_UUID4_REGEX, _MIMIC_SERVER)
+
 
 def _re(pattern):
-    return re.compile(pattern.format(uuid=_UUID4_REGEX), re.IGNORECASE)
+    return re.compile(pattern.format(uuid=_SERVER_REGEX), re.IGNORECASE)
 
 
 _SERVER_NOT_A_MEMBER_PATTERN = _re(
-    "Cloud Server (?P<server_id>{uuid}) is not a member of Load Balancer Pool "
+    "Cloud Server (?P<server_id>.+) is not a member of Load Balancer Pool "
     "(?P<lb_id>{uuid})")
 _NODE_ALREADY_A_MEMBER_PATTERN = _re(
     "Cloud Server (?P<node_id>{uuid}) is already a member of Load Balancer "

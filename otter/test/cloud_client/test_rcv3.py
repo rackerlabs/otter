@@ -27,7 +27,11 @@ _TEST_DATA = {
         ('Cloud Server D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is not a member of'
          ' Load Balancer Pool D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
          {'lb_id': 'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
-          'server_id': 'D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2'})
+          'server_id': 'D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2'}),
+        ('Cloud Server test-server5260830393-id-5260830393 is not a member of'
+         ' Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2',
+         {'lb_id': 'd95ae0c4-6ab8-4873-b82f-f8433840cff2',
+          'server_id': 'test-server5260830393-id-5260830393'})
     ],
     r._NODE_ALREADY_A_MEMBER_PATTERN: [
         ('Cloud Server d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2 is already '
@@ -39,7 +43,12 @@ _TEST_DATA = {
          'a member of Load Balancer Pool '
          'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
          {'lb_id': 'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
-          'node_id': 'D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2'})
+          'node_id': 'D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2'}),
+        ('Cloud Server test-server5260830393-id-5260830393 is already '
+         'a member of Load Balancer Pool '
+         'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
+         {'lb_id': 'D95AE0C4-6AB8-4873-B82F-F8433840CFF2',
+          'node_id': 'test-server5260830393-id-5260830393'})
     ],
     r._LB_INACTIVE_PATTERN: [
         ('Load Balancer Pool d95ae0c4-6ab8-4873-b82f-f8433840cff2 is '
@@ -61,7 +70,9 @@ _TEST_DATA = {
         ("Cloud Server d95ae0c4-6ab8-4873-b82f-f8433840cff2 is unprocessable ",
          {"server_id": "d95ae0c4-6ab8-4873-b82f-f8433840cff2"}),
         ("Cloud Server D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2 is unprocessable ",
-         {"server_id": "D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2"})
+         {"server_id": "D6D3AA7C-DFA5-4E61-96EE-1D54AC1075D2"}),
+        ("Cloud Server test-server5260830393-id-5260830393 is unprocessable ",
+         {"server_id": "test-server5260830393-id-5260830393"})
     ]
 }
 
