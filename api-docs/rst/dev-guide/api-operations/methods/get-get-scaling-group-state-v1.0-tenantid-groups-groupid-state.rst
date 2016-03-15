@@ -24,7 +24,9 @@ The *GroupState* object consists of the following properties:
 *  *activeCapacity*. Integer. Specifies the number of active servers in the group.
 *  *desiredCapacity*. Integer. Specifies the number of servers that are desired in the scaling group.
 *  *status*. String. This value can be set to either ACTIVE or ERROR. If *status* is set to ACTIVE, the scaling group is converging, if *status* is set to ERROR, it implies that Autoscale has stopped converging due to an irrecoverable error.
-*  *errors*. List of objects. This list is provided if *status* is set to ERROR. It contains a list of JSON objects with each object containing a message property that describes the error in human readable format.
+*  *errors*. List of objects. This list is provided if *status* is set to ERROR.
+   It contains a list of JSON objects with each object containing a message property
+   that describes the error in human readable format.
 
 
 This operation retrieves the current state of the specified scaling group. It describes the state of the group in terms of its current set of active entities, the number of pending entities, and the desired number of entities. The description is returned in the response body in JSON format.
