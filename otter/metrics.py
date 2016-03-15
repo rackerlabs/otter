@@ -39,7 +39,7 @@ from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.gathering import get_all_scaling_group_servers
 from otter.convergence.model import (
     NovaServer, ServerState, group_id_from_metadata)
-from otter.effect_dispatcher import get_legacy_dispatcher, get_log_dispatcher
+from otter.effect_dispatcher import get_legacy_dispatcher
 from otter.log import log as otter_log
 from otter.models.cass import CassScalingGroupCollection
 from otter.models.intents import GetAllValidGroups, get_model_dispatcher
