@@ -14,18 +14,26 @@ This operation retrieves the current state of a scaling group.
 The *GroupState* object consists of the following properties:
 
 
-*  *paused*. Specifies whether execution of scaling policies for the group is currently suspended. If this value
-   is set to TRUE, the group will not scale up or down. All scheduled and API-generated policy executions are suspended, and convergence will
-   not be triggered while this value is set to TRUE. Any *POST* calls to the :ref:`/converge <post-create-scaling-group-v1.1-tenantid-converge>` operation and any *POST* calls to the :ref:`/execute <post-execute-policy-v1.0-tenantid-groups-groupid-policies-policyid-execute>`
-   operation will error with a `403GroupPausedError` error message if convergence is paused. If this value is set FALSE, all scaling and convergence activities, as well as all policy execution calls are resumed.
+*  *paused*. If ``paused=TRUE``, the group does not scale up or down. All
+   scheduled or API-generated policy operations are suspended, and convergence
+   is not triggered. When the group is paused, any POST requests to
+   :ref:`converge <trigger-convergence>` or
+   :ref:`execute policy <execute-policye>`
+   operations return a ``403 GroupPausedError`` response.
+   If ``paused=FALSE``, all group scaling and convergence operations resume and
+   scheduled or API-generated policy exectuions are allowed.
 *  *pendingCapacity*. Integer. Specifies the number of servers that are in a "building" state.
 *  *name*. Specifies the name of the group.
 *  *active*. Specifies an array of active servers in the group. This array includes the server Id, as well as other data.
 *  *activeCapacity*. Integer. Specifies the number of active servers in the group.
 *  *desiredCapacity*. Integer. Specifies the number of servers that are desired in the scaling group.
-*  *status*. String. This value can be set to either ACTIVE or ERROR. If *status* is set to ACTIVE, the scaling group is converging, if *status* is set to ERROR, it implies that Autoscale has stopped converging due to an irrecoverable error.
-*  *errors*. List of objects. This list is provided if *status* is set to ERROR.
-   It contains a list of JSON objects with each object containing a message property
+*  *status*. String. Indicates the scaling group status. If ``status=ACTIVE``,
+   the scaling group is healthy and actively scaling up and down on request.
+   If ``status=ERROR``, the scaling group cannot complete scaling operation
+   requests successfully, typically due to an unrecoverable error that requires
+   user attention.
+*  *errors*. List of objects. If ``status=ERROR`` then this field contains
+   list of JSON objects with each object containing a message property
    that describes the error in human readable format.
 
 
