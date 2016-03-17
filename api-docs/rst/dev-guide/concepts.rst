@@ -115,10 +115,10 @@ Each scaling group has an associated ``status`` that represents the health of th
 group. When the group is successfully able to launch servers and optionally add
 them to load balancers then the status is ``ACTIVE``. If it is not able to
 that due to some irrecoverable error that requires user attention then status
-will be ``ERROR``. In this case, the :ref:`group state <get-scaling-group-state`
+will be ``ERROR``. In this case, the :ref:`group state <get-scaling-group-state>`
 will contain list of human-readable texts describing the reasons why group has
 ERROR status. These errors will need to be fixed before group can become ACTIVE
-again which can be done by either :ref:`converging <converge>` or
+again that can be done by either :ref:`converging <trigger-convergence>` or
 :ref:`executing policy <execute-policy>` after fixing the errors.
 
 
