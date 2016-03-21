@@ -810,34 +810,29 @@ To get started with RackConnect v3 cloud bursting:
 .. _Knowledge Center articles for RackConnect: http://www.rackspace.com/knowledge_center/product-page/rackconnect
 
 
-.. _concergence-concept:
+.. _convergence-concept:
 
 Convergence
 ~~~~~~~~~~~
 
-Convergence is completely rewritten orchestration layer of autoscale that provides
-higher reliability for scaling up and down by optimizing use of Nova API with retries
-as necessary. In addition, Convergence continuously keeps track of all the servers
-in autoscaling groups, notices when a server is deleted out-of-band or goes into
-an non-ACTIVE state (eg ERROR) and automatically replaces it.
-We call this capability “self-healing”.
+The convergence feature provides higher reliability for scaling by optimizing
+the use of the Cloud Servers API with retries until they are successful.
+Convergence ensures that the current server and load balancer configuration
+for a scaling group always matches the specification in the launch configuration
+of the group. It does this by continuously converging to the desired state of the
+scaling group, instead of manipulating servers only once.
 
-A new endpoint :ref:`**converge** <post-create-scaling-group-v1.1-tenantid-converge>`
-is added which triggers convergence on a group. This can be useful when a group's
-status is ERROR which happens when group has invalid launch configuration
-(ex imageRef of deleted image). After correcting the launch configuration, one
-needs to invoke this endpoint to converge the group.
+Convergence also provides a self-healing capability by tracking all the servers
+in autoscaling group continuously and automatically replacing any servers that
+have been deleted out-of-band or transitioned to an ``ERROR`` state.
 
-With this change there are minor behavioral differences which should not impact
-any existing users:
+It is used internally to launch and delete servers. You can trigger it explicitly 
+by submitting a :ref:`converge <trigger-convergence>` request on a group. This
+operation is useful for fixing a scaling group that is in ``ERROR`` state. Typically,
+the ``ERROR`` state is caused by an invalid launch configuration, for example a
+configuration that includes a server image reference of a deleted image.
+After correcting the launch configuration, you can submit a convergence request
+to restore the group to the desired state.
 
-- If autoscaled server is manually removed from load balancer it is supposed
-  to be on as per scaling group config, then autoscale will revert that change
-  and put the server back in configured CLB. Note that autoscale does not care
-  if server is added to any other CLB. It only ensures that server is always
-  there in configured CLB.
-
-- If a CLB configured in the group is not found / deleted then the group will
-  be put in ERROR and server that was supposed to be added to CLB *will* remain.
-  This is unlike current behavior where the server that couldn't be added to CLB
-  gets deleted.
+This has been released on December 8th 2015. Kindly check
+:ref:`release notes <document-release-notes/as_20151204>` for any behavioral changes.

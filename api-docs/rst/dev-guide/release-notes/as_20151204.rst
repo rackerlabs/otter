@@ -4,31 +4,30 @@ API v1.0 release, December 08, 2015
 What's new
 ~~~~~~~~~~
 
-*  Added a new :ref:`**converge** endpoint <post-create-scaling-group-v1.1-tenantid-converge>`. You can submit a **POST** request to this endpoint to trigger convergence. Convergence implies that Autoscale tries to continuously converge to the desired state of the scaling group, instead of manipulating servers only once.
-   When this convergence process starts, it will continue until the desired number of servers are in **ACTIVE** state.
+*  Added a new :ref:`converge endpoint <trigger-convergence>`. You can submit a
+   **POST** request to this endpoint to trigger convergence. Kindly check
+   :ref:`convergence <convergence>`.
 
-*  Added the `status` attribute for group state. This attribute can be either "ACTIVE" or "ERROR". An "ACTIVE" status means that the group is converging
-   and everything is operating well. An "ERROR" status means that Autoscale has stopped converging due to an irrecoverable error that requires user attention.
-   If the `status` attribute is set to "ERROR", an additional `errors` attribute is added that displays a list of errors that Autoscale has encountered.
+*  Added the ``status`` and ``errors`` attributes in group state.
 
-*  Added support for "pause". Pausing a scaling group cancels any executions on the group.
-   This includes policy executions via the API or scheduled scaling activities, as well as triggering convergence. Any existing convergence that is running will be stopped. Group configuration changes are allowed during a paused state.
-   If a scaling group is paused, the group state will return `"paused": true`.
+*  Implemented :ref:`pause <pause-group>` scaling group operation.
 
-*  Added support for "resume". Resuming a scaling group ends the "pause" state. When a scaling group is resumed,
-   policy executions and convergence triggering resume. The group state returns `"paused": false`.
+*  Implemented  :ref:`resume <resume-group>` scaling group operation. 
 
 Behavioral changes
 ~~~~~~~~~~~~~~~~~~
 
-* If autoscaled server is manually removed from load balancer it is supposed
-  to be on as per scaling group config, then autoscale will revert that change
-  and put the server back in configured CLB. Note that autoscale does not care
-  if server is added to any other CLB. It only ensures that server is always
-  there in configured CLB.
+* If an autoscaled server is removed from the load balancer manually, and that
+  server is supposed to be included based on the scaling group configuration,
+  Autoscale reverts the change and adds the server back to the configured cloud
+  load balancer. Note that autoscale does not care if server is added to any
+  other CLB. It only ensures that server is always there in configured CLB.
 
-* If a CLB configured in the group is not found / deleted, the group will be put in ERROR and server that was supposed to be added to CLB *will remain*.
-  This is unlike current behavior where the server that couldn't be added to CLB gets deleted.
+* When Autoscale attempts to add a server to a cloud load balancer that is
+  missing or deleted, the scaling group status changes to ``ERROR``.
+  In previous Autoscale releases, the server that couldn't be added was deleted.
+  In the current release, the server remains in the scaling group instead of
+  being deleted.
 
 Known issues
 ~~~~~~~~~~~~
