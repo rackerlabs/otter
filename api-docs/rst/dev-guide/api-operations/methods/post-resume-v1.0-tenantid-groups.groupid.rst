@@ -7,7 +7,7 @@ Resume group
 
 .. code::
 
-    POST /v1.1/{tenantId}/groups/groupId/resume
+    POST /v1.0/{tenantId}/groups/groupId/resume
 
 This operation resumes a scaling group. When a scaling group is resumed, policy
 executions and convergence triggering is allowed and group state returns 

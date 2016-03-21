@@ -7,7 +7,7 @@ Pause group
 
 .. code::
 
-    POST /v1.1/{tenantId}/groups/groupId/pause
+    POST /v1.0/{tenantId}/groups/groupId/pause
 
 This operation pauses a specific scaling group. After a group is paused no
 executions on the group are allowed. This includes API-generated or scheduled
