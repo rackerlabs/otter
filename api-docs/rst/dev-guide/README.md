@@ -1,6 +1,6 @@
 # Rackspace Autoscale API documentation
 
-**Build:** [Strider](http://ci.deconst.horse/) (http://ci.deconst.horse/rackerlabs/otter/)
+[![build badge](https://build.developer.rackspace.com/rackerlabs/otter/badge?branch=master)](https://build.developer.rackspace.com/rackerlabs/otter/)
 
 ## Purpose
 
