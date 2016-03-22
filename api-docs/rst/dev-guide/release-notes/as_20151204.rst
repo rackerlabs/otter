@@ -4,15 +4,14 @@ API v1.0 release, December 08, 2015
 What's new
 ~~~~~~~~~~
 
-*  Added a new :ref:`converge endpoint <trigger-convergence>`. You can submit a
-   **POST** request to this endpoint to trigger convergence. Kindly check
-   :ref:`convergence <convergence>`.
+*  Added a new :ref:`converge endpoint <trigger-convergence>` that you can use
+   when there are unexpected number of servers in a group. See
+   :ref:`convergence <convergence-concept>` in concepts section.
 
 *  Added the ``status`` and ``errors`` attributes in group state.
 
-*  Implemented :ref:`pause <pause-group>` scaling group operation.
-
-*  Implemented  :ref:`resume <resume-group>` scaling group operation. 
+*  Added :ref:`pause <pause-group>` and :ref:`resume <resume-group>` scaling
+   group operations.
 
 Behavioral changes
 ~~~~~~~~~~~~~~~~~~

@@ -1,6 +1,6 @@
 
 
-.. _post-pause-v1.0-tenantid-groups-groupid:
+.. _pause-group:
 
 Pause group
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -9,14 +9,11 @@ Pause group
 
     POST /v1.0/{tenantId}/groups/groupId/pause
 
-This operation pauses a specific scaling group. After a group is paused no
-executions on the group are allowed. This includes API-generated or scheduled
-policy executions. Triggering convergerence is also not allowed.
-Any existing convergence that is running will be stopped. Group configuration
-like min/max/cooldown and launch configuration changes like imageRef are allowed
-during a paused state. If a scaling group is paused, the group state will
-return ``"paused": true``. Use :ref:`resume <resume-group>` API operation to
-resume a paused group.
+This operation pauses the specified scaling group. When a group is paused,
+no policy or convergence operations are allowed. Any convergence operations
+in progress are stopped. Group configuration updates like min/max/cooldown and
+launch configurations updates like imageRef can run when a group is paused.
+You can resume a paused group by submitting a :ref:`resume <resume-group>` request.
 
 This operation does not take any data and does not return any data. If it
 succeeds, a 204 response code is returned.

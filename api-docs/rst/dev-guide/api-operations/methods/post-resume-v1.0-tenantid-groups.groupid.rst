@@ -1,6 +1,6 @@
 
 
-.. _post-resume-v1.0-tenantid-groups-groupid:
+.. _resume-group:
 
 Resume group
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -9,9 +9,10 @@ Resume group
 
     POST /v1.0/{tenantId}/groups/groupId/resume
 
-This operation resumes a scaling group. When a scaling group is resumed, policy
-executions and convergence triggering is allowed and group state returns 
-``"paused": false``. Use :ref:`pause <pause-group>` API operation to pause a group.
+This operation resumes the specified scaling group. When a group is resumed,
+policy executions and convergence operations are allowed. The group state
+contains ``"paused": false``. You can pause a group by submitting a
+:ref:`pause request <pause-group>`.
 
 This operation does not take any data and does not return any data. If it
 succeeds, a 204 response code is returned.

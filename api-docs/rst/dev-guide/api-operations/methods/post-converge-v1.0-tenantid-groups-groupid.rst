@@ -1,6 +1,6 @@
 
 
-.. _post-converge-v1.0-tenantid-groups-groupid:
+.. _trigger-convergence:
 
 Trigger convergence
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -1,6 +1,6 @@
 
 
-.. _get-get-scaling-group-state-v1.0-tenantid-groups-groupid-state:
+.. _get-group-state:
 
 Get scaling group state
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -17,8 +17,7 @@ The *GroupState* object consists of the following properties:
 *  *paused*. If ``paused=TRUE``, the group does not scale up or down. All
    scheduled or API-generated policy operations are suspended, and convergence
    is not triggered. When the group is paused, any POST requests to
-   :ref:`converge <trigger-convergence>` or
-   :ref:`execute policy <execute-policye>`
+   :ref:`converge <trigger-convergence>` or :ref:`execute policy <execute-policy>`
    operations return a ``403 GroupPausedError`` response.
    If ``paused=FALSE``, all group scaling and convergence operations resume and
    scheduled or API-generated policy exectuions are allowed.
@@ -33,7 +32,7 @@ The *GroupState* object consists of the following properties:
    requests successfully, typically due to an unrecoverable error that requires
    user attention.
 *  *errors*. List of objects. If ``status=ERROR`` then this field contains
-   list of JSON objects with each object containing a message property
+   a list of JSON objects with each object containing a message property
    that describes the error in human readable format.
 
 

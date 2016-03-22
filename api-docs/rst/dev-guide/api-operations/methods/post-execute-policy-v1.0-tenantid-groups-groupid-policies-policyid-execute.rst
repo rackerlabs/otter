@@ -1,5 +1,5 @@
 
-.. _post-execute-policy-v1.0-tenantid-groups-groupid-policies-policyid-execute:
+.. _execute-policy:
 
 Execute policy
 ^^^^^^^^^^^^^^
