@@ -236,120 +236,104 @@ The following example shows a launch configuration of type
 
 .. code::  sh
 
-                              "launchConfiguration": {
-        "args": {
-          "loadBalancers": [
+{
+    "args": {
+        "loadBalancers": [
             {
-              "port": 8080,
-              "loadBalancerId": 9099
+                "loadBalancerId": 9099,
+                "port": 8080
             }
-          ],
-          "server": {
-            "name": "autoscale_server",
-            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-            "flavorRef": "performance1-2",
+        ],
+        "server": {
             "OS-DCF:diskConfig": "AUTO",
+            "flavorRef": "performance1-2",
+            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
             "metadata": {
-              "build_config": "core",
-              "meta_key_1": "meta_value_1",
-              "meta_key_2": "meta_value_2"
+                "build_config": "core",
+                "meta_key_1": "meta_value_1",
+                "meta_key_2": "meta_value_2"
             },
+            "name": "autoscale_server",
             "networks": [
-              {
-                "uuid": "11111111-1111-1111-1111-111111111111"
-              },
-              {
-                "uuid": "00000000-0000-0000-0000-000000000000"
-              }
+                {
+                    "uuid": "11111111-1111-1111-1111-111111111111"
+                },
+                {
+                    "uuid": "00000000-0000-0000-0000-000000000000"
+                }
             ],
             "personality": [
-              {
-                "path": "/root/.csivh",
-                "contents": "VGhpcyBpcyBhIHRlc3QgZmlsZS4="
-              }
+                {
+                    "contents": "VGhpcyBpcyBhIHRlc3QgZmlsZS4=",
+                    "path": "/root/.csivh"
+                }
             ]
-          }
-        },
-        "type": "launch_server"
-
-
+        }
+    },
+    "type": "launch_server"
+}
 
 
 **Example: Launch configuration for boot from volume**
 
 .. code::  sh
 
-                                  "launchConfiguration": {
-        "args": {
-          "server": {
-            "name": "autoscale_server",
-            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-            "flavorRef": "performance1-2",
-            "OS-DCF:diskConfig": "AUTO",
-            "metadata": {
-              "build_config": "core",
-              "meta_key_1": "meta_value_1",
-              "meta_key_2": "meta_value_2"
-            },
-            "user_data": "very long base64 encoded string goes here"
-            "networks": [
-              {
-                "uuid": "11111111-1111-1111-1111-111111111111"
-              },
-              {
-                "uuid": "00000000-0000-0000-0000-000000000000"
-              }
+{
+    "args": {
+        "server": {
+            "block_device_mapping_v2": [
+                {
+                    "boot_index": 0,
+                    "delete_on_termination": false,
+                    "destination_type": "volume",
+                    "source_type": "image",
+                    "volume_id": "09de0a66-3156-48b4-90a5-1cf25a905207",
+                    "volume_size": "50"
+                }
             ],
-            "personality": [
-              {
-                "path": "/root/.csivh",
-                "contents": "VGhpcyBpcyBhIHRlc3QgZmlsZS4="
-              }
+            "flavorRef": "compute1-4",
+            "imageRef": "",
+            "name": "bfvserver",
+            "networks": [
+                {
+                    "uuid": "11111111-1111-1111-1111-111111111111"
+                }
             ]
-          }
-        },
-        "type": "launch_server"
-
-
-
-The "very long base64 encoded string goes here" is where you insert your create server
-template.
-
-The following shows a very simple create server template that you
-could base64 encode. You can use this template to install the apache2 package
-and runs a shell command.
-
+        }
+    },
+    "type": "launch_server"
+}
 
 **Example: Create server template for RackConnect v3**
 
 .. code::  sh
 
-                                {
-        "type": "launch_server",
-        "args": {
-            "loadBalancers": [
-                {
-                    "loadBalancerId": "4fe1b258-f7c9-4688-a3ab-0c90e654b98",
-                    "type": "RackConnectV3"
-                },
-                {
-                    "loadBalancerId": "cf2c0cc4-7631-4863-ad22-fb8fc2b6b8d",
-                    "type": "RackConnectV3"
-                }
-            ],
-            "server": {
-                "flavorRef": "performance1-1",
-                "imageRef": "3cb52e99-ccb8-490f-a482-9eba116bae9",
-                "name": "jp-as-sg-wosn",
-                "metadata": {},
-                "networks": [
-                    {
-                        "uuid": "07426958-1ebf-4c38-b032-d456820ca2a"
-                    }
-                ]
+{
+    "args": {
+        "loadBalancers": [
+            {
+                "loadBalancerId": "4fe1b258-f7c9-4688-a3ab-0c90e654b98",
+                "type": "RackConnectV3"
+            },
+            {
+                "loadBalancerId": "cf2c0cc4-7631-4863-ad22-fb8fc2b6b8d",
+                "type": "RackConnectV3"
             }
+        ],
+        "server": {
+            "flavorRef": "performance1-1",
+            "imageRef": "3cb52e99-ccb8-490f-a482-9eba116bae9",
+            "metadata": {},
+            "name": "jp-as-sg-wosn",
+            "networks": [
+                {
+                    "uuid": "07426958-1ebf-4c38-b032-d456820ca2a"
+                }
+            ]
         }
-    }
+    },
+    "type": "launch_server"
+}
 
 
 Learn more
