@@ -1,0 +1,33 @@
+API v1.0 release, December 08, 2015
+-----------------------------------
+
+What's new
+~~~~~~~~~~
+
+*  Added a new :ref:`converge endpoint <trigger-convergence>` that you can use
+   when there are unexpected number of servers in a group. See
+   :ref:`convergence <convergence-concept>` in concepts section.
+
+*  Added the ``status`` and ``errors`` attributes in group state.
+
+*  Added :ref:`pause <pause-group>` and :ref:`resume <resume-group>` scaling
+   group operations.
+
+Behavioral changes
+~~~~~~~~~~~~~~~~~~
+
+* If an autoscaled server is removed from the load balancer manually, and that
+  server is supposed to be included based on the scaling group configuration,
+  Autoscale reverts the change and adds the server back to the configured cloud
+  load balancer. Note that autoscale does not care if server is added to any
+  other CLB. It only ensures that server is always there in configured CLB.
+
+* When Autoscale attempts to add a server to a cloud load balancer that is
+  missing or deleted, the scaling group status changes to ``ERROR``.
+  In previous Autoscale releases, the server that couldn't be added was deleted.
+  In the current release, the server remains in the scaling group instead of
+  being deleted.
+
+Known issues
+~~~~~~~~~~~~
+|no changes|

@@ -1,16 +1,21 @@
 
-.. _post-resume-group-policy-execution-v1.0-tenantid-groups-groupid-resume:
 
-Resume group policy execution
+.. _resume-group:
+
+Resume group
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code::
 
-    POST /v1.0/{tenantId}/groups/{groupId}/resume
+    POST /v1.0/{tenantId}/groups/groupId/resume
 
-This operation resumes the execution of all scaling policies for a specified scaling group.
+This operation resumes the specified scaling group. When a group is resumed,
+policy executions and convergence operations are allowed. The group state
+contains ``"paused": false``. You can pause a group by submitting a
+:ref:`pause request <pause-group>`.
 
-IMPORTANT: This method has not been implemented in the Auto Scale API yet and will be implemented in a future release.
+This operation does not take any data and does not return any data. If it
+succeeds, a 204 response code is returned.
 
 
 This table shows the possible response codes for this operation:
@@ -19,24 +24,8 @@ This table shows the possible response codes for this operation:
 +--------------------------+-------------------------+-------------------------+
 |Response Code             |Name                     |Description              |
 +==========================+=========================+=========================+
-|204                       |                         |                         |
-+--------------------------+-------------------------+-------------------------+
-|400                       |InvalidJsonError         |The request is refused   |
-|                          |                         |because the body was     |
-|                          |                         |invalid JSON".           |
-+--------------------------+-------------------------+-------------------------+
-|400                       |ValidationError          |The request body had     |
-|                          |                         |valid JSON but with      |
-|                          |                         |unexpected properties or |
-|                          |                         |values in it. Please     |
-|                          |                         |note that there can be   |
-|                          |                         |many combinations that   |
-|                          |                         |cause this error. We     |
-|                          |                         |will try to list the     |
-|                          |                         |most common mistakes     |
-|                          |                         |users are likely to make |
-|                          |                         |in a particular request. |
-|                          |                         |".                       |
+|204                       |Success                  |Group was successfully   |
+|                          |                         |paused.                  |
 +--------------------------+-------------------------+-------------------------+
 |401                       |InvalidCredentials       |The X-Auth-Token the     |
 |                          |                         |user supplied is bad.    |
@@ -54,17 +43,15 @@ This table shows the possible response codes for this operation:
 |                          |                         |status code for other    |
 |                          |                         |things.                  |
 +--------------------------+-------------------------+-------------------------+
+|404                       |NoSuchScalingGroupError  |The specified scaling    |
+|                          |                         |group was not found.     |
++--------------------------+-------------------------+-------------------------+
 |405                       |InvalidMethod            |The method used is       |
 |                          |                         |unavailable for the      |
 |                          |                         |endpoint.                |
 +--------------------------+-------------------------+-------------------------+
 |413                       |RateLimitError           |The user has surpassed   |
 |                          |                         |their rate limit.        |
-+--------------------------+-------------------------+-------------------------+
-|415                       |UnsupportedMediaType     |The request is refused   |
-|                          |                         |because the content type |
-|                          |                         |of the request is not    |
-|                          |                         |"application/json".      |
 +--------------------------+-------------------------+-------------------------+
 |500                       |InternalError            |An error internal to the |
 |                          |                         |application has          |
@@ -79,8 +66,6 @@ This table shows the possible response codes for this operation:
 
 Request
 """"""""""""""""
-
-
 
 
 This table shows the URI parameters for the request:
@@ -99,8 +84,6 @@ This table shows the URI parameters for the request:
 
 
 
-
-
 This operation does not accept a request body.
 
 
@@ -110,12 +93,4 @@ Response
 """"""""""""""""
 
 
-
-
-
-
 This operation does not return a response body.
-
-
-
-

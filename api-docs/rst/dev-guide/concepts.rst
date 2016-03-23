@@ -111,6 +111,16 @@ The launch configuration specifies the launch type along with server and load ba
              Not used when there is no ``loadbalancers`` configuration. Please note that
              this feature only works with a cloud load balancer.
 
+Each scaling group has an associated ``status`` that represents the health of the
+group. When the group is successfully able to launch servers and optionally add
+them to load balancers then the status is ``ACTIVE``. If the scaling group cannot
+launch servers because of an error that requires user attention,
+the status changes to ``ERROR``. In this case, the :ref:`group state <get-group-state>`
+contains a list of human-readable messages that explain the conditions that caused the error.
+After you fix the errors, you can restore the group to ``ACTIVE`` state by submitting a
+:ref:`converge <trigger-convergence>` or :ref:`execute policy <execute-policy>`
+API request.
+
 
 .. _server-parameters:
 
@@ -798,3 +808,29 @@ To get started with RackConnect v3 cloud bursting:
 
 .. _RackConnect product information: http://www.rackspace.com/cloud/hybrid/rackconnect
 .. _Knowledge Center articles for RackConnect: http://www.rackspace.com/knowledge_center/product-page/rackconnect
+
+
+.. _convergence-concept:
+
+Convergence
+~~~~~~~~~~~
+
+The convergence feature provides higher reliability for scaling by optimizing
+the use of the Cloud Servers API with retries until they are successful.
+Convergence ensures that the current server and load balancer configuration
+for a scaling group always matches the specification in the launch configuration
+of the group. It does this by continuously converging to the desired state of the
+scaling group, instead of manipulating servers only once.
+
+Convergence also provides a self-healing capability by tracking all the servers
+in an autoscaling group continuously and automatically replacing any servers that
+have been deleted out-of-band or transitioned to an ``ERROR`` state.
+
+Autoscale uses convergence internally to launch and delete servers.
+You can trigger convergence explicitly by submitting a :ref:`converge <trigger-convergence>`
+request for a specified group. This operation is useful for fixing a scaling
+group that is in an ``ERROR`` state. Typically, the ``ERROR`` state is caused
+by an invalid launch configuration, for example a configuration that includes
+a server image reference of a deleted image. After correcting the launch
+configuration, you can submit a :ref:`converge <trigger-convergence>` request
+to restore the group to the desired state.

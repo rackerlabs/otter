@@ -1,5 +1,5 @@
 
-.. _post-execute-policy-v1.0-tenantid-groups-groupid-policies-policyid-execute:
+.. _execute-policy:
 
 Execute policy
 ^^^^^^^^^^^^^^
@@ -44,18 +44,24 @@ This table shows the possible response codes for this operation:
 |401                       |InvalidCredentials       |The X-Auth-Token the     |
 |                          |                         |user supplied is bad.    |
 +--------------------------+-------------------------+-------------------------+
-|403                       |CannotExecutePolicyError |The policy was not       |
-|                          |                         |executed because a       |
+|403                       |CannotExecutePolicyError |The policy did not       |
+|                          |                         |run because a            |
 |                          |                         |scaling policy or        |
 |                          |                         |scaling group cooldown   |
 |                          |                         |was still in effect.     |
 +--------------------------+-------------------------+-------------------------+
-|403                       |CannotExecutePolicyError |The policy was not       |
-|                          |                         |executed because         |
+|403                       |CannotExecutePolicyError |The policy did not       |
+|                          |                         |run because              |
 |                          |                         |applying the changes     |
 |                          |                         |would not result in the  |
 |                          |                         |addition or deletion of  |
 |                          |                         |any servers.             |
++--------------------------+-------------------------+-------------------------+
+|403                       |GroupPausedError         |The policy did not run   |
+|                          |                         |because the group is     |
+|                          |                         |paused. You can resolve  |
+|                          |                         |this error by :ref:`resuming <resume-group>`|
+|                          |                         |the group.               |
 +--------------------------+-------------------------+-------------------------+
 |403                       |Forbidden                |The user does not have   |
 |                          |                         |permission to perform    |
