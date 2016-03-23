@@ -61,7 +61,7 @@ def _re(pattern):
 
 
 _SERVER_NOT_A_MEMBER_PATTERN = _re(
-    "Cloud Server (?P<server_id>.+) is not a member of Load Balancer Pool "
+    "Cloud Server (?P<server_id>{uuid}) is not a member of Load Balancer Pool "
     "(?P<lb_id>{uuid})")
 _NODE_ALREADY_A_MEMBER_PATTERN = _re(
     "Cloud Server (?P<node_id>{uuid}) is already a member of Load Balancer "
