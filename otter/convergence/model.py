@@ -503,6 +503,14 @@ class ILBNode(Interface):
         """
 
 
+class DrainingUnavailable(Exception):
+    """
+    Draining information is not available for given node
+    """
+    def __init__(self, node):
+        self.node = node
+
+
 class IDrainable(Interface):
     """
     The drainability part of a LB Node.  If a node is drainable, it should
@@ -521,6 +529,7 @@ class IDrainable(Interface):
 
         :return: Whether the node is done draining.
         :rtype: `bool`
+        :raises: `DrainingUnavailable` if this node doesn't have draining info
         """
 
 
@@ -605,6 +614,8 @@ class CLBNode(object):
         """
         See :func:`IDrainable.is_done_draining`.
         """
+        if self.drained_at is None:
+            raise DrainingUnavailable(self)
         return now - self.drained_at >= timeout or self.connections == 0
 
     def is_active(self):
