@@ -3972,7 +3972,7 @@ class GetScalingGroupsTests(SynchronousTestCase):
         rows = [assoc(row, "tenantId", "t1") for row in rows]
         mock_gsgr.return_value = defer.succeed(rows)
         results = self.successResultOf(collection.get_all_valid_groups())
-        self.assertEqual(results, [rows[0], rows[3]])
+        self.assertEqual(results, [rows[0], rows[3], rows[4], rows[6]])
         mock_gsgr.assert_called_once_with()
 
 
