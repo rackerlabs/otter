@@ -291,18 +291,18 @@ The following example shows a launch configuration of type
     {
         "args": {
             "server": {
+                "imageRef": "",
                 "block_device_mapping_v2": [
                     {
-                        "boot_index": 0,
-                        "delete_on_termination": false,
-                        "destination_type": "volume",
+                        "uuid": "09de0a66-3156-48b4-90a5-1cf25a905207",
                         "source_type": "image",
-                        "volume_id": "09de0a66-3156-48b4-90a5-1cf25a905207",
+                        "boot_index": 0,
+                        "delete_on_termination": true,
+                        "destination_type": "volume",
                         "volume_size": "50"
                     }
                 ],
                 "flavorRef": "compute1-4",
-                "imageRef": "",
                 "name": "bfvserver",
                 "networks": [
                     {
