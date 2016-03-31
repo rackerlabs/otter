@@ -62,10 +62,14 @@ class GetTenantMetricsTests(SynchronousTestCase):
                    [_server('g1', 'BUILD')] * 2 +
                    [_server("g1", "ERROR"), _server("g1", "DELETED"),
                     _server("g1", "SHUTOFF"), _server("g1", "PASSWORD")]),
-            'g3': [_server("g3", 'ACTIVE')]
+            'g3': [_server("g3", 'ACTIVE')],
+            'g4': [_server("g4", 'ACTIVE')],
+            'g5': [_server("g5", 'ACTIVE')]
         }
         groups = [{'groupId': 'g1', 'desired': 3},
-                  {'groupId': 'g2', 'desired': 4}]
+                  {'groupId': 'g2', 'desired': 4, "status": "ACTIVE"},
+                  {'groupId': 'g5', 'desired': 1, "status": "DISABLED"},
+                  {'groupId': 'g4', 'desired': 5, "status": "ERROR"}]
         self.assertEqual(
             set(get_tenant_metrics('t', groups, servers)),
             # g1 2 BUILD and 1 PASSWORD servers is considered pending

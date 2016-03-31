@@ -70,6 +70,8 @@ def get_tenant_metrics(tenant_id, scaling_groups, grouped_servers,
         servers = grouped_servers.get(group_id, [])
         if group_id in groups:
             group = groups[group_id]
+            if group.get("status") in ("ERROR", "DISABLED"):
+                continue
         else:
             group = {'groupId': group_id_from_metadata(servers[0]['metadata']),
                      'desired': 0}

@@ -1719,7 +1719,6 @@ class CassScalingGroupCollection:
         def _valid_group_row(row):
             return (row.get('created_at') is not None and
                     row.get('desired') is not None and
-                    row.get('status') not in ('DISABLED', 'ERROR') and
                     not row.get('deleting', False))
 
         d = self.get_scaling_group_rows()
