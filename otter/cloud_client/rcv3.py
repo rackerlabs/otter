@@ -16,6 +16,14 @@ from otter.util.pure_http import has_code
 
 
 def _sorted_data(lb_node_pairs):
+    """
+    Return HTTP request body to be sent to RCv3 load_balancer_pools/nodes API
+    from list of (lb_id, node_id) tuples. The returned list is sorted to allow
+    easier testing with predictability.
+
+    :param list lb_node_pairs: List of (lb_id, node_id) tuples
+    :return: List of ``dict``
+    """
     return sorted(
         [{"cloud_server": {"id": node}, "load_balancer_pool": {"id": lb}}
          for (lb, node) in lb_node_pairs],
