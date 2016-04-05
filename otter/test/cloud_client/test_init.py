@@ -133,21 +133,18 @@ def service_request_eqf(stub_response):
     return resolve_service_request
 
 
-def log_intent(msg_type, body, log_as_json=True, req_body=None):
+def log_intent(msg_type, body, log_as_json=True, req_body=''):
     """
     Return a :obj:`Log` intent for the given mesasge type and body.
     """
     body = json.dumps(body, sort_keys=True) if log_as_json else body
-    intent = Log(
+    return Log(
         msg_type,
         {'url': "original/request/URL",
          'method': 'method',
          'request_id': "original-request-id",
-         'response_body': body}
+         'response_body': body, 'request_body': req_body}
     )
-    if req_body is not None:
-        intent.fields["request_body"] = req_body
-    return intent
 
 
 class BindServiceTests(SynchronousTestCase):
@@ -1176,7 +1173,8 @@ class NovaClientTests(SynchronousTestCase):
             'url': "original/request/URL",
             'method': 'method',
             'request_id': "original-request-id",
-            'response_body': '{"server": {"id": "server_id"}}'
+            'response_body': '{"server": {"id": "server_id"}}',
+            'request_body': ''
         })
         expected, real = self._setup_for_create_server()
         resp, body = _perform_one_request(
