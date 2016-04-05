@@ -55,33 +55,24 @@ def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
                                  request_body=json.dumps(req_body)))
 
 
-_UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
-                "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
-
-# https://github.com/rackerlabs/mimic/issues/566
-_MIMIC_SERVER = "test-server[0-9]{10}-id-[0-9]{10}"
-
-_SERVER_REGEX = "{}|{}".format(_UUID4_REGEX, _MIMIC_SERVER)
-
-
 def _re(pattern):
-    return re.compile(pattern.format(uuid=_SERVER_REGEX), re.IGNORECASE)
+    return re.compile(pattern, re.IGNORECASE)
 
 
 _SERVER_NOT_A_MEMBER_PATTERN = _re(
-    "Cloud Server (?P<server_id>{uuid}) is not a member of Load Balancer Pool "
-    "(?P<lb_id>{uuid})")
+    "Cloud Server (?P<server_id>.*) is not a member of Load Balancer Pool "
+    "(?P<lb_id>.*)")
 _NODE_ALREADY_A_MEMBER_PATTERN = _re(
-    "Cloud Server (?P<node_id>{uuid}) is already a member of Load Balancer "
-    "Pool (?P<lb_id>{uuid})")
+    "Cloud Server (?P<node_id>.*) is already a member of Load Balancer "
+    "Pool (?P<lb_id>.*)")
 _LB_INACTIVE_PATTERN = _re(
-    "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state")
+    "Load Balancer Pool (?P<lb_id>.*) is not in an ACTIVE state")
 _LB_DOESNT_EXIST_PATTERN = _re(
-    "Load Balancer Pool (?P<lb_id>{uuid}) does not exist")
+    "Load Balancer Pool (?P<lb_id>.*) does not exist")
 _SERVER_UNPROCESSABLE = _re(
-    "Cloud Server (?P<server_id>{uuid}) is unprocessable")
+    "Cloud Server (?P<server_id>.*) is unprocessable")
 _SERVER_DOES_NOT_EXIST = _re(
-    "Cloud Server (?P<server_id>{uuid}) does not exist")
+    "Cloud Server (?P<server_id>.*) does not exist")
 
 
 class LBInactive(ExceptionWithMessage):
