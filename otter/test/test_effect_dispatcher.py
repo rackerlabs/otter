@@ -28,13 +28,14 @@ def simple_intents():
         Retry(effect=Effect(Constant(None)), should_retry=lambda e: False),
         Delay(0),
         Constant(None),
-        ReadReference(ref=Reference(None)),
+        ReadReference(ref=Reference(None))
     ]
 
 
 def legacy_intents():
     return simple_intents() + [
-        TenantScope(Effect(Constant(None)), 1)
+        TenantScope(Effect(Constant(None)), 1),
+        Log('msg', {}), LogErr('f', 'msg', {}), BoundFields(Effect(None), {})
     ]
 
 
@@ -45,7 +46,6 @@ def full_intents():
         EvictServerFromScalingGroup(log='log', transaction_id='transaction_id',
                                     scaling_group='scaling_group',
                                     server_id='server_id'),
-        Log('msg', {}), LogErr('f', 'msg', {}), BoundFields(Effect(None), {}),
         MsgWithTime('msg', Effect(None)),
         CQLQueryExecute(query='q', params={}, consistency_level=7)
     ]

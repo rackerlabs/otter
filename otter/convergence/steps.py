@@ -1,6 +1,4 @@
 """Steps for convergence."""
-import re
-from functools import partial
 from uuid import uuid4
 
 import attr
@@ -34,6 +32,7 @@ from otter.cloud_client import (
     delete_stack,
     has_code,
     remove_clb_nodes,
+    rcv3,
     service_request,
     set_nova_metadata_item,
     update_stack)
@@ -346,50 +345,6 @@ class ChangeCLBNode(object):
             error=_failure_reporter(CLBNotFoundError, NoSuchCLBNodeError))
 
 
-def _rackconnect_bulk_request(lb_node_pairs, method, success_pred):
-    """
-    Creates a bulk request for RackConnect v3.0 load balancers.
-
-    :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
-        connections to be made or broken.
-    :param str method: The method of the request ``"DELETE"`` or
-        ``"POST"``.
-    :param success_pred: Predicate that determines if a response was
-        successful.
-    :return: A bulk RackConnect v3.0 request for the given load balancer,
-        node pairs.
-    :rtype: :class:`Request`
-    """
-    return service_request(
-        ServiceType.RACKCONNECT_V3,
-        method,
-        append_segments("load_balancer_pools", "nodes"),
-        data=[{"cloud_server": {"id": node},
-               "load_balancer_pool": {"id": lb}}
-              for (lb, node) in lb_node_pairs],
-        success_pred=success_pred)
-
-
-_UUID4_REGEX = ("[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}"
-                "-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}")
-
-
-def _rcv3_re(pattern):
-    return re.compile(pattern.format(uuid=_UUID4_REGEX), re.IGNORECASE)
-
-
-_RCV3_NODE_NOT_A_MEMBER_PATTERN = _rcv3_re(
-    "Node (?P<node_id>{uuid}) is not a member of Load Balancer Pool "
-    "(?P<lb_id>{uuid})")
-_RCV3_NODE_ALREADY_A_MEMBER_PATTERN = _rcv3_re(
-    "Cloud Server (?P<node_id>{uuid}) is already a member of Load Balancer "
-    "Pool (?P<lb_id>{uuid})")
-_RCV3_LB_INACTIVE_PATTERN = _rcv3_re(
-    "Load Balancer Pool (?P<lb_id>{uuid}) is not in an ACTIVE state")
-_RCV3_LB_DOESNT_EXIST_PATTERN = _rcv3_re(
-    "Load Balancer Pool (?P<lb_id>{uuid}) does not exist")
-
-
 @implementer(IStep)
 @attributes([Attribute('lb_node_pairs', instance_of=PSet)])
 class BulkAddToRCv3(object):
@@ -405,59 +360,32 @@ class BulkAddToRCv3(object):
     :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
         connections to be made.
     """
-    def _bare_effect(self):
-        """
-        Just the RCv3 bulk request effect, with no callbacks.
-        """
-        return _rackconnect_bulk_request(self.lb_node_pairs, "POST",
-                                         success_pred=has_code(201, 409))
-
     def as_effect(self):
         """
         Produce a :obj:`Effect` to add some nodes to some RCv3 load
         balancers.
         """
-        eff = self._bare_effect()
-        return eff.on(partial(_rcv3_check_bulk_add, self.lb_node_pairs))
+        eff = rcv3.bulk_add(self.lb_node_pairs)
+        return eff.on(
+            success=lambda _: (StepResult.RETRY, [ErrorReason.String(
+                'must re-gather after LB add in order to update the '
+                'active cache')]),
+            error=catch(rcv3.BulkErrors, _handle_bulk_add_errors))
 
 
-def _rcv3_check_bulk_add(attempted_pairs, result):
-    """
-    Checks if the RCv3 bulk add command was successful.
-    """
-    response, body = result
-
-    if response.code == 201:  # All done!
-        return StepResult.RETRY, [
-            ErrorReason.String('must re-gather after adding to LB in order to '
-                               'update the active cache')]
-
-    failure_reasons = []
-    to_retry = pset(attempted_pairs)
-    for error in body["errors"]:
-        match = _RCV3_NODE_ALREADY_A_MEMBER_PATTERN.match(error)
-        if match is not None:
-            to_retry -= pset([match.groups()[::-1]])
-
-        match = _RCV3_LB_INACTIVE_PATTERN.match(error)
-        if match is not None:
-            failure_reasons.append(
-                "RCv3 LB {lb_id} was inactive".format(**match.groupdict()))
-
-        match = _RCV3_LB_DOESNT_EXIST_PATTERN.match(error)
-        if match is not None:
-            failure_reasons.append(
-                "RCv3 LB {lb_id} does not exist".format(**match.groupdict()))
-
-    if failure_reasons:
-        return StepResult.FAILURE, failure_reasons
-    elif to_retry:
-        next_step = BulkAddToRCv3(lb_node_pairs=to_retry)
-        return next_step.as_effect()
+def _handle_bulk_add_errors(exc_tuple):
+    error = exc_tuple[1]
+    failures = []
+    retries = []
+    for excp in error.errors:
+        if isinstance(excp, rcv3.ServerUnprocessableError):
+            retries.append(ErrorReason.String(excp.message))
+        else:
+            failures.append(ErrorReason.String(excp.message))
+    if failures:
+        return StepResult.FAILURE, failures
     else:
-        # It's unclear when this condition is reached. Should we really be
-        # returning SUCCESS?
-        return StepResult.SUCCESS, []
+        return StepResult.RETRY, retries
 
 
 @implementer(IStep)
@@ -473,67 +401,17 @@ class BulkRemoveFromRCv3(object):
     :param list lb_node_pairs: A list of ``lb_id, node_id`` tuples of
         connections to be removed.
     """
-    def _bare_effect(self):
-        """
-        Just the RCv3 bulk request effect, with no callbacks.
-        """
-        # While 409 isn't success, that has to be introspected by
-        # _rcv3_check_bulk_delete in order to recover from it.
-        return _rackconnect_bulk_request(self.lb_node_pairs, "DELETE",
-                                         success_pred=has_code(204, 409))
-
     def as_effect(self):
         """
         Produce a :obj:`Effect` to remove some nodes from some RCv3 load
         balancers.
         """
-        eff = self._bare_effect()
-        return eff.on(partial(_rcv3_check_bulk_delete, self.lb_node_pairs))
-
-
-def _rcv3_check_bulk_delete(attempted_pairs, result):
-    """Checks if the RCv3 bulk deletion command was successful.
-
-    The request is considered successful if the response code indicated
-    unambiguous success, or the nodes we're trying to remove aren't on the
-    respective load balancers we're trying to remove them from, or if the load
-    balancers we're trying to remove from aren't active.
-
-    If a node wasn't on the load balancer we tried to remove it from, or a
-    load balancer we were supposed to remove things from wasn't active,
-    returns the next step to try and remove the remaining pairs. This is
-    necessary because RCv3 bulk requests are atomic-ish.
-
-    :param attempted_pairs: The (lb, node) pairs that were attempted to be
-        removed. This is the :attr:`lb_node_pairs` attribute of
-        :class:`BulkRemoveFromRCv3` instances.
-    :param result: The result of the :class:`ServiceRequest`. This should be a
-        2-tuple of the response object and the (parsed) body.
-    """
-    response, body = result
-
-    if response.code == 204:  # All done!
-        return StepResult.SUCCESS, []
-
-    to_retry = pset(attempted_pairs)
-    for error in body["errors"]:
-        match = _RCV3_NODE_NOT_A_MEMBER_PATTERN.match(error)
-        if match is not None:
-            to_retry -= pset([match.groups()[::-1]])
-
-        match = (_RCV3_LB_INACTIVE_PATTERN.match(error)
-                 or _RCV3_LB_DOESNT_EXIST_PATTERN.match(error))
-        if match is not None:
-            bad_lb_id, = match.groups()
-            to_retry = pset([(lb_id, node_id)
-                             for (lb_id, node_id) in to_retry
-                             if lb_id != bad_lb_id])
-
-    if to_retry:
-        next_step = BulkRemoveFromRCv3(lb_node_pairs=to_retry)
-        return next_step.as_effect()
-    else:
-        return StepResult.SUCCESS, []
+        eff = rcv3.bulk_delete(self.lb_node_pairs)
+        return eff.on(
+            success=lambda _: (StepResult.RETRY, [ErrorReason.String(
+                'must re-gather after RCv3 LB change in order to update the '
+                'active cache')]),
+            error=_failure_reporter(rcv3.BulkErrors))
 
 
 @implementer(IStep)

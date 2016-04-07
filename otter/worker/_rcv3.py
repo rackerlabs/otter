@@ -3,25 +3,20 @@
 
 At some point, this should just be moved into that module.
 """
-from functools import partial
-from operator import itemgetter
-
 from effect import Effect
 
-from pyrsistent import s
+from pyrsistent import pset
 
 from txeffect import perform
 
-from otter.cloud_client import TenantScope
-from otter.convergence.steps import BulkAddToRCv3, BulkRemoveFromRCv3
-from otter.util.pure_http import has_code
+from otter.cloud_client import TenantScope, rcv3 as cc_rcv3
 
 
-def _generic_rcv3_request(step_class, request_bag, lb_id, server_id):
+def _generic_rcv3_request(operation, request_bag, lb_id, server_id):
     """
-    Perform a generic RCv3 bulk step on a single (lb, server) pair.
+    Perform a generic RCv3 bulk operation on a single (lb, server) pair.
 
-    :param IStep step_class: The step class to perform the action.
+    :param callable operation: RCv3 function to perform on (lb, server) pair.
     :param request_bag: An object with a bunch of useful data on it.
     :param str lb_id: The id of the RCv3 load balancer to act on.
     :param str server_id: The Nova server id to act on.
@@ -29,19 +24,16 @@ def _generic_rcv3_request(step_class, request_bag, lb_id, server_id):
         firing with the parsed result of the request, or :data:`None` if the
         request has no body.
     """
-    effect = step_class(lb_node_pairs=s((lb_id, server_id)))._bare_effect()
-
-    if step_class is BulkAddToRCv3:
-        svc_req = effect.intent
-        codes = set(svc_req.success_pred.codes) - set([409])
-        svc_req.success_pred = has_code(*codes)
-
-    # Unfortunate that we have to TenantScope here, but here's where we're
-    # performing.
-    scoped = Effect(TenantScope(effect, request_bag.tenant_id))
-    d = perform(request_bag.dispatcher, scoped)
-    return d.addCallback(itemgetter(1))
+    eff = operation(pset([(lb_id, server_id)]))
+    scoped = Effect(TenantScope(eff, request_bag.tenant_id))
+    return perform(request_bag.dispatcher, scoped)
 
 
-add_to_rcv3 = partial(_generic_rcv3_request, BulkAddToRCv3)
-remove_from_rcv3 = partial(_generic_rcv3_request, BulkRemoveFromRCv3)
+def add_to_rcv3(request_bag, lb_id, server_id):
+    return _generic_rcv3_request(cc_rcv3.bulk_add, request_bag,
+                                 lb_id, server_id)
+
+
+def remove_from_rcv3(request_bag, lb_id, server_id):
+    return _generic_rcv3_request(cc_rcv3.bulk_delete, request_bag,
+                                 lb_id, server_id)

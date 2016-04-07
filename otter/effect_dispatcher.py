@@ -57,7 +57,6 @@ def get_full_dispatcher(reactor, authenticator, log, service_configs,
         get_zk_dispatcher(kz_client),
         get_model_dispatcher(log, store),
         get_eviction_dispatcher(supervisor),
-        get_log_dispatcher(log, {}),
         get_msg_time_dispatcher(reactor),
         get_cql_dispatcher(cass_client)
     ])
@@ -83,4 +82,5 @@ def get_legacy_dispatcher(reactor, authenticator, log, service_configs):
         get_cloud_client_dispatcher(
             reactor, authenticator, log, service_configs),
         get_simple_dispatcher(reactor),
+        get_log_dispatcher(log, {})
     ])

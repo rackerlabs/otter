@@ -5,14 +5,16 @@ from uuid import uuid4
 
 from characteristic import attributes
 
-from effect import Effect
+from effect.testing import SequenceDispatcher
 
-from twisted.internet.defer import succeed
+import mock
+
+from pyrsistent import pset
+
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.constants import ServiceType
-from otter.test.utils import StubResponse
-from otter.util.pure_http import has_code
+from otter.cloud_client import TenantScope
+from otter.test.utils import intent_func, nested_sequence
 from otter.worker import _rcv3
 
 
@@ -49,53 +51,25 @@ class RCv3Tests(SynchronousTestCase):
         Set up :class:`RCv3Tests`.
         """
         self.reactor = object()
-        self.patch(_rcv3, "perform", self._fake_perform)
-        self.dispatcher = object()
-        self.request_bag = _RequestBag(dispatcher=self.dispatcher,
-                                       tenant_id='thetenantid')
-        self.post_result = (StubResponse(201, {}),
-                            _rcv3_add_response_body("lb_id", "server_id"))
-        self.del_result = StubResponse(204, {}), None
+        self.patch(_rcv3.cc_rcv3, "bulk_add", intent_func("ba"))
+        self.patch(_rcv3.cc_rcv3, "bulk_delete", intent_func("bd"))
 
-    def _fake_perform(self, dispatcher, effect):
-        """
-        A test double for :func:`txeffect.perform`.
-
-        :param dispatcher: The Effect dispatcher.
-        :param effect: The effect to "execute".
-        """
-        self.assertIdentical(dispatcher, self.dispatcher)
-
-        self.assertIs(type(effect), Effect)
-        tenant_scope = effect.intent
-        self.assertEqual(tenant_scope.tenant_id, 'thetenantid')
-
-        req = tenant_scope.effect.intent
-        self.assertEqual(req.service_type, ServiceType.RACKCONNECT_V3)
-        self.assertEqual(req.data,
-                         [{'load_balancer_pool': {'id': 'lb_id'},
-                           'cloud_server': {'id': 'server_id'}}])
-        self.assertEqual(req.url, 'load_balancer_pools/nodes')
-        self.assertEqual(req.headers, None)
-        # The method is either POST (add) or DELETE (remove).
-        self.assertIn(req.method, ["POST", "DELETE"])
-
-        if req.method == "POST":
-            self.assertEqual(req.success_pred, has_code(201))
-            # http://docs.rcv3.apiary.io/#post-%2Fv3%2F{tenant_id}
-            # %2Fload_balancer_pools%2Fnodes
-            return succeed(self.post_result)
-        elif req.method == "DELETE":
-            self.assertEqual(req.success_pred, has_code(204, 409))
-            # http://docs.rcv3.apiary.io/#delete-%2Fv3%2F{tenant_id}
-            # %2Fload_balancer_pools%2Fnode
-            return succeed(self.del_result)
+    def dispatcher(self, operation, resp):
+        return SequenceDispatcher([
+            (TenantScope(mock.ANY, "tid"),
+             nested_sequence([
+                 ((operation, pset([("lb_id", "server_id")])), lambda i: resp)
+             ]))
+        ])
 
     def test_add_to_rcv3(self):
         """
         :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
         """
-        d = _rcv3.add_to_rcv3(self.request_bag, "lb_id", "server_id")
+        disp = self.dispatcher(
+            "ba", _rcv3_add_response_body("lb_id", "server_id"))
+        request_bag = _RequestBag(dispatcher=disp, tenant_id="tid")
+        d = _rcv3.add_to_rcv3(request_bag, "lb_id", "server_id")
         (add_result,) = self.successResultOf(d)
         self.assertEqual(add_result["cloud_server"], {"id": "server_id"})
         self.assertEqual(add_result["load_balancer_pool"], {"id": "lb_id"})
@@ -104,5 +78,7 @@ class RCv3Tests(SynchronousTestCase):
         """
         :func:`_rcv3.add_to_rcv3` attempts to perform the correct effect.
         """
-        d = _rcv3.remove_from_rcv3(self.request_bag, "lb_id", "server_id")
+        disp = self.dispatcher("bd", None)
+        request_bag = _RequestBag(dispatcher=disp, tenant_id="tid")
+        d = _rcv3.remove_from_rcv3(request_bag, "lb_id", "server_id")
         self.assertIdentical(self.successResultOf(d), None)
