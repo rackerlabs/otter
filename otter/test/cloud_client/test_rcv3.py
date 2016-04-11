@@ -276,8 +276,10 @@ class BulkDeleteTests(RCv3Tests):
         errors = {
             "errors": [
                 server_not_member(self.lbs[0], self.nodes[0]),
+                server_not_member(self.lbs[0].upper(), self.nodes[0]),
                 "Cloud Server {} does not exist".format(self.nodes[1]),
-                "Load Balancer Pool {} does not exist".format(self.lbs[2])
+                "Load Balancer Pool {} does not exist".format(self.lbs[2]),
+                "Load Balancer Pool {} does not exist".format(self.lbs[2].upper())
             ]
         }
         lbr1 = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
@@ -316,8 +318,10 @@ class BulkDeleteTests(RCv3Tests):
         errors = {
             "errors": [
                 server_not_member(self.lbs[0], self.nodes[0]),
+                server_not_member(self.lbs[0].upper(), self.nodes[0]),
                 "Cloud Server {} does not exist".format(self.nodes[1]),
-                "Load Balancer Pool {} does not exist".format(self.lbs[2])
+                "Load Balancer Pool {} does not exist".format(self.lbs[2]),
+                "Load Balancer Pool {} does not exist".format(self.lbs[2].upper())
             ]
         }
         pairs = pset([
@@ -343,7 +347,8 @@ class BulkDeleteTests(RCv3Tests):
         errors = {
             "errors": [
                 lb_inactive(self.lbs[0]),
-                server_not_member(self.lbs[1], self.nodes[1])
+                server_not_member(self.lbs[1], self.nodes[1]),
+                server_not_member(self.lbs[1].upper(), self.nodes[1])
             ]
         }
         seq = [

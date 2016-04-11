@@ -7,7 +7,8 @@ import re
 
 from pyrsistent import pset
 
-from toolz.functoolz import curry, identity
+from toolz.functoolz import compose, curry, identity
+from toolz.curried import map
 
 from otter.cloud_client import (
     ExceptionWithMessage, ServiceType, log_success_response, service_request)
@@ -189,7 +190,8 @@ def _check_bulk_add(attempted_pairs, result):
     if errors:
         raise BulkErrors(errors)
     elif exists:
-        to_retry = pset(attempted_pairs) - exists
+        lc_set = compose(pset, map(lambda (l, s): (l.lower(), s.lower())))
+        to_retry = lc_set(attempted_pairs) - lc_set(exists)
         return bulk_add(to_retry) if to_retry else None
     else:
         raise UnknownBulkResponse(body)
@@ -262,7 +264,8 @@ def _check_bulk_delete(attempted_pairs, result):
     if errors:
         raise BulkErrors(errors)
     elif non_members:
-        to_retry = pset(attempted_pairs) - non_members
+        lc_set = compose(pset, map(lambda (l, s): (l.lower(), s.lower())))
+        to_retry = lc_set(attempted_pairs) - lc_set(non_members)
         return bulk_delete(to_retry) if to_retry else None
     else:
         raise UnknownBulkResponse(body)
