@@ -109,39 +109,6 @@ class TriggerConvergenceTests(SynchronousTestCase):
             ValueError, perform_sequence, seq, trigger_convergence("t", "g"))
 
 
-class ConvergenceStarterTests(SynchronousTestCase):
-    """Tests for :obj:`ConvergenceStarter`."""
-
-    def test_start_convergence(self):
-        """Starting convergence marks dirty and logs a message."""
-        svc = ConvergenceStarter('my-dispatcher')
-        log = mock_log()
-
-        def perform(dispatcher, eff):
-            return succeed((dispatcher, eff))
-        d = svc.start_convergence(log, 'tenant', 'group', perform=perform)
-        self.assertEqual(
-            self.successResultOf(d),
-            ('my-dispatcher',
-             Effect(CreateOrSet(path='/groups/divergent/tenant_group',
-                                content='dirty'))))
-        log.msg.assert_called_once_with(
-            'mark-dirty-success', tenant_id='tenant', scaling_group_id='group')
-
-    def test_error_marking_dirty(self):
-        """An error is logged when marking dirty fails."""
-        svc = ConvergenceStarter('my-dispatcher')
-        log = mock_log()
-
-        def perform(dispatcher, eff):
-            return fail(RuntimeError('oh no'))
-        d = svc.start_convergence(log, 'tenant', 'group', perform=perform)
-        self.assertEqual(self.successResultOf(d), None)
-        log.err.assert_called_once_with(
-            CheckFailureValue(RuntimeError('oh no')),
-            'mark-dirty-failure', tenant_id='tenant', scaling_group_id='group')
-
-
 class ConvergerTests(SynchronousTestCase):
     """Tests for :obj:`Converger`."""
 
@@ -753,6 +720,26 @@ def _get_dispatcher():
         reference_dispatcher,
         base_dispatcher,
     ])
+
+
+class ConverAllGroupsServiceTests(SynchronousTestCase):
+    """
+    Tests for :obj:`ConvergeAllGroups`
+    """
+
+    def setUp(self):
+        self.lock = mock.Mock(specs=["acquire", "release"])
+        self.kzc = mock.Mock(specs=["Lock"])
+
+    def test_calls_cat(self):
+        s = ConvergeAllGroups(disp,
+
+    def test_health_check(self):
+
+    def test_stop_service(self):
+
+
+
 
 
 class NonConcurrentlyTests(SynchronousTestCase):

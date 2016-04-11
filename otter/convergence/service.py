@@ -1,7 +1,7 @@
 """
 Converger service
 
-The top-level entry-points into this module are :obj:`ConvergenceStarter` and
+The top-level entry-points into this module are :func:`trigger_convergence` and
 :obj:`Converger`.
 """
 
@@ -465,26 +465,74 @@ def trigger_convergence(tenant_id, group_id):
                   error=log_and_raise("mark-dirty-failure"))
 
 
-class ConvergenceStarter(object):
-    """
-    A service that allows indicating that a group has diverged and needs
-    convergence, but does not do the converging itself (see :obj:`Converger`
-    for that).
-    """
-    def __init__(self, dispatcher):
-        self.dispatcher = dispatcher
 
-    def start_convergence(self, log, tenant_id, group_id, perform=perform):
-        """Record that a group needs converged by creating a ZooKeeper node."""
-        log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id)
-        eff = mark_divergent(tenant_id, group_id)
-        d = perform(self.dispatcher, eff)
+class ConvergeAllGroups(MultiService, object):
+    """
+    A service that triggers convergence on all the groups every 5 mins. Only
+    one node is allowed to do this.
+    """
 
-        def success(r):
-            log.msg('mark-dirty-success')
-            return r  # The result is ignored normally, but return it for tests
-        d.addCallbacks(success, log.err, errbackArgs=('mark-dirty-failure',))
-        return d
+    def __init__(self, dispatcher, kz_client, interval, log, clock,
+                 config_func):
+        super(ConvergeAllGroups, self).__init__()
+        self.disp = dispatcher
+        self.log = log
+        self.lock = self.kz_client.Lock("/selfheallock")
+        self.lock_acquired = False
+        self.clock = clock
+        self.time_range = interval - 5
+        timer = TimerService(interval, self._converge_all, config_func)
+        timer.clock = clock
+        timer.setServiceParent(self)
+
+    def stopService(self):
+        # We explicitly do not wait for convergence triggering to complete
+        # before shutting down the service. We however want to release the lock
+        # before shutting down
+        super(ConvergeAllGroups, self).stopService()
+        if self.lock_acquired:
+            return self.lock.release()
+
+    def health_check(self):
+        """
+        Return if this object has lock
+        """
+        return True, {"has_lock": self.lock_acquired}
+
+    def _perform(self):
+        d = perform(self.disp, get_groups_to_converge(config_func))
+        d.addCallback(self._setup_converges)
+        return d.addErrback(self.log.err, "self-heal-err")
+
+    def _setup_converges(self, groups):
+        wait_time = self.time_range / len(groups)
+        for i, group in enumerate(groups):
+            self.clock.callLater(
+                i * wait_time, perform, self.disp,
+                trigger_convergence(group["tenantId"], group["groupId"]))
+
+    @inlineCallbacks
+    def _converge_all(self, config_func):
+        if self.lock_acquired:
+            yield self._perform()
+        else:
+            if (yield self.lock.acquire(False, None)):
+                self.lock_acquired = True
+                yield self._perform()
+
+
+def get_groups_to_converge(time_range, config_func):
+    """
+    Get all tenant's all groups that needs convergence triggering
+    """
+    eff = Effect(GetAllValidGroups())
+
+    def should_converge(g):
+        """ Convergence enabled on tenant and ACTIVE group is not paused """
+        return (tenant_is_enabled(g["tenantId"], config_func)
+                and (not g["paused"]) and g.get("status") == "ACTIVE")
+
+    return eff.on(list(filter(should_converge)))
 
 
 class ConcurrentError(Exception):
@@ -732,8 +780,8 @@ class Converger(MultiService):
     - virtual "buckets" are partitioned between nodes running this service by
       using ZooKeeper (thus, this service could/should be run separately from
       the API). group IDs are deterministically mapped to these buckets.
-    - we repeatedly check for 'dirty flags' created by the
-      :obj:`ConvergenceStarter` service, and determine if they're "ours" with
+    - we repeatedly check for 'dirty flags' created by
+      :func:`trigger_convergence` service, and determine if they're "ours" with
       the partitioner.
     - we ensure we don't execute convergence for the same group concurrently.
     """
