@@ -113,7 +113,7 @@ class BulkAddTests(RCv3Tests):
         """
         errors = {
             "errors": [
-                node_already_member(self.lbs[0], self.nodes[0])
+                node_already_member(self.lbs[0].upper(), self.nodes[0])
             ]
         }
         retried_data = r._sorted_data(
@@ -135,6 +135,40 @@ class BulkAddTests(RCv3Tests):
         ]
         self.assertEqual(perform_sequence(seq, r.bulk_add(self.pairs)), resp)
 
+    def test_retries_uppercase(self):
+        """
+        If bulk adding is called with upper case LB ID and it only returns
+        "lb node pair is already member" error with 409 then other pairs
+        are retried
+        """
+        errors = {
+            "errors": [
+                node_already_member(self.lbs[0].upper(), self.nodes[0])
+            ]
+        }
+        retried_data = r._sorted_data(
+            self.pairs - pset([(self.lbs[0], self.nodes[0])]))
+        resp = {"response": "yo"}
+        lbs = self.lbs[:]
+        lbs[0] = lbs[0].upper()
+        pairs = pset(zip(lbs, self.nodes))
+        data = r._sorted_data(pairs)
+        seq = [
+            (self.svc_req_intent(data),
+             const(stub_json_response(errors, 409))),
+            (log_intent(
+                "request-rcv3-bulk", errors,
+                req_body=("jsonified", data)),
+             noop),
+            (self.svc_req_intent(retried_data),
+             const(stub_json_response(resp, 201))),
+            (log_intent(
+                "request-rcv3-bulk", resp,
+                req_body=("jsonified", retried_data)),
+             noop)
+        ]
+        self.assertEqual(perform_sequence(seq, r.bulk_add(pairs)), resp)
+
     def test_all_already_member(self):
         """
         If bulk_add returns 409 with all attempted pairs as "lb node already
@@ -142,7 +176,8 @@ class BulkAddTests(RCv3Tests):
         """
         errors = {
             "errors": [
-                node_already_member(lb, node) for lb, node in self.pairs
+                node_already_member(lb.upper(), node)
+                for lb, node in self.pairs
             ]
         }
         seq = [
@@ -162,7 +197,7 @@ class BulkAddTests(RCv3Tests):
         """
         errors = {
             "errors": [
-                node_already_member(self.lbs[0], self.nodes[0]),
+                node_already_member(self.lbs[0].upper(), self.nodes[0]),
                 lb_inactive(self.lbs[1])
             ]
         }
@@ -275,11 +310,10 @@ class BulkDeleteTests(RCv3Tests):
         """
         errors = {
             "errors": [
-                server_not_member(self.lbs[0], self.nodes[0]),
                 server_not_member(self.lbs[0].upper(), self.nodes[0]),
                 "Cloud Server {} does not exist".format(self.nodes[1]),
-                "Load Balancer Pool {} does not exist".format(self.lbs[2]),
-                "Load Balancer Pool {} does not exist".format(self.lbs[2].upper())
+                "Load Balancer Pool {} does not exist".format(
+                    self.lbs[2].upper())
             ]
         }
         lbr1 = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
@@ -310,6 +344,52 @@ class BulkDeleteTests(RCv3Tests):
         self.assertEqual(
             perform_sequence(seq, r.bulk_delete(pairs)), success_resp)
 
+    def test_retries_uppercase(self):
+        """
+        If bulk_delete is called with upper case LB ID and it only returns
+        "server not a member", lb or server deleted error(s) with 409 then
+        other pairs are retried
+        """
+        errors = {
+            "errors": [
+                server_not_member(self.lbs[0].upper(), self.nodes[0]),
+                "Cloud Server {} does not exist".format(self.nodes[1]),
+                "Load Balancer Pool {} does not exist".format(
+                    self.lbs[2].upper())
+            ]
+        }
+        lbr1 = "d6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        noder1 = "a95ae0c4-6ab8-4873-b82f-f8433840cff2"
+        lbr2 = "e6d3aa7c-dfa5-4e61-96ee-1d54ac1075d2"
+        noder2 = "e95ae0c4-6ab8-4873-b82f-f8433840cff2"
+        new_pairs = pset(
+            [(self.lbs[0], self.nodes[1]),  # test same server pairs
+             (self.lbs[2], self.nodes[0]),  # test same lb pairs
+             (lbr1, noder1), (lbr2, noder2)])
+        # existing pairs with upper case LB
+        lbs = self.lbs[:]
+        lbs[0] = lbs[0].upper()
+        existing_pairs = pset(zip(lbs, self.nodes))
+        pairs = existing_pairs | new_pairs
+        data = r._sorted_data(pairs)
+        retried_data = r._sorted_data([(lbr1, noder1), (lbr2, noder2)])
+        success_resp = {"good": "response"}
+        seq = [
+            (self.svc_req_intent(data),
+             const(stub_json_response(errors, 409))),
+            (log_intent(
+                "request-rcv3-bulk", errors, req_body=("jsonified", data)),
+             noop),
+            (self.svc_req_intent(retried_data),
+             const(stub_json_response(success_resp, 204))),
+            (log_intent(
+                "request-rcv3-bulk", success_resp,
+                req_body=("jsonified", retried_data)),
+             noop)
+        ]
+        self.assertEqual(
+            perform_sequence(seq, r.bulk_delete(pairs)), success_resp)
+
     def test_all_retries(self):
         """
         If bulk_delete returns "server not a member", lb or server deleted
@@ -317,11 +397,10 @@ class BulkDeleteTests(RCv3Tests):
         """
         errors = {
             "errors": [
-                server_not_member(self.lbs[0], self.nodes[0]),
                 server_not_member(self.lbs[0].upper(), self.nodes[0]),
                 "Cloud Server {} does not exist".format(self.nodes[1]),
-                "Load Balancer Pool {} does not exist".format(self.lbs[2]),
-                "Load Balancer Pool {} does not exist".format(self.lbs[2].upper())
+                "Load Balancer Pool {} does not exist".format(
+                    self.lbs[2].upper())
             ]
         }
         pairs = pset([

@@ -7,8 +7,8 @@ import re
 
 from pyrsistent import pset
 
-from toolz.functoolz import compose, curry, identity
 from toolz.curried import map
+from toolz.functoolz import curry, identity
 
 from otter.cloud_client import (
     ExceptionWithMessage, ServiceType, log_success_response, service_request)
@@ -168,7 +168,8 @@ def _check_bulk_add(attempted_pairs, result):
         match = _NODE_ALREADY_A_MEMBER_PATTERN.match(error)
         if match is not None:
             pair = match.groupdict()
-            exists = exists.add((pair["lb_id"], pair["node_id"]))
+            # lb_id returned in upper case
+            exists = exists.add((pair["lb_id"].lower(), pair["node_id"]))
             continue
 
         match = _LB_INACTIVE_PATTERN.match(error)
@@ -190,8 +191,9 @@ def _check_bulk_add(attempted_pairs, result):
     if errors:
         raise BulkErrors(errors)
     elif exists:
-        lc_set = compose(pset, map(lambda (l, s): (l.lower(), s.lower())))
-        to_retry = lc_set(attempted_pairs) - lc_set(exists)
+        # lb_id is case-insensitive and could've been called with upper case
+        attempted = pset(map(lambda p: (p[0].lower(), p[1]), attempted_pairs))
+        to_retry = attempted - exists
         return bulk_add(to_retry) if to_retry else None
     else:
         raise UnknownBulkResponse(body)
@@ -234,7 +236,9 @@ def _check_bulk_delete(attempted_pairs, result):
         match = _SERVER_NOT_A_MEMBER_PATTERN.match(error)
         if match is not None:
             pair = match.groupdict()
-            non_members = non_members.add((pair["lb_id"], pair["server_id"]))
+            # lb_id returned is in upper case
+            non_members = non_members.add(
+                (pair["lb_id"].lower(), pair["server_id"]))
             continue
 
         match = _LB_INACTIVE_PATTERN.match(error)
@@ -244,7 +248,8 @@ def _check_bulk_delete(attempted_pairs, result):
 
         match = _LB_DOESNT_EXIST_PATTERN.match(error)
         if match is not None:
-            del_lb_id = match.group("lb_id")
+            # lb_id returned is in upper case
+            del_lb_id = match.group("lb_id").lower()
             # consider all pairs with this LB to be removed
             removed = [(lb_id, node_id) for lb_id, node_id in attempted_pairs
                        if lb_id == del_lb_id]
@@ -264,8 +269,9 @@ def _check_bulk_delete(attempted_pairs, result):
     if errors:
         raise BulkErrors(errors)
     elif non_members:
-        lc_set = compose(pset, map(lambda (l, s): (l.lower(), s.lower())))
-        to_retry = lc_set(attempted_pairs) - lc_set(non_members)
+        # LB_ID is case-insensitive and could've been called with upper case
+        attempted = pset(map(lambda p: (p[0].lower(), p[1]), attempted_pairs))
+        to_retry = attempted - non_members
         return bulk_delete(to_retry) if to_retry else None
     else:
         raise UnknownBulkResponse(body)
