@@ -22,6 +22,7 @@ from silverberg.cluster import RoundRobinCassandraCluster
 from toolz.curried import filter, get_in
 from toolz.dicttoolz import keyfilter, merge
 from toolz.itertoolz import groupby
+from toolz.recipes import countby
 
 from twisted.application.internet import TimerService
 from twisted.application.service import Service
@@ -75,12 +76,12 @@ def get_tenant_metrics(tenant_id, scaling_groups, grouped_servers,
             group = {'groupId': group_id_from_metadata(servers[0]['metadata']),
                      'desired': 0}
         servers = map(NovaServer.from_server_details_json, servers)
-        dservers = groupby(get_destiny, servers)
-        active = len(dservers.get(Destiny.CONSIDER_AVAILABLE, [])) + \
-            len(dservers.get(Destiny.AVOID_REPLACING, []))
-        ignore = len(dservers.get(Destiny.DELETE, [])) + \
-            len(dservers.get(Destiny.CLEANUP, [])) + \
-            len(dservers.get(Destiny.IGNORE, []))
+        counts = defaultdict(lambda: 0)
+        counts.update(countby(get_destiny, servers))
+        active = counts[Destiny.CONSIDER_AVAILABLE] + \
+            counts[Destiny.AVOID_REPLACING]
+        ignore = counts[Destiny.DELETE] + counts[Destiny.CLEANUP] + \
+            counts[Destiny.IGNORE]
         yield GroupMetrics(tenant_id, group['groupId'], group['desired'],
                            active, len(servers) - ignore - active)
 
