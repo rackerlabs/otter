@@ -58,10 +58,14 @@ class GetTenantMetricsTests(SynchronousTestCase):
     def test_get_tenant_metrics(self):
         """Extracts metrics from the servers."""
         servers = {
-            'g1': ([_server('g1', 'ACTIVE')] * 3 +
+            'g1': ([_server('g1', 'ACTIVE')] * 2 +
+                   [_server('g1', 'SUSPENDED')] +   # Destiny.AVOID_REPLACING
                    [_server('g1', 'BUILD')] * 2 +
-                   [_server("g1", "ERROR"), _server("g1", "DELETED"),
-                    _server("g1", "SHUTOFF"), _server("g1", "PASSWORD")]),
+                   [_server('g1', 'UNKNOWN')] +  # Destiny.IGNORE
+                   [_server("g1", "ERROR"),  # Destiny.DELETE
+                    _server("g1", "DELETED"),  # Destiny.CLEANUP
+                    _server("g1", "SHUTOFF"),  # Destiny.DELETE
+                    _server("g1", "PASSWORD")]),  # Destiny.WAIT
             'g3': [_server("g3", 'ACTIVE')],
             'g4': [_server("g4", 'ACTIVE')],
             'g5': [_server("g5", 'ACTIVE')]

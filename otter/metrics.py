@@ -21,8 +21,8 @@ from silverberg.cluster import RoundRobinCassandraCluster
 
 from toolz.curried import filter, get_in
 from toolz.dicttoolz import keyfilter, merge
-from toolz.functoolz import compose, flip
 from toolz.itertoolz import groupby
+from toolz.recipes import countby
 
 from twisted.application.internet import TimerService
 from twisted.application.service import Service
@@ -37,8 +37,8 @@ from otter.cloud_client import TenantScope, service_request
 from otter.constants import ServiceType, get_service_configs
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.gathering import get_all_scaling_group_servers
-from otter.convergence.model import (
-    NovaServer, ServerState, group_id_from_metadata)
+from otter.convergence.model import NovaServer, group_id_from_metadata
+from otter.convergence.planning import Destiny, get_destiny
 from otter.effect_dispatcher import get_legacy_dispatcher
 from otter.log import log as otter_log
 from otter.models.cass import CassScalingGroupCollection
@@ -76,13 +76,14 @@ def get_tenant_metrics(tenant_id, scaling_groups, grouped_servers,
             group = {'groupId': group_id_from_metadata(servers[0]['metadata']),
                      'desired': 0}
         servers = map(NovaServer.from_server_details_json, servers)
-        _len = compose(len, list, flip(filter, servers))
-        active = _len(lambda s: s.state == ServerState.ACTIVE)
-        bad = _len(lambda s: s.state in (ServerState.SHUTOFF,
-                                         ServerState.ERROR,
-                                         ServerState.DELETED))
+        counts = defaultdict(lambda: 0)
+        counts.update(countby(get_destiny, servers))
+        active = counts[Destiny.CONSIDER_AVAILABLE] + \
+            counts[Destiny.AVOID_REPLACING]
+        ignore = counts[Destiny.DELETE] + counts[Destiny.CLEANUP] + \
+            counts[Destiny.IGNORE]
         yield GroupMetrics(tenant_id, group['groupId'], group['desired'],
-                           active, len(servers) - bad - active)
+                           active, len(servers) - ignore - active)
 
 
 def get_all_metrics_effects(tenanted_groups, log, _print=False):
