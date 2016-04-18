@@ -135,6 +135,14 @@ class UnknownBulkResponse(ExceptionWithMessage):
             "Unknown bulk API response: {}".format(body))
 
 
+def normalize_lb_id(lb_id):
+    """
+    Load balancer IDs are case insensitive. Here, we normalize it to lower case
+    for consistency and comparison
+    """
+    return lb_id.lower()
+
+
 def bulk_add(lb_node_pairs):
     """
     Bulk add RCv3 LB Nodes. If RCv3 returns error about a pair being already
@@ -146,9 +154,10 @@ def bulk_add(lb_node_pairs):
         when all pairs are already members. Otherwise raises `BulkErrors` or
         `UnknownBulkResponse`
     """
-    eff = _rackconnect_bulk_request(lb_node_pairs, "POST",
+    pairs = [(normalize_lb_id(l), n) for l, n in lb_node_pairs]
+    eff = _rackconnect_bulk_request(pairs, "POST",
                                     success_pred=has_code(201, 409))
-    return eff.on(_check_bulk_add(lb_node_pairs))
+    return eff.on(_check_bulk_add(pairs))
 
 
 @curry
@@ -167,7 +176,8 @@ def _check_bulk_add(attempted_pairs, result):
         match = _NODE_ALREADY_A_MEMBER_PATTERN.match(error)
         if match is not None:
             pair = match.groupdict()
-            exists = exists.add((pair["lb_id"], pair["node_id"]))
+            exists = exists.add(
+                (normalize_lb_id(pair["lb_id"]), pair["node_id"]))
             continue
 
         match = _LB_INACTIVE_PATTERN.match(error)
@@ -211,9 +221,10 @@ def bulk_delete(lb_node_pairs):
         all nodes are already deleted. Otherwise raises `BulkErrors` or
         `UnknownBulkResponse`
     """
-    eff = _rackconnect_bulk_request(lb_node_pairs, "DELETE",
+    pairs = [(normalize_lb_id(l), n) for l, n in lb_node_pairs]
+    eff = _rackconnect_bulk_request(pairs, "DELETE",
                                     success_pred=has_code(204, 409))
-    return eff.on(_check_bulk_delete(lb_node_pairs))
+    return eff.on(_check_bulk_delete(pairs))
 
 
 @curry
@@ -232,7 +243,8 @@ def _check_bulk_delete(attempted_pairs, result):
         match = _SERVER_NOT_A_MEMBER_PATTERN.match(error)
         if match is not None:
             pair = match.groupdict()
-            non_members = non_members.add((pair["lb_id"], pair["server_id"]))
+            non_members = non_members.add(
+                (normalize_lb_id(pair["lb_id"]), pair["server_id"]))
             continue
 
         match = _LB_INACTIVE_PATTERN.match(error)
@@ -242,7 +254,7 @@ def _check_bulk_delete(attempted_pairs, result):
 
         match = _LB_DOESNT_EXIST_PATTERN.match(error)
         if match is not None:
-            del_lb_id = match.group("lb_id")
+            del_lb_id = normalize_lb_id(match.group("lb_id"))
             # consider all pairs with this LB to be removed
             removed = [(lb_id, node_id) for lb_id, node_id in attempted_pairs
                        if lb_id == del_lb_id]
