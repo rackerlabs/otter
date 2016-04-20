@@ -77,10 +77,11 @@ def trigger_convergence_groups(authenticator, region, groups,
     :return: Deferred fired with None
     """
     sem = DeferredSemaphore(concurrency_limit)
-    return gatherResults(
+    return DeferredList(
         [sem.run(trigger_convergence, authenticator, region, group,
                  no_error_group)
          for group in groups],
+        fireOnOneErrback=False,
         consumeErrors=True).addCallback(lambda _: None)
 
 
