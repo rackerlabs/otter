@@ -1,5 +1,5 @@
 klein==15.0.0
-twisted==15.0.0
+twisted==16.1.1
 service_identity==14.0.0
 jsonschema==2.4.0
 iso8601==0.1.8
