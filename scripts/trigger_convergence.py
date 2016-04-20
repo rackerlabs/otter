@@ -16,6 +16,7 @@ from __future__ import print_function
 import json
 from argparse import ArgumentParser
 from datetime import datetime
+from pprint import pprint
 
 from effect import Effect, Func, parallel
 from effect.do import do, do_return
@@ -27,7 +28,7 @@ import treq
 
 from twisted.internet import task
 from twisted.internet.defer import (
-    DeferredSemaphore, gatherResults, inlineCallbacks, succeed)
+    DeferredList, DeferredSemaphore, gatherResults, inlineCallbacks, succeed)
 
 from txeffect import perform
 
@@ -77,12 +78,17 @@ def trigger_convergence_groups(authenticator, region, groups,
     :return: Deferred fired with None
     """
     sem = DeferredSemaphore(concurrency_limit)
-    return DeferredList(
+    d = DeferredList(
         [sem.run(trigger_convergence, authenticator, region, group,
                  no_error_group)
          for group in groups],
+        fireOnOneCallback=False,
         fireOnOneErrback=False,
-        consumeErrors=True).addCallback(lambda _: None)
+        consumeErrors=True)
+    d.addCallback(
+        lambda results: [{"group": (g["tenantId"], g["groupId"]), "error": r}
+                         for g, (s, r) in zip(groups, results) if not s])
+    return d
 
 
 def get_groups_of_tenants(log, store, tenant_ids):
@@ -215,9 +221,12 @@ def main(reactor):
                                    authenticator, conf)
         print(*steps, sep='\n')
     else:
-        yield trigger_convergence_groups(
+        error_groups = yield trigger_convergence_groups(
             authenticator, conf["region"], groups, parsed.limit,
             parsed.no_error_group)
+        if error_groups:
+            print("Following groups errored")
+            pprint(error_groups)
     yield cass_client.disconnect()
 
 
