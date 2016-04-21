@@ -16,6 +16,7 @@ from __future__ import print_function
 import json
 from argparse import ArgumentParser
 from datetime import datetime
+from pprint import pprint
 
 from effect import Effect, Func, parallel
 from effect.do import do, do_return
@@ -27,7 +28,7 @@ import treq
 
 from twisted.internet import task
 from twisted.internet.defer import (
-    DeferredSemaphore, gatherResults, inlineCallbacks, succeed)
+    DeferredList, DeferredSemaphore, gatherResults, inlineCallbacks, succeed)
 
 from txeffect import perform
 
@@ -39,7 +40,7 @@ from otter.effect_dispatcher import get_full_dispatcher
 from otter.metrics import connect_cass_servers
 from otter.models.cass import CassScalingGroupCollection
 from otter.test.utils import mock_log
-from otter.util.http import append_segments, headers
+from otter.util.http import append_segments, check_success, headers
 from otter.util.timestamp import datetime_to_epoch
 
 
@@ -59,8 +60,7 @@ def trigger_convergence(authenticator, region, group, no_error_group):
     resp = yield treq.post(
         append_segments(endpoint, "groups", group["groupId"], "converge"),
         headers=headers(token), params={"on_error": conv_on_error}, data="")
-    if resp.code != 204:
-        raise ValueError("bad code", resp.code)
+    yield check_success(resp, [204])
 
 
 def trigger_convergence_groups(authenticator, region, groups,
@@ -77,11 +77,17 @@ def trigger_convergence_groups(authenticator, region, groups,
     :return: Deferred fired with None
     """
     sem = DeferredSemaphore(concurrency_limit)
-    return gatherResults(
+    d = DeferredList(
         [sem.run(trigger_convergence, authenticator, region, group,
                  no_error_group)
          for group in groups],
-        consumeErrors=True).addCallback(lambda _: None)
+        fireOnOneCallback=False,
+        fireOnOneErrback=False,
+        consumeErrors=True)
+    d.addCallback(
+        lambda results: [(g["tenantId"], g["groupId"], f.value)
+                         for g, (s, f) in zip(groups, results) if not s])
+    return d
 
 
 def get_groups_of_tenants(log, store, tenant_ids):
@@ -214,9 +220,12 @@ def main(reactor):
                                    authenticator, conf)
         print(*steps, sep='\n')
     else:
-        yield trigger_convergence_groups(
+        error_groups = yield trigger_convergence_groups(
             authenticator, conf["region"], groups, parsed.limit,
             parsed.no_error_group)
+        if error_groups:
+            print("Following groups errored")
+            pprint(error_groups)
     yield cass_client.disconnect()
 
 
