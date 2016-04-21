@@ -40,7 +40,7 @@ from otter.effect_dispatcher import get_full_dispatcher
 from otter.metrics import connect_cass_servers
 from otter.models.cass import CassScalingGroupCollection
 from otter.test.utils import mock_log
-from otter.util.http import append_segments, headers
+from otter.util.http import append_segments, check_success, headers
 from otter.util.timestamp import datetime_to_epoch
 
 
@@ -60,8 +60,7 @@ def trigger_convergence(authenticator, region, group, no_error_group):
     resp = yield treq.post(
         append_segments(endpoint, "groups", group["groupId"], "converge"),
         headers=headers(token), params={"on_error": conv_on_error}, data="")
-    if resp.code != 204:
-        raise ValueError("bad code", resp.code)
+    yield check_success(resp, [204])
 
 
 def trigger_convergence_groups(authenticator, region, groups,
@@ -86,8 +85,8 @@ def trigger_convergence_groups(authenticator, region, groups,
         fireOnOneErrback=False,
         consumeErrors=True)
     d.addCallback(
-        lambda results: [{"group": (g["tenantId"], g["groupId"]), "error": r}
-                         for g, (s, r) in zip(groups, results) if not s])
+        lambda results: [(g["tenantId"], g["groupId"], f.value)
+                         for g, (s, f) in zip(groups, results) if not s])
     return d
 
 
