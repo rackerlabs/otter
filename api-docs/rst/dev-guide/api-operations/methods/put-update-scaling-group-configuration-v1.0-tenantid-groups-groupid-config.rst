@@ -144,17 +144,17 @@ This table shows the body parameters for the request:
 |                          |                         |be an integer between 0  |
 |                          |                         |and 1000.                |
 +--------------------------+-------------------------+-------------------------+
-|\ **metadata**            |Object *(Required)*      |Optional. Custom         |
-|                          |                         |metadata for your group  |
-|                          |                         |configuration. You can   |
-|                          |                         |use this parameter for   |
-|                          |                         |custom automation, but   |
-|                          |                         |it does not change any   |
-|                          |                         |functionality in Auto    |
-|                          |                         |Scale. There currently   |
-|                          |                         |is no limitation on      |
-|                          |                         |depth.                   |
-+--------------------------+-------------------------+-------------------------+
+|\ **metadata**            |Object *(Required)*      |Custom metadata for your |
+|                          |                         |group  configuration.    |
+|                          |                         |You can use this         |
+|                          |                         |parameter for custom     |
+|                          |                         |automation, but it does  |
+|                          |                         |not change any           |
+|                          |                         |functionality in         |
+|                          |                         |Auto Scale. There        |
+|                          |                         |currently is no          |
+|                          |                         |limitation on depth.     |
+--------------------------+-------------------------+--------------------------+
 
 
 
