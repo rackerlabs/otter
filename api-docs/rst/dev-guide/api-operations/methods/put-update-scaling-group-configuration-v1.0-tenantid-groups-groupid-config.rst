@@ -145,7 +145,7 @@ This table shows the body parameters for the request:
 |                          |                         |and 1000.                |
 +--------------------------+-------------------------+-------------------------+
 |\ **metadata**            |Object *(Required)*      |Custom metadata for your |
-|                          |                         |group  configuration.    |
+|                          |                         |group configuration.     |
 |                          |                         |You can use this         |
 |                          |                         |parameter for custom     |
 |                          |                         |automation, but it does  |
@@ -154,7 +154,7 @@ This table shows the body parameters for the request:
 |                          |                         |Auto Scale. There        |
 |                          |                         |currently is no          |
 |                          |                         |limitation on depth.     |
---------------------------+-------------------------+--------------------------+
+---------------------------+-------------------------+-------------------------+
 
 
 
