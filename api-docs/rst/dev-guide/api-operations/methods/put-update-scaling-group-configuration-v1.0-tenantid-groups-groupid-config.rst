@@ -144,16 +144,15 @@ This table shows the body parameters for the request:
 |                          |                         |be an integer between 0  |
 |                          |                         |and 1000.                |
 +--------------------------+-------------------------+-------------------------+
-|\ **metadata**            |Object *(Required)*      |Optional. Custom         |
-|                          |                         |metadata for your group  |
+|\ **metadata**            |Object *(Required)*      |Specifies custom metadata|
+|                          |                         |for your group           |
 |                          |                         |configuration. You can   |
-|                          |                         |use this parameter for   |
-|                          |                         |custom automation, but   |
-|                          |                         |it does not change any   |
-|                          |                         |functionality in Auto    |
-|                          |                         |Scale. There currently   |
-|                          |                         |is no limitation on      |
-|                          |                         |depth.                   |
+|                          |                         |use this object to enable|
+|                          |                         |custom automation. The   |
+|                          |                         |specification does not   |
+|                          |                         |affect Auto Scale        |
+|                          |                         |functionality. There is  |
+|                          |                         |no limitation on depth.  |
 +--------------------------+-------------------------+-------------------------+
 
 
