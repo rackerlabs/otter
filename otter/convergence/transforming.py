@@ -14,6 +14,8 @@ from toolz.itertoolz import concat, concatv
 
 from otter.convergence.steps import (
     AddNodesToCLB,
+    BulkAddToRCv3,
+    BulkRemoveFromRCv3,
     CreateServer,
     CreateStack,
     RemoveNodesFromCLB)
@@ -64,6 +66,28 @@ def _register_bulk_clb_optimizer(step_class, attr_name):
 
 _register_bulk_clb_optimizer(AddNodesToCLB, 'address_configs')
 _register_bulk_clb_optimizer(RemoveNodesFromCLB, 'node_ids')
+
+
+def _register_bulk_rcv3_optimizer(step_class):
+    """
+    Merge together multiple RCv3 bulk steps.
+
+    :param step_class: One of :obj:`BulkAddToRCv3` or :obj:`BulkRemoveFromRCv3`
+
+    :return: Nothing, because this just registers the optimizers with the
+        module.
+    """
+    def optimize_steps(rcv3_steps):
+        return [
+            step_class(
+                lb_node_pairs=pset(
+                    concat(s.lb_node_pairs for s in rcv3_steps)))
+        ]
+
+    _optimizer(step_class)(optimize_steps)
+
+_register_bulk_rcv3_optimizer(BulkAddToRCv3)
+_register_bulk_rcv3_optimizer(BulkRemoveFromRCv3)
 
 
 def optimize_steps(steps):

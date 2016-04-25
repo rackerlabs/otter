@@ -287,3 +287,60 @@ class OptimizerTests(SynchronousTestCase):
                 # Unoptimizable steps
                 CreateServer(server_config=pmap({}))
             ]))
+
+    def _test_rcv3_step(self, step_class):
+        steps = [
+            step_class(
+                lb_node_pairs=pset([("l1", "s1"), ("l1", "s2")])),
+            step_class(lb_node_pairs=pset([("l2", "s1")])),
+            step_class(lb_node_pairs=pset([("l1", "s3"), ("l2", "s3")]))
+        ]
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                step_class(
+                    lb_node_pairs=pset([
+                        ("l1", "s1"), ("l1", "s2"), ("l2", "s1"), ("l1", "s3"),
+                        ("l2", "s3")
+                    ])
+                )
+            ])
+        )
+
+    def test_rcv3_add(self):
+        """
+        Multiple BulkAddToRCv3 steps are combined into one step
+        """
+        self._test_rcv3_step(BulkAddToRCv3)
+
+    def test_rcv3_remove(self):
+        """
+        Multiple BulkRemoveFromRCv3 steps are combined into one step
+        """
+        self._test_rcv3_step(BulkRemoveFromRCv3)
+
+    def test_rcv3_mixed(self):
+        """
+        Multiple BulkAddToRCv3 and BulkRemoveFromRCv3 steps are combined
+        into one BulkAddToRCv3 step and one BulkRemoveFromRCv3 step
+        """
+        steps = [
+            BulkAddToRCv3(
+                lb_node_pairs=pset([("l1", "s1"), ("l1", "s2")])),
+            # Same pair for different class does not conflict
+            BulkRemoveFromRCv3(lb_node_pairs=pset([("l1", "s1")])),
+            BulkAddToRCv3(lb_node_pairs=pset([("l1", "s3")])),
+            BulkRemoveFromRCv3(
+                lb_node_pairs=pset([("l3", "s3"), ("l2", "s3")]))
+        ]
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                BulkAddToRCv3(
+                    lb_node_pairs=pset([
+                        ("l1", "s1"), ("l1", "s2"), ("l1", "s3")])),
+                BulkRemoveFromRCv3(
+                    lb_node_pairs=pset([
+                        ("l1", "s1"), ("l3", "s3"), ("l2", "s3")]))
+            ])
+        )
