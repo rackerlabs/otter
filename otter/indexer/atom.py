@@ -42,21 +42,30 @@ def entries(feed):
     return xpath('./atom:entry', feed)
 
 
-def previous_link(feed):
+def _link(feed, direction):
     """
-    Get the previous link from a particular AtomHopper feed
+    Get the previous/next link from a particular AtomHopper feed
 
     :type feed: :class:`ElementTree`
+    :param str direction: "next" or "previous"
 
     :return: the URL to the previous feed
     :rtype: ``str``
     """
-    links = xpath('./atom:link[@rel="previous"]', feed)
+    links = xpath('./atom:link[@rel="{}"]'.format(direction), feed)
 
     if len(links) == 0:
         return None
 
     return links[0].attrib['href']
+
+
+def previous_link(feed):
+    return _link(feed, "previous")
+
+
+def next_link(feed):
+    return _link(feed, "next")
 
 
 def summary(entry):

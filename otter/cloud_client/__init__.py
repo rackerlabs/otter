@@ -15,6 +15,7 @@ from effect import (
     catch,
     perform,
     sync_performer)
+from effect.do import do
 
 import six
 
@@ -705,21 +706,34 @@ def get_clbs():
         success=lambda (response, body): body['loadBalancers'])
 
 
-def get_clb_node_feed(lb_id, node_id):
-    """Get the atom feed associated with a CLB node. Returns feed as str."""
+def _node_feed_request(lb_id, node_id, params):
     return service_request(
-        ServiceType.CLOUD_LOAD_BALANCERS,
-        'GET',
+        ServiceType.CLOUD_LOAD_BALANCERS, 'GET',
         append_segments('loadbalancers', str(lb_id), 'nodes',
                         '{}.atom'.format(node_id)),
+        params=params,
         json_response=False
     ).on(
         error=_only_json_api_errors(
             lambda c, b: _process_clb_api_error(c, b, lb_id))
     ).on(
         log_success_response('request-get-clb-node-feed', identity)
-    ).on(
-        success=lambda (response, body): body)
+    )
+
+
+@do
+def get_clb_node_feed(lb_id, node_id):
+    """Get the atom feed associated with a CLB node. Returns feed as str."""
+    all_entries = []
+    params = {}
+    while True:
+        feed = yield _node_feed_request(lb_id, params)
+        entries = atom.entries(feed)
+        if entries == []:
+            yield do_return(all_entries)
+        all_entries.extend(entries)
+        next_link = atom.next_link(atom.parse(feed))
+        params = parse_qs(urlparse(next_link).query)
 
 
 def _expand_clb_matches(matches_tuples, lb_id, node_id=None):

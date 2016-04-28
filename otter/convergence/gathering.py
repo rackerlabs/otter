@@ -1,4 +1,5 @@
 """Code related to gathering data to inform convergence."""
+import re
 from functools import partial
 
 from effect import catch, parallel
@@ -189,32 +190,38 @@ def get_clb_contents():
         if node.description.lb_id in deleted_lbs:
             return None
         if feed is not None:
-            return assoc_obj(node, drained_at=extract_CLB_drained_at(feed))
+            created_at, drained_at = extract_CLB_node_info(feed)
+            return assoc_obj(node, created_at=created_at, drained_at=drained_at)
         else:
             return node
     nodes = map(update_drained_at, concat(lb_nodes.values()))
     yield do_return(list(filter(bool, nodes)))
 
 
-def extract_CLB_drained_at(feed):
-    """
-    Extract time when node was changed to DRAINING from a CLB atom feed.
+_DRAINING_RE = re.compile(
+    "^Node successfully (created|updated) with address: '.+', port: '\d+', "
+    "condition: 'DRAINING', weight: '\d+'$")
 
-    :param str feed: Atom feed of the node
 
-    :returns: EPOCH in seconds
-    :rtype: float
+def extract_CLB_node_info(feed):
     """
-    # TODO: This function temporarily only looks at last entry assuming that
-    # it was draining operation. May need to look at all entries in reverse
-    # order and check for draining operation. This could include paging to
-    # further entries
-    entry = atom.entries(atom.parse(feed))[0]
-    summary = atom.summary(entry)
-    if 'Node successfully updated' in summary and 'DRAINING' in summary:
-        return timestamp_to_epoch(atom.updated(entry))
+    Extract time when node was created and was changed to DRAINING from a CLB
+    atom feed entries. Return None if either info is not available.
+
+    :param list feed: ``list`` of atom entry :class:`Elements`
+
+    :returns: tuple of (created_at EPOCH, drained_at EPOCH) in seconds
+    :rtype: (float, float) tuple
+    """
+    # Last entry must be create node entry
+    created_at = (timestamp_to_epoch(atom.updated(feed[-1]))
+                  if atom.categories(feed[-1]) == ["CREATE"] else None)
+    for entry in feed:
+        if _DRAINING_RE.match(atom.summary(entry)):
+            drained_at = timestamp_to_epoch(atom.updated(entry))
+            return created_at, drained_at
     else:
-        raise ValueError('Unexpected summary: {}'.format(summary))
+        return created_at, None
 
 
 def get_rcv3_contents():
