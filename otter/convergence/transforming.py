@@ -72,7 +72,8 @@ def _register_bulk_rcv3_optimizer(step_class):
     """
     Merge together multiple RCv3 bulk steps.
 
-    :param step_class: One of :obj:`BulkAddToRCv3` or :obj:`BulkRemoveFromRCv3`
+    :param type step_class: One of :obj:`BulkAddToRCv3` or
+        :obj:`BulkRemoveFromRCv3`
 
     :return: Nothing, because this just registers the optimizers with the
         module.
