@@ -32,7 +32,7 @@ from otter.cloud_client import (
 )
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
-    extract_CLB_node_info,
+    extract_CLB_drained_at,
     get_all_launch_server_data,
     get_all_launch_stack_data,
     get_all_scaling_group_servers,
@@ -317,63 +317,58 @@ class GetScalingGroupServersTests(SynchronousTestCase):
             self.freeze(exp_old))
 
 
-class ExtractNodeInfoTests(SynchronousTestCase):
+class ExtractDrainedTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.convergence.extract_CLB_node_info`
+    Tests for :func:`otter.convergence.extract_CLB_drained_at`
     """
-    summary = ("Node successfully updated with address: "
-               "'10.23.45.6', port: '8080', condition: 'DRAINING', "
-               "weight: '1'")
+    updated_summary = ("Node successfully updated with address: "
+                       "'10.23.45.6', port: '8080', weight: '1', "
+                       "condition: 'DRAINING'")
+    created_summary = ("Node successfully created with address: "
+                       "'10.23.45.6', port: '8080', condition: 'DRAINING', "
+                       "weight: '1'")
     updated1 = '2014-10-23T18:10:48.001Z'
     updated2 = '2015-09-23T08:00:40Z'
-    entry = ('<entry><summary>{}</summary><updated>{}</updated>'
-             '<category term="{}"/></entry>>')
+    entry = '<entry><summary>{}</summary><updated>{}</updated></entry>'
     feed = '<feed xmlns="http://www.w3.org/2005/Atom">{}</feed>'
 
     def parsed_feed(self, *entries):
         entries = ''.join(self.entry.format(*e) for e in entries)
         return atom.entries(atom.parse(self.feed.format(entries)))
 
-    def test_success(self):
+    def test_updated(self):
         """
-        Last entry is CREATE and one of the entries has DRAINING
+        Returns time matched from first "Node updated" entry found in feeds
         """
         feed = self.parsed_feed(
-            (self.summary, self.updated1, "UPDATE"),
-            ("don't care", self.updated2, "CREATE"))
+            ("summary", "2000-10-01Z"),
+            (self.updated_summary, self.updated1),
+            ("don't care", self.updated2))
         self.assertEqual(
-            extract_CLB_node_info(feed),
-            (timestamp_to_epoch(self.updated2),
-             timestamp_to_epoch(self.updated1)))
+            extract_CLB_drained_at(feed), timestamp_to_epoch(self.updated1))
 
-    def test_no_create(self):
+    def test_created(self):
         """
-        Last entry is not CREATE but DRAINING is there
+        Returns time matched from first "Node created" entry found in feeds
         """
-        feed = self.feed.format("Node successfully updated with ENABLED",
-                                self.updated)
-        self.assertRaises(ValueError, extract_CLB_drained_at, feed)
+        feed = self.parsed_feed(
+            ("summary", "2000-10-01Z"), (self.created_summary, self.updated2))
+        self.assertEqual(
+            extract_CLB_drained_at(feed), timestamp_to_epoch(self.updated2))
 
-    def test_no_draining(self):
+    def test_no_match(self):
         """
-        No entry for DRAINING but last entry is CREATE
+        Returns None when no entry matches
         """
+        feed = self.parsed_feed(
+            ("summary", self.updated1), ("don't care", self.updated2))
+        self.assertIsNone(extract_CLB_drained_at(feed))
 
     def test_empty(self):
         """
-        No entries
+        Returns None when there are no entries in the feed
         """
-
-    def test_same_value(self):
-        """
-        Only one CREATE entry that shows node is created as DRAINING. That
-        entry's timestamp is returned as both values of the tuple
-        """
-
-    def test_failure(self):
-        """
-        Last entry is not CREATE and no DRAINING entry found
-        """
+        self.assertIsNone(extract_CLB_drained_at([]))
 
 
 def lb_req(url, json_response, response):

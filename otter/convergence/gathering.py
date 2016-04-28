@@ -190,38 +190,38 @@ def get_clb_contents():
         if node.description.lb_id in deleted_lbs:
             return None
         if feed is not None:
-            created_at, drained_at = extract_CLB_node_info(feed)
-            return assoc_obj(node, created_at=created_at, drained_at=drained_at)
+            return assoc_obj(node, drained_at=extract_CLB_drained_at(feed))
         else:
             return node
     nodes = map(update_drained_at, concat(lb_nodes.values()))
     yield do_return(list(filter(bool, nodes)))
 
 
-_DRAINING_RE = re.compile(
-    "^Node successfully (created|updated) with address: '.+', port: '\d+', "
+_DRAINING_CREATED_RE = (
+    "^Node successfully created with address: '.+', port: '\d+', "
     "condition: 'DRAINING', weight: '\d+'$")
+_DRAINING_UPDATED_RE = (
+    "^Node successfully updated with address: '.+', port: '\d+', "
+    "weight: '\d+', condition: 'DRAINING'$")
+_DRAINING_RE = re.compile(
+    "({})|({})".format(_DRAINING_UPDATED_RE, _DRAINING_CREATED_RE))
 
 
-def extract_CLB_node_info(feed):
+def extract_CLB_drained_at(feed):
     """
-    Extract time when node was created and was changed to DRAINING from a CLB
-    atom feed entries. Return None if either info is not available.
+    Extract time when node was changed to DRAINING from a CLB atom feed. Will
+    return node's creation time if node was created with DRAINING. Return None
+    if couldnt find for any reason.
 
     :param list feed: ``list`` of atom entry :class:`Elements`
 
-    :returns: tuple of (created_at EPOCH, drained_at EPOCH) in seconds
-    :rtype: (float, float) tuple
+    :returns: drained_at EPOCH in seconds
+    :rtype: float
     """
-    # Last entry must be create node entry
-    created_at = (timestamp_to_epoch(atom.updated(feed[-1]))
-                  if atom.categories(feed[-1]) == ["CREATE"] else None)
     for entry in feed:
         if _DRAINING_RE.match(atom.summary(entry)):
-            drained_at = timestamp_to_epoch(atom.updated(entry))
-            return created_at, drained_at
-    else:
-        return created_at, None
+            return timestamp_to_epoch(atom.updated(entry))
+    return None
 
 
 def get_rcv3_contents():
