@@ -167,7 +167,7 @@ def group_steps(group):
 
 def groups_steps(groups, reactor, store, cass_client, authenticator, conf):
     """
-    Return [(group, steps, delta)] list
+    Return [(group, (steps, delta))] list
     """
     eff = parallel(map(group_steps, groups))
     disp = get_full_dispatcher(
