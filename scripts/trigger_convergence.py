@@ -16,12 +16,14 @@ from __future__ import print_function
 import json
 from argparse import ArgumentParser
 from datetime import datetime
+from functools import partial
 from pprint import pprint
 
 from effect import Effect, Func, parallel
 from effect.do import do, do_return
 
 from toolz.curried import filter
+from toolz.dicttoolz import assoc
 from toolz.itertoolz import concat
 
 import treq
@@ -35,10 +37,11 @@ from txeffect import perform
 from otter.auth import generate_authenticator, public_endpoint_url
 from otter.cloud_client import TenantScope
 from otter.constants import get_service_configs
+from otter.convergence.gathering import get_all_launch_server_data
 from otter.convergence.service import convergence_exec_data, get_executor
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.metrics import connect_cass_servers
-from otter.models.cass import CassScalingGroupCollection
+from otter.models.cass import CassScalingGroupCollection, DEFAULT_CONSISTENCY
 from otter.test.utils import mock_log
 from otter.util.http import append_segments, check_success, headers
 from otter.util.timestamp import datetime_to_epoch
@@ -146,7 +149,8 @@ def get_groups(parsed, store, conf):
 def group_steps(group):
     """
     Return Effect of list of steps that would be performed on the group
-    if convergence is triggered on it with desired=actual
+    if convergence is triggered on it with desired=actual. Also returns
+    current delta of desired and actual
     """
     now_dt = yield Effect(Func(datetime.utcnow))
     all_data_eff = convergence_exec_data(
@@ -154,21 +158,50 @@ def group_steps(group):
     all_data = yield Effect(TenantScope(all_data_eff, group["tenantId"]))
     (executor, scaling_group, group_state, desired_group_state,
      resources) = all_data
-    desired_group_state.desired = len(resources['servers'])
+    delta = desired_group_state.capacity - len(resources['servers'])
+    desired_group_state.capacity = len(resources['servers'])
     steps = executor.plan(desired_group_state, datetime_to_epoch(now_dt),
-                          3600, **resources)
-    yield do_return(steps)
+                          3600, 10, **resources)
+    yield do_return((steps, delta))
 
 
 def groups_steps(groups, reactor, store, cass_client, authenticator, conf):
     """
-    Return [(group, steps)] list
+    Return [(group, steps, delta)] list
     """
     eff = parallel(map(group_steps, groups))
     disp = get_full_dispatcher(
         reactor, authenticator, mock_log(), get_service_configs(conf),
         "kzclient", store, "supervisor", cass_client)
-    return perform(disp, eff).addCallback(lambda steps: zip(groups, steps))
+    d = perform(disp, eff)
+    return d.addCallback(lambda steps: zip(groups, steps))
+
+
+@inlineCallbacks
+def set_desired_to_actual_group(dispatcher, cass_client, group):
+    """
+    Set group's desired to current number of servers in the group
+    """
+    res_eff = get_all_launch_server_data(
+        group["tenantId"], group["groupId"], datetime.utcnow())
+    eff = Effect(TenantScope(res_eff, group["tenantId"]))
+    resources = yield perform(dispatcher, eff)
+    actual = len(resources["servers"])
+    print("group", group, "setting desired to ", actual)
+    yield cass_client.execute(
+        ('UPDATE scaling_group SET desired=:desired WHERE '
+         '"tenantId"=:tenantId AND "groupId"=:groupId'),
+        assoc(group, "desired", actual), DEFAULT_CONSISTENCY)
+
+
+def set_desired_to_actual(groups, reactor, store, cass_client, authenticator,
+                          conf):
+    dispatcher = get_full_dispatcher(
+        reactor, authenticator, mock_log(), get_service_configs(conf),
+        "kzclient", store, "supervisor", cass_client)
+    return gatherResults(
+        map(partial(set_desired_to_actual_group, dispatcher, cass_client),
+            groups))
 
 
 @inlineCallbacks
@@ -182,6 +215,9 @@ def main(reactor):
         "--steps", action="store_true",
         help=("Return steps that would be taken if convergence was triggered "
               "with desired set to current actual. No convergence triggered"))
+    parser.add_argument(
+        "--set-desired-to-actual", action="store_true", dest="set_desired",
+        help="Set group's desired to current actual number of servers")
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
@@ -218,7 +254,10 @@ def main(reactor):
     if parsed.steps:
         steps = yield groups_steps(groups, reactor, store, cass_client,
                                    authenticator, conf)
-        print(*steps, sep='\n')
+        pprint(steps)
+    elif parsed.set_desired:
+        yield set_desired_to_actual(groups, reactor, store, cass_client,
+                                    authenticator, conf)
     else:
         error_groups = yield trigger_convergence_groups(
             authenticator, conf["region"], groups, parsed.limit,
