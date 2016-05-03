@@ -161,7 +161,7 @@ def group_steps(group):
     delta = desired_group_state.capacity - len(resources['servers'])
     desired_group_state.capacity = len(resources['servers'])
     steps = executor.plan(desired_group_state, datetime_to_epoch(now_dt),
-                          3600, 10, **resources)
+                          3600, {}, **resources)
     yield do_return((steps, delta))
 
 
