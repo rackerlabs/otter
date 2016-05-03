@@ -722,26 +722,6 @@ def _get_dispatcher():
     ])
 
 
-class ConverAllGroupsServiceTests(SynchronousTestCase):
-    """
-    Tests for :obj:`ConvergeAllGroups`
-    """
-
-    def setUp(self):
-        self.lock = mock.Mock(specs=["acquire", "release"])
-        self.kzc = mock.Mock(specs=["Lock"])
-
-    def test_calls_cat(self):
-        s = ConvergeAllGroups(disp,
-
-    def test_health_check(self):
-
-    def test_stop_service(self):
-
-
-
-
-
 class NonConcurrentlyTests(SynchronousTestCase):
     """Tests for :func:`non_concurrently`."""
 
