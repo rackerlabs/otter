@@ -185,16 +185,19 @@ def set_desired_to_actual_group(dispatcher, cass_client, group):
     """
     Set group's desired to current number of servers in the group
     """
-    res_eff = get_all_launch_server_data(
-        group["tenantId"], group["groupId"], datetime.utcnow())
-    eff = Effect(TenantScope(res_eff, group["tenantId"]))
-    resources = yield perform(dispatcher, eff)
-    actual = len(resources["servers"])
-    print("group", group, "setting desired to ", actual)
-    yield cass_client.execute(
-        ('UPDATE scaling_group SET desired=:desired WHERE '
-         '"tenantId"=:tenantId AND "groupId"=:groupId'),
-        assoc(group, "desired", actual), DEFAULT_CONSISTENCY)
+    try:
+        res_eff = get_all_launch_server_data(
+            group["tenantId"], group["groupId"], datetime.utcnow())
+        eff = Effect(TenantScope(res_eff, group["tenantId"]))
+        resources = yield perform(dispatcher, eff)
+        actual = len(resources["servers"])
+        print("group", group, "setting desired to ", actual)
+        yield cass_client.execute(
+            ('UPDATE scaling_group SET desired=:desired WHERE '
+             '"tenantId"=:tenantId AND "groupId"=:groupId'),
+            assoc(group, "desired", actual), DEFAULT_CONSISTENCY)
+    except Exception as e:
+        print("Couldn't set group {} to {} due to {}".format(group, actual, e))
 
 
 def set_desired_to_actual(groups, reactor, store, cass_client, authenticator,
