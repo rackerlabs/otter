@@ -155,7 +155,10 @@ def group_steps(group):
     now_dt = yield Effect(Func(datetime.utcnow))
     all_data_eff = convergence_exec_data(
         group["tenantId"], group["groupId"], now_dt, get_executor)
-    all_data = yield Effect(TenantScope(all_data_eff, group["tenantId"]))
+    try:
+        all_data = yield Effect(TenantScope(all_data_eff, group["tenantId"]))
+    except Exception as e:
+        yield do_return((e, 0))
     (executor, scaling_group, group_state, desired_group_state,
      resources) = all_data
     delta = desired_group_state.capacity - len(resources['servers'])
