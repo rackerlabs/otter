@@ -123,10 +123,20 @@ def check_and_trigger(tenant_id, group_id):
 
 
 def lock_is_acquired(dispatcher, lock):
+    """
+    Does given lock object has the lock?
+
+    :return: `Deferred` of `bool`
+    """
     return perform(dispatcher, lock_is_acquired_eff(lock))
 
 
 def lock_is_acquired_eff(lock):
+    """
+    Does given lock object has the lock?
+
+    :return: `Effect` of `bool`
+    """
     children = yield Effect(GetChildren(lock.path))
     if not children:
         yield do_return(False)

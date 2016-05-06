@@ -12,9 +12,11 @@ from twisted.internet.defer import fail, succeed
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.convergence.selfheal import SelfHeal
 from otter.convergence import selfheal as sh
-from otter.test.utils import CheckFailure, const, intent_func, mock_log, noop, patch, raise_
+from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
+from otter.test.utils import (
+    CheckFailure, const, intent_func, mock_log, noop, patch, perform_sequence,
+    raise_)
 
 
 class SelfHealTests(SynchronousTestCase):
@@ -35,7 +37,7 @@ class SelfHealTests(SynchronousTestCase):
             side_effect=intent_func("ggtc"))
         self.lia = patch(self, "otter.convergence.selfheal.lock_is_acquired",
                          return_value=succeed(True))
-        self.s = SelfHeal("disp", self.kzc, 300, self.log, self.clock, "cf")
+        self.s = sh.SelfHeal("disp", self.kzc, 300, self.log, self.clock, "cf")
 
     def test_converge_all_lock_not_acquired(self):
         """
@@ -172,3 +174,61 @@ class SelfHealTests(SynchronousTestCase):
         # was called again
         self.s.disp = "bad"
         self.clock.advance(300)
+
+
+class GetGroupsToConvergeTests(SynchronousTestCase):
+    """
+    Tests for :func:`get_groups_to_converge`
+    """
+    def test_success(self):
+        conf = {"non-convergence-tenants": ["t1"]}
+        groups = [{"tenantId": "t1", "groupId": "g1"},
+                  {"tenantId": "t1", "groupId": "g12"},
+                  {"tenantId": "t2", "groupId": "g2"},
+                  {"tenantId": "t3", "groupId": "g3"}]
+        eff = sh.get_groups_to_converge(conf.get)
+        seq = [(GetAllValidGroups(), const(groups))]
+        self.assertEqual(perform_sequence(seq, eff), groups[2:])
+
+
+class CheckTriggerTests(SynchronousTestCase):
+    """
+    Tests for :func:`check_and_trigger`
+    """
+
+    def setUp(self):
+        self.patch(sh, "trigger_convergence", intent_func("tg"))
+
+    def test_active_resumed(self):
+        """
+        Convergence is triggerred on ACTIVE resumed group
+        """
+        seq = [
+            (GetScalingGroupInfo(tenant_id="tid", group_id="gid"),
+             const({"state": {"status": "ACTIVE", "paused": False}})),
+            (("tg", "tid", "gid"), noop)
+        ]
+        self.assertIsNone(
+            perform_sequence(seq, sh.check_and_trigger("tid", "gid")))
+
+    def test_active_paused(self):
+        """
+        Convergence is not triggerred on ACTIVE paused group
+        """
+        seq = [
+            (GetScalingGroupInfo(tenant_id="tid", group_id="gid"),
+             const({"state": {"status": "ACTIVE", "paused": True}}))
+        ]
+        self.assertIsNone(
+            perform_sequence(seq, sh.check_and_trigger("tid", "gid")))
+
+    def test_inactive_group(self):
+        """
+        Convergence is not triggerred on in-ACTIVE group
+        """
+        seq = [
+            (GetScalingGroupInfo(tenant_id="tid", group_id="gid"),
+             const({"state": {"status": "ERROR", "paused": False}}))
+        ]
+        self.assertIsNone(
+            perform_sequence(seq, sh.check_and_trigger("tid", "gid")))
