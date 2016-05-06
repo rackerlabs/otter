@@ -31,7 +31,7 @@ class SelfHeal(MultiService, object):
                  config_func):
         super(SelfHeal, self).__init__()
         self.disp = dispatcher
-        self.log = log
+        self.log = log.bind(otter_service="selfheal")
         self.lock = kz_client.Lock("/selfheallock")
         self.kz_client = kz_client
         self.clock = clock
@@ -74,9 +74,10 @@ class SelfHeal(MultiService, object):
     def _setup_converges(self, groups):
         active = self._cancel_scheduled_calls()
         if active:
+            # This should never happen
             self.log.err(RuntimeError("self-heal-calls-err"),
-                         "self-heal-calls-err", num_calls=active)
-        wait_time = self.time_range / len(groups)
+                         "self-heal-calls-err", active=active)
+        wait_time = float(self.time_range) / len(groups)
         for i, group in enumerate(groups):
             self.calls.append(
                 self.clock.callLater(
