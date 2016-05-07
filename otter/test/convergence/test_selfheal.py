@@ -17,6 +17,7 @@ from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
 from otter.test.utils import (
     CheckFailure, const, intent_func, mock_log, noop, patch, perform_sequence,
     raise_)
+from otter.util.zk import GetChildren
 
 
 class SelfHealTests(SynchronousTestCase):
@@ -35,7 +36,7 @@ class SelfHealTests(SynchronousTestCase):
         self.ggtc = patch(
             self, "otter.convergence.selfheal.get_groups_to_converge",
             side_effect=intent_func("ggtc"))
-        self.lia = patch(self, "otter.convergence.selfheal.lock_is_acquired",
+        self.ila = patch(self, "otter.convergence.selfheal.is_lock_acquired",
                          return_value=succeed(True))
         self.s = sh.SelfHeal("disp", self.kzc, 300, self.log, self.clock, "cf")
 
@@ -44,7 +45,7 @@ class SelfHealTests(SynchronousTestCase):
         When lock is not acquired, it is tried and if failed does not
         call _perform
         """
-        self.lia.return_value = succeed(False)
+        self.ila.return_value = succeed(False)
         self.lock.acquire.return_value = succeed(False)
         # tests that it is not called
         self.s._perform = lambda: 1 / 0
@@ -56,7 +57,7 @@ class SelfHealTests(SynchronousTestCase):
         When lock is not acquired, it is tried and if successful self._perform
         is called
         """
-        self.lia.return_value = succeed(False)
+        self.ila.return_value = succeed(False)
         self.lock.acquire.return_value = succeed(True)
         self.s._perform = mock.Mock()
         self.s.startService()
@@ -84,7 +85,7 @@ class SelfHealTests(SynchronousTestCase):
         def bad_func(*a):
             return 1 / 0
 
-        self.s._perform = self.lia.side_effect = \
+        self.s._perform = self.ila.side_effect = \
             self.lock.acquire.side_effect = bad_func
         self.s.startService()
         self.log.err.assert_called_once_with(
@@ -152,7 +153,7 @@ class SelfHealTests(SynchronousTestCase):
         self.assertEqual(
             self.successResultOf(self.s.health_check()),
             (True, {"has_lock": True}))
-        self.lia.return_value = succeed(False)
+        self.ila.return_value = succeed(False)
         self.assertEqual(
             self.successResultOf(self.s.health_check()),
             (True, {"has_lock": False}))
@@ -180,7 +181,10 @@ class GetGroupsToConvergeTests(SynchronousTestCase):
     """
     Tests for :func:`get_groups_to_converge`
     """
-    def test_success(self):
+    def test_filtered(self):
+        """
+        Only convgergence enabled tenants are returned
+        """
         conf = {"non-convergence-tenants": ["t1"]}
         groups = [{"tenantId": "t1", "groupId": "g1"},
                   {"tenantId": "t1", "groupId": "g12"},
@@ -232,3 +236,51 @@ class CheckTriggerTests(SynchronousTestCase):
         ]
         self.assertIsNone(
             perform_sequence(seq, sh.check_and_trigger("tid", "gid")))
+
+
+class IsLockAcquiredTests(SynchronousTestCase):
+    """
+    Tests for :func:`is_lock_acquired`
+    """
+
+    def test_eff_no_children(self):
+        """
+        If lock node does not have any children, it does not have lock
+        """
+        lock = mock.Mock(path="/lock")
+        seq = [(GetChildren("/lock"), const([]))]
+        self.assertFalse(perform_sequence(seq, sh.is_lock_acquired_eff(lock)))
+
+    def test_eff_has_lock(self):
+        """
+        Lock node's first child belongs to given object. Hence has the lock
+        """
+        lock = mock.Mock(path="/lock", node="someprefix__lock__0000000001")
+        children = ["errrprefix__lock__0000000004",
+                    "someprefix__lock__0000000001",
+                    "wtfrrefix__lock__0000000002"]
+        seq = [(GetChildren("/lock"), const(children))]
+        self.assertTrue(perform_sequence(seq, sh.is_lock_acquired_eff(lock)))
+
+    def test_eff_no_lock(self):
+        """
+        If lock's node is not the first in the sorted list of children, then
+        it does not have the lock
+        """
+        lock = mock.Mock(path="/lock", node="wtfrrefix__lock__0000000002")
+        children = ["errrprefix__lock__0000000004",
+                    "someprefix__lock__0000000001",
+                    "wtfrrefix__lock__0000000002"]
+        seq = [(GetChildren("/lock"), const(children))]
+        self.assertFalse(perform_sequence(seq, sh.is_lock_acquired_eff(lock)))
+
+    def test_is_lock_acquired_performs(self):
+        """
+        `is_lock_acquired` just performs the effect returned from
+        `is_lock_acquired_eff` with given dispatcher
+        """
+        self.patch(sh, "is_lock_acquired_eff", intent_func("ilae"))
+        disp = SequenceDispatcher([(("ilae", "lock"), const("ret"))])
+        self.assertEqual(
+            self.successResultOf(sh.is_lock_acquired(disp, "lock")),
+            "ret")

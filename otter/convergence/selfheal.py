@@ -63,7 +63,7 @@ class SelfHeal(MultiService, object):
         """
         Return about whether this object has lock
         """
-        d = lock_is_acquired(self.disp, self.lock)
+        d = is_lock_acquired(self.disp, self.lock)
         return d.addCallback(lambda b: (True, {"has_lock": b}))
 
     def _perform(self):
@@ -91,7 +91,7 @@ class SelfHeal(MultiService, object):
             self.log.err(RuntimeError("self-heal-kz-state"),
                          "self-heal-kz-state", state=self.kz_client.state)
             returnValue(None)
-        if (yield lock_is_acquired(self.lock)):
+        if (yield is_lock_acquired(self.lock)):
             yield self._perform()
         else:
             if (yield self.lock.acquire(False, None)):
@@ -122,18 +122,19 @@ def check_and_trigger(tenant_id, group_id):
         yield trigger_convergence(tenant_id, group_id)
 
 
-def lock_is_acquired(dispatcher, lock):
+def is_lock_acquired(dispatcher, lock):
     """
-    Does given lock object has the lock?
+    Does given lock object has acquired the lock?
 
     :return: `Deferred` of `bool`
     """
-    return perform(dispatcher, lock_is_acquired_eff(lock))
+    return perform(dispatcher, is_lock_acquired_eff(lock))
 
 
-def lock_is_acquired_eff(lock):
+@do
+def is_lock_acquired_eff(lock):
     """
-    Does given lock object has the lock?
+    Does given lock object has acquired the lock?
 
     :return: `Effect` of `bool`
     """
