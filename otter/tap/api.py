@@ -303,10 +303,13 @@ def makeService(config):
                 config_value('converger.limited_retry_iterations') or 10,
                 config_value('converger.step_limits') or {})
 
-            setup_selfheal(
-                parent, dispatcher, kz_client,
-                config_value("selfheal.interval") or 300,
-                log, reactor, config_value, health_checker)
+            # Setup selfheal service
+            shsvc = SelfHeal(
+                dispatcher, kz_client,
+                config_value("selfheal.interval") or 300, log, reactor,
+                config_value)
+            health_checker.checks["selfheal"] = shsvc.health_check
+            shsvc.setServiceParent(parent)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
@@ -331,17 +334,6 @@ def setup_converger(parent, kz_client, dispatcher, interval, build_timeout,
                     interval / 2, limited_retry_iterations, step_limits)
     cvg.setServiceParent(parent)
     watch_children(kz_client, CONVERGENCE_DIRTY_DIR, cvg.divergent_changed)
-
-
-def setup_selfheal(parent, dispatcher, kz_client, interval, log, reactor,
-                   config_value, health_checker):
-    """
-    Create SelfHeal service and set its parent
-    """
-    svc = SelfHeal(dispatcher, kz_client, interval, log, reactor,
-                   config_value)
-    health_checker.checks["selfheal"] = svc.health_check
-    svc.setServiceParent(parent)
 
 
 def setup_scheduler(parent, dispatcher, store, kz_client):
