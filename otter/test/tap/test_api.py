@@ -587,6 +587,15 @@ class APIMakeServiceTests(SynchronousTestCase):
         mock_txkz.assert_called_once_with(
             self.reactor, thread_pool, kazoo_client)
 
+        # check for no scheduler case
+        mock_txkz.reset_mock()
+        mock_setup_scheduler.reset_mock()
+        self.Otter.return_value.scheduler = None
+        mock_setup_scheduler.return_value = None
+        parent = makeService(config)
+        self.assertNotIn("scheduler", self.health_checker.checks)
+        self.assertIsNone(self.Otter.return_value.scheduler)
+
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
     @mock.patch('otter.tap.api.KazooClient')
