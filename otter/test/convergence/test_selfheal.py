@@ -8,7 +8,7 @@ from kazoo.protocol.states import KazooState
 
 import mock
 
-from twisted.internet.defer import succeed
+from twisted.internet.defer import fail, succeed
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -103,6 +103,19 @@ class SelfHealTests(SynchronousTestCase):
         self.s._perform = mock.Mock()
         self.s.startService()
         self.s._perform.assert_called_once_with()
+        self.clock.advance(300)
+        self.assertEqual(self.s._perform.call_count, 2)
+
+    def test_performs_again_on_err(self):
+        """
+        Calls _perform at every interval even it it fails
+        """
+        self.s._perform = mock.Mock(return_value=fail(ValueError("h")))
+        self.s.startService()
+        self.s._perform.assert_called_once_with()
+        self.log.err.assert_called_once_with(
+            CheckFailure(ValueError), otter_service="selfheal")
+        self.s._perform.return_value = succeed(None)
         self.clock.advance(300)
         self.assertEqual(self.s._perform.call_count, 2)
 

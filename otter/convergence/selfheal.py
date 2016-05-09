@@ -39,11 +39,16 @@ class SelfHeal(MultiService, object):
         self.time_range = interval - 5
         self.config_func = config_func
         self.calls = []
-        timer = TimerService(interval, self._converge_all)
+        timer = TimerService(
+            interval, lambda: self._converge_all().addErrback(self.log.err))
         timer.clock = clock
         timer.setServiceParent(self)
 
     def stopService(self):
+        """
+        Stop service by cancelling any remaining scheduled calls and releasing
+        the lock
+        """
         super(SelfHeal, self).stopService()
         self._cancel_scheduled_calls()
         return self.lock.release()
