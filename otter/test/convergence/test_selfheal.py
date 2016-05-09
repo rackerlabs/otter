@@ -8,7 +8,7 @@ from kazoo.protocol.states import KazooState
 
 import mock
 
-from twisted.internet.defer import fail, succeed
+from twisted.internet.defer import succeed
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 

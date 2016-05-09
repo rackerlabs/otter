@@ -20,7 +20,6 @@ import mock
 
 from pyrsistent import freeze, pbag, pmap, pset, s, thaw
 
-from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import NoSuchCLBError, TenantScope
@@ -36,7 +35,6 @@ from otter.convergence.planning import plan_launch_server, plan_launch_stack
 from otter.convergence.service import (
     ConcurrentError,
     ConvergenceExecutor,
-    ConvergenceStarter,
     Converger,
     converge_all_groups,
     converge_one_group,

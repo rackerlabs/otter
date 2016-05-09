@@ -465,8 +465,6 @@ def trigger_convergence(tenant_id, group_id):
                   error=log_and_raise("mark-dirty-failure"))
 
 
-
-
 class ConcurrentError(Exception):
     """Tried to run an effect concurrently when it shouldn't be."""
 

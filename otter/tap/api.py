@@ -33,8 +33,8 @@ from otter.constants import (
     CONVERGENCE_DIRTY_DIR,
     CONVERGENCE_PARTITIONER_PATH,
     get_service_configs)
-from otter.convergence.service import Converger
 from otter.convergence.selfheal import SelfHeal
+from otter.convergence.service import Converger
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log
 from otter.log.cloudfeeds import CloudFeedsObserver
