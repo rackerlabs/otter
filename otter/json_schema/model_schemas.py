@@ -81,17 +81,22 @@ manifest = {
     "description": "Schema returned by the interface for viewing a manifest",
     "properties": {
         "id": _id,
-        "state": {},
+        "state": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "required": False,
+                    "decription": (
+                        "Status of the group. One of 'ACTIVE', 'ERROR' or "
+                        "'DELETING'"),
+                    "pattern": "ACTIVE|ERROR|DELETING"
+                },
+            }
+        },
         "groupConfiguration": group_schemas.config,
         "launchConfiguration": group_schemas.launch_config,
         "scalingPolicies": m_pol_list,
-        "status": {
-            "type": "string",
-            "required": False,
-            "decription": (
-                "Status of the group. One of 'ACTIVE', 'ERROR' or 'DELETING'"),
-            "pattern": "ACTIVE|ERROR|DELETING"
-        },
     },
     "additionalProperties": False
 }
