@@ -14,6 +14,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence import selfheal as sh
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
+from otter.models.interface import GroupState, ScalingGroupStatus
 from otter.test.utils import (
     CheckFailure, const, intent_func, mock_log, noop, patch, perform_sequence,
     raise_)
@@ -50,6 +51,7 @@ class SelfHealTests(SynchronousTestCase):
         # tests that it is not called
         self.s._perform = lambda: 1 / 0
         self.s.startService()
+        self.ila.assert_called_once_with(self.s.disp, self.lock)
         self.lock.acquire.assert_called_once_with(False, None)
 
     def test_converge_all_lock_acquired(self):
@@ -61,6 +63,7 @@ class SelfHealTests(SynchronousTestCase):
         self.lock.acquire.return_value = succeed(True)
         self.s._perform = mock.Mock()
         self.s.startService()
+        self.ila.assert_called_once_with(self.s.disp, self.lock)
         self.lock.acquire.assert_called_once_with(False, None)
         self.s._perform.assert_called_once_with()
         self.log.msg.assert_called_once_with(
@@ -72,6 +75,7 @@ class SelfHealTests(SynchronousTestCase):
         """
         self.s._perform = mock.Mock()
         self.s.startService()
+        self.ila.assert_called_once_with(self.s.disp, self.lock)
         # Lock is not acquired again
         self.assertFalse(self.lock.acquire.called)
         self.s._perform.assert_called_once_with()
@@ -113,11 +117,22 @@ class SelfHealTests(SynchronousTestCase):
         mock_cat.side_effect = lambda t, g: t + g
         self.s.startService()
         calls = self.clock.getDelayedCalls()
+        # Last call will be for next _convere_all call
         self.assertEqual(self.s.calls, calls[:-1])
         for i, c in enumerate(calls[:-1]):
             self.assertEqual(c.getTime(), i * 59)
             self.assertEqual(c.func, sh.perform)
             self.assertEqual(c.args, (self.s.disp, "t{}g{}".format(i, i)))
+
+    def test_perform_no_groups(self):
+        """
+        Gets groups and doesnt do anything if there are no groups
+        """
+        self.s.disp = SequenceDispatcher([(("ggtc", "cf"), const([]))])
+        self.s.startService()
+        self.assertEqual(self.s.calls, [])
+        calls = self.clock.getDelayedCalls()
+        self.assertEqual(len(calls), 1)
 
     def test_perform_still_active(self):
         """
@@ -202,6 +217,10 @@ class CheckTriggerTests(SynchronousTestCase):
 
     def setUp(self):
         self.patch(sh, "trigger_convergence", intent_func("tg"))
+        self.state = GroupState("tid", "gid", 'group-name',
+                                {}, {}, None, {}, False,
+                                ScalingGroupStatus.ACTIVE, desired=2)
+        self.manifest = {"state": self.state}
 
     def test_active_resumed(self):
         """
@@ -209,7 +228,7 @@ class CheckTriggerTests(SynchronousTestCase):
         """
         seq = [
             (GetScalingGroupInfo(tenant_id="tid", group_id="gid"),
-             const({"state": {"status": "ACTIVE", "paused": False}})),
+             const(("group", self.manifest))),
             (("tg", "tid", "gid"), noop)
         ]
         self.assertIsNone(
@@ -219,9 +238,10 @@ class CheckTriggerTests(SynchronousTestCase):
         """
         Convergence is not triggerred on ACTIVE paused group
         """
+        self.state.paused = True
         seq = [
             (GetScalingGroupInfo(tenant_id="tid", group_id="gid"),
-             const({"state": {"status": "ACTIVE", "paused": True}}))
+             const(("group", self.manifest))),
         ]
         self.assertIsNone(
             perform_sequence(seq, sh.check_and_trigger("tid", "gid")))
@@ -230,9 +250,10 @@ class CheckTriggerTests(SynchronousTestCase):
         """
         Convergence is not triggerred on in-ACTIVE group
         """
+        self.state.status = ScalingGroupStatus.ERROR
         seq = [
             (GetScalingGroupInfo(tenant_id="tid", group_id="gid"),
-             const({"state": {"status": "ERROR", "paused": False}}))
+             const(("group", self.manifest))),
         ]
         self.assertIsNone(
             perform_sequence(seq, sh.check_and_trigger("tid", "gid")))

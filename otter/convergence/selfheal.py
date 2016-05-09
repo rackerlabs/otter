@@ -18,6 +18,7 @@ from txeffect import perform
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.service import trigger_convergence
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
+from otter.models.interface import ScalingGroupStatus
 from otter.util.zk import GetChildren
 
 
@@ -77,6 +78,8 @@ class SelfHeal(MultiService, object):
             # This should never happen
             self.log.err(RuntimeError("self-heal-calls-err"),
                          "self-heal-calls-err", active=active)
+        if not groups:
+            return
         wait_time = float(self.time_range) / len(groups)
         for i, group in enumerate(groups):
             self.calls.append(
@@ -91,7 +94,7 @@ class SelfHeal(MultiService, object):
             self.log.err(RuntimeError("self-heal-kz-state"),
                          "self-heal-kz-state", state=self.kz_client.state)
             returnValue(None)
-        if (yield is_lock_acquired(self.lock)):
+        if (yield is_lock_acquired(self.disp, self.lock)):
             yield self._perform()
         else:
             if (yield self.lock.acquire(False, None)):
@@ -114,11 +117,11 @@ def check_and_trigger(tenant_id, group_id):
     """
     Trigger convergence on given group if it is ACTIVE and not paused
     """
-    group_info = yield Effect(
+    group, info = yield Effect(
         GetScalingGroupInfo(tenant_id=tenant_id, group_id=group_id))
-    state = group_info["state"]
+    state = info["state"]
 
-    if (state["status"] == "ACTIVE") and (not state["paused"]):
+    if state.status == ScalingGroupStatus.ACTIVE and (not state.paused):
         yield trigger_convergence(tenant_id, group_id)
 
 

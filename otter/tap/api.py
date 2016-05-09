@@ -34,6 +34,7 @@ from otter.constants import (
     CONVERGENCE_PARTITIONER_PATH,
     get_service_configs)
 from otter.convergence.service import Converger
+from otter.convergence.selfheal import SelfHeal
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log
 from otter.log.cloudfeeds import CloudFeedsObserver
@@ -280,8 +281,9 @@ def makeService(config):
                                              cassandra_cluster)
             # Setup scheduler service after starting
             scheduler = setup_scheduler(parent, dispatcher, store, kz_client)
-            health_checker.checks['scheduler'] = scheduler.health_check
-            otter.scheduler = scheduler
+            if scheduler is not None:
+                health_checker.checks['scheduler'] = scheduler.health_check
+                otter.scheduler = scheduler
             # Give dispatcher to Otter REST object
             otter.dispatcher = dispatcher
             # Set the client after starting
@@ -300,6 +302,11 @@ def makeService(config):
                 config_value('converger.build_timeout') or 3600,
                 config_value('converger.limited_retry_iterations') or 10,
                 config_value('converger.step_limits') or {})
+
+            setup_selfheal(
+                parent, dispatcher, kz_client,
+                config_value("selfheal.interval") or 300,
+                log, reactor, config_value, health_checker)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
@@ -324,6 +331,17 @@ def setup_converger(parent, kz_client, dispatcher, interval, build_timeout,
                     interval / 2, limited_retry_iterations, step_limits)
     cvg.setServiceParent(parent)
     watch_children(kz_client, CONVERGENCE_DIRTY_DIR, cvg.divergent_changed)
+
+
+def setup_selfheal(parent, dispatcher, kz_client, interval, log, reactor,
+                   config_value, health_checker):
+    """
+    Create SelfHeal service and set its parent
+    """
+    svc = SelfHeal(dispatcher, kz_client, interval, log, reactor,
+                   config_value)
+    health_checker.checks["selfheal"] = svc.health_check
+    svc.setServiceParent(parent)
 
 
 def setup_scheduler(parent, dispatcher, store, kz_client):
