@@ -255,6 +255,9 @@ def _perform_throttle(dispatcher, throttle):
 _CFG_NAMES = {
     (ServiceType.CLOUD_SERVERS, 'post'): 'create_server_delay',
     (ServiceType.CLOUD_SERVERS, 'delete'): 'delete_server_delay',
+    (ServiceType.RACKCONNECT_V3, 'get'): 'get_rcv3_delay',
+    (ServiceType.RACKCONNECT_V3, 'post'): 'create_rcv3_delay',
+    (ServiceType.RACKCONNECT_V3, 'delete'): 'delete_rcv3_delay'
 }
 
 # Throttling configs where locking is done per-tenant instead of globally
