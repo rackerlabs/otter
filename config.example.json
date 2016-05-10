@@ -75,7 +75,8 @@
             "put_clb_delay": 0.2,
             "delete_clb_delay": 0.5,
             "get_rcv3_delay": 0.1,
-            "create_rcv3_delay": 0.4
+            "create_rcv3_delay": 0.4,
+            "delete_rcv3_delay": 0.4
     	}
     }
 }
