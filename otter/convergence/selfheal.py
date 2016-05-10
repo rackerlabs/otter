@@ -17,6 +17,7 @@ from txeffect import perform
 
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.service import trigger_convergence
+from otter.log.intents import with_log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
 from otter.models.interface import ScalingGroupStatus
 from otter.util.zk import GetChildren
@@ -127,7 +128,9 @@ def check_and_trigger(tenant_id, group_id):
     state = info["state"]
 
     if state.status == ScalingGroupStatus.ACTIVE and (not state.paused):
-        yield trigger_convergence(tenant_id, group_id)
+        yield with_log(
+            trigger_convergence(tenant_id, group_id),
+            tenant_id=tenant_id, scaling_group_id=group_id)
 
 
 def is_lock_acquired(dispatcher, lock):

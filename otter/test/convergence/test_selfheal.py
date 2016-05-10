@@ -13,11 +13,12 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence import selfheal as sh
+from otter.log.intents import BoundFields
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
 from otter.models.interface import GroupState, ScalingGroupStatus
 from otter.test.utils import (
-    CheckFailure, const, intent_func, mock_log, noop, patch, perform_sequence,
-    raise_)
+    CheckFailure, const, intent_func, mock_log, nested_sequence, noop, patch,
+    perform_sequence, raise_)
 from otter.util.zk import GetChildren
 
 
@@ -242,7 +243,9 @@ class CheckTriggerTests(SynchronousTestCase):
         seq = [
             (GetScalingGroupInfo(tenant_id="tid", group_id="gid"),
              const(("group", self.manifest))),
-            (("tg", "tid", "gid"), noop)
+            (BoundFields(effect=mock.ANY,
+                         fields=dict(tenant_id="tid", scaling_group_id="gid")),
+             nested_sequence([(("tg", "tid", "gid"), noop)]))
         ]
         self.assertIsNone(
             perform_sequence(seq, sh.check_and_trigger("tid", "gid")))
