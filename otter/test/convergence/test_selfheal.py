@@ -4,6 +4,7 @@ Tests for :mod:`otter.convergence.selfheal`
 
 from effect.testing import SequenceDispatcher
 
+from kazoo.client import KazooClient
 from kazoo.protocol.states import KazooState
 
 import mock
@@ -277,14 +278,14 @@ class CheckTriggerTests(SynchronousTestCase):
 
 class IsLockAcquiredTests(SynchronousTestCase):
     """
-    Tests for :func:`is_lock_acquired`
+    Tests for :func:`is_lock_acquired` and :func:`is_lock_acquired_eff`
     """
 
     def test_eff_no_children(self):
         """
         If lock node does not have any children, it does not have lock
         """
-        lock = mock.Mock(path="/lock")
+        lock = mock.Mock(spec=KazooClient, path="/lock")
         seq = [(GetChildren("/lock"), const([]))]
         self.assertFalse(perform_sequence(seq, sh.is_lock_acquired_eff(lock)))
 
@@ -292,10 +293,11 @@ class IsLockAcquiredTests(SynchronousTestCase):
         """
         Lock node's first child belongs to given object. Hence has the lock
         """
-        lock = mock.Mock(path="/lock", node="someprefix__lock__0000000001")
+        prefix = "someprefix__lock__"
+        lock = mock.Mock(spec=KazooClient, path="/lock", prefix=prefix)
         children = ["errrprefix__lock__0000000004",
-                    "someprefix__lock__0000000001",
-                    "wtfrrefix__lock__0000000002"]
+                    "{}0000000001".format(prefix),
+                    "whyprefix__lock__0000000002"]
         seq = [(GetChildren("/lock"), const(children))]
         self.assertTrue(perform_sequence(seq, sh.is_lock_acquired_eff(lock)))
 
@@ -304,10 +306,11 @@ class IsLockAcquiredTests(SynchronousTestCase):
         If lock's node is not the first in the sorted list of children, then
         it does not have the lock
         """
-        lock = mock.Mock(path="/lock", node="wtfrrefix__lock__0000000002")
+        prefix = "whyprefix__lock__"
+        lock = mock.Mock(spec=KazooClient, path="/lock", prefix=prefix)
         children = ["errrprefix__lock__0000000004",
                     "someprefix__lock__0000000001",
-                    "wtfrrefix__lock__0000000002"]
+                    "{}0000000002".format(prefix)]
         seq = [(GetChildren("/lock"), const(children))]
         self.assertFalse(perform_sequence(seq, sh.is_lock_acquired_eff(lock)))
 

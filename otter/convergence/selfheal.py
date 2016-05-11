@@ -155,4 +155,5 @@ def is_lock_acquired_eff(lock):
     # The last 10 characters are sequence number as per
     # https://zookeeper.apache.org/doc/current/zookeeperProgrammers.html\
     # #Sequence+Nodes+--+Unique+Naming
-    yield do_return(sorted(children, key=lambda c: c[-10:])[0] == lock.node)
+    yield do_return(
+        sorted(children, key=lambda c: c[-10:])[0][:-10] == lock.prefix)
