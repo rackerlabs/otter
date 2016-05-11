@@ -465,6 +465,7 @@ class DefaultThrottlerTests(SynchronousTestCase):
             'create_server_delay', ServiceType.CLOUD_SERVERS, 'post')
         self._test_throttle(
             'delete_server_delay', ServiceType.CLOUD_SERVERS, 'delete')
+
         self._test_throttle(
             'get_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'get')
         self._test_throttle(
@@ -473,6 +474,13 @@ class DefaultThrottlerTests(SynchronousTestCase):
             'put_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'put')
         self._test_throttle(
             'delete_clb_delay', ServiceType.CLOUD_LOAD_BALANCERS, 'delete')
+
+        self._test_throttle(
+            'get_rcv3_delay', ServiceType.RACKCONNECT_V3, 'get')
+        self._test_throttle(
+            'create_rcv3_delay', ServiceType.RACKCONNECT_V3, 'post')
+        self._test_throttle(
+            'delete_rcv3_delay', ServiceType.RACKCONNECT_V3, 'delete')
 
     def test_tenant_specific_locking(self):
         self._test_tenant(
