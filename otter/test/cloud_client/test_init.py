@@ -67,9 +67,11 @@ from otter.cloud_client import (
     set_nova_metadata_item,
     update_stack)
 from otter.constants import ServiceType
+from otter.indexer import atom
 from otter.log.intents import Log
 from otter.test.utils import (
     StubResponse,
+    const,
     nested_sequence,
     raise_,
     resolve_effect,
@@ -600,6 +602,94 @@ class PerformTenantScopeTests(SynchronousTestCase):
              self.throttler, 1, ereq.intent))
 
 
+def assert_parses_common_clb_errors(testcase, intent, eff, lb_id="123456"):
+    """
+    Assert that the effect produced performs the common CLB error parsing:
+    :class:`CLBImmutableError`, :class:`CLBDescription`,
+    :class:`NoSuchCLBError`, :class:`CLBRateLimitError`,
+    :class:`APIError`
+    """
+    json_responses_and_errs = [
+        ("Load Balancer '{0}' has a status of 'BUILD' and is "
+         "considered immutable.", 422, CLBImmutableError),
+        ("Load Balancer '{0}' has a status of 'PENDING_UPDATE' and is "
+         "considered immutable.", 422, CLBImmutableError),
+        ("Load Balancer '{0}' has a status of 'unexpected status' and is "
+         "considered immutable.", 422, CLBImmutableError),
+        ("Load Balancer '{0}' has a status of 'PENDING_DELETE' and is "
+         "considered immutable.", 422, CLBDeletedError),
+        ("The load balancer is deleted and considered immutable.",
+         422, CLBDeletedError),
+        ("Load balancer not found.", 404, NoSuchCLBError),
+        ("LoadBalancer is not ACTIVE", 422, CLBNotActiveError),
+        ("The loadbalancer is marked as deleted.", 410, CLBDeletedError),
+    ]
+
+    for msg, code, err in json_responses_and_errs:
+        msg = msg.format(lb_id)
+        resp = stub_pure_response(
+            json.dumps({'message': msg, 'code': code, 'details': ''}),
+            code)
+        with testcase.assertRaises(err) as cm:
+            perform_sequence([(intent, service_request_eqf(resp))], eff)
+        testcase.assertEqual(cm.exception,
+                             err(msg, lb_id=six.text_type(lb_id)))
+
+    # OverLimit Retry is different because it's produced by repose
+    over_limit = stub_pure_response(
+        json.dumps({
+            "overLimit": {
+                "message": "OverLimit Retry...",
+                "code": 413,
+                "retryAfter": "2015-06-13T22:30:10Z",
+                "details": "Error Details..."
+            }
+        }),
+        413)
+    with testcase.assertRaises(CLBRateLimitError) as cm:
+        perform_sequence([(intent, service_request_eqf(over_limit))], eff)
+    testcase.assertEqual(
+        cm.exception,
+        CLBRateLimitError("OverLimit Retry...",
+                          lb_id=six.text_type(lb_id)))
+
+    # Ignored errors
+    bad_resps = [
+        stub_pure_response(
+            json.dumps({
+                'message': ("Load Balancer '{0}' has a status of 'BROKEN' "
+                            "and is considered immutable."),
+                'code': 422}),
+            422),
+        stub_pure_response(
+            json.dumps({
+                'message': ("The load balancer is deleted and considered "
+                            "immutable"),
+                'code': 404}),
+            404),
+        stub_pure_response(
+            json.dumps({
+                'message': "Cloud load balancers is down",
+                'code': 500}),
+            500),
+        stub_pure_response(
+            json.dumps({
+                'message': "this is not an over limit message",
+                'code': 413}),
+            413),
+        stub_pure_response("random repose error message", 404),
+        stub_pure_response("random repose error message", 413)
+    ]
+
+    for resp in bad_resps:
+        with testcase.assertRaises(APIError) as cm:
+            perform_sequence([(intent, service_request_eqf(resp))], eff)
+        testcase.assertEqual(
+            cm.exception,
+            APIError(headers={}, code=resp[0].code, body=resp[1],
+                     method='method', url='original/request/URL'))
+
+
 class CLBClientTests(SynchronousTestCase):
     """
     Tests for CLB client functions, such as :obj:`change_clb_node`.
@@ -608,99 +698,6 @@ class CLBClientTests(SynchronousTestCase):
     def lb_id(self):
         """What is my LB ID"""
         return "123456"
-
-    def assert_parses_common_clb_errors(self, intent, eff):
-        """
-        Assert that the effect produced performs the common CLB error parsing:
-        :class:`CLBImmutableError`, :class:`CLBDescription`,
-        :class:`NoSuchCLBError`, :class:`CLBRateLimitError`,
-        :class:`APIError`
-        """
-        json_responses_and_errs = [
-            ("Load Balancer '{0}' has a status of 'BUILD' and is "
-             "considered immutable.", 422, CLBImmutableError),
-            ("Load Balancer '{0}' has a status of 'PENDING_UPDATE' and is "
-             "considered immutable.", 422, CLBImmutableError),
-            ("Load Balancer '{0}' has a status of 'unexpected status' and is "
-             "considered immutable.", 422, CLBImmutableError),
-            ("Load Balancer '{0}' has a status of 'PENDING_DELETE' and is "
-             "considered immutable.", 422, CLBDeletedError),
-            ("The load balancer is deleted and considered immutable.",
-             422, CLBDeletedError),
-            ("Load balancer not found.", 404, NoSuchCLBError),
-            ("LoadBalancer is not ACTIVE", 422, CLBNotActiveError),
-            ("The loadbalancer is marked as deleted.", 410, CLBDeletedError),
-        ]
-
-        for msg, code, err in json_responses_and_errs:
-            msg = msg.format(self.lb_id)
-            resp = stub_pure_response(
-                json.dumps({'message': msg, 'code': code, 'details': ''}),
-                code)
-            with self.assertRaises(err) as cm:
-                sync_perform(
-                    EQFDispatcher([(intent, service_request_eqf(resp))]),
-                    eff)
-            self.assertEqual(cm.exception,
-                             err(msg, lb_id=six.text_type(self.lb_id)))
-
-        # OverLimit Retry is different because it's produced by repose
-        over_limit = stub_pure_response(
-            json.dumps({
-                "overLimit": {
-                    "message": "OverLimit Retry...",
-                    "code": 413,
-                    "retryAfter": "2015-06-13T22:30:10Z",
-                    "details": "Error Details..."
-                }
-            }),
-            413)
-        with self.assertRaises(CLBRateLimitError) as cm:
-            sync_perform(
-                EQFDispatcher([(intent, service_request_eqf(over_limit))]),
-                eff)
-        self.assertEqual(
-            cm.exception,
-            CLBRateLimitError("OverLimit Retry...",
-                              lb_id=six.text_type(self.lb_id)))
-
-        # Ignored errors
-        bad_resps = [
-            stub_pure_response(
-                json.dumps({
-                    'message': ("Load Balancer '{0}' has a status of 'BROKEN' "
-                                "and is considered immutable."),
-                    'code': 422}),
-                422),
-            stub_pure_response(
-                json.dumps({
-                    'message': ("The load balancer is deleted and considered "
-                                "immutable"),
-                    'code': 404}),
-                404),
-            stub_pure_response(
-                json.dumps({
-                    'message': "Cloud load balancers is down",
-                    'code': 500}),
-                500),
-            stub_pure_response(
-                json.dumps({
-                    'message': "this is not an over limit message",
-                    'code': 413}),
-                413),
-            stub_pure_response("random repose error message", 404),
-            stub_pure_response("random repose error message", 413)
-        ]
-
-        for resp in bad_resps:
-            with self.assertRaises(APIError) as cm:
-                sync_perform(
-                    EQFDispatcher([(intent, service_request_eqf(resp))]),
-                    eff)
-            self.assertEqual(
-                cm.exception,
-                APIError(headers={}, code=resp[0].code, body=resp[1],
-                         method='method', url='original/request/URL'))
 
     def test_change_clb_node(self):
         """
@@ -743,7 +740,7 @@ class CLBClientTests(SynchronousTestCase):
                                node_id=u'1234'))
 
         # all the common failures
-        self.assert_parses_common_clb_errors(expected.intent, eff)
+        assert_parses_common_clb_errors(self, expected.intent, eff)
 
     def test_change_clb_node_default_type(self):
         """
@@ -821,7 +818,7 @@ class CLBClientTests(SynchronousTestCase):
                               node_limit=25))
 
         # all the common failures
-        self.assert_parses_common_clb_errors(expected.intent, eff)
+        assert_parses_common_clb_errors(self, expected.intent, eff)
 
     def expected_node_removal_req(self, nodes=(1, 2)):
         """
@@ -853,8 +850,8 @@ class CLBClientTests(SynchronousTestCase):
         etc. are handled.
         """
         eff = remove_clb_nodes(self.lb_id, [1, 2])
-        self.assert_parses_common_clb_errors(
-            self.expected_node_removal_req().intent, eff)
+        assert_parses_common_clb_errors(
+            self, self.expected_node_removal_req().intent, eff)
 
     def test_remove_clb_nodes_non_202(self):
         """Any random HTTP response code is bubbled up as an APIError."""
@@ -928,29 +925,92 @@ class CLBClientTests(SynchronousTestCase):
         expected = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'GET', 'loadbalancers/123456/nodes')
-        self.assert_parses_common_clb_errors(
-            expected.intent, get_clb_nodes(self.lb_id))
+        assert_parses_common_clb_errors(
+            self, expected.intent, get_clb_nodes(self.lb_id))
 
-    def test_get_clb_node_feed(self):
-        """:func:`get_clb_node_feed` returns the Atom feed for a CLB node."""
-        expected = service_request(
-            ServiceType.CLOUD_LOAD_BALANCERS,
-            'GET', 'loadbalancers/123456/nodes/node1.atom',
-            json_response=False)
-        seq = [(expected.intent, lambda i: stub_pure_response('feed!')),
-               (log_intent('request-get-clb-node-feed', 'feed!'),
-                lambda _: None)]
-        req = get_clb_node_feed(self.lb_id, 'node1')
-        self.assertEqual(perform_sequence(seq, req), 'feed!')
 
-    def test_get_clb_node_feed_error_handling(self):
-        """:func:`get_clb_node_feed` parses the common CLB errors."""
-        expected = service_request(
-            ServiceType.CLOUD_LOAD_BALANCERS,
-            'GET', 'loadbalancers/123456/nodes/node1.atom',
-            json_response=False)
-        self.assert_parses_common_clb_errors(
-            expected.intent, get_clb_node_feed(self.lb_id, 'node1'))
+class GetCLBNodeFeedTests(SynchronousTestCase):
+
+    entry = '<entry><summary>{}</summary></entry>'
+    feed_fmt = (
+        '<feed xmlns="http://www.w3.org/2005/Atom">'
+        '<link rel="next" href="{next_link}"/>{entries}</feed>')
+
+    def svc_intent(self, params={}):
+        return service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS, "GET",
+            "loadbalancers/12/nodes/13.atom", params=params,
+            json_response=False).intent
+
+    def feed(self, next_link, summaries):
+        return self.feed_fmt.format(
+            next_link=next_link,
+            entries=''.join(self.entry.format(s) for s in summaries))
+
+    def test_empty(self):
+        """
+        Does not goto next link when there are no entries and returns []
+        """
+        feedstr = self.feed("next-doesnt-matter", [])
+        seq = [
+            (self.svc_intent(), const(stub_json_response(feedstr))),
+            (log_intent("request-get-clb-node-feed", feedstr), const(feedstr))
+        ]
+        self.assertEqual(
+            perform_sequence(seq, get_clb_node_feed("12", "13")), [])
+
+    def test_single_page(self):
+        """
+        Collects entries and goes to next link if there are entries and returns
+        if next one is empty
+        """
+        feed1_str = self.feed("https://url?page=2", ["summary1", "summ2"])
+        feed2_str = self.feed("next-link", [])
+        seq = [
+            (self.svc_intent(), const(stub_json_response(feed1_str))),
+            (log_intent("request-get-clb-node-feed", feed1_str),
+             const(feed1_str)),
+            (self.svc_intent({"page": ['2']}),
+             const(stub_json_response(feed2_str))),
+            (log_intent("request-get-clb-node-feed", feed2_str),
+             const(feed2_str)),
+        ]
+        entries = perform_sequence(seq, get_clb_node_feed("12", "13"))
+        self.assertEqual(
+            [atom.summary(entry) for entry in entries], ["summary1", "summ2"])
+
+    def test_multiple_pages(self):
+        """
+        Collects entries and goes to next link if there are entries and
+        continues until next link returns empty list
+        """
+        feed1_str = self.feed("https://url?page=2", ["summ1", "summ2"])
+        feed2_str = self.feed("https://url?page=3", ["summ3", "summ4"])
+        feed3_str = self.feed("next-link", [])
+        seq = [
+            (self.svc_intent(), const(stub_json_response(feed1_str))),
+            (log_intent("request-get-clb-node-feed", feed1_str),
+             const(feed1_str)),
+            (self.svc_intent({"page": ['2']}),
+             const(stub_json_response(feed2_str))),
+            (log_intent("request-get-clb-node-feed", feed2_str),
+             const(feed2_str)),
+            (self.svc_intent({"page": ['3']}),
+             const(stub_json_response(feed3_str))),
+            (log_intent("request-get-clb-node-feed", feed3_str),
+             const(feed3_str)),
+        ]
+        entries = perform_sequence(seq, get_clb_node_feed("12", "13"))
+        self.assertEqual(
+            [atom.summary(entry) for entry in entries],
+            ["summ1", "summ2", "summ3", "summ4"])
+
+    def test_error_handling(self):
+        """
+        Parses regular CLB errors and raises corresponding exceptions
+        """
+        assert_parses_common_clb_errors(
+            self, self.svc_intent(), get_clb_node_feed("12", "13"), "12")
 
 
 def _perform_one_request(intent, effect, response_code, response_body,

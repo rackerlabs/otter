@@ -2,6 +2,7 @@
 import json
 import re
 from functools import partial, wraps
+from operator import itemgetter
 from urlparse import parse_qs, urlparse
 
 import attr
@@ -15,7 +16,7 @@ from effect import (
     catch,
     perform,
     sync_performer)
-from effect.do import do
+from effect.do import do, do_return
 
 import six
 
@@ -29,6 +30,7 @@ from txeffect import deferred_performer, perform as twisted_perform
 
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType
+from otter.indexer import atom
 from otter.log.intents import msg as msg_effect
 from otter.util.config import config_value
 from otter.util.http import APIError, append_segments, try_json_with_keys
@@ -718,22 +720,30 @@ def _node_feed_request(lb_id, node_id, params):
             lambda c, b: _process_clb_api_error(c, b, lb_id))
     ).on(
         log_success_response('request-get-clb-node-feed', identity)
-    )
+    ).on(itemgetter(1))
 
 
 @do
 def get_clb_node_feed(lb_id, node_id):
-    """Get the atom feed associated with a CLB node. Returns feed as str."""
+    """
+    Get the atom feed associated with a CLB node.
+
+    :param int lb_id: Cloud Load balancer ID
+    :param int node_id: Node ID of in loadbalancer node
+
+    :returns: ``list`` of atom entry :class:`Element`
+    :rtype: ``list``
+    """
     all_entries = []
     params = {}
     while True:
-        feed = yield _node_feed_request(lb_id, params)
+        feed_str = yield _node_feed_request(lb_id, node_id, params)
+        feed = atom.parse(feed_str)
         entries = atom.entries(feed)
         if entries == []:
             yield do_return(all_entries)
         all_entries.extend(entries)
-        next_link = atom.next_link(atom.parse(feed))
-        params = parse_qs(urlparse(next_link).query)
+        params = parse_qs(urlparse(atom.next_link(feed)).query)
 
 
 def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
