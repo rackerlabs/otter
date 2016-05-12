@@ -6,6 +6,8 @@
     <link href="http://example.org/" />
     <link href="http://example.org/feed/?marker=urn:uuid:1225c695-cfb8-4ebb-aaaa-80da344efa6a"
         rel="previous" />
+    <link href="http://example.org/feed/?marker=urn:uuid:e5caea3a-188c-11e6-8692-acbc32badee9"
+        rel="next" />
     <id>urn:uuid:60a76c80-d399-11d9-b91C-0003939e0af6</id>
     <updated>2003-12-13T18:30:02Z</updated>
     <entry>
