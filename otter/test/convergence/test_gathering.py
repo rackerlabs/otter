@@ -51,8 +51,8 @@ from otter.convergence.model import (
     RCv3Description,
     RCv3Node,
     ServerState)
-from otter.log.intents import Log
 from otter.indexer import atom
+from otter.log.intents import Log
 from otter.test.utils import (
     EffectServersCache,
     StubResponse,
