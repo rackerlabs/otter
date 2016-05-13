@@ -101,6 +101,10 @@ class SelfHeal(MultiService, object):
             self.log.err(RuntimeError("self-heal-kz-state"),
                          "self-heal-kz-state", state=self.kz_client.state)
             returnValue(None)
+        # The reason why it checks everytime by talking to ZK is because
+        # we could've lost the lock if there where connection changes between
+        # subsequent intervals and it is not clear how state change to
+        # SUSPENDED should be handled
         if (yield is_lock_acquired(self.disp, self.lock)):
             yield self._perform()
         else:
