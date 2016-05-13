@@ -5,6 +5,7 @@ Tests for :mod:`otter.convergence.selfheal`
 from effect.testing import SequenceDispatcher
 
 from kazoo.client import KazooClient
+from kazoo.exceptions import LockTimeout
 from kazoo.protocol.states import KazooState
 
 import mock
@@ -49,12 +50,12 @@ class SelfHealTests(SynchronousTestCase):
         call _perform
         """
         self.ila.return_value = succeed(False)
-        self.lock.acquire.return_value = succeed(False)
+        self.lock.acquire.return_value = fail(LockTimeout())
         # tests that it is not called
         self.s._perform = lambda: 1 / 0
         self.s.startService()
         self.ila.assert_called_once_with(self.s.disp, self.lock)
-        self.lock.acquire.assert_called_once_with(False, None)
+        self.lock.acquire.assert_called_once_with(True, 0.1)
 
     def test_converge_all_lock_acquired(self):
         """
@@ -66,7 +67,7 @@ class SelfHealTests(SynchronousTestCase):
         self.s._perform = mock.Mock()
         self.s.startService()
         self.ila.assert_called_once_with(self.s.disp, self.lock)
-        self.lock.acquire.assert_called_once_with(False, None)
+        self.lock.acquire.assert_called_once_with(True, 0.1)
         self.s._perform.assert_called_once_with()
         self.log.msg.assert_called_once_with(
             "self-heal-lock-acquired", otter_service="selfheal")

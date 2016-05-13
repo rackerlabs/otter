@@ -5,6 +5,7 @@ Self heal service
 from effect import Effect
 from effect.do import do, do_return
 
+from kazoo.exceptions import LockTimeout
 from kazoo.protocol.states import KazooState
 
 from toolz.curried import filter
@@ -103,9 +104,13 @@ class SelfHeal(MultiService, object):
         if (yield is_lock_acquired(self.disp, self.lock)):
             yield self._perform()
         else:
-            if (yield self.lock.acquire(False, None)):
+            try:
+                yield self.lock.acquire(True, 0.1)
                 self.log.msg("self-heal-lock-acquired")
                 yield self._perform()
+            except LockTimeout:
+                # expected. Nothing to do here. Will try on next interval
+                pass
 
 
 def get_groups_to_converge(config_func):
@@ -135,7 +140,8 @@ def check_and_trigger(tenant_id, group_id):
 
 def is_lock_acquired(dispatcher, lock):
     """
-    Does given lock object has acquired the lock?
+    Does given lock object has acquired the lock? It does this by getting
+    all the children and checking if first ephemeral node is ours
 
     :return: `Deferred` of `bool`
     """
