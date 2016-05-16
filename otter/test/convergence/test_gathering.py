@@ -405,9 +405,19 @@ def nodes_req(lb_id, nodes):
 
 
 def node_feed_req(lb_id, node_id, response):
-    return lb_req(
-        'loadbalancers/{}/nodes/{}.atom'.format(lb_id, node_id),
-        False, response)
+    if isinstance(response, Exception):
+        def handler(i): raise response
+    else:
+        def handler(i): return response
+    return (
+        Retry(
+            effect=mock.ANY,
+            should_retry=ShouldDelayAndRetry(
+                can_retry=retry_times(5),
+                next_interval=exponential_backoff_interval(2))
+        ),
+        nested_sequence([(("gcnf", lb_id, node_id), handler)])
+    )
 
 
 def node(id, address, port=20, weight=2, condition='ENABLED',
@@ -430,6 +440,8 @@ class GetCLBContentsTests(SynchronousTestCase):
         self.mock_eda = patch(
             self, 'otter.convergence.gathering.extract_CLB_drained_at',
             side_effect=lambda f: self.feeds[f])
+        patch(self, "otter.convergence.gathering.get_clb_node_feed",
+              side_effect=intent_func("gcnf"))
 
     def test_success(self):
         """
@@ -444,8 +456,8 @@ class GetCLBContentsTests(SynchronousTestCase):
                    {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             parallel_sequence([[nodes_req(1, [node11, node12])],
                                [nodes_req(2, [node21, node22])]]),
-            parallel_sequence([[node_feed_req(1, '11', '11feed')],
-                               [node_feed_req(2, '22', '22feed')]]),
+            parallel_sequence([[node_feed_req('1', '11', '11feed')],
+                               [node_feed_req('2', '22', '22feed')]]),
         ]
         eff = get_clb_contents()
         self.assertEqual(
@@ -540,8 +552,8 @@ class GetCLBContentsTests(SynchronousTestCase):
                 [nodes_req(2, [node21])]
             ]),
             parallel_sequence([
-                [node_feed_req(1, '11', CLBNotFoundError(lb_id=u'1'))],
-                [node_feed_req(2, '21', '22feed')]]),
+                [node_feed_req('1', '11', CLBNotFoundError(lb_id=u'1'))],
+                [node_feed_req('2', '21', '22feed')]]),
         ]
         eff = get_clb_contents()
         self.assertEqual(
