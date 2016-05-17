@@ -49,7 +49,7 @@ def _link(feed, direction):
     :type feed: :class:`ElementTree`
     :param str direction: "next" or "previous"
 
-    :return: the URL to the previous feed
+    :return: the URL to the previous feed if found, otherwise ``None``
     :rtype: ``str``
     """
     links = xpath('./atom:link[@rel="{}"]'.format(direction), feed)
@@ -61,10 +61,26 @@ def _link(feed, direction):
 
 
 def previous_link(feed):
+    """
+    Get the previous link from a particular AtomHopper feed
+
+    :type feed: :class:`ElementTree`
+
+    :return: the URL to the previous feed if found, otherwise ``None``
+    :rtype: ``str``
+    """
     return _link(feed, "previous")
 
 
 def next_link(feed):
+    """
+    Get the next link from a particular AtomHopper feed
+
+    :type feed: :class:`ElementTree`
+
+    :return: the URL to the next feed if found, otherwise ``None``
+    :rtype: ``str``
+    """
     return _link(feed, "next")
 
 
