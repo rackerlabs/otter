@@ -1005,6 +1005,21 @@ class GetCLBNodeFeedTests(SynchronousTestCase):
             [atom.summary(entry) for entry in entries],
             ["summ1", "summ2", "summ3", "summ4"])
 
+    def test_no_next_link(self):
+        """
+        Returns entries collected till now if there is no next link
+        """
+        feedstr = (
+            '<feed xmlns="http://www.w3.org/2005/Atom">'
+            '<entry><summary>summary</summary></entry></feed>')
+        seq = [
+            (self.svc_intent(), const(stub_json_response(feedstr))),
+            (log_intent("request-get-clb-node-feed", feedstr),
+             const(feedstr))
+        ]
+        entries = perform_sequence(seq, get_clb_node_feed("12", "13"))
+        self.assertEqual(atom.summary(entries[0]), "summary")
+
     def test_error_handling(self):
         """
         Parses regular CLB errors and raises corresponding exceptions

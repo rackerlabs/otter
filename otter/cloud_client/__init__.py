@@ -743,7 +743,10 @@ def get_clb_node_feed(lb_id, node_id):
         if entries == []:
             yield do_return(all_entries)
         all_entries.extend(entries)
-        params = parse_qs(urlparse(atom.next_link(feed)).query)
+        next_link = atom.next_link(feed)
+        if not next_link:
+            yield do_return(all_entries)
+        params = parse_qs(urlparse(next_link).query)
 
 
 def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
