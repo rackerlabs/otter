@@ -66,6 +66,22 @@ class CLBNodeType(Names):
     """
 
 
+class CLBNodeStatus(Names):
+    """
+    Constants representing online/offline status of CLB node
+    """
+
+    ONLINE = NamedConstant()
+    """
+    Node is ONLINE and is receiving traffic
+    """
+
+    OFFLINE = NamedConstant()
+    """
+    Node is marked OFFLINE by CLB and is not receiving traffic
+    """
+
+
 class ServerState(Names):
     """
     Constants representing the state of a Nova cloud server.
@@ -568,6 +584,8 @@ class CLBDescription(object):
              Attribute("description", instance_of=CLBDescription),
              Attribute("address", instance_of=basestring),
              Attribute("drained_at", default_value=0.0, instance_of=float),
+             Attribute("status", instance_of=NamedConstant,
+                       default_value=CLBNodeStatus.ONLINE),
              Attribute("connections", default_value=None)])
 class CLBNode(object):
     """
@@ -585,6 +603,10 @@ class CLBNode(object):
         nodes with the same IP and port cannot exist on a single CLB.
     :ivar float drained_at: EPOCH at which this node was put in DRAINING.
         Should be 0 if node is not DRAINING.
+
+    :ivar status: One of ``ONLINE`` or ``OFFLINE``
+    :type status: A member of :class:`CLBNodeStatus`
+
     :ivar int connections: The number of active connections on the node - this
         is None by default (the stat is not available yet).
     """
@@ -622,6 +644,7 @@ class CLBNode(object):
         return cls(
             node_id=str(json['id']),
             address=json['address'],
+            status=CLBNodeStatus.lookupByName(json["status"]),
             description=CLBDescription(
                 lb_id=str(lb_id),
                 port=json['port'],

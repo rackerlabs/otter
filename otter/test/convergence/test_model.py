@@ -15,6 +15,7 @@ from otter.convergence.model import (
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
+    CLBNodeStatus,
     CLBNodeType,
     HeatStack,
     IDrainable,
@@ -120,7 +121,8 @@ class CLBNodeTests(SynchronousTestCase):
         An instance of :class:`CLBNode` provides :class:`ILBNode` and
         :class:`IDrainable`.
         """
-        node = CLBNode(node_id='1234', description=self.desc, address='10.1.1.1')
+        node = CLBNode(node_id='1234', description=self.desc,
+                       address='10.1.1.1', status=CLBNodeStatus.ONLINE)
         self.assertTrue(ILBNode.providedBy(node))
         self.assertTrue(IDrainable.providedBy(node))
 
@@ -130,7 +132,7 @@ class CLBNodeTests(SynchronousTestCase):
         of :class:`NovaServer`.
         """
         node = CLBNode(node_id='1234', description=self.desc,
-                       address='10.1.1.1')
+                       address='10.1.1.1', status=CLBNodeStatus.ONLINE)
         self.assertFalse(
             node.matches(DummyServer(servicenet_address="10.1.1.1")))
 
@@ -140,7 +142,7 @@ class CLBNodeTests(SynchronousTestCase):
         has the same ServiceNet address as the node address
         """
         node = CLBNode(node_id='1234', description=self.desc,
-                       address='10.1.1.1')
+                       address='10.1.1.1', status=CLBNodeStatus.ONLINE)
         self.assertFalse(node.matches(
             NovaServer(id='1', state=ServerState.ACTIVE, created=0.0,
                        servicenet_address="10.1.1.2",
@@ -156,7 +158,7 @@ class CLBNodeTests(SynchronousTestCase):
         `CLBNode.description.condition` is :obj:`CLBNodeCondition.DRAINING`
         """
         node = CLBNode(node_id='1234', description=self.drain_desc,
-                       address='10.1.1.1')
+                       address='10.1.1.1', status=CLBNodeStatus.ONLINE)
         self.assertTrue(node.currently_draining())
 
     def test_current_draining_false_if_description_not_draining(self):
@@ -164,7 +166,9 @@ class CLBNodeTests(SynchronousTestCase):
         :func:`CLBNode.currently_draining` returns `False` if
         `CLBNode.description.condition` is not :obj:`CLBNodeCondition.DRAINING`
         """
-        node = CLBNode(node_id='1234', description=self.desc, address='10.1.1.1')
+        node = CLBNode(
+            node_id='1234', description=self.desc, address='10.1.1.1',
+            status=CLBNodeStatus.ONLINE)
         self.assertFalse(node.currently_draining())
 
     def test_done_draining_past_timeout_even_if_there_are_connections(self):
@@ -173,7 +177,8 @@ class CLBNodeTests(SynchronousTestCase):
         the timeout, :func:`CLBNode.is_done_draining` returns `True`.
         """
         node = CLBNode(node_id='1234', description=self.drain_desc,
-                       address='10.1.1.1', drained_at=0.0, connections=1)
+                       address='10.1.1.1', drained_at=0.0, connections=1,
+                       status=CLBNodeStatus.ONLINE)
         self.assertTrue(node.is_done_draining(now=30, timeout=15))
 
     def test_done_draining_past_timeout_even_if_no_connection_info(self):
@@ -183,7 +188,8 @@ class CLBNodeTests(SynchronousTestCase):
         `True`.
         """
         node = CLBNode(node_id='1234', description=self.drain_desc,
-                       address='10.1.1.1', drained_at=0.0)
+                       address='10.1.1.1', drained_at=0.0,
+                       status=CLBNodeStatus.ONLINE)
         self.assertTrue(node.is_done_draining(now=30, timeout=15))
 
     def test_done_draining_before_timeout_if_there_are_no_connections(self):
@@ -192,7 +198,8 @@ class CLBNodeTests(SynchronousTestCase):
         than the timeout, :func:`CLBNode.is_done_draining` returns `True`.
         """
         node = CLBNode(node_id='1234', description=self.drain_desc,
-                       address='10.1.1.1', drained_at=0.0, connections=0)
+                       address='10.1.1.1', drained_at=0.0, connections=0,
+                       status=CLBNodeStatus.ONLINE)
         self.assertTrue(node.is_done_draining(now=15, timeout=30))
 
     def test_not_done_draining_before_timeout_if_no_connection_info(self):
@@ -202,7 +209,8 @@ class CLBNodeTests(SynchronousTestCase):
         returns `False`.
         """
         node = CLBNode(node_id='1234', description=self.drain_desc,
-                       address='10.1.1.1', drained_at=0.0)
+                       address='10.1.1.1', drained_at=0.0,
+                       status=CLBNodeStatus.ONLINE)
         self.assertFalse(node.is_done_draining(now=15, timeout=30))
 
     def test_active_if_node_is_enabled(self):
@@ -210,7 +218,8 @@ class CLBNodeTests(SynchronousTestCase):
         If the node is ENABLED, :func:`CLBNode.is_active` returns `True`.
         """
         node = CLBNode(node_id='1234', description=self.desc,
-                       address='10.1.1.1', drained_at=0.0, connections=1)
+                       address='10.1.1.1', drained_at=0.0, connections=1,
+                       status=CLBNodeStatus.ONLINE)
         self.assertTrue(node.is_active())
 
     def test_active_if_node_is_draining(self):
@@ -218,7 +227,8 @@ class CLBNodeTests(SynchronousTestCase):
         If the node is DRAINING, :func:`CLBNode.is_active` returns `True`.
         """
         node = CLBNode(node_id='1234', description=self.drain_desc,
-                       address='10.1.1.1', drained_at=0.0, connections=1)
+                       address='10.1.1.1', drained_at=0.0, connections=1,
+                       status=CLBNodeStatus.ONLINE)
         self.assertTrue(node.is_active())
 
     def test_inactive_if_node_is_disabled(self):
@@ -229,6 +239,7 @@ class CLBNodeTests(SynchronousTestCase):
                        description=CLBDescription(
                            lb_id='12345', port=80,
                            condition=CLBNodeCondition.DISABLED),
+                       status=CLBNodeStatus.ONLINE,
                        address='10.1.1.1', drained_at=0.0, connections=1)
         self.assertFalse(node.is_active())
 
@@ -238,12 +249,14 @@ class CLBNodeTests(SynchronousTestCase):
         with a `CLBDescription`. When weight is not specified it defaults to 1.
         """
         node_json = {'id': 'node1', 'address': '1.2.3.4', 'port': 20,
-                     'condition': 'DRAINING', 'type': 'SECONDARY'}
+                     'condition': 'DRAINING', 'type': 'SECONDARY',
+                     'status': 'OFFLINE'}
         node = CLBNode.from_node_json(123, node_json)
         self.assertEqual(
             node,
             CLBNode(node_id='node1', address='1.2.3.4',
                     connections=None, drained_at=0.0,
+                    status=CLBNodeStatus.OFFLINE,
                     description=CLBDescription(
                         lb_id='123', port=20,
                         weight=1,
@@ -257,12 +270,13 @@ class CLBNodeTests(SynchronousTestCase):
         """
         node_json = {'id': 'node1', 'address': '1.2.3.4', 'port': 20,
                      'condition': 'DRAINING', 'type': 'SECONDARY',
-                     'weight': 50}
+                     'weight': 50, 'status': 'OFFLINE'}
         node = CLBNode.from_node_json(123, node_json)
         self.assertEqual(
             node,
             CLBNode(node_id='node1', address='1.2.3.4',
                     connections=None, drained_at=0.0,
+                    status=CLBNodeStatus.OFFLINE,
                     description=CLBDescription(
                         lb_id='123', port=20,
                         weight=50,
