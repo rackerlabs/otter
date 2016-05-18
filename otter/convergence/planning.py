@@ -158,7 +158,7 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     return removes + changes + retry
 
 
-def _converge_lb_state(server, current_lb_nodes):
+def _converge_lb_state(server, current_lb_nodes, now):
     """
     Produce a series of steps to converge a server's current load balancer
     state towards its desired load balancer state.
@@ -196,7 +196,7 @@ def _converge_lb_state(server, current_lb_nodes):
     ]
 
     changes = [
-        change_lb_node(node=node, description=desired)
+        change_lb_node(node, desired, now)
         for desired, node in desired_matching_existing
         if node.description != desired
     ]
@@ -402,7 +402,8 @@ def converge_launch_server(desired_state, servers_with_cheese,
         for server in still_active_servers
         for step in _converge_lb_state(
             server,
-            [node for node in load_balancer_contents if node.matches(server)])
+            [node for node in load_balancer_contents if node.matches(server)],
+            now)
         ]
 
     # Converge again if we expect state transitions on any servers
@@ -563,6 +564,9 @@ def add_server_to_lb(server, description):
     """
     if isinstance(description, CLBDescription):
         if server.servicenet_address:
+            if description.health_monitor:
+                description = assoc_obj(description,
+                                        condition=CLBNodeCondition.DRAINING)
             return AddNodesToCLB(
                 lb_id=description.lb_id,
                 address_configs=pset(
@@ -587,7 +591,7 @@ def remove_node_from_lb(node):
             [(node.description.lb_id, node.cloud_server_id)]))
 
 
-def change_lb_node(node, description):
+def change_lb_node(node, description, now):
     """
     Change the configuration of a load balancer node.
 
@@ -600,6 +604,23 @@ def change_lb_node(node, description):
     """
     if type(node.description) == type(description):
         if isinstance(description, CLBDescription):
+            if (node.description.health_monitor and
+                    node.description.condition == CLBNodeCondition.DRAINING):
+                # Enable node if it is online
+                if node.status == CLBNodeStatus.ONLINE:
+                    return ChangeCLBNode(lb_id=description.lb_id,
+                                         node_id=node.node_id,
+                                         condition=CLBNodeCondition.ENABLED,
+                                         weight=description.weight,
+                                         type=description.type)
+                elif now - node.drained_at > 3600:
+                    rsfmt = "Node {} has remained OFFLINE for more than 1 hour"
+                    return FailConvergence(
+                        [ErrorReason.String(rsfmt.format(node.node_id))])
+                else:
+                    return ConvergeLater(
+                        [ErrorReason.String(("Waiting for node {} to come "
+                                             "ONLINE").format(node.node_id))])
             return ChangeCLBNode(lb_id=description.lb_id,
                                  node_id=node.node_id,
                                  condition=description.condition,
