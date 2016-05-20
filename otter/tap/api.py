@@ -342,7 +342,8 @@ def setup_converger(parent, kz_client, dispatcher, interval, build_timeout,
 
 def setup_scheduler(parent, dispatcher, store, kz_client):
     """
-    Setup scheduler service
+    Setup scheduler service based on the configuration and return service
+    object. If "scheduler" config is not found then return `None`.
     """
     # Setup scheduler service
     if not config_value('scheduler') or config_value('mock'):
