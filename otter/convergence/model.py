@@ -547,7 +547,9 @@ class IDrainable(Interface):
              Attribute("condition", default_value=CLBNodeCondition.ENABLED,
                        instance_of=NamedConstant),
              Attribute("type", default_value=CLBNodeType.PRIMARY,
-                       instance_of=NamedConstant)])
+                       instance_of=NamedConstant),
+             Attribute("health_monitor", default_value=False,
+                       instance_of=bool)])
 class CLBDescription(object):
     """
     Information representing a Rackspace CLB port mapping; how a particular
@@ -636,7 +638,7 @@ class CLBNode(object):
         return self.description.condition != CLBNodeCondition.DISABLED
 
     @classmethod
-    def from_node_json(cls, lb_id, json):
+    def from_node_json(cls, lb_id, json, health_mon):
         """
         Create an instance of this class based on node JSON data from the CLB
         API.
@@ -650,7 +652,8 @@ class CLBNode(object):
                 port=json['port'],
                 weight=json.get('weight', 1),
                 condition=CLBNodeCondition.lookupByName(json['condition']),
-                type=CLBNodeType.lookupByName(json['type'])))
+                type=CLBNodeType.lookupByName(json['type']),
+                health_monitor=health_mon))
 
 
 @implementer(ILBDescription)

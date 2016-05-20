@@ -16,6 +16,7 @@ from otter.cloud_client import (
     get_clb_node_feed,
     get_clb_nodes,
     get_clbs,
+    is_clb_health_monitor_enabled,
     list_servers_details_all,
     list_stacks_all,
     service_request)
@@ -170,9 +171,16 @@ def get_clb_contents():
     lb_ids = [lb['id'] for lb in (yield _retry(get_clbs()))]
     node_reqs = [_retry(get_clb_nodes(lb_id).on(error=gone([])))
                  for lb_id in lb_ids]
-    all_nodes = yield parallel(node_reqs)
-    lb_nodes = {lb_id: [CLBNode.from_node_json(lb_id, node) for node in nodes]
-                for lb_id, nodes in zip(lb_ids, all_nodes)}
+    healthmon_reqs = [
+        _retry(is_clb_health_monitor_enabled(lb_id).on(error=gone(False)))
+        for lb_id in lb_ids]
+
+    all_nodes_hms = yield parallel(node_reqs + healthmon_reqs)
+    all_nodes, hms = all_nodes_hms[:len(lb_ids)], all_nodes_hms[len(lb_ids):]
+    lb_nodes = {
+        lb_id: [CLBNode.from_node_json(lb_id, node, health_mon)
+                for node in nodes]
+        for lb_id, nodes, health_mon in zip(lb_ids, all_nodes, hms)}
     draining = [n for n in concat(lb_nodes.values())
                 if n.description.condition == CLBNodeCondition.DRAINING]
     feeds = yield parallel(

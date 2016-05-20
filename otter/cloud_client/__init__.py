@@ -763,6 +763,23 @@ def get_clb_node_feed(lb_id, node_id):
     yield do_return(all_entries)
 
 
+def is_clb_health_monitor_enabled(lb_id):
+    """
+    Does given CLB has health monitor enabled?
+    """
+    return service_request(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        'GET',
+        append_segments('loadbalancers', str(lb_id), 'healthmonitor')
+    ).on(
+        error=_only_json_api_errors(
+            lambda c, b: _process_clb_api_error(c, b, lb_id))
+    ).on(
+        log_success_response('request-get-clb-healthmon', identity)
+    ).on(
+        success=lambda (response, body): bool(body["healthMonitor"]))
+
+
 def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
     """
     All CLB messages have only the keys ("message",), and the exception tpye
