@@ -68,7 +68,7 @@ class SelfHealTests(SynchronousTestCase):
         self.s.startService()
         self.ila.assert_called_once_with(self.s.disp, self.lock)
         self.lock.acquire.assert_called_once_with(True, 0.1)
-        self.s._perform.assert_called_once_with()
+        self.s._perform.assert_called_once_with("cf", 300)
         self.log.msg.assert_called_once_with(
             "self-heal-lock-acquired", otter_service="selfheal")
 
@@ -81,7 +81,7 @@ class SelfHealTests(SynchronousTestCase):
         self.ila.assert_called_once_with(self.s.disp, self.lock)
         # Lock is not acquired again
         self.assertFalse(self.lock.acquire.called)
-        self.s._perform.assert_called_once_with()
+        self.s._perform.assert_called_once_with("cf", 300)
 
     def test_converge_all_kz_not_connected(self):
         """
@@ -105,7 +105,7 @@ class SelfHealTests(SynchronousTestCase):
         """
         self.s._perform = mock.Mock()
         self.s.startService()
-        self.s._perform.assert_called_once_with()
+        self.s._perform.assert_called_once_with("cf", 300)
         self.clock.advance(300)
         self.assertEqual(self.s._perform.call_count, 2)
 
@@ -115,9 +115,10 @@ class SelfHealTests(SynchronousTestCase):
         """
         self.s._perform = mock.Mock(return_value=fail(ValueError("h")))
         self.s.startService()
-        self.s._perform.assert_called_once_with()
+        self.s._perform.assert_called_once_with("cf", 300)
         self.log.err.assert_called_once_with(
-            CheckFailure(ValueError), otter_service="selfheal")
+            CheckFailure(ValueError), "self-heal-convergeall-err",
+            otter_service="selfheal")
         self.s._perform.return_value = succeed(None)
         self.clock.advance(300)
         self.assertEqual(self.s._perform.call_count, 2)
@@ -136,7 +137,7 @@ class SelfHealTests(SynchronousTestCase):
         # Last call will be for next _convere_all call
         self.assertEqual(self.s.calls, calls[:-1])
         for i, c in enumerate(calls[:-1]):
-            self.assertEqual(c.getTime(), i * 59)
+            self.assertEqual(c.getTime(), i * 60)
             self.assertEqual(c.func, sh.perform)
             self.assertEqual(c.args, (self.s.disp, "t{}g{}".format(i, i)))
 
@@ -174,7 +175,7 @@ class SelfHealTests(SynchronousTestCase):
         self.s.startService()
         self.assertEqual(self.s.calls, [])
         self.log.err.assert_called_once_with(
-            CheckFailure(ValueError), "self-heal-err",
+            CheckFailure(ValueError), "self-heal-convergeall-err",
             otter_service="selfheal")
 
     def test_health_check(self):

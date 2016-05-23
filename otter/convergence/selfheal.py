@@ -1,5 +1,5 @@
 """
-Self heal service
+Self heal service.
 """
 
 from effect import Effect
@@ -28,21 +28,37 @@ class SelfHeal(MultiService, object):
     """
     A service that triggers convergence on all the groups on interval basis.
     Only one node is allowed to do this.
+
+    :ivar disp: Effect dispatcher to perform all effects (ZK, CASS, log, etc)
+    :type disp: Either :obj:`ComposedDispatcher` or :obj:`TypeDispatcher`
+
+    :ivar log: Twisted logger with .msg and .err methods
+    :ivar lock: Lock object from :obj:`TxKazooClient`
+    :ivar :obj:`TxKazooClient` kz_client: Twistified kazoo client object
+    :ivar :obj:`IReactorTime` clock: Reactor providing timing APIs
+    :ivar ``list`` calls: List of `IDelayedCall` objects. Each object
+        represents scheduled call to trigger convergence on a group
     """
 
     def __init__(self, dispatcher, kz_client, interval, log, clock,
                  config_func):
+        """
+        :var float interval: All groups will be scheduled to be triggered
+            within this time
+        :var callable config_func: Callable used when calling
+            :func:`tenant_is_enabled`
+        """
         super(SelfHeal, self).__init__()
         self.disp = dispatcher
         self.log = log.bind(otter_service="selfheal")
         self.lock = kz_client.Lock("/selfheallock")
         self.kz_client = kz_client
         self.clock = clock
-        self.time_range = interval - 5
-        self.config_func = config_func
         self.calls = []
         timer = TimerService(
-            interval, lambda: self._converge_all().addErrback(self.log.err))
+            interval,
+            lambda: self._converge_all(config_func, interval).addErrback(
+                self.log.err, "self-heal-convergeall-err"))
         timer.clock = clock
         timer.setServiceParent(self)
 
@@ -57,7 +73,9 @@ class SelfHeal(MultiService, object):
 
     def _cancel_scheduled_calls(self):
         """
-        Cancel any remaining scheduled calls
+        Cancel any remaining scheduled calls.
+
+        :return: Number of remaining active scheduled calls before cancelling
         """
         active = 0
         for call in self.calls:
@@ -74,20 +92,22 @@ class SelfHeal(MultiService, object):
         d = is_lock_acquired(self.disp, self.lock)
         return d.addCallback(lambda b: (True, {"has_lock": b}))
 
-    def _perform(self):
-        d = perform(self.disp, get_groups_to_converge(self.config_func))
-        d.addCallback(self._setup_converges)
-        return d.addErrback(self.log.err, "self-heal-err")
-
-    def _setup_converges(self, groups):
+    @inlineCallbacks
+    def _perform(self, config_func, time_range):
+        """
+        Get groups to converge and setup scheduled calls to trigger convergence
+        on each of them within time_range
+        """
+        groups = yield perform(self.disp,
+                               get_groups_to_converge(config_func))
         active = self._cancel_scheduled_calls()
         if active:
             # This should never happen
             self.log.err(RuntimeError("self-heal-calls-err"),
                          "self-heal-calls-err", active=active)
         if not groups:
-            return
-        wait_time = float(self.time_range) / len(groups)
+            returnValue(None)
+        wait_time = float(time_range) / len(groups)
         for i, group in enumerate(groups):
             self.calls.append(
                 self.clock.callLater(
@@ -96,7 +116,11 @@ class SelfHeal(MultiService, object):
             )
 
     @inlineCallbacks
-    def _converge_all(self):
+    def _converge_all(self, config_func, time_range):
+        """
+        Setup convergence triggering on all groups by acquiring the lock and
+        calling _perform
+        """
         if self.kz_client.state != KazooState.CONNECTED:
             self.log.err(RuntimeError("self-heal-kz-state"),
                          "self-heal-kz-state", state=self.kz_client.state)
@@ -106,12 +130,12 @@ class SelfHeal(MultiService, object):
         # subsequent intervals and it is not clear how state change to
         # SUSPENDED should be handled
         if (yield is_lock_acquired(self.disp, self.lock)):
-            yield self._perform()
+            yield self._perform(config_func, time_range)
         else:
             try:
                 yield self.lock.acquire(True, 0.1)
                 self.log.msg("self-heal-lock-acquired")
-                yield self._perform()
+                yield self._perform(config_func, time_range)
             except LockTimeout:
                 # expected. Nothing to do here. Will try on next interval
                 pass
