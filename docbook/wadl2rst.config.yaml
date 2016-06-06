@@ -1,3 +1,0 @@
-src/wadl/autoscale.wadl:
-    title: Rackspace Cloud Auto Scale Developer Guide v1
-    output_directory: rst/dev-guide/api-operations   
