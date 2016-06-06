@@ -1,9 +1,0 @@
-#cloud-config
-
-packages:
-
- - apache2
-
-runcmd:
-
- - echo 'do setup stuff here' > /var/www/temp.txt

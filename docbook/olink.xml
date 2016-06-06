@@ -1,5 +1,0 @@
-<books xmlns="http://docs.rackspace.com/olink">
-  <book path="src/docbkx/autoscale-gettingstarted.xml"/>
-  <book path="src/docbkx/autoscale-devguide.xml"/>
-</books>
-
