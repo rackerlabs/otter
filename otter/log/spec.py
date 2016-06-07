@@ -210,7 +210,15 @@ msg_types = {
         "capacity has been reached or policy execution will result in current "
         "desired number of servers"),
     "sch-exec-pol": "Executing scheduled policy {policy_id}",
-    "sch-exec-pol-err": "Error executing scheduled policy {policy_id}"
+    "sch-exec-pol-err": "Error executing scheduled policy {policy_id}",
+
+    # Selfheal service
+    "self-heal-convergeall-err": (
+        "SelfHeal service errored occurred when scheduling convergence"),
+    "self-heal-calls-err": "SelfHeal service has {active} scheduled calls",
+    "self-heal-kz-state": (
+        "SelfHeal service kazoo client is not connected. State: {state}"),
+    "self-heal-lock-acquired": "SelfHeal service acquired lock"
 }
 
 
