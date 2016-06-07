@@ -131,7 +131,7 @@ from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, msg_with_time, with_log
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, UpdateGroupErrorReasons,
-    UpdateGroupStatus, UpdateServersCache)
+    UpdateGroupStatus, UpdateScalingGroupStatus, UpdateServersCache)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.timestamp import datetime_to_epoch
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
@@ -294,8 +294,13 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
     :raise: :obj:`NoSuchScalingGroupError` if the group doesn't exist.
     """
     clean_waiting = _clean_waiting(waiting, group_id)
-    # Gather data
+
+    # Begin convergence by updating group status to ACTIVE
     yield msg("begin-convergence")
+    yield Effect(UpdateScalingGroupStatus(tenant_id, group_id,
+                                          ScalingGroupStatus.ACTIVE))
+
+    # Gather data
     now_dt = yield Effect(Func(datetime.utcnow))
     all_data = yield msg_with_time(
         "gather-convergence-data",

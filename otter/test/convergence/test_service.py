@@ -57,6 +57,7 @@ from otter.models.intents import (
     GetScalingGroupInfo,
     UpdateGroupErrorReasons,
     UpdateGroupStatus,
+    UpdateScalingGroupStatus,
     UpdateServersCache)
 from otter.models.interface import (
     GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
@@ -871,6 +872,10 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             )
         return [
             (Log("begin-convergence", {}), noop),
+            (UpdateScalingGroupStatus(
+                self.tenant_id, self.group_id,
+                ScalingGroupStatus.ACTIVE),
+             noop),
             (Func(datetime.utcnow), lambda i: self.now),
             (MsgWithTime("gather-convergence-data", mock.ANY),
              nested_sequence(exec_seq))
