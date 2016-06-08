@@ -94,7 +94,7 @@ endif
 
 coverage:
 	PYRSISTENT_NO_C_EXTENSION=true coverage run --source=${CODEDIR} \
-		--branch `which trial` \
+		--branch `which trial` --omit="*/test/*","*/integration/tests/*" \
 	    ${TRIAL_OPTIONS} ${UNITTESTS}
 
 coverage-html: coverage
