@@ -11,14 +11,14 @@ cache:
 
 install:
     - pip install -U pip wheel
-    - pip install -r requirements.txt -r dev_requirements.txt coveralls
+    - pip install -r requirements.txt -r dev_requirements.txt codecov
 
 script:
     - make lint-code
     - make coverage
 
 after_script:
-    - coveralls
+    - codecov
 
 branches:
   only:
