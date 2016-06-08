@@ -297,8 +297,12 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
 
     # Begin convergence by updating group status to ACTIVE
     yield msg("begin-convergence")
-    yield Effect(UpdateScalingGroupStatus(tenant_id, group_id,
-                                          ScalingGroupStatus.ACTIVE))
+    try:
+        yield Effect(UpdateScalingGroupStatus(tenant_id, group_id,
+                                              ScalingGroupStatus.ACTIVE))
+    except NoSuchScalingGroupError:
+        # Expected for DELETING group. Ignore.
+        pass
 
     # Gather data
     now_dt = yield Effect(Func(datetime.utcnow))

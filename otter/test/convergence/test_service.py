@@ -858,7 +858,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.now = datetime(1970, 1, 1)
         self.waiting = Reference(pmap())
 
-    def get_seq(self, with_cache=True):
+    def get_seq(self, with_cache=True, upd_status_nogroup_err=False):
         exec_seq = [
             (self.gsgi, lambda i: self.gsgi_result),
             (("gacd", self.tenant_id, self.group_id, self.now),
@@ -870,12 +870,16 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                     self.tenant_id, self.group_id, self.now, self.cache),
                  noop)
             )
+        if upd_status_nogroup_err:
+            def handler(i):
+                raise NoSuchScalingGroupError(self.tenant_id, self.group_id)
+        else:
+            handler = noop
         return [
             (Log("begin-convergence", {}), noop),
             (UpdateScalingGroupStatus(
-                self.tenant_id, self.group_id,
-                ScalingGroupStatus.ACTIVE),
-             noop),
+                self.tenant_id, self.group_id, ScalingGroupStatus.ACTIVE),
+             handler),
             (Func(datetime.utcnow), lambda i: self.now),
             (MsgWithTime("gather-convergence-data", mock.ANY),
              nested_sequence(exec_seq))
@@ -1073,7 +1077,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                          group_id=self.group_id), noop))
         self.assertEqual(
             # skipping cache update intents returned in get_seq()
-            perform_sequence(self.get_seq(False) + sequence,
+            perform_sequence(self.get_seq(False, True) + sequence,
                              self._invoke(_plan)),
             exec_result)
         # desired capacity was changed to 0
