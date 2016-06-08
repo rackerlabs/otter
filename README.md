@@ -1,4 +1,4 @@
-[![Coverage Status](https://coveralls.io/repos/rackerlabs/otter/badge.svg?branch=master&service=github)](https://coveralls.io/github/rackerlabs/otter?branch=master)
+[![codecov](https://codecov.io/gh/rackerlabs/otter/branch/master/graph/badge.svg)](https://codecov.io/gh/rackerlabs/otter)
 # Rackspace Autoscale
 
 *There Otter be an Otter scaling system.*
