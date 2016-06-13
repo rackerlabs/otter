@@ -9,7 +9,8 @@ from testtools.matchers import ContainsDict, Equals, MatchesListwise, NotEquals
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import inlineCallbacks
 
-from otter.integration.lib.nova import NovaServer, extract_active_ids
+from otter.integration.lib.autoscale import extract_active_ids
+from otter.integration.lib.nova import NovaServer
 from otter.integration.lib.resources import TestResources
 from otter.integration.lib.trial_tools import (
     TestHelper,
