@@ -6,8 +6,8 @@ import os
 
 from testtools.matchers import ContainsDict, Equals, MatchesListwise, NotEquals
 
-from twisted.trial.unittest import TestCase
 from twisted.internet.defer import inlineCallbacks
+from twisted.trial.unittest import TestCase
 
 from otter.integration.lib.autoscale import extract_active_ids
 from otter.integration.lib.nova import NovaServer
@@ -41,7 +41,7 @@ class SelfHealTests(TestCase):
             region=region
         )
 
-    @skip_if(lambda _: "AS_SELFHEAL_INTERVAL" in os.environ,
+    @skip_if(lambda: "AS_SELFHEAL_INTERVAL" not in os.environ,
              "AS_SELFHEAL_INTERVAL environment variable needed")
     @inlineCallbacks
     def test_selfheal(self):
@@ -53,8 +53,8 @@ class SelfHealTests(TestCase):
         yield group.wait_for_state(
             self.rcs, ContainsDict({"activeCapacity": Equals(1)}))
         # delete server OOB
-        server_id = yield only_server_id(self.rcs)
-        yield NovaServer(id=server_id, pool=self.pool).delete()
+        server_id = yield only_server_id(self.rcs, group)
+        yield NovaServer(id=server_id, pool=self.helper.pool).delete(self.rcs)
         # Wait for new server to come back up by self heal service. It can
         # take 2 * selfheal interval because the new group may get scheduled
         # to be triggered after last scheduling is already setup
@@ -63,13 +63,14 @@ class SelfHealTests(TestCase):
             ContainsDict(
                 {"active": MatchesListwise([
                     ContainsDict({"id": NotEquals(server_id)})])}),
-            timeout=os.environ["AS_SELFHEAL_INTERVAL"] * 2)
+            timeout=float(os.environ["AS_SELFHEAL_INTERVAL"]) * 2)
         # Delete new server again and see if it comes back. It should be
         # back within selfheal interval
-        server_id = yield only_server_id(self.rcs)
+        server_id = yield only_server_id(self.rcs, group)
+        yield NovaServer(id=server_id, pool=self.helper.pool).delete(self.rcs)
         yield group.wait_for_state(
             self.rcs,
             ContainsDict(
                 {"active": MatchesListwise([
                     ContainsDict({"id": NotEquals(server_id)})])}),
-            timeout=os.environ["AS_SELFHEAL_INTERVAL"])
+            timeout=float(os.environ["AS_SELFHEAL_INTERVAL"]))
