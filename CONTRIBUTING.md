@@ -24,7 +24,7 @@ needs these things. This can be done by creating issues requesting docs and
 integration tests.
 
 An author may also feel free to submit end-user docs and functional tests for
-their own changes.
+their own changes. For details about contributing the docs, see the [API docs readme](https://github.com/rackerlabs/otter/blob/master/api-docs/rst/dev-guide/README.md).
 
 ## Review Process
 
