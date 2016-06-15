@@ -17,7 +17,7 @@ from otter.integration.lib.trial_tools import (
     get_identity,
     get_resource_mapping,
     region,
-    skip_if,
+    skip_if
 )
 
 
@@ -30,6 +30,8 @@ def only_server_id(rcs, group):
 
 
 class SelfHealTests(TestCase):
+
+    skip = "Until #1855 is completed"
 
     def setUp(self):
         self.helper = TestHelper(self)
