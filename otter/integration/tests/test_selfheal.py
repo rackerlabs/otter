@@ -31,8 +31,6 @@ def only_server_id(rcs, group):
 
 class SelfHealTests(TestCase):
 
-    skip = "Until #1855 is completed"
-
     def setUp(self):
         self.helper = TestHelper(self)
         self.rcs = TestResources()
