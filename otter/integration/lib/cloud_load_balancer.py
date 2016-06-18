@@ -418,6 +418,32 @@ class CloudLoadBalancer(object):
 
         return really_add()
 
+    @diagnose("clb", "Updating health monitor")
+    def update_health_monitor(self, rcs, config, clock=reactor):
+        """
+        Update health monitor configuration
+
+        :param rcs: a :class:`otter.integration.lib.resources.TestResources`
+            instance
+        :param dict config: Health monitor configuration that will be sent as
+            {"healthMonitor": config"}
+
+        :return: On success, Deferred fired with None
+        """
+
+        @_retry("Trying to update health monitor.", clock=clock)
+        def try_update():
+            d = self.treq.put(
+                "{}/healthmonitor".format(self.endpoint(rcs)),
+                json.dumps({"healthMonitor": config}),
+                headers=headers(str(rcs.token)),
+                pool=self.pool)
+            d.addCallback(check_success, [202], _treq=self.treq)
+            d.addCallbacks(self.treq.content, _pending_update_to_transient)
+            return d.addCallback(lambda _: None)
+
+        return try_update()
+
 
 HasLength = MatchesPredicateWithParams(
     lambda items, length: len(items) == length,
