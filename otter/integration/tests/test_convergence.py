@@ -17,6 +17,7 @@ from testtools.matchers import (
     GreaterThan,
     LessThan,
     MatchesAll,
+    MatchesListwise,
     MatchesSetwise,
     Not,
     NotEquals
@@ -39,14 +40,17 @@ from otter.integration.lib.nova import (
 from otter.integration.lib.resources import TestResources
 from otter.integration.lib.trial_tools import (
     TestHelper,
+    convergence_interval,
     copy_test_methods,
     get_identity,
     get_resource_mapping,
+    mimic_convergence_exec_time,
     not_mimic,
     otter_build_timeout,
     random_string,
     region,
     skip_if,
+    skip_me,
     tag
 )
 from otter.integration.lib.utils import diagnose
@@ -1409,6 +1413,62 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 timeout=600
             )
         )
+
+    @skip_me("Until #1870 is implemented")
+    @skip_if(not_mimic, "Requires mimic for controling CLB node status")
+    @inlineCallbacks
+    def test_node_added_as_draining(self):
+        """
+        When CLB has health monitor enabled, then node is added as DRAINING.
+        It is ENABLEed when it becomes ONLINE
+        """
+        # enable health monitor on CLB
+        clb = self.helper.clbs[0]
+        yield clb.update_health_monitor(
+            self.rcs,
+            {"type": "CONNECT", "delay": 10, "timeout": 10,
+             "attemptsBeforeDeactivation": 3})
+
+        # Create group with 1 entity
+        group, _ = self.helper.create_group(min_entities=1)
+        yield group.start(self.rcs, self)
+
+        # Wait for server to build and extract its IP
+        yield group.wait_for_state(
+            self.rcs,
+            ContainsDict({"activeCapacity": Equals(1),
+                          "pendingCapacity": Equals(0),
+                          "desiredCapacity": Equals(1),
+                          "status": Equals("ACTIVE")}),
+            period=2)
+        ip = (yield group.get_servicenet_ips(self.rcs)).values()[0]
+
+        # Server's corresponding CLB node should be DRAINING and OFFLINE
+        yield clb.wait_for_nodes(
+            self.rcs,
+            MatchesListwise(
+                [ContainsDict({"address": Equals(ip),
+                               "condition": Equals("DRAINING"),
+                               "status": Equals("OFFLINE")})]),
+            convergence_interval + mimic_convergence_exec_time * 2,  # timeout
+            2)                         # interval
+
+        # Change the node's status to ONLINE via mimic CLB control API
+        node_id = (yield clb.list_nodes(self.rcs))["nodes"][0]["id"]
+        mimic_clb = MimicCLB(pool=self.helper.pool, test_case=self,
+                             treq=self.helper.treq)
+        yield mimic_clb.update_clb_node_status(
+            self.rcs, clb.clb_id, node_id, "ONLINE")
+
+        # The node should now be ENABLED
+        yield clb.wait_for_nodes(
+            self.rcs,
+            MatchesListwise(
+                [ContainsDict({"address": Equals(ip),
+                               "condition": Equals("ENABLED"),
+                               "status": Equals("ONLINE")})]),
+            convergence_interval + mimic_convergence_exec_time * 2,  # timeout
+            2)                         # interval
 
 
 # Run the ConvergenceTestsNoLBs in a configuration with 1 CLB
