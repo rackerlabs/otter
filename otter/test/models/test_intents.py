@@ -10,8 +10,8 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.log.intents import get_log_dispatcher
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, ModifyGroupStatePaused,
-    UpdateGroupErrorReasons, UpdateGroupStatus, LoadAndUpdateGroupStatus,
+    DeleteGroup, GetScalingGroupInfo, LoadAndUpdateGroupStatus,
+    ModifyGroupStatePaused, UpdateGroupErrorReasons, UpdateGroupStatus,
     UpdateServersCache, get_model_dispatcher)
 from otter.models.interface import (
     GroupState, IScalingGroupCollection, ScalingGroupStatus)

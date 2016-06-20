@@ -130,8 +130,8 @@ from otter.convergence.transforming import get_step_limits_from_conf
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, msg_with_time, with_log
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, UpdateGroupErrorReasons,
-    UpdateGroupStatus, LoadAndUpdateGroupStatus, UpdateServersCache)
+    DeleteGroup, GetScalingGroupInfo, LoadAndUpdateGroupStatus,
+    UpdateGroupErrorReasons, UpdateGroupStatus, UpdateServersCache)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.timestamp import datetime_to_epoch
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
