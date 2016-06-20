@@ -2,6 +2,7 @@
 import json
 import re
 from functools import partial, wraps
+from operator import itemgetter
 from urlparse import parse_qs, urlparse
 
 import attr
@@ -15,6 +16,7 @@ from effect import (
     catch,
     perform,
     sync_performer)
+from effect.do import do, do_return
 
 import six
 
@@ -28,6 +30,7 @@ from txeffect import deferred_performer, perform as twisted_perform
 
 from otter.auth import Authenticate, InvalidateToken, public_endpoint_url
 from otter.constants import ServiceType
+from otter.indexer import atom
 from otter.log.intents import msg as msg_effect
 from otter.util.config import config_value
 from otter.util.http import APIError, append_segments, try_json_with_keys
@@ -708,21 +711,56 @@ def get_clbs():
         success=lambda (response, body): body['loadBalancers'])
 
 
-def get_clb_node_feed(lb_id, node_id):
-    """Get the atom feed associated with a CLB node. Returns feed as str."""
+def _node_feed_page(lb_id, node_id, params):
+    """
+    Return page of CLB node feed
+
+    :param int lb_id: Cloud Load balancer ID
+    :param int node_id: Node ID of in loadbalancer node
+    :param dict params: Request query parameters
+
+    :returns: Unparsed response body as string
+    :rtype: `str`
+    """
     return service_request(
-        ServiceType.CLOUD_LOAD_BALANCERS,
-        'GET',
+        ServiceType.CLOUD_LOAD_BALANCERS, 'GET',
         append_segments('loadbalancers', str(lb_id), 'nodes',
                         '{}.atom'.format(node_id)),
+        params=params,
         json_response=False
     ).on(
         error=_only_json_api_errors(
             lambda c, b: _process_clb_api_error(c, b, lb_id))
     ).on(
         log_success_response('request-get-clb-node-feed', identity)
-    ).on(
-        success=lambda (response, body): body)
+    ).on(itemgetter(1))
+
+
+@do
+def get_clb_node_feed(lb_id, node_id):
+    """
+    Get the atom feed associated with a CLB node.
+
+    :param int lb_id: Cloud Load balancer ID
+    :param int node_id: Node ID of in loadbalancer node
+
+    :returns: Effect of ``list`` of atom entry :class:`Element`
+    :rtype: ``Effect``
+    """
+    all_entries = []
+    params = {}
+    while True:
+        feed_str = yield _node_feed_page(lb_id, node_id, params)
+        feed = atom.parse(feed_str)
+        entries = atom.entries(feed)
+        if entries == []:
+            break
+        all_entries.extend(entries)
+        next_link = atom.next_link(feed)
+        if not next_link:
+            break
+        params = parse_qs(urlparse(next_link).query)
+    yield do_return(all_entries)
 
 
 def _expand_clb_matches(matches_tuples, lb_id, node_id=None):

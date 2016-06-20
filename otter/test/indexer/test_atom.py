@@ -4,11 +4,12 @@ Tests for :mod:`otter.indexer.atom`
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.test.utils import fixture
-
 from otter.indexer.atom import (
-    parse, summary, categories, entries, previous_link, updated, content
+    categories, content, entries, next_link, parse, previous_link, summary,
+    updated
 )
+
+from otter.test.utils import fixture
 
 
 class SimpleAtomTestCase(SynchronousTestCase):
@@ -68,6 +69,17 @@ class SimpleAtomTestCase(SynchronousTestCase):
             previous_link(self.simple_atom),
             ('http://example.org/feed/?'
              'marker=urn:uuid:1225c695-cfb8-4ebb-aaaa-80da344efa6a')
+        )
+
+    def test_next_link(self):
+        """
+        :func:`otter.indexer.next_link` finds the next link in the
+        simple sample atom feed.
+        """
+        self.assertEqual(
+            next_link(self.simple_atom),
+            ('http://example.org/feed/?'
+             'marker=urn:uuid:e5caea3a-188c-11e6-8692-acbc32badee9')
         )
 
     def test_updated(self):

@@ -32,7 +32,7 @@ from otter.cloud_client import (
 )
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
-    extract_CLB_drained_at,
+    extract_clb_drained_at,
     get_all_launch_server_data,
     get_all_launch_stack_data,
     get_all_scaling_group_servers,
@@ -51,6 +51,7 @@ from otter.convergence.model import (
     RCv3Description,
     RCv3Node,
     ServerState)
+from otter.indexer import atom
 from otter.log.intents import Log
 from otter.test.utils import (
     EffectServersCache,
@@ -318,33 +319,56 @@ class GetScalingGroupServersTests(SynchronousTestCase):
 
 class ExtractDrainedTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.convergence.extract_CLB_drained_at`
+    Tests for :func:`otter.convergence.extract_clb_drained_at`
     """
-    summary = ("Node successfully updated with address: "
-               "'10.23.45.6', port: '8080', weight: '1', "
-               "condition: 'DRAINING'")
-    updated = '2014-10-23T18:10:48.001Z'
-    feed = (
-        '<feed xmlns="http://www.w3.org/2005/Atom">' +
-        '<entry><summary>{}</summary><updated>{}</updated></entry>' +
-        '<entry><summary>else</summary><updated>badtime</updated></entry>' +
-        '</feed>')
+    updated_summary = ("Node successfully updated with address: "
+                       "'10.23.45.6', port: '8080', weight: '1', "
+                       "condition: 'DRAINING'")
+    created_summary = ("Node successfully created with address: "
+                       "'10.23.45.6', port: '8080', condition: 'DRAINING', "
+                       "weight: '1'")
+    updated1 = '2014-10-23T18:10:48.001Z'
+    updated2 = '2015-09-23T08:00:40Z'
+    entry = '<entry><summary>{}</summary><updated>{}</updated></entry>'
+    feed = '<feed xmlns="http://www.w3.org/2005/Atom">{}</feed>'
 
-    def test_first_entry(self):
-        """
-        Takes the first entry only
-        """
-        feed = self.feed.format(self.summary, self.updated)
-        self.assertEqual(extract_CLB_drained_at(feed),
-                         timestamp_to_epoch(self.updated))
+    def parsed_feed(self, *entries):
+        entries = ''.join(self.entry.format(*e) for e in entries)
+        return atom.entries(atom.parse(self.feed.format(entries)))
 
-    def test_invalid_first_entry(self):
+    def test_updated(self):
         """
-        Raises error if first entry is not DRAINING entry
+        Returns time matched from first "Node updated" entry found in feeds
         """
-        feed = self.feed.format("Node successfully updated with ENABLED",
-                                self.updated)
-        self.assertRaises(ValueError, extract_CLB_drained_at, feed)
+        feed = self.parsed_feed(
+            ("summary", "2000-10-01Z"),
+            (self.updated_summary, self.updated1),
+            ("don't care", self.updated2))
+        self.assertEqual(
+            extract_clb_drained_at(feed), timestamp_to_epoch(self.updated1))
+
+    def test_created(self):
+        """
+        Returns time matched from first "Node created" entry found in feeds
+        """
+        feed = self.parsed_feed(
+            ("summary", "2000-10-01Z"), (self.created_summary, self.updated2))
+        self.assertEqual(
+            extract_clb_drained_at(feed), timestamp_to_epoch(self.updated2))
+
+    def test_no_match(self):
+        """
+        Returns None when no entry matches
+        """
+        feed = self.parsed_feed(
+            ("summary", self.updated1), ("don't care", self.updated2))
+        self.assertIsNone(extract_clb_drained_at(feed))
+
+    def test_empty(self):
+        """
+        Returns None when there are no entries in the feed
+        """
+        self.assertIsNone(extract_clb_drained_at([]))
 
 
 def lb_req(url, json_response, response):
@@ -381,9 +405,31 @@ def nodes_req(lb_id, nodes):
 
 
 def node_feed_req(lb_id, node_id, response):
-    return lb_req(
-        'loadbalancers/{}/nodes/{}.atom'.format(lb_id, node_id),
-        False, response)
+    """
+    Return (intent, performer) sequence for getting clb node's feed that
+    wrapped with retry intent.
+
+    :param lb_id: Lodbalancer ID
+    :param node_id: LB node ID
+    :param response: The response returned when getting CLB node feed. It is
+        either string containing feed or Exception object that will be raised
+        when getting the feed
+
+    :return: (intent, performer) tuple
+    """
+    if isinstance(response, Exception):
+        def handler(i): raise response
+    else:
+        def handler(i): return response
+    return (
+        Retry(
+            effect=mock.ANY,
+            should_retry=ShouldDelayAndRetry(
+                can_retry=retry_times(5),
+                next_interval=exponential_backoff_interval(2))
+        ),
+        nested_sequence([(("gcnf", lb_id, node_id), handler)])
+    )
 
 
 def node(id, address, port=20, weight=2, condition='ENABLED',
@@ -401,11 +447,13 @@ class GetCLBContentsTests(SynchronousTestCase):
     """
 
     def setUp(self):
-        """mock `extract_CLB_drained_at`"""
+        """mock `extract_clb_drained_at`"""
         self.feeds = {'11feed': 1.0, '22feed': 2.0}
         self.mock_eda = patch(
-            self, 'otter.convergence.gathering.extract_CLB_drained_at',
+            self, 'otter.convergence.gathering.extract_clb_drained_at',
             side_effect=lambda f: self.feeds[f])
+        patch(self, "otter.convergence.gathering.get_clb_node_feed",
+              side_effect=intent_func("gcnf"))
 
     def test_success(self):
         """
@@ -420,8 +468,8 @@ class GetCLBContentsTests(SynchronousTestCase):
                    {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             parallel_sequence([[nodes_req(1, [node11, node12])],
                                [nodes_req(2, [node21, node22])]]),
-            parallel_sequence([[node_feed_req(1, '11', '11feed')],
-                               [node_feed_req(2, '22', '22feed')]]),
+            parallel_sequence([[node_feed_req('1', '11', '11feed')],
+                               [node_feed_req('2', '22', '22feed')]]),
         ]
         eff = get_clb_contents()
         self.assertEqual(
@@ -516,8 +564,8 @@ class GetCLBContentsTests(SynchronousTestCase):
                 [nodes_req(2, [node21])]
             ]),
             parallel_sequence([
-                [node_feed_req(1, '11', CLBNotFoundError(lb_id=u'1'))],
-                [node_feed_req(2, '21', '22feed')]]),
+                [node_feed_req('1', '11', CLBNotFoundError(lb_id=u'1'))],
+                [node_feed_req('2', '21', '22feed')]]),
         ]
         eff = get_clb_contents()
         self.assertEqual(

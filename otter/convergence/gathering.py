@@ -1,4 +1,5 @@
 """Code related to gathering data to inform convergence."""
+import re
 from functools import partial
 
 from effect import catch, parallel
@@ -189,32 +190,38 @@ def get_clb_contents():
         if node.description.lb_id in deleted_lbs:
             return None
         if feed is not None:
-            return assoc_obj(node, drained_at=extract_CLB_drained_at(feed))
+            return assoc_obj(node, drained_at=extract_clb_drained_at(feed))
         else:
             return node
     nodes = map(update_drained_at, concat(lb_nodes.values()))
     yield do_return(list(filter(bool, nodes)))
 
 
-def extract_CLB_drained_at(feed):
+_DRAINING_CREATED_RE = (
+    "^Node successfully created with address: '.+', port: '\d+', "
+    "condition: 'DRAINING', weight: '\d+'$")
+_DRAINING_UPDATED_RE = (
+    "^Node successfully updated with address: '.+', port: '\d+', "
+    "weight: '\d+', condition: 'DRAINING'$")
+_DRAINING_RE = re.compile(
+    "({})|({})".format(_DRAINING_UPDATED_RE, _DRAINING_CREATED_RE))
+
+
+def extract_clb_drained_at(feed):
     """
-    Extract time when node was changed to DRAINING from a CLB atom feed.
+    Extract time when node was changed to DRAINING from a CLB atom feed. Will
+    return node's creation time if node was created with DRAINING. Return None
+    if couldnt find for any reason.
 
-    :param str feed: Atom feed of the node
+    :param list feed: ``list`` of atom entry :class:`Elements`
 
-    :returns: EPOCH in seconds
+    :returns: drained_at EPOCH in seconds
     :rtype: float
     """
-    # TODO: This function temporarily only looks at last entry assuming that
-    # it was draining operation. May need to look at all entries in reverse
-    # order and check for draining operation. This could include paging to
-    # further entries
-    entry = atom.entries(atom.parse(feed))[0]
-    summary = atom.summary(entry)
-    if 'Node successfully updated' in summary and 'DRAINING' in summary:
-        return timestamp_to_epoch(atom.updated(entry))
-    else:
-        raise ValueError('Unexpected summary: {}'.format(summary))
+    for entry in feed:
+        if _DRAINING_RE.match(atom.summary(entry)):
+            return timestamp_to_epoch(atom.updated(entry))
+    return None
 
 
 def get_rcv3_contents():
