@@ -859,6 +859,15 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.waiting = Reference(pmap())
 
     def get_seq(self, with_cache=True, upd_status_nogroup_err=False):
+        """
+        Return list of (intent, performer) tuples for all the effects produced
+        during gathering step of ``execute_convergence`` function
+
+        :param bool with_cache: Should it include tuple corresponding to
+            updating servers cache effect?
+        :param upd_status_nogroup_err: Should LoadAndUpdateGroupStatus handler
+            raise `NoSuchScalingGroupError` instead of returning None?
+        """
         exec_seq = [
             (self.gsgi, lambda i: self.gsgi_result),
             (("gacd", self.tenant_id, self.group_id, self.now),
