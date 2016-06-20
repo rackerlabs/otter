@@ -32,7 +32,7 @@ from otter.cloud_client import (
 )
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
-    extract_CLB_drained_at,
+    extract_clb_drained_at,
     get_all_launch_server_data,
     get_all_launch_stack_data,
     get_all_scaling_group_servers,
@@ -319,7 +319,7 @@ class GetScalingGroupServersTests(SynchronousTestCase):
 
 class ExtractDrainedTests(SynchronousTestCase):
     """
-    Tests for :func:`otter.convergence.extract_CLB_drained_at`
+    Tests for :func:`otter.convergence.extract_clb_drained_at`
     """
     updated_summary = ("Node successfully updated with address: "
                        "'10.23.45.6', port: '8080', weight: '1', "
@@ -345,7 +345,7 @@ class ExtractDrainedTests(SynchronousTestCase):
             (self.updated_summary, self.updated1),
             ("don't care", self.updated2))
         self.assertEqual(
-            extract_CLB_drained_at(feed), timestamp_to_epoch(self.updated1))
+            extract_clb_drained_at(feed), timestamp_to_epoch(self.updated1))
 
     def test_created(self):
         """
@@ -354,7 +354,7 @@ class ExtractDrainedTests(SynchronousTestCase):
         feed = self.parsed_feed(
             ("summary", "2000-10-01Z"), (self.created_summary, self.updated2))
         self.assertEqual(
-            extract_CLB_drained_at(feed), timestamp_to_epoch(self.updated2))
+            extract_clb_drained_at(feed), timestamp_to_epoch(self.updated2))
 
     def test_no_match(self):
         """
@@ -362,13 +362,13 @@ class ExtractDrainedTests(SynchronousTestCase):
         """
         feed = self.parsed_feed(
             ("summary", self.updated1), ("don't care", self.updated2))
-        self.assertIsNone(extract_CLB_drained_at(feed))
+        self.assertIsNone(extract_clb_drained_at(feed))
 
     def test_empty(self):
         """
         Returns None when there are no entries in the feed
         """
-        self.assertIsNone(extract_CLB_drained_at([]))
+        self.assertIsNone(extract_clb_drained_at([]))
 
 
 def lb_req(url, json_response, response):
@@ -435,10 +435,10 @@ class GetCLBContentsTests(SynchronousTestCase):
     """
 
     def setUp(self):
-        """mock `extract_CLB_drained_at`"""
+        """mock `extract_clb_drained_at`"""
         self.feeds = {'11feed': 1.0, '22feed': 2.0}
         self.mock_eda = patch(
-            self, 'otter.convergence.gathering.extract_CLB_drained_at',
+            self, 'otter.convergence.gathering.extract_clb_drained_at',
             side_effect=lambda f: self.feeds[f])
         patch(self, "otter.convergence.gathering.get_clb_node_feed",
               side_effect=intent_func("gcnf"))

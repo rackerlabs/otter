@@ -190,7 +190,7 @@ def get_clb_contents():
         if node.description.lb_id in deleted_lbs:
             return None
         if feed is not None:
-            return assoc_obj(node, drained_at=extract_CLB_drained_at(feed))
+            return assoc_obj(node, drained_at=extract_clb_drained_at(feed))
         else:
             return node
     nodes = map(update_drained_at, concat(lb_nodes.values()))
@@ -207,7 +207,7 @@ _DRAINING_RE = re.compile(
     "({})|({})".format(_DRAINING_UPDATED_RE, _DRAINING_CREATED_RE))
 
 
-def extract_CLB_drained_at(feed):
+def extract_clb_drained_at(feed):
     """
     Extract time when node was changed to DRAINING from a CLB atom feed. Will
     return node's creation time if node was created with DRAINING. Return None
