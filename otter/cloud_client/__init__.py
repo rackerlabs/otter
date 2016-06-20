@@ -708,7 +708,17 @@ def get_clbs():
         success=lambda (response, body): body['loadBalancers'])
 
 
-def _node_feed_request(lb_id, node_id, params):
+def _node_feed_page(lb_id, node_id, params):
+    """
+    Return page of CLB node feed
+
+    :param int lb_id: Cloud Load balancer ID
+    :param int node_id: Node ID of in loadbalancer node
+    :param dict params: Request query parameters
+
+    :returns: Unparsed response body as string
+    :rtype: `str`
+    """
     return service_request(
         ServiceType.CLOUD_LOAD_BALANCERS, 'GET',
         append_segments('loadbalancers', str(lb_id), 'nodes',
@@ -731,22 +741,23 @@ def get_clb_node_feed(lb_id, node_id):
     :param int lb_id: Cloud Load balancer ID
     :param int node_id: Node ID of in loadbalancer node
 
-    :returns: ``list`` of atom entry :class:`Element`
-    :rtype: ``list``
+    :returns: Effect of ``list`` of atom entry :class:`Element`
+    :rtype: ``Effect``
     """
     all_entries = []
     params = {}
     while True:
-        feed_str = yield _node_feed_request(lb_id, node_id, params)
+        feed_str = yield _node_feed_page(lb_id, node_id, params)
         feed = atom.parse(feed_str)
         entries = atom.entries(feed)
         if entries == []:
-            yield do_return(all_entries)
+            break
         all_entries.extend(entries)
         next_link = atom.next_link(feed)
         if not next_link:
-            yield do_return(all_entries)
+            break
         params = parse_qs(urlparse(next_link).query)
+    yield do_return(all_entries)
 
 
 def _expand_clb_matches(matches_tuples, lb_id, node_id=None):
