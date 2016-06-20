@@ -405,6 +405,18 @@ def nodes_req(lb_id, nodes):
 
 
 def node_feed_req(lb_id, node_id, response):
+    """
+    Return (intent, performer) sequence for getting clb node's feed that
+    wrapped with retry intent.
+
+    :param lb_id: Lodbalancer ID
+    :param node_id: LB node ID
+    :param response: The response returned when getting CLB node feed. It is
+        either string containing feed or Exception object that will be raised
+        when getting the feed
+
+    :return: (intent, performer) tuple
+    """
     if isinstance(response, Exception):
         def handler(i): raise response
     else:
