@@ -10,9 +10,9 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.log.intents import get_log_dispatcher
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, ModifyGroupStatePaused,
-    UpdateGroupErrorReasons, UpdateGroupStatus, UpdateServersCache,
-    get_model_dispatcher)
+    DeleteGroup, GetScalingGroupInfo, LoadAndUpdateGroupStatus,
+    ModifyGroupStatePaused, UpdateGroupErrorReasons, UpdateGroupStatus,
+    UpdateServersCache, get_model_dispatcher)
 from otter.models.interface import (
     GroupState, IScalingGroupCollection, ScalingGroupStatus)
 from otter.test.utils import (
@@ -123,6 +123,20 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         self.assertIs(
             sync_perform(self.get_dispatcher(self.get_store()), eff),
             None)
+        self.group.update_status.assert_called_once_with(
+            ScalingGroupStatus.ERROR)
+
+    def test_update_scaling_group_status(self):
+        """
+        Performing :obj:`LoadAndUpdateGroupStatus` calls update_status
+        on group created from tenant_id and group_id in the object
+        """
+        eff = Effect(
+            LoadAndUpdateGroupStatus("t", "g", ScalingGroupStatus.ERROR))
+        self.group.update_status.return_value = None
+        result = self.perform_with_group(
+            eff, (self.log, 't', 'g'), self.group)
+        self.assertIsNone(result)
         self.group.update_status.assert_called_once_with(
             ScalingGroupStatus.ERROR)
 

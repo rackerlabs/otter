@@ -57,6 +57,7 @@ from otter.models.intents import (
     GetScalingGroupInfo,
     UpdateGroupErrorReasons,
     UpdateGroupStatus,
+    LoadAndUpdateGroupStatus,
     UpdateServersCache)
 from otter.models.interface import (
     GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
@@ -857,7 +858,16 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.now = datetime(1970, 1, 1)
         self.waiting = Reference(pmap())
 
-    def get_seq(self, with_cache=True):
+    def get_seq(self, with_cache=True, upd_status_nogroup_err=False):
+        """
+        Return list of (intent, performer) tuples for all the effects produced
+        during gathering step of ``execute_convergence`` function
+
+        :param bool with_cache: Should it include tuple corresponding to
+            updating servers cache effect?
+        :param upd_status_nogroup_err: Should LoadAndUpdateGroupStatus handler
+            raise `NoSuchScalingGroupError` instead of returning None?
+        """
         exec_seq = [
             (self.gsgi, lambda i: self.gsgi_result),
             (("gacd", self.tenant_id, self.group_id, self.now),
@@ -869,8 +879,16 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                     self.tenant_id, self.group_id, self.now, self.cache),
                  noop)
             )
+        if upd_status_nogroup_err:
+            def handler(i):
+                raise NoSuchScalingGroupError(self.tenant_id, self.group_id)
+        else:
+            handler = noop
         return [
             (Log("begin-convergence", {}), noop),
+            (LoadAndUpdateGroupStatus(
+                self.tenant_id, self.group_id, ScalingGroupStatus.ACTIVE),
+             handler),
             (Func(datetime.utcnow), lambda i: self.now),
             (MsgWithTime("gather-convergence-data", mock.ANY),
              nested_sequence(exec_seq))
@@ -1068,7 +1086,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                          group_id=self.group_id), noop))
         self.assertEqual(
             # skipping cache update intents returned in get_seq()
-            perform_sequence(self.get_seq(False) + sequence,
+            perform_sequence(self.get_seq(False, True) + sequence,
                              self._invoke(_plan)),
             exec_result)
         # desired capacity was changed to 0
