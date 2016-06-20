@@ -131,7 +131,7 @@ from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err, msg, msg_with_time, with_log
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, UpdateGroupErrorReasons,
-    UpdateGroupStatus, UpdateScalingGroupStatus, UpdateServersCache)
+    UpdateGroupStatus, LoadAndUpdateGroupStatus, UpdateServersCache)
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.timestamp import datetime_to_epoch
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
@@ -298,7 +298,7 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
     # Begin convergence by updating group status to ACTIVE
     yield msg("begin-convergence")
     try:
-        yield Effect(UpdateScalingGroupStatus(tenant_id, group_id,
+        yield Effect(LoadAndUpdateGroupStatus(tenant_id, group_id,
                                               ScalingGroupStatus.ACTIVE))
     except NoSuchScalingGroupError:
         # Expected for DELETING group. Ignore.

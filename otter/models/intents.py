@@ -78,11 +78,11 @@ def perform_update_group_status(dispatcher, ugs_intent):
 
 
 @attr.s
-class UpdateScalingGroupStatus(object):
+class LoadAndUpdateGroupStatus(object):
     """
-    Intent to update scaling group status. This is different from
-    :obj:`UpdateGroupStatus` by taking tenant_id and group_id instead
-    of group object
+    Intent to load the scaling group object and update its status. This is
+    different from :obj:`UpdateGroupStatus` by taking tenant_id and group_id
+    instead of group object
     """
     tenant_id = attr.ib()
     group_id = attr.ib()
@@ -90,8 +90,8 @@ class UpdateScalingGroupStatus(object):
 
 
 @deferred_performer
-def perform_update_scaling_group_status(log, store, dispatcher, intent):
-    """Perform an :obj:`UpdateScalingGroupStatus`."""
+def perform_load_and_update_group_status(log, store, dispatcher, intent):
+    """Perform an :obj:`LoadAndUpdateGroupStatus`."""
     group = store.get_scaling_group(log, intent.tenant_id, intent.group_id)
     return group.update_status(intent.status)
 
@@ -154,8 +154,8 @@ def get_model_dispatcher(log, store):
             partial(perform_get_scaling_group_info, log, store),
         DeleteGroup: partial(perform_delete_group, log, store),
         UpdateGroupStatus: perform_update_group_status,
-        UpdateScalingGroupStatus:
-            partial(perform_update_scaling_group_status, log, store),
+        LoadAndUpdateGroupStatus:
+            partial(perform_load_and_update_group_status, log, store),
         UpdateServersCache: perform_update_servers_cache,
         UpdateGroupErrorReasons: perform_update_error_reasons,
         ModifyGroupStatePaused: perform_modify_group_state_paused,

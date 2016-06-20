@@ -11,7 +11,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.log.intents import get_log_dispatcher
 from otter.models.intents import (
     DeleteGroup, GetScalingGroupInfo, ModifyGroupStatePaused,
-    UpdateGroupErrorReasons, UpdateGroupStatus, UpdateScalingGroupStatus,
+    UpdateGroupErrorReasons, UpdateGroupStatus, LoadAndUpdateGroupStatus,
     UpdateServersCache, get_model_dispatcher)
 from otter.models.interface import (
     GroupState, IScalingGroupCollection, ScalingGroupStatus)
@@ -128,11 +128,11 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
 
     def test_update_scaling_group_status(self):
         """
-        Performing :obj:`UpdateScalingGroupStatus` calls update_status
+        Performing :obj:`LoadAndUpdateGroupStatus` calls update_status
         on group created from tenant_id and group_id in the object
         """
         eff = Effect(
-            UpdateScalingGroupStatus("t", "g", ScalingGroupStatus.ERROR))
+            LoadAndUpdateGroupStatus("t", "g", ScalingGroupStatus.ERROR))
         self.group.update_status.return_value = None
         result = self.perform_with_group(
             eff, (self.log, 't', 'g'), self.group)
