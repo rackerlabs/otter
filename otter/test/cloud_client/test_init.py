@@ -602,12 +602,18 @@ class PerformTenantScopeTests(SynchronousTestCase):
              self.throttler, 1, ereq.intent))
 
 
-def assert_parses_common_clb_errors(testcase, intent, eff, lb_id="123456"):
+def assert_parses_common_clb_errors(testcase, intent, eff, lb_id):
     """
     Assert that the effect produced performs the common CLB error parsing:
     :class:`CLBImmutableError`, :class:`CLBDescription`,
     :class:`NoSuchCLBError`, :class:`CLBRateLimitError`,
     :class:`APIError`
+
+    :param :obj:`twisted.trial.unittest.TestCase` testcase: Test object
+    :param intent: expected ``ServiceRequest`` intent
+    :param eff: Effect returned from function being tested
+    :param lb_id: ID of load balancer being accessed in the function being
+        tested
     """
     json_responses_and_errs = [
         ("Load Balancer '{0}' has a status of 'BUILD' and is "
@@ -740,7 +746,7 @@ class CLBClientTests(SynchronousTestCase):
                                node_id=u'1234'))
 
         # all the common failures
-        assert_parses_common_clb_errors(self, expected.intent, eff)
+        assert_parses_common_clb_errors(self, expected.intent, eff, "123456")
 
     def test_change_clb_node_default_type(self):
         """
@@ -818,7 +824,7 @@ class CLBClientTests(SynchronousTestCase):
                               node_limit=25))
 
         # all the common failures
-        assert_parses_common_clb_errors(self, expected.intent, eff)
+        assert_parses_common_clb_errors(self, expected.intent, eff, "123456")
 
     def expected_node_removal_req(self, nodes=(1, 2)):
         """
@@ -851,7 +857,7 @@ class CLBClientTests(SynchronousTestCase):
         """
         eff = remove_clb_nodes(self.lb_id, [1, 2])
         assert_parses_common_clb_errors(
-            self, self.expected_node_removal_req().intent, eff)
+            self, self.expected_node_removal_req().intent, eff, "123456")
 
     def test_remove_clb_nodes_non_202(self):
         """Any random HTTP response code is bubbled up as an APIError."""
@@ -926,7 +932,7 @@ class CLBClientTests(SynchronousTestCase):
             ServiceType.CLOUD_LOAD_BALANCERS,
             'GET', 'loadbalancers/123456/nodes')
         assert_parses_common_clb_errors(
-            self, expected.intent, get_clb_nodes(self.lb_id))
+            self, expected.intent, get_clb_nodes(self.lb_id), "123456")
 
 
 class GetCLBNodeFeedTests(SynchronousTestCase):
