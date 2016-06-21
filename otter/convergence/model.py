@@ -568,6 +568,8 @@ class CLBDescription(object):
 
     :ivar type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
     :type type: A member of :class:`CLBNodeType`
+
+    :ivar bool health_monitor: Is health monitor enabled on this CLB?
     """
     def equivalent_definition(self, other_description):
         """
