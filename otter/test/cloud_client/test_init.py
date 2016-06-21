@@ -53,6 +53,7 @@ from otter.cloud_client import (
     create_server,
     create_stack,
     delete_stack,
+    get_clb_health_monitor,
     get_clb_node_feed,
     get_clb_nodes,
     get_clbs,
@@ -62,7 +63,6 @@ from otter.cloud_client import (
     list_servers_details_page,
     list_stacks_all,
     perform_tenant_scope,
-    is_clb_health_monitor_enabled,
     remove_clb_nodes,
     service_request,
     set_nova_metadata_item,
@@ -944,55 +944,39 @@ class CLBClientTests(SynchronousTestCase):
         assert_parses_common_clb_errors(
             self, expected.intent, get_clb_nodes(self.lb_id), "123456")
 
-    def test_clb_health_mon_enabled(self):
+    def test_get_clb_health_mon(self):
         """
-        :func:`is_clb_health_monitor_enabled` returns True if
-        'loadbalancers/123456/healthmonitor' returns anything inside
-        healthMonitor body
+        :func:`get_clb_health_monitor` calls
+        ``GET .../loadbalancers/lb_id/healthmonitor`` and returns setting
+        inside {"healthMonitor": ...}
         """
         expected = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS,
             'GET', 'loadbalancers/123456/healthmonitor')
-        body = {
-            "healthMonitor": {
-                "type": "CONNECT",
-                "delay": 10,
-                "timeout": 10,
-                "attemptsBeforeDeactivation": 3
-            }
+        settings = {
+            "type": "CONNECT",
+            "delay": 10,
+            "timeout": 10,
+            "attemptsBeforeDeactivation": 3
         }
+        body = {"healthMonitor": settings}
         seq = [
             (expected.intent, const(stub_json_response(body))),
             (log_intent('request-get-clb-healthmon', body), noop)
         ]
-        self.assertTrue(
-            perform_sequence(seq, is_clb_health_monitor_enabled(self.lb_id)))
+        self.assertEqual(
+            perform_sequence(seq, get_clb_health_monitor(self.lb_id)),
+            settings)
 
-    def test_clb_health_mon_disabled(self):
+    def test_get_clb_health_mon_error(self):
         """
-        :func:`is_clb_health_monitor_enabled` returns False if
-        'loadbalancers/123456/healthmonitor' returns {"healthMonitor" {}}
-        """
-        expected = service_request(
-            ServiceType.CLOUD_LOAD_BALANCERS,
-            'GET', 'loadbalancers/123456/healthmonitor')
-        body = {"healthMonitor": {}}
-        seq = [
-            (expected.intent, const(stub_json_response(body))),
-            (log_intent('request-get-clb-healthmon', body), noop)
-        ]
-        self.assertFalse(
-            perform_sequence(seq, is_clb_health_monitor_enabled(self.lb_id)))
-
-    def test_clb_health_mon_error_handling(self):
-        """
-        :func:`is_clb_health_monitor_enabled` parses the common CLB errors.
+        :func:`get_clb_health_monitor` parses the common CLB errors.
         """
         expected = service_request(
             ServiceType.CLOUD_LOAD_BALANCERS, 'GET',
             'loadbalancers/123456/healthmonitor')
         assert_parses_common_clb_errors(
-            self, expected.intent, is_clb_health_monitor_enabled(self.lb_id),
+            self, expected.intent, get_clb_health_monitor(self.lb_id),
             self.lb_id)
 
 

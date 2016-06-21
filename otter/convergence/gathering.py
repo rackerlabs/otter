@@ -13,10 +13,10 @@ from toolz.itertoolz import concat
 from otter.auth import NoSuchEndpoint
 from otter.cloud_client import (
     CLBNotFoundError,
+    get_clb_health_monitor,
     get_clb_node_feed,
     get_clb_nodes,
     get_clbs,
-    is_clb_health_monitor_enabled,
     list_servers_details_all,
     list_stacks_all,
     service_request)
@@ -172,13 +172,13 @@ def get_clb_contents():
     node_reqs = [_retry(get_clb_nodes(lb_id).on(error=gone([])))
                  for lb_id in lb_ids]
     healthmon_reqs = [
-        _retry(is_clb_health_monitor_enabled(lb_id).on(error=gone(False)))
+        _retry(get_clb_health_monitor(lb_id).on(error=gone(False)))
         for lb_id in lb_ids]
 
     all_nodes_hms = yield parallel(node_reqs + healthmon_reqs)
     all_nodes, hms = all_nodes_hms[:len(lb_ids)], all_nodes_hms[len(lb_ids):]
     lb_nodes = {
-        lb_id: [CLBNode.from_node_json(lb_id, node, health_mon)
+        lb_id: [CLBNode.from_node_json(lb_id, node, bool(health_mon))
                 for node in nodes]
         for lb_id, nodes, health_mon in zip(lb_ids, all_nodes, hms)}
     draining = [n for n in concat(lb_nodes.values())
