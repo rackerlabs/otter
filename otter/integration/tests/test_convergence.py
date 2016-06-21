@@ -40,11 +40,11 @@ from otter.integration.lib.nova import (
 from otter.integration.lib.resources import TestResources
 from otter.integration.lib.trial_tools import (
     TestHelper,
+    convergence_exec_time,
     convergence_interval,
     copy_test_methods,
     get_identity,
     get_resource_mapping,
-    mimic_convergence_exec_time,
     not_mimic,
     otter_build_timeout,
     random_string,
@@ -1450,7 +1450,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 [ContainsDict({"address": Equals(ip),
                                "condition": Equals("DRAINING"),
                                "status": Equals("OFFLINE")})]),
-            convergence_interval + mimic_convergence_exec_time * 2,  # timeout
+            convergence_interval + convergence_exec_time * 2,  # timeout
             2)                         # interval
 
         # Change the node's status to ONLINE via mimic CLB control API
@@ -1467,7 +1467,7 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
                 [ContainsDict({"address": Equals(ip),
                                "condition": Equals("ENABLED"),
                                "status": Equals("ONLINE")})]),
-            convergence_interval + mimic_convergence_exec_time * 2,  # timeout
+            convergence_interval + convergence_exec_time * 2,  # timeout
             2)                         # interval
 
 
