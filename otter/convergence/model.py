@@ -66,6 +66,22 @@ class CLBNodeType(Names):
     """
 
 
+class CLBNodeStatus(Names):
+    """
+    Constants representing online/offline status of CLB node
+    """
+
+    ONLINE = NamedConstant()
+    """
+    Node is ONLINE and is receiving traffic
+    """
+
+    OFFLINE = NamedConstant()
+    """
+    Node is marked OFFLINE by CLB and is not receiving traffic
+    """
+
+
 class ServerState(Names):
     """
     Constants representing the state of a Nova cloud server.
@@ -531,7 +547,9 @@ class IDrainable(Interface):
              Attribute("condition", default_value=CLBNodeCondition.ENABLED,
                        instance_of=NamedConstant),
              Attribute("type", default_value=CLBNodeType.PRIMARY,
-                       instance_of=NamedConstant)])
+                       instance_of=NamedConstant),
+             Attribute("health_monitor", default_value=False,
+                       instance_of=bool)])
 class CLBDescription(object):
     """
     Information representing a Rackspace CLB port mapping; how a particular
@@ -550,6 +568,8 @@ class CLBDescription(object):
 
     :ivar type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
     :type type: A member of :class:`CLBNodeType`
+
+    :ivar bool health_monitor: Is health monitor enabled on this CLB?
     """
     def equivalent_definition(self, other_description):
         """
@@ -568,6 +588,8 @@ class CLBDescription(object):
              Attribute("description", instance_of=CLBDescription),
              Attribute("address", instance_of=basestring),
              Attribute("drained_at", default_value=0.0, instance_of=float),
+             Attribute("status", instance_of=NamedConstant,
+                       default_value=CLBNodeStatus.ONLINE),
              Attribute("connections", default_value=None)])
 class CLBNode(object):
     """
@@ -585,6 +607,10 @@ class CLBNode(object):
         nodes with the same IP and port cannot exist on a single CLB.
     :ivar float drained_at: EPOCH at which this node was put in DRAINING.
         Should be 0 if node is not DRAINING.
+
+    :ivar status: One of ``ONLINE`` or ``OFFLINE``
+    :type status: A member of :class:`CLBNodeStatus`
+
     :ivar int connections: The number of active connections on the node - this
         is None by default (the stat is not available yet).
     """
@@ -614,7 +640,7 @@ class CLBNode(object):
         return self.description.condition != CLBNodeCondition.DISABLED
 
     @classmethod
-    def from_node_json(cls, lb_id, json):
+    def from_node_json(cls, lb_id, json, health_mon):
         """
         Create an instance of this class based on node JSON data from the CLB
         API.
@@ -622,12 +648,14 @@ class CLBNode(object):
         return cls(
             node_id=str(json['id']),
             address=json['address'],
+            status=CLBNodeStatus.lookupByName(json["status"]),
             description=CLBDescription(
                 lb_id=str(lb_id),
                 port=json['port'],
                 weight=json.get('weight', 1),
                 condition=CLBNodeCondition.lookupByName(json['condition']),
-                type=CLBNodeType.lookupByName(json['type'])))
+                type=CLBNodeType.lookupByName(json['type']),
+                health_monitor=health_mon))
 
 
 @implementer(ILBDescription)
