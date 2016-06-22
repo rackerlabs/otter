@@ -74,6 +74,7 @@ from otter.convergence.model import (
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
+    CLBNodeStatus,
     ErrorReason,
     IDrainable,
     RCv3Description,
@@ -97,7 +98,7 @@ from otter.convergence.steps import (
     UpdateStack,
 )
 from otter.convergence.transforming import limit_steps_by_count, optimize_steps
-from otter.util.fp import partition_bool
+from otter.util.fp import assoc_obj, partition_bool
 
 
 DRAINING_METADATA = ('rax:autoscale:server:state', 'DRAINING')
@@ -593,7 +594,9 @@ def remove_node_from_lb(node):
 
 def change_lb_node(node, description, now):
     """
-    Change the configuration of a load balancer node.
+    Change the configuration of a load balancer node to desired description.
+    If CLB has health monitor enabled and the node is DRAINING then it will be
+    ENABLEDed.
 
     :ivar node: The node to be changed.
     :type node: :class:`ILBNode` provider
@@ -601,31 +604,33 @@ def change_lb_node(node, description, now):
     :ivar description: The description of the load balancer and how to add
         the server to it.
     :type description: :class:`ILBDescription` provider
+
+    :ivar float now: Current time in EPOCH
     """
-    if type(node.description) == type(description):
-        if isinstance(description, CLBDescription):
-            if (node.description.health_monitor and
-                    node.description.condition == CLBNodeCondition.DRAINING):
-                # Enable node if it is online
-                if node.status == CLBNodeStatus.ONLINE:
-                    return ChangeCLBNode(lb_id=description.lb_id,
-                                         node_id=node.node_id,
-                                         condition=CLBNodeCondition.ENABLED,
-                                         weight=description.weight,
-                                         type=description.type)
-                elif now - node.drained_at > 3600:
-                    rsfmt = "Node {} has remained OFFLINE for more than 1 hour"
-                    return FailConvergence(
-                        [ErrorReason.String(rsfmt.format(node.node_id))])
-                else:
-                    return ConvergeLater(
-                        [ErrorReason.String(("Waiting for node {} to come "
-                                             "ONLINE").format(node.node_id))])
-            return ChangeCLBNode(lb_id=description.lb_id,
-                                 node_id=node.node_id,
-                                 condition=description.condition,
-                                 weight=description.weight,
-                                 type=description.type)
+    if (type(node.description) == type(description) and
+            isinstance(description, CLBDescription)):
+        if (node.description.health_monitor and
+                node.description.condition == CLBNodeCondition.DRAINING):
+            # Enable node if it is ONLINE
+            if node.status == CLBNodeStatus.ONLINE:
+                return ChangeCLBNode(lb_id=description.lb_id,
+                                     node_id=node.node_id,
+                                     condition=CLBNodeCondition.ENABLED,
+                                     weight=description.weight,
+                                     type=description.type)
+            elif now - node.drained_at > 3600:
+                rsfmt = "Node {} has remained OFFLINE for more than 1 hour"
+                return FailConvergence(
+                    [ErrorReason.String(rsfmt.format(node.node_id))])
+            else:
+                return ConvergeLater(
+                    [ErrorReason.String(("Waiting for node {} to come "
+                                         "ONLINE").format(node.node_id))])
+        return ChangeCLBNode(lb_id=description.lb_id,
+                             node_id=node.node_id,
+                             condition=description.condition,
+                             weight=description.weight,
+                             type=description.type)
 
 
 def drain_lb_node(node):

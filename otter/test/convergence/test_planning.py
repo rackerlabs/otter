@@ -10,6 +10,7 @@ from otter.convergence.model import (
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
+    CLBNodeStatus,
     CLBNodeType,
     DesiredServerGroupState,
     DesiredStackGroupState,
@@ -43,7 +44,8 @@ from otter.convergence.steps import (
 from otter.test.utils import server, stack
 
 
-def copy_clb_desc(clb_desc, condition=CLBNodeCondition.ENABLED, weight=1):
+def copy_clb_desc(clb_desc, condition=CLBNodeCondition.ENABLED, weight=1,
+                  health_monitor=False):
     """
     Produce a :class:`CLBDescription` from another, but with the provided
     conditions and weights instead of the original conditions and weights.
@@ -52,7 +54,8 @@ def copy_clb_desc(clb_desc, condition=CLBNodeCondition.ENABLED, weight=1):
     :param condition: the :class:`CLBNodeCondition` to use
     """
     return CLBDescription(lb_id=clb_desc.lb_id, port=clb_desc.port,
-                          condition=condition, weight=weight)
+                          condition=condition, weight=weight,
+                          health_monitor=health_monitor)
 
 
 class RemoveFromLBWithDrainingTests(SynchronousTestCase):
@@ -333,24 +336,37 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If a desired LB config is not in the set of current configs,
         `converge_lb_state` returns the relevant adding-to-load-balancer
         steps (:class:`AddNodesToCLB` in the case of CLB,
-        :class:`BulkAddToRCv3` in the case of RCv3).
+        :class:`BulkAddToRCv3` in the case of RCv3). If desired description
+        has health monitor enabled then node is added as DRAINING
         """
         clb_desc = CLBDescription(lb_id='5', port=80)
+        clb_with_health_desc = CLBDescription(lb_id='3', port=80,
+                                              health_monitor=True)
         rcv3_desc = RCv3Description(
             lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')
 
+        exp_clb_desc = copy_clb_desc(
+            clb_with_health_desc, condition=CLBNodeCondition.DRAINING,
+            health_monitor=True)
+
         self.assertEqual(
             converge_launch_server(
-                DesiredServerGroupState(server_config={}, capacity=1),
+                DesiredServerGroupState(server_config={}, capacity=2),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
-                            desired_lbs=s(clb_desc, rcv3_desc))]),
+                            desired_lbs=s(clb_desc, rcv3_desc)),
+                     server('hea', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.2',
+                            desired_lbs=s(clb_with_health_desc))]),
                 set(),
                 0),
             pbag([
                 AddNodesToCLB(
                     lb_id='5',
                     address_configs=s(('1.1.1.1', clb_desc))),
+                AddNodesToCLB(
+                    lb_id='3',
+                    address_configs=s(('1.1.1.2', exp_clb_desc))),
                 BulkAddToRCv3(
                     lb_node_pairs=s(
                         ('c6fe49fa-114a-4ea4-9425-0af8b30ff1e7', 'abc')))
@@ -383,6 +399,90 @@ class ConvergeLBStateTests(SynchronousTestCase):
                 ChangeCLBNode(lb_id='5', node_id='123', weight=1,
                               condition=CLBNodeCondition.ENABLED,
                               type=CLBNodeType.PRIMARY)]))
+
+    def test_change_lb_node_draining(self):
+        """
+        If a desired CLB mapping is in the set of current configs,
+        and the configuration is wrong with CLB health monitor enabled
+        `converge_lb_state` returns a :class:`ChangeCLBNode` object to ENABLE
+        the node.
+        """
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        current = [
+            CLBNode(
+                node_id='123', address='1.1.1.1', status=CLBNodeStatus.ONLINE,
+                description=copy_clb_desc(
+                    clb_desc, condition=CLBNodeCondition.DRAINING,
+                    health_monitor=True))]
+        self.assertEqual(
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(clb_desc))]),
+                set(current),
+                0),
+            pbag([
+                ChangeCLBNode(lb_id='5', node_id='123', weight=1,
+                              condition=CLBNodeCondition.ENABLED,
+                              type=CLBNodeType.PRIMARY)]))
+
+    def test_change_lb_node_draining_timeout(self):
+        """
+        If a desired CLB mapping is in the set of current configs,
+        with wrong configuration with CLB health monitor enabled and
+        node has been OFFLINE and DRAINING for more than 1 hour, then
+        `converge_lb_state` returns a :class:`FailConvergence` object to
+        fail convergence.
+        """
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        current = [
+            CLBNode(
+                node_id='123', address='1.1.1.1', status=CLBNodeStatus.OFFLINE,
+                description=copy_clb_desc(
+                    clb_desc, condition=CLBNodeCondition.DRAINING,
+                    health_monitor=True))]
+        self.assertEqual(
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(clb_desc))]),
+                set(current),
+                3601),
+            pbag([
+                FailConvergence(
+                    [ErrorReason.String(
+                        "Node 123 has remained OFFLINE "
+                        "for more than 1 hour")])]))
+
+    def test_change_lb_node_draining_converge_later(self):
+        """
+        If a desired CLB mapping is in the set of current configs,
+        with wrong configuration with CLB health monitor enabled and
+        node has been OFFLINE and DRAINING for less than 1 hour, then
+        `converge_lb_state` returns a :class:`ConvergeLater` object to
+        retry convergence.
+        """
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        current = [
+            CLBNode(
+                node_id='123', address='1.1.1.1', status=CLBNodeStatus.OFFLINE,
+                description=copy_clb_desc(
+                    clb_desc, condition=CLBNodeCondition.DRAINING,
+                    health_monitor=True))]
+        self.assertEqual(
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(clb_desc))]),
+                set(current),
+                300),
+            pbag([
+                ConvergeLater(
+                    [ErrorReason.String(
+                        "Waiting for node 123 to come ONLINE")])]))
 
     def test_do_nothing(self):
         """
