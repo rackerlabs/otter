@@ -53,6 +53,7 @@ from otter.cloud_client import (
     create_server,
     create_stack,
     delete_stack,
+    get_clb_health_monitor,
     get_clb_node_feed,
     get_clb_nodes,
     get_clbs,
@@ -73,6 +74,7 @@ from otter.test.utils import (
     StubResponse,
     const,
     nested_sequence,
+    noop,
     raise_,
     resolve_effect,
     stub_json_response,
@@ -941,6 +943,41 @@ class CLBClientTests(SynchronousTestCase):
             'GET', 'loadbalancers/123456/nodes')
         assert_parses_common_clb_errors(
             self, expected.intent, get_clb_nodes(self.lb_id), "123456")
+
+    def test_get_clb_health_mon(self):
+        """
+        :func:`get_clb_health_monitor` calls
+        ``GET .../loadbalancers/lb_id/healthmonitor`` and returns setting
+        inside {"healthMonitor": ...}
+        """
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS,
+            'GET', 'loadbalancers/123456/healthmonitor')
+        settings = {
+            "type": "CONNECT",
+            "delay": 10,
+            "timeout": 10,
+            "attemptsBeforeDeactivation": 3
+        }
+        body = {"healthMonitor": settings}
+        seq = [
+            (expected.intent, const(stub_json_response(body))),
+            (log_intent('request-get-clb-healthmon', body), noop)
+        ]
+        self.assertEqual(
+            perform_sequence(seq, get_clb_health_monitor(self.lb_id)),
+            settings)
+
+    def test_get_clb_health_mon_error(self):
+        """
+        :func:`get_clb_health_monitor` parses the common CLB errors.
+        """
+        expected = service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS, 'GET',
+            'loadbalancers/123456/healthmonitor')
+        assert_parses_common_clb_errors(
+            self, expected.intent, get_clb_health_monitor(self.lb_id),
+            self.lb_id)
 
 
 class GetCLBNodeFeedTests(SynchronousTestCase):
