@@ -251,7 +251,7 @@ class CLBNodeTests(SynchronousTestCase):
         node_json = {'id': 'node1', 'address': '1.2.3.4', 'port': 20,
                      'condition': 'DRAINING', 'type': 'SECONDARY',
                      'status': 'OFFLINE'}
-        node = CLBNode.from_node_json(123, node_json, False)
+        node = CLBNode.from_node_json(123, node_json)
         self.assertEqual(
             node,
             CLBNode(node_id='node1', address='1.2.3.4',
@@ -261,8 +261,7 @@ class CLBNodeTests(SynchronousTestCase):
                         lb_id='123', port=20,
                         weight=1,
                         condition=CLBNodeCondition.DRAINING,
-                        type=CLBNodeType.SECONDARY,
-                        health_monitor=False)))
+                        type=CLBNodeType.SECONDARY)))
 
     def test_from_node_json_with_weight(self):
         """
@@ -272,7 +271,7 @@ class CLBNodeTests(SynchronousTestCase):
         node_json = {'id': 'node1', 'address': '1.2.3.4', 'port': 20,
                      'condition': 'DRAINING', 'type': 'SECONDARY',
                      'weight': 50, 'status': 'OFFLINE'}
-        node = CLBNode.from_node_json(123, node_json, True)
+        node = CLBNode.from_node_json(123, node_json)
         self.assertEqual(
             node,
             CLBNode(node_id='node1', address='1.2.3.4',
@@ -282,8 +281,7 @@ class CLBNodeTests(SynchronousTestCase):
                         lb_id='123', port=20,
                         weight=50,
                         condition=CLBNodeCondition.DRAINING,
-                        type=CLBNodeType.SECONDARY,
-                        health_monitor=True)))
+                        type=CLBNodeType.SECONDARY)))
 
 
 class ServiceMetadataTests(SynchronousTestCase):

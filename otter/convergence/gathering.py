@@ -22,6 +22,7 @@ from otter.cloud_client import (
     service_request)
 from otter.constants import ServiceType
 from otter.convergence.model import (
+    CLB,
     CLBNode,
     CLBNodeCondition,
     HeatStack,
@@ -168,19 +169,22 @@ def get_clb_contents():
 
     def gone(r):
         return catch(CLBNotFoundError, lambda exc: r)
+
     lb_ids = [lb['id'] for lb in (yield _retry(get_clbs()))]
     node_reqs = [_retry(get_clb_nodes(lb_id).on(error=gone([])))
                  for lb_id in lb_ids]
     healthmon_reqs = [
-        _retry(get_clb_health_monitor(lb_id).on(error=gone(False)))
+        _retry(get_clb_health_monitor(lb_id).on(error=gone(None)))
         for lb_id in lb_ids]
-
     all_nodes_hms = yield parallel(node_reqs + healthmon_reqs)
     all_nodes, hms = all_nodes_hms[:len(lb_ids)], all_nodes_hms[len(lb_ids):]
     lb_nodes = {
-        lb_id: [CLBNode.from_node_json(lb_id, node, bool(health_mon))
+        lb_id: [CLBNode.from_node_json(lb_id, node)
                 for node in nodes]
-        for lb_id, nodes, health_mon in zip(lb_ids, all_nodes, hms)}
+        for lb_id, nodes in zip(lb_ids, all_nodes)}
+    clbs = {
+        str(lb_id): CLB(bool(health_mon))
+        for lb_id, health_mon in zip(lb_ids, hms) if health_mon is not None}
     draining = [n for n in concat(lb_nodes.values())
                 if n.description.condition == CLBNodeCondition.DRAINING]
     feeds = yield parallel(
@@ -202,7 +206,9 @@ def get_clb_contents():
         else:
             return node
     nodes = map(update_drained_at, concat(lb_nodes.values()))
-    yield do_return(list(filter(bool, nodes)))
+    yield do_return((
+        list(filter(bool, nodes)),
+        keyfilter(lambda k: k not in deleted_lbs, clbs)))
 
 
 _DRAINING_CREATED_RE = (
@@ -281,9 +287,10 @@ def get_all_launch_server_data(
          .on(map(NovaServer.from_server_details_json)).on(list),
          get_clb_contents(),
          get_rcv3_contents()]
-    ).on(lambda (servers, clb, rcv3): {
+    ).on(lambda (servers, (clb_nodes, clbs), rcv3_nodes): {
         'servers': servers,
-        'lb_nodes': list(concat([clb, rcv3]))
+        'lb_nodes': clb_nodes + rcv3_nodes,
+        'lbs': clbs
     })
     return eff
 

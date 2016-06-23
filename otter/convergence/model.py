@@ -547,9 +547,7 @@ class IDrainable(Interface):
              Attribute("condition", default_value=CLBNodeCondition.ENABLED,
                        instance_of=NamedConstant),
              Attribute("type", default_value=CLBNodeType.PRIMARY,
-                       instance_of=NamedConstant),
-             Attribute("health_monitor", default_value=False,
-                       instance_of=bool)])
+                       instance_of=NamedConstant)])
 class CLBDescription(object):
     """
     Information representing a Rackspace CLB port mapping; how a particular
@@ -568,8 +566,6 @@ class CLBDescription(object):
 
     :ivar type: One of ``PRIMARY`` or ``SECONDARY`` - default is ``PRIMARY``
     :type type: A member of :class:`CLBNodeType`
-
-    :ivar bool health_monitor: Is health monitor enabled on this CLB?
     """
     def equivalent_definition(self, other_description):
         """
@@ -581,6 +577,15 @@ class CLBDescription(object):
         return (isinstance(other_description, CLBDescription) and
                 other_description.lb_id == self.lb_id and
                 other_description.port == self.port)
+
+
+@attr.s
+class CLB(object):
+    """
+    Cloud load balancer
+    """
+    # Is health monitor enabled?
+    health_monitor = attr.ib(default=False)
 
 
 @implementer(ILBNode, IDrainable)
@@ -640,7 +645,7 @@ class CLBNode(object):
         return self.description.condition != CLBNodeCondition.DISABLED
 
     @classmethod
-    def from_node_json(cls, lb_id, json, health_mon):
+    def from_node_json(cls, lb_id, json):
         """
         Create an instance of this class based on node JSON data from the CLB
         API.
@@ -654,8 +659,7 @@ class CLBNode(object):
                 port=json['port'],
                 weight=json.get('weight', 1),
                 condition=CLBNodeCondition.lookupByName(json['condition']),
-                type=CLBNodeType.lookupByName(json['type']),
-                health_monitor=health_mon))
+                type=CLBNodeType.lookupByName(json['type'])))
 
 
 @implementer(ILBDescription)

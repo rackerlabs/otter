@@ -854,7 +854,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         }
         self.gsgi_result = (self.group, self.manifest)
         self.gacd_runner = lambda i: {'servers': self.servers,
-                                      'lb_nodes': self.lb_nodes}
+                                      'lb_nodes': self.lb_nodes,
+                                      'lbs': {}}
         self.now = datetime(1970, 1, 1)
         self.waiting = Reference(pmap())
 
@@ -955,14 +956,14 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                      'now': 0})
                 .on(lambda _: (StepResult.SUCCESS, [])))]
 
-        def plan(dgs, now, build_timeout, step_limits, servers, lb_nodes):
+        def plan(dgs, now, build_timeout, step_limits, servers, lb_nodes, lbs):
             self.assertEqual(build_timeout, 3600)
             return steps
 
         sequence = [
             parallel_sequence([]),
             (Log('execute-convergence',
-                 dict(servers=self.servers, lb_nodes=self.lb_nodes,
+                 dict(servers=self.servers, lb_nodes=self.lb_nodes, lbs={},
                       steps=steps, now=self.now, desired=dgs)), noop),
             parallel_sequence([
                 [({'dgs': dgs, 'servers': self.servers,

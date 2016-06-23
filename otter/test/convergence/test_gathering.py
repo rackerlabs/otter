@@ -44,6 +44,7 @@ from otter.convergence.gathering import (
     get_scaling_group_stacks,
     mark_deleted_servers)
 from otter.convergence.model import (
+    CLB,
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
@@ -481,12 +482,13 @@ class GetCLBContentsTests(SynchronousTestCase):
         eff = get_clb_contents()
         self.assertEqual(
             perform_sequence(seq, eff),
-            [assoc_obj(CLBNode.from_node_json(1, node11, True),
-                       drained_at=1.0),
-             CLBNode.from_node_json(1, node12, True),
-             CLBNode.from_node_json(2, node21, False),
-             assoc_obj(CLBNode.from_node_json(2, node22, False),
-                       drained_at=2.0)])
+            ([assoc_obj(CLBNode.from_node_json(1, node11),
+                        drained_at=1.0),
+              CLBNode.from_node_json(1, node12),
+              CLBNode.from_node_json(2, node21),
+              assoc_obj(CLBNode.from_node_json(2, node22),
+                        drained_at=2.0)],
+             {'1': CLB(True), '2': CLB(False)}))
 
     def test_no_lb(self):
         """
@@ -498,7 +500,7 @@ class GetCLBContentsTests(SynchronousTestCase):
             parallel_sequence([]),  # No nodes to fetch
         ]
         eff = get_clb_contents()
-        self.assertEqual(perform_sequence(seq, eff), [])
+        self.assertEqual(perform_sequence(seq, eff), ([], {}))
 
     def test_no_nodes(self):
         """
@@ -509,11 +511,13 @@ class GetCLBContentsTests(SynchronousTestCase):
                    {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             parallel_sequence([
                 [nodes_req(1, [])], [nodes_req(2, [])],
-                [lb_hm_req(1, {})], [lb_hm_req(2, {})]
+                [lb_hm_req(1, {})], [lb_hm_req(2, {"type": "a"})]
             ]),
             parallel_sequence([]),  # No nodes to fetch
         ]
-        self.assertEqual(perform_sequence(seq, get_clb_contents()), [])
+        self.assertEqual(
+            perform_sequence(seq, get_clb_contents()),
+            ([], {'1': CLB(False), '2': CLB(True)}))
 
     def test_no_draining(self):
         """
@@ -530,14 +534,15 @@ class GetCLBContentsTests(SynchronousTestCase):
         ]
         make_desc = partial(CLBDescription, port=20, weight=2,
                             condition=CLBNodeCondition.ENABLED,
-                            type=CLBNodeType.PRIMARY, health_monitor=False)
+                            type=CLBNodeType.PRIMARY)
         eff = get_clb_contents()
         self.assertEqual(
             perform_sequence(seq, eff),
-            [CLBNode(node_id='11', address='a11',
-                     description=make_desc(lb_id='1')),
-             CLBNode(node_id='21', address='a21',
-                     description=make_desc(lb_id='2'))])
+            ([CLBNode(node_id='11', address='a11',
+                      description=make_desc(lb_id='1')),
+              CLBNode(node_id='21', address='a21',
+                      description=make_desc(lb_id='2'))],
+             {'1': CLB(False), '2': CLB(False)}))
 
     def test_lb_disappeared_during_node_fetch(self):
         """
@@ -559,12 +564,13 @@ class GetCLBContentsTests(SynchronousTestCase):
         ]
         make_desc = partial(CLBDescription, port=20, weight=2,
                             condition=CLBNodeCondition.ENABLED,
-                            type=CLBNodeType.PRIMARY, health_monitor=True)
+                            type=CLBNodeType.PRIMARY)
         eff = get_clb_contents()
         self.assertEqual(
             perform_sequence(seq, eff),
-            [CLBNode(node_id='11', address='a11',
-                     description=make_desc(lb_id='1'))])
+            ([CLBNode(node_id='11', address='a11',
+                      description=make_desc(lb_id='1'))],
+             {'1': CLB(True)}))
 
     def test_lb_disappeared_during_feed_fetch(self):
         """
@@ -589,8 +595,8 @@ class GetCLBContentsTests(SynchronousTestCase):
         eff = get_clb_contents()
         self.assertEqual(
             perform_sequence(seq, eff),
-            [assoc_obj(CLBNode.from_node_json(2, node21, True),
-                       drained_at=2.0)])
+            ([assoc_obj(CLBNode.from_node_json(2, node21), drained_at=2.0)],
+             {'2': CLB(True)}))
 
 
 class GetRCv3ContentsTests(SynchronousTestCase):
@@ -743,7 +749,8 @@ class GetAllLaunchServerDataTests(SynchronousTestCase):
             self.now,
             get_scaling_group_servers=_constant_as_eff(
                 ('tid', 'gid', self.now), self.servers),
-            get_clb_contents=_constant_as_eff((), clb_nodes),
+            get_clb_contents=_constant_as_eff(
+                (), (clb_nodes, {'lb1': CLB(True), 'lb2': CLB(False)})),
             get_rcv3_contents=_constant_as_eff((), rcv3_nodes))
 
         expected_servers = [
@@ -757,7 +764,8 @@ class GetAllLaunchServerDataTests(SynchronousTestCase):
         ]
         self.assertEqual(resolve_stubs(eff),
                          {'servers': expected_servers,
-                          'lb_nodes': clb_nodes + rcv3_nodes})
+                          'lb_nodes': clb_nodes + rcv3_nodes,
+                          'lbs': {'lb1': CLB(True), 'lb2': CLB(False)}})
 
     def test_no_group_servers(self):
         """
@@ -770,10 +778,12 @@ class GetAllLaunchServerDataTests(SynchronousTestCase):
             self.now,
             get_scaling_group_servers=_constant_as_eff(
                 ('tid', 'gid', self.now), []),
-            get_clb_contents=_constant_as_eff((), []),
+            get_clb_contents=_constant_as_eff((), ([], {'a': CLB(False)})),
             get_rcv3_contents=_constant_as_eff((), []))
 
-        self.assertEqual(resolve_stubs(eff), {'servers': [], 'lb_nodes': []})
+        self.assertEqual(
+            resolve_stubs(eff),
+            {'servers': [], 'lb_nodes': [], 'lbs': {'a': CLB(False)}})
 
 
 class GetAllStacksTests(SynchronousTestCase):
