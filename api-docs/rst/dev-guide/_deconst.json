@@ -3,6 +3,6 @@
   "githubUrl": "https://github.com/rackerlabs/otter/",
   "githubBranch": "master",
   "meta": {
-    "preferGithubIssues": true
+    "preferGithubIssues": false
   }
 }
