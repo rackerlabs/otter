@@ -204,7 +204,6 @@ def is_lock_acquired(lock):
     if not children:
         yield do_return(False)
     # The last 10 characters are sequence number as per
-    # https://zookeeper.apache.org/doc/current/zookeeperProgrammers.html\
-    # #Sequence+Nodes+--+Unique+Naming
+    # https://zookeeper.apache.org/doc/current/zookeeperProgrammers.html#Sequence+Nodes+--+Unique+Naming
     yield do_return(
         sorted(children, key=lambda c: c[-10:])[0][:-10] == lock.prefix)
