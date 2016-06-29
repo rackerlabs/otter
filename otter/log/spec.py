@@ -213,7 +213,7 @@ msg_types = {
     "sch-exec-pol-err": "Error executing scheduled policy {policy_id}",
 
     # Selfheal service
-    "self-heal-convergeall-err": (
+    "self-heal-setup-err": (
         "SelfHeal service errored occurred when scheduling convergence"),
     "self-heal-calls-err": "SelfHeal service has {active} scheduled calls",
     "self-heal-kz-state": (

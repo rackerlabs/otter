@@ -1,5 +1,7 @@
 from functools import partial
 
+import attr
+
 from characteristic import attributes
 
 from effect import Effect, TypeDispatcher, parallel, sync_performer
@@ -135,6 +137,24 @@ def perform_delete_node(kz_client, dispatcher, intent):
     return kz_client.delete(intent.path, version=intent.version)
 
 
+@attr.s
+class AcquireLock(object):
+    """
+    Intent to acquire lock
+    """
+    lock = attr.ib()
+    blocking = attr.ib(default=True)
+    timeout = attr.ib(default=None)
+
+
+@deferred_performer
+def perform_acquire_lock(dispatcher, intent):
+    """
+    Perform :obj:`AcquireLock`.
+    """
+    return intent.lock.acquire(intent.blocking, intent.timeout)
+
+
 def get_zk_dispatcher(kz_client):
     """Get a dispatcher that can support all of the ZooKeeper intents."""
     return TypeDispatcher({
@@ -147,5 +167,6 @@ def get_zk_dispatcher(kz_client):
         GetChildren:
             partial(perform_get_children, kz_client),
         GetStat:
-            partial(perform_get_stat, kz_client)
+            partial(perform_get_stat, kz_client),
+        AcquireLock: perform_acquire_lock
     })
