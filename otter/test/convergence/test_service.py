@@ -20,7 +20,6 @@ import mock
 
 from pyrsistent import freeze, pbag, pmap, pset, s, thaw
 
-from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import NoSuchCLBError, TenantScope
@@ -36,7 +35,6 @@ from otter.convergence.planning import plan_launch_server, plan_launch_stack
 from otter.convergence.service import (
     ConcurrentError,
     ConvergenceExecutor,
-    ConvergenceStarter,
     Converger,
     converge_all_groups,
     converge_one_group,
@@ -108,39 +106,6 @@ class TriggerConvergenceTests(SynchronousTestCase):
         ]
         self.assertRaises(
             ValueError, perform_sequence, seq, trigger_convergence("t", "g"))
-
-
-class ConvergenceStarterTests(SynchronousTestCase):
-    """Tests for :obj:`ConvergenceStarter`."""
-
-    def test_start_convergence(self):
-        """Starting convergence marks dirty and logs a message."""
-        svc = ConvergenceStarter('my-dispatcher')
-        log = mock_log()
-
-        def perform(dispatcher, eff):
-            return succeed((dispatcher, eff))
-        d = svc.start_convergence(log, 'tenant', 'group', perform=perform)
-        self.assertEqual(
-            self.successResultOf(d),
-            ('my-dispatcher',
-             Effect(CreateOrSet(path='/groups/divergent/tenant_group',
-                                content='dirty'))))
-        log.msg.assert_called_once_with(
-            'mark-dirty-success', tenant_id='tenant', scaling_group_id='group')
-
-    def test_error_marking_dirty(self):
-        """An error is logged when marking dirty fails."""
-        svc = ConvergenceStarter('my-dispatcher')
-        log = mock_log()
-
-        def perform(dispatcher, eff):
-            return fail(RuntimeError('oh no'))
-        d = svc.start_convergence(log, 'tenant', 'group', perform=perform)
-        self.assertEqual(self.successResultOf(d), None)
-        log.err.assert_called_once_with(
-            CheckFailureValue(RuntimeError('oh no')),
-            'mark-dirty-failure', tenant_id='tenant', scaling_group_id='group')
 
 
 class ConvergerTests(SynchronousTestCase):

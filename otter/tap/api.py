@@ -33,6 +33,7 @@ from otter.constants import (
     CONVERGENCE_DIRTY_DIR,
     CONVERGENCE_PARTITIONER_PATH,
     get_service_configs)
+from otter.convergence.selfheal import SelfHeal
 from otter.convergence.service import Converger
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.log import log
@@ -278,17 +279,22 @@ def makeService(config):
                                              get_service_configs(config),
                                              kz_client, store, supervisor,
                                              cassandra_cluster)
+
             # Setup scheduler service after starting
             scheduler = setup_scheduler(parent, dispatcher, store, kz_client)
-            health_checker.checks['scheduler'] = scheduler.health_check
-            otter.scheduler = scheduler
+            if scheduler is not None:
+                health_checker.checks['scheduler'] = scheduler.health_check
+                otter.scheduler = scheduler
+
             # Give dispatcher to Otter REST object
             otter.dispatcher = dispatcher
+
             # Set the client after starting
             # NOTE: There is small amount of time when the start is
             # not finished and the kz_client is not set in which case
             # policy execution and group delete will fail
             store.kz_client = kz_client
+
             # Setup kazoo to stop when shutting down
             parent.addService(FunctionalService(
                 stop=partial(call_after_supervisor,
@@ -300,6 +306,14 @@ def makeService(config):
                 config_value('converger.build_timeout') or 3600,
                 config_value('converger.limited_retry_iterations') or 10,
                 config_value('converger.step_limits') or {})
+
+            # Setup selfheal service
+            shsvc = SelfHeal(
+                dispatcher, kz_client,
+                config_value("selfheal.interval") or 300, log, reactor,
+                config_value)
+            health_checker.checks["selfheal"] = shsvc.health_check
+            shsvc.setServiceParent(parent)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
@@ -328,11 +342,12 @@ def setup_converger(parent, kz_client, dispatcher, interval, build_timeout,
 
 def setup_scheduler(parent, dispatcher, store, kz_client):
     """
-    Setup scheduler service
+    Setup scheduler service based on the configuration and return service
+    object. If "scheduler" config is not found then return `None`.
     """
     # Setup scheduler service
     if not config_value('scheduler') or config_value('mock'):
-        return
+        return None
     buckets = range(1, int(config_value('scheduler.buckets')) + 1)
     store.set_scheduler_buckets(buckets)
     partition_path = (config_value('scheduler.partition.path') or

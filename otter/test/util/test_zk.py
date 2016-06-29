@@ -13,7 +13,7 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.utils import test_dispatcher
 from otter.util.zk import (
-    CreateOrSet, CreateOrSetLoopLimitReachedError,
+    AcquireLock, CreateOrSet, CreateOrSetLoopLimitReachedError,
     DeleteNode, GetChildren, GetChildrenWithStats,
     GetStat,
     get_zk_dispatcher,
@@ -87,6 +87,29 @@ class ZKCrudModel(object):
             return ZNodeStatStub(version=self.nodes[path][1])
         else:
             return None
+
+    def Lock(self, path):
+        return ZKLock(self, path)
+
+
+class ZKLock(object):
+    """
+    Stub for :obj:`kazoo.recipe.lock.KazooLock`
+    """
+    def __init__(self, client, path):
+        self.client = client
+        self.path = path
+        self.acquired = False
+        self.acquire_calls = {}
+
+    def acquire(self, blocking=True, timeout=None):
+        assert not self.acquired
+        self.acquired = self.acquire_calls[(blocking, timeout)]
+        return succeed(self.acquired)
+
+    def release(self):
+        self.acquired = False
+        return succeed(None)
 
 
 class CreateOrSetTests(SynchronousTestCase):
@@ -245,3 +268,14 @@ class DeleteTests(SynchronousTestCase):
         result = sync_perform(dispatcher, eff)
         self.assertEqual(model.nodes, {})
         self.assertEqual(result, 'delete return value')
+
+
+class AcquireLockTests(SynchronousTestCase):
+    """Tests for :obj:`AcquireLock`."""
+    def test_success(self):
+        lock = ZKLock("client", "path")
+        lock.acquire_calls[(True, 0.3)] = True
+        eff = Effect(AcquireLock(lock, True, 0.3))
+        dispatcher = get_zk_dispatcher("client")
+        result = sync_perform(dispatcher, eff)
+        self.assertIs(result, True)

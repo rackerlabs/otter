@@ -1,7 +1,7 @@
 """
 Converger service
 
-The top-level entry-points into this module are :obj:`ConvergenceStarter` and
+The top-level entry-points into this module are :func:`trigger_convergence` and
 :obj:`Converger`.
 """
 
@@ -474,28 +474,6 @@ def trigger_convergence(tenant_id, group_id):
                   error=log_and_raise("mark-dirty-failure"))
 
 
-class ConvergenceStarter(object):
-    """
-    A service that allows indicating that a group has diverged and needs
-    convergence, but does not do the converging itself (see :obj:`Converger`
-    for that).
-    """
-    def __init__(self, dispatcher):
-        self.dispatcher = dispatcher
-
-    def start_convergence(self, log, tenant_id, group_id, perform=perform):
-        """Record that a group needs converged by creating a ZooKeeper node."""
-        log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id)
-        eff = mark_divergent(tenant_id, group_id)
-        d = perform(self.dispatcher, eff)
-
-        def success(r):
-            log.msg('mark-dirty-success')
-            return r  # The result is ignored normally, but return it for tests
-        d.addCallbacks(success, log.err, errbackArgs=('mark-dirty-failure',))
-        return d
-
-
 class ConcurrentError(Exception):
     """Tried to run an effect concurrently when it shouldn't be."""
 
@@ -741,8 +719,8 @@ class Converger(MultiService):
     - virtual "buckets" are partitioned between nodes running this service by
       using ZooKeeper (thus, this service could/should be run separately from
       the API). group IDs are deterministically mapped to these buckets.
-    - we repeatedly check for 'dirty flags' created by the
-      :obj:`ConvergenceStarter` service, and determine if they're "ours" with
+    - we repeatedly check for 'dirty flags' created by
+      :func:`trigger_convergence` service, and determine if they're "ours" with
       the partitioner.
     - we ensure we don't execute convergence for the same group concurrently.
     """
