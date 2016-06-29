@@ -5,7 +5,6 @@ Tests for :mod:`otter.convergence.selfheal`
 from effect import Effect
 from effect.testing import SequenceDispatcher
 
-from kazoo.client import KazooClient
 from kazoo.exceptions import LockTimeout
 
 import mock
