@@ -1,5 +1,7 @@
 """
-Self heal service.
+Self heal service. It continously triggers convergence on all groups by equally
+distributing the triggering over a period of time in effect "heal"ing the
+groups.
 """
 
 from effect import ComposedDispatcher, Effect, TypeDispatcher
