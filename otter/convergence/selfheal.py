@@ -35,9 +35,9 @@ class SelfHeal(MultiService, object):
 
     :ivar log: Twisted logger with .msg and .err methods
     :ivar lock: Lock object from :obj:`TxKazooClient`
-    :ivar :obj:`TxKazooClient` kz_client: Twistified kazoo client object
-    :ivar :obj:`IReactorTime` clock: Reactor providing timing APIs
-    :ivar ``list`` calls: List of `IDelayedCall` objects. Each object
+    :ivar TxKazooClient kz_client: Twistified kazoo client object
+    :ivar IReactorTime clock: Reactor providing timing APIs
+    :ivar list calls: List of `IDelayedCall` objects. Each object
         represents scheduled call to trigger convergence on a group
     """
 
