@@ -250,10 +250,30 @@ class MimicCLB(object):
         :return: A deferred that fires with the content of the response, which
             is probably the empty string.
         """
-        print('Use mimic to set CLB attribute')
         return self.treq.patch(
             "{0}/loadbalancer/{1}/attributes".format(
                 rcs.endpoints["mimic_clb"], clb_id),
             json.dumps(kvpairs),
             pool=self.pool
         ).addCallback(check_success, [204]).addCallback(self.treq.content)
+
+    @diagnose("mimic", "Updating CLB node status")
+    def update_clb_node_status(self, rcs, clb_id, node_id, status):
+        """
+        Update CLB node's status field
+
+        :param rcs: A :class:`otter.integration.lib.resources.TestResources`
+            instance.
+        :param int clb_id: The ID of the load balancer whose node's status
+            is to be updated
+        :param int node_id: ID of updating node
+        :param str status: status to update. One of "ONLINE" or "OFFLINE"
+        :return: A deferred that fires with the content of the response, which
+            is probably the empty string.
+        """
+        return self.treq.put(
+            "{0}/loadbalancers/{1}/nodes/{2}/status".format(
+                rcs.endpoints["mimic_clb"], clb_id, node_id),
+            json.dumps({"status": status}),
+            pool=self.pool
+        ).addCallback(check_success, [200]).addCallback(self.treq.content)

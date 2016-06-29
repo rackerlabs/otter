@@ -238,6 +238,31 @@ class CLBTests(SynchronousTestCase):
         self.assert_mutate_function_does_not_retry_if_not_pending_update(
             add, main_treq_args)
 
+    def test_update_health_monitor(self):
+        """
+        `:func:update_health_monitor` will call
+        ``PUT .../loadbalancers/lb_id/healthmonitor`` with udpated config,
+        succeeds on 202, and retries on pending update for 60 seconds.
+        It does not retry if the error is not PENDING_UPDATE.
+        """
+        main_treq_args = [
+            'put', 'clburl/loadbalancers/12345/healthmonitor',
+            (('{"healthMonitor": {"type": "CONNECT"}}',),
+             self.expected_kwargs)]
+
+        def update(clb, clock):
+            return clb.update_health_monitor(self.rcs, {"type": "CONNECT"},
+                                             clock=clock)
+
+        self.assert_mutate_function_retries_until_success(
+            update, main_treq_args, (Response(202), ""), None)
+
+        self.assert_mutate_function_retries_until_timeout(
+            update, main_treq_args, 60)
+
+        self.assert_mutate_function_does_not_retry_if_not_pending_update(
+            update, main_treq_args)
+
     def get_fake_treq_for_delete(self, get_response, del_response=None):
         """
         Return a CLB for use with deleting a CLB - this is different than

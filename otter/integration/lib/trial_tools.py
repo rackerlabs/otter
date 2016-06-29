@@ -63,6 +63,14 @@ scheduler_interval = float(os.environ.get("AS_SCHEDULER_INTERVAL", "10"))
 otter_build_timeout = float(os.environ.get("AS_BUILD_TIMEOUT_SECONDS", "30"))
 convergence_interval = float(os.environ.get("AS_CONVERGENCE_INTERVAL", "10"))
 
+# Approx higher limit on number of seconds taken to execute one convergence
+# cycle
+if bool(os.environ.get("AS_USING_MIMIC", False)):
+    convergence_exec_time = 10
+else:
+    # production env is generally unpredictable; hence upper limit of 5 mins
+    convergence_exec_time = 300
+
 # Get vs dict lookup because it will return None if not found,
 # not throw an exception.  None is a valid value for convergence_tenant.
 convergence_tenant = os.environ.get('AS_CONVERGENCE_TENANT')

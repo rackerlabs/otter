@@ -4,7 +4,7 @@ service_identity==14.0.0
 jsonschema==2.4.0
 iso8601==0.1.8
 lxml==3.4.1
-treq==0.2.1
+treq==15.1.0
 silverberg==0.1.12
 pyOpenSSL==0.14
 jsonfig==0.1.1

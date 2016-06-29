@@ -1,9 +1,13 @@
 """Tests for :mod:`otter.integration.lib.nova`"""
 import json
 
+import mock
+
+from treq.testing import RequestSequence, StringStubbingResource, StubTreq
+
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.integration.lib.mimic import MimicIdentity, MimicNova
+from otter.integration.lib.mimic import MimicCLB, MimicIdentity, MimicNova
 from otter.integration.lib.test_nova import Response, get_fake_treq
 
 
@@ -148,3 +152,47 @@ class MimicIdentityTestCase(SynchronousTestCase):
 
         self.assertEqual("successfully deleted behavior",
                          self.successResultOf(test_case.cleanup()))
+
+
+class MimicCLBTestCase(SynchronousTestCase):
+    """
+    Tests for :class:`MimicCLB`
+    """
+    def setUp(self):
+        """
+        Set up fake pool, treq, responses, and RCS.
+        """
+        class FakeRCS(object):
+            endpoints = {'mimic_clb': 'http://host'}
+
+        self.rcs = FakeRCS()
+        self.clb = MimicCLB(pool=object(), test_case=self)
+
+    def test_set_clb_attributes(self):
+        """
+        :func:`set_clb_attributes` calls
+        ``PATCH .../loadbalancer/lb_id/attributes`` with given key-value pairs
+        """
+        stubs = RequestSequence(
+            [(("patch", "http://host/loadbalancer/3/attributes", {}, mock.ANY,
+               '{"a": "b"}'),
+              (204, {}, ""))],
+            self.fail)
+        self.clb.treq = StubTreq(StringStubbingResource(stubs))
+        with stubs.consume(self.fail):
+            self.clb.set_clb_attributes(self.rcs, 3, {"a": "b"})
+
+    def test_update_clb_node_status(self):
+        """
+        :func:`update_clb_node_status` calls
+        ``PUT .../loadbalancers/lb_id/nodes/node_id/status`` with given status
+        in body
+        """
+        stubs = RequestSequence(
+            [(("put", "http://host/loadbalancers/3/nodes/2/status", {},
+               mock.ANY, '{"status": "ONLINE"}'),
+              (200, {}, ""))],
+            self.fail)
+        self.clb.treq = StubTreq(StringStubbingResource(stubs))
+        with stubs.consume(self.fail):
+            self.clb.update_clb_node_status(self.rcs, 3, 2, "ONLINE")
