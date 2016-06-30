@@ -446,7 +446,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
             3601,
             FailConvergence(
                 [ErrorReason.String("Node 123 has remained OFFLINE "
-                                    "for more than 1 hour")]))
+                                    "for more than 3600 seconds")]))
 
     def test_change_lb_node_draining_converge_later(self):
         """

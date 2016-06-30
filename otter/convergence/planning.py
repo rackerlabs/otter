@@ -159,7 +159,7 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     return removes + changes + retry
 
 
-def _converge_lb_state(server, current_lb_nodes, load_balancers, now):
+def _converge_lb_state(server, current_lb_nodes, load_balancers, now, timeout):
     """
     Produce a series of steps to converge a server's current load balancer
     state towards its desired load balancer state.
@@ -175,9 +175,11 @@ def _converge_lb_state(server, current_lb_nodes, load_balancers, now):
 
     :param server: The server to be converged.
     :type server: :class:`NovaServer`
+    :param list current_lb_nodes: ``list`` of :obj:`CLBNode`
+    :param float now: Current time in EPOCH
+    :param float timeout: How long can node remain OFFLINE after adding?
 
-    :param list current_lb_nodes: `list` of :obj:`CLBNode`
-
+    :return: steps to converge
     :rtype: `list` of :class:`IStep`
     """
     # list of desired configurations that match up with existing nodes
@@ -197,7 +199,8 @@ def _converge_lb_state(server, current_lb_nodes, load_balancers, now):
     ]
 
     changes = [
-        change_lb_node(node, desired, load_balancers.get(desired.lb_id), now)
+        change_lb_node(node, desired, load_balancers.get(desired.lb_id),
+                       now, timeout)
         for desired, node in desired_matching_existing
         if node.description != desired
     ]
@@ -409,7 +412,10 @@ def converge_launch_server(desired_state, servers_with_cheese,
             server,
             [node for node in load_balancer_nodes if node.matches(server)],
             load_balancers,
-            now)
+            now,
+            # Temporarily using build timeout as node offline timeout.
+            # See https://github.com/rackerlabs/otter/issues/1905
+            timeout)
         ]
 
     # Converge again if we expect state transitions on any servers
@@ -597,20 +603,22 @@ def remove_node_from_lb(node):
             [(node.description.lb_id, node.cloud_server_id)]))
 
 
-def change_lb_node(node, description, lb, now):
+def change_lb_node(node, description, lb, now, timeout):
     """
     Change the configuration of a load balancer node to desired description.
     If CLB has health monitor enabled and the node is DRAINING then it will be
     ENABLEDed.
 
-    :ivar node: The node to be changed.
+    :param node: The node to be changed.
     :type node: :class:`ILBNode` provider
-
-    :ivar description: The description of the load balancer and how to add
+    :param description: The description of the load balancer and how to add
         the server to it.
     :type description: :class:`ILBDescription` provider
+    :param float now: Current time in EPOCH
+    :param float timeout: How long can node remain OFFLINE after adding
+        in seconds?
 
-    :ivar float now: Current time in EPOCH
+    :return: :obj:`IStep` object or None
     """
     if (type(node.description) == type(description) and
             isinstance(description, CLBDescription)):
@@ -623,10 +631,11 @@ def change_lb_node(node, description, lb, now):
                                      condition=CLBNodeCondition.ENABLED,
                                      weight=description.weight,
                                      type=description.type)
-            elif now - node.drained_at > 3600:
-                rsfmt = "Node {} has remained OFFLINE for more than 1 hour"
+            elif now - node.drained_at > timeout:
+                rsfmt = ("Node {} has remained OFFLINE for more than "
+                         "{} seconds")
                 return FailConvergence(
-                    [ErrorReason.String(rsfmt.format(node.node_id))])
+                    [ErrorReason.String(rsfmt.format(node.node_id, timeout))])
             else:
                 return ConvergeLater(
                     [ErrorReason.String(("Waiting for node {} to come "
