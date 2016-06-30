@@ -1414,7 +1414,6 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             )
         )
 
-    @skip_me("Until #1870 is implemented")
     @skip_if(not_mimic, "Requires mimic for controling CLB node status")
     @inlineCallbacks
     def test_node_added_as_draining(self):
