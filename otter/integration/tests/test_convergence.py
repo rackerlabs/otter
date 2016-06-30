@@ -50,7 +50,6 @@ from otter.integration.lib.trial_tools import (
     random_string,
     region,
     skip_if,
-    skip_me,
     tag
 )
 from otter.integration.lib.utils import diagnose
