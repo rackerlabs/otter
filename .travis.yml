@@ -18,7 +18,9 @@ script:
     - make coverage
 
 after_script:
-    - codecov
+    - ls -al
+    - coverage xml && cat coverage.xml | head -10
+    - codecov -d
 
 branches:
   only:
