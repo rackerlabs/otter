@@ -63,6 +63,8 @@
 
 from collections import defaultdict
 
+import attr
+
 from pyrsistent import pbag, pset
 
 from toolz.curried import filter
@@ -102,6 +104,14 @@ from otter.util.fp import assoc_obj, partition_bool
 
 
 DRAINING_METADATA = ('rax:autoscale:server:state', 'DRAINING')
+
+
+@attr.s
+class CLBHealthInfoNotFound(Exception):
+    """
+    Error to be raised when CLB health information is required and is not found
+    """
+    lb_id = attr.ib()
 
 
 def _remove_from_lb_with_draining(timeout, nodes, now):
@@ -576,6 +586,12 @@ def add_server_to_lb(server, description, load_balancer):
     """
     if isinstance(description, CLBDescription):
         if server.servicenet_address:
+            if load_balancer is None:
+                return FailConvergence([
+                    ErrorReason.Exception(
+                        (CLBHealthInfoNotFound,
+                         CLBHealthInfoNotFound(description.lb_id),
+                         None))])
             if load_balancer.health_monitor:
                 description = assoc_obj(description,
                                         condition=CLBNodeCondition.DRAINING)
@@ -622,6 +638,12 @@ def change_lb_node(node, description, lb, now, timeout):
     """
     if (type(node.description) == type(description) and
             isinstance(description, CLBDescription)):
+        if lb is None:
+            return FailConvergence([
+                ErrorReason.Exception(
+                    (CLBHealthInfoNotFound,
+                     CLBHealthInfoNotFound(description.lb_id),
+                     None))])
         if (lb.health_monitor and
                 node.description.condition == CLBNodeCondition.DRAINING):
             # Enable node if it is ONLINE

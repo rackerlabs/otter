@@ -15,6 +15,7 @@ from otter.cloud_client import (
     NoSuchCLBNodeError
 )
 from otter.convergence.model import ErrorReason
+from otter.convergence.planning import CLBHealthInfoNotFound
 from otter.log.formatters import serialize_to_jsonable
 
 
@@ -63,6 +64,12 @@ def _present_no_clb_node_error(exception):
 def _present_clb_node_limit_error(exception):
     return "Cannot create more than {} nodes in Cloud Load Balancer {}".format(
         exception.node_limit, exception.lb_id)
+
+
+@_present_exception.register(CLBHealthInfoNotFound)
+def _present_clb_health_info_not_found(exception):
+    return ("Could not find health monitor configuration of "
+            "Cloud Load Balancer {}").format(exception.lb_id)
 
 
 @_present_exception.register(CreateServerConfigurationError)

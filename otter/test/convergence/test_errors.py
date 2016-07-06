@@ -12,6 +12,7 @@ from otter.cloud_client import (
 )
 from otter.convergence.errors import present_reasons, structure_reason
 from otter.convergence.model import ErrorReason
+from otter.convergence.planning import CLBHealthInfoNotFound
 from otter.test.utils import raise_to_exc_info
 
 
@@ -42,6 +43,9 @@ class PresentReasonsTests(SynchronousTestCase):
                 "Node node1 of Cloud Load Balancer lbid3 does not exist",
             CLBNodeLimitError(lb_id=u'lb2', node_limit=25):
                 "Cannot create more than 25 nodes in Cloud Load Balancer lb2",
+            CLBHealthInfoNotFound(u'lb2'):
+                "Could not find health monitor configuration of "
+                "Cloud Load Balancer lb2",
             CreateServerConfigurationError("Your server is wrong"):
                 'Server launch configuration is invalid: Your server is wrong',
             CreateServerOverQuoteError("You are over quota"):

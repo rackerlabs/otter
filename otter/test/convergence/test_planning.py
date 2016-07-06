@@ -20,6 +20,7 @@ from otter.convergence.model import (
     RCv3Node,
     ServerState)
 from otter.convergence.planning import (
+    CLBHealthInfoNotFound,
     DRAINING_METADATA,
     Destiny,
     converge_launch_server,
@@ -372,6 +373,27 @@ class ConvergeLBStateTests(SynchronousTestCase):
                         ('c6fe49fa-114a-4ea4-9425-0af8b30ff1e7', 'abc')))
             ]))
 
+    def test_add_to_lb_no_health_info(self):
+        """
+        If a desired LB config is not in the set of current configs
+        and desired LB's health monitor is not found then
+        `converge_lb_state` returns `FailConvergence` step
+        """
+        exc_info = (CLBHealthInfoNotFound, CLBHealthInfoNotFound("5"), None)
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        self.assertEqual(
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(clb_desc))]),
+                set(),
+                {},     # CLB 5 health monitor is not there
+                0),
+            pbag([
+                FailConvergence([ErrorReason.Exception(exc_info)])
+            ]))
+
     def test_change_lb_node(self):
         """
         If a desired CLB mapping is in the set of current configs,
@@ -400,6 +422,30 @@ class ConvergeLBStateTests(SynchronousTestCase):
                 ChangeCLBNode(lb_id='5', node_id='123', weight=1,
                               condition=CLBNodeCondition.ENABLED,
                               type=CLBNodeType.PRIMARY)]))
+
+    def test_change_lb_node_no_health(self):
+        """
+        If a desired CLB mapping is in the set of current configs,
+        but the configuration is wrong and there is no health monitor
+        health info then `converge_lb_state` returns :obj:`FailConvergence`
+        """
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        exc_info = (CLBHealthInfoNotFound, CLBHealthInfoNotFound("5"), None)
+        current = [CLBNode(node_id='123', address='1.1.1.1',
+                           description=copy_clb_desc(clb_desc, weight=5))]
+        self.assertEqual(
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(clb_desc))]),
+                set(current),
+                {},     # No health info for CLB 5
+                0),
+            pbag([
+                FailConvergence([ErrorReason.Exception(exc_info)])
+            ])
+        )
 
     def _test_change_lb_node_draining(self, node_status, now, step):
         clb_desc = CLBDescription(lb_id='5', port=80)
