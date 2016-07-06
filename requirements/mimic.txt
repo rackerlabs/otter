@@ -1,1 +1,1 @@
-git+https://github.com/rackerlabs/mimic.git@b4ffe4b066430404f5363d7506a6228fcc2d5b4f
+git+https://github.com/rackerlabs/mimic.git@a778c2e5d7a7725d4a610238a905dd40cf078b87
