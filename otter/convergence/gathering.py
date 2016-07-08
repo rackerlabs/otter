@@ -287,10 +287,10 @@ def get_all_launch_server_data(
          .on(map(NovaServer.from_server_details_json)).on(list),
          get_clb_contents(),
          get_rcv3_contents()]
-    ).on(lambda (servers, (clb_nodes, clbs), rcv3_nodes): {
+    ).on(lambda (servers, clb_nodes_and_clbs, rcv3_nodes): {
         'servers': servers,
-        'lb_nodes': clb_nodes + rcv3_nodes,
-        'lbs': clbs
+        'lb_nodes': clb_nodes_and_clbs[0] + rcv3_nodes,
+        'lbs': clb_nodes_and_clbs[1]
     })
     return eff
 
