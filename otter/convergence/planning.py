@@ -76,7 +76,6 @@ from otter.convergence.model import (
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
-    CLBNodeStatus,
     ErrorReason,
     IDrainable,
     RCv3Description,
@@ -647,7 +646,7 @@ def change_lb_node(node, description, lb, now, timeout):
         if (lb.health_monitor and
                 node.description.condition == CLBNodeCondition.DRAINING):
             # Enable node if it is ONLINE
-            if node.status == CLBNodeStatus.ONLINE:
+            if node.is_online:
                 return ChangeCLBNode(lb_id=description.lb_id,
                                      node_id=node.node_id,
                                      condition=CLBNodeCondition.ENABLED,

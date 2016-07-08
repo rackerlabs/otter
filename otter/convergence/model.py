@@ -66,22 +66,6 @@ class CLBNodeType(Names):
     """
 
 
-class CLBNodeStatus(Names):
-    """
-    Constants representing online/offline status of CLB node
-    """
-
-    ONLINE = NamedConstant()
-    """
-    Node is ONLINE and is receiving traffic
-    """
-
-    OFFLINE = NamedConstant()
-    """
-    Node is marked OFFLINE by CLB and is not receiving traffic
-    """
-
-
 class ServerState(Names):
     """
     Constants representing the state of a Nova cloud server.
@@ -593,8 +577,8 @@ class CLB(object):
              Attribute("description", instance_of=CLBDescription),
              Attribute("address", instance_of=basestring),
              Attribute("drained_at", default_value=0.0, instance_of=float),
-             Attribute("status", instance_of=NamedConstant,
-                       default_value=CLBNodeStatus.ONLINE),
+             Attribute("is_online", instance_of=bool,
+                       default_value=True),
              Attribute("connections", default_value=None)])
 class CLBNode(object):
     """
@@ -606,16 +590,13 @@ class CLBNode(object):
     :ivar description: The description of how the node should be set up. See
         :obj:`ILBNode.description`.
     :type description: :class:`CLBescription`
-
     :ivar str address: The IP address of the node.  The IP and port form a
         unique mapping on the CLB, which is assigned a node ID.  Two
         nodes with the same IP and port cannot exist on a single CLB.
     :ivar float drained_at: EPOCH at which this node was put in DRAINING.
         Should be 0 if node is not DRAINING.
-
-    :ivar status: One of ``ONLINE`` or ``OFFLINE``
-    :type status: A member of :class:`CLBNodeStatus`
-
+    :ivar bool is_online: Is this node ONLINE and receiving traffic? This field
+        corresponds to node's `status` field.
     :ivar int connections: The number of active connections on the node - this
         is None by default (the stat is not available yet).
     """
@@ -653,7 +634,7 @@ class CLBNode(object):
         return cls(
             node_id=str(json['id']),
             address=json['address'],
-            status=CLBNodeStatus.lookupByName(json["status"]),
+            is_online=(json["status"] == "ONLINE"),
             description=CLBDescription(
                 lb_id=str(lb_id),
                 port=json['port'],

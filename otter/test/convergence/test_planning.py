@@ -11,7 +11,6 @@ from otter.convergence.model import (
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
-    CLBNodeStatus,
     CLBNodeType,
     DesiredServerGroupState,
     DesiredStackGroupState,
@@ -447,11 +446,11 @@ class ConvergeLBStateTests(SynchronousTestCase):
             ])
         )
 
-    def _test_change_lb_node_draining(self, node_status, now, step):
+    def _test_change_lb_node_draining(self, node_is_online, now, step):
         clb_desc = CLBDescription(lb_id='5', port=80)
         current = [
             CLBNode(
-                node_id='123', address='1.1.1.1', status=node_status,
+                node_id='123', address='1.1.1.1', is_online=node_is_online,
                 description=copy_clb_desc(
                     clb_desc, condition=CLBNodeCondition.DRAINING))]
         self.assertEqual(
@@ -473,7 +472,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         the node.
         """
         self._test_change_lb_node_draining(
-            CLBNodeStatus.ONLINE,
+            True,
             0,
             ChangeCLBNode(lb_id='5', node_id='123', weight=1,
                           condition=CLBNodeCondition.ENABLED,
@@ -488,7 +487,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         fail convergence.
         """
         self._test_change_lb_node_draining(
-            CLBNodeStatus.OFFLINE,
+            False,
             3601,
             FailConvergence(
                 [ErrorReason.String("Node 123 has remained OFFLINE "
@@ -503,7 +502,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
         retry convergence.
         """
         self._test_change_lb_node_draining(
-            CLBNodeStatus.OFFLINE,
+            False,
             300,
             ConvergeLater(
                 [ErrorReason.String("Waiting for node 123 to come ONLINE")]))
