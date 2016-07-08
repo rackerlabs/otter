@@ -43,6 +43,7 @@ from otter.effect_dispatcher import get_full_dispatcher
 from otter.metrics import connect_cass_servers
 from otter.models.cass import CassScalingGroupCollection, DEFAULT_CONSISTENCY
 from otter.test.utils import mock_log
+from otter.util.cqlbatch import batch
 from otter.util.http import append_segments, check_success, headers
 from otter.util.timestamp import datetime_to_epoch
 
@@ -210,6 +211,20 @@ def set_desired_to_actual(groups, reactor, store, cass_client, authenticator,
             groups))
 
 
+def pause_groups(cass_client, groups):
+    """
+    Pause given groups by setting their paused=true
+    """
+    queries, params = [], {}
+    for i, group in enumerate(groups):
+        queries.append(
+            ('UPDATE scaling_group SET paused=true WHERE '
+             '"tenantId"=:tenantId{0} AND "groupId"=:groupId{0}').format(i))
+        params["tenantId{}".format(i)] = group["tenantId"]
+        params["groupId{}".format(i)] = group["groupId"]
+    return cass_client.execute(batch(queries), params, DEFAULT_CONSISTENCY)
+
+
 @inlineCallbacks
 def main(reactor):
     parser = ArgumentParser(
@@ -224,6 +239,9 @@ def main(reactor):
     parser.add_argument(
         "--set-desired-to-actual", action="store_true", dest="set_desired",
         help="Set group's desired to current actual number of servers")
+    parser.add_argument(
+        "--pause", action="store_true", dest="pause_group",
+        help="Pause given groups")
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
@@ -264,6 +282,8 @@ def main(reactor):
     elif parsed.set_desired:
         yield set_desired_to_actual(groups, reactor, store, cass_client,
                                     authenticator, conf)
+    elif parsed.pause_group:
+        yield pause_groups(cass_client, groups)
     else:
         error_groups = yield trigger_convergence_groups(
             authenticator, conf["region"], groups, parsed.limit,
