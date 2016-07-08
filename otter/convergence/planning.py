@@ -630,7 +630,7 @@ def change_lb_node(node, description, lb, now, timeout):
     :param description: The description of the load balancer and how to add
         the server to it.
     :type description: :class:`ILBDescription` provider
-    :param float now: Current time in EPOCH
+    :param float now: Number of seconds since EPOCH
     :param float timeout: How long can node remain OFFLINE after adding
         in seconds?
 
