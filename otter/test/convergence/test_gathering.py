@@ -401,11 +401,21 @@ def lb_req(url, json_response, response):
 
 
 def nodes_req(lb_id, nodes):
+    """
+    Return a SequenceDispatcher two-tuple that matches a service request to
+    given load balancer ``nodes`` endpoint (using GET), and returns the given
+    ``nodes`` as the content in an HTTP 200 ``StubResponse``.
+    """
     return lb_req('loadbalancers/{}/nodes'.format(lb_id),
                   True, {'nodes': nodes})
 
 
 def lb_hm_req(lb_id, health_mon):
+    """
+    Return a SequenceDispatcher two-tuple that matches a service request to
+    given load balancer ``healthMonitor`` endpoint (using GET), and returns
+    the given ``health_mon`` as the content in an HTTP 200 ``StubResponse``.
+    """
     return lb_req('loadbalancers/{}/healthmonitor'.format(lb_id), True,
                   {'healthMonitor': health_mon})
 
