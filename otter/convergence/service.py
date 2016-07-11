@@ -180,13 +180,19 @@ def is_autoscale_active(server, lb_nodes):
                              if node.matches(server)]))
 
 
-def update_servers_cache(group, now, servers, lb_nodes, include_deleted=True):
+def update_servers_cache(group, now, servers, lb_nodes, lbs,
+                         include_deleted=True):
     """
     Updates the cache, adding servers, with a flag if autoscale is active on
-    each one.
+    each one. All arguments after ``now`` are resources specific to
+    ``launch_server`` config that are used by that planner. Here we only cache
+    servers that are in desired LBs since as it is needed by REST API and
+    ignore ``lbs``.
+
     :param group: scaling group
     :param list servers: list of NovaServer objects
     :param list lb_nodes: list of CLBNode objects
+    :param dict lbs: load balancer objects keyed on ID (currently ignored)
     :param include_deleted: Include deleted servers in cache. Defaults to True.
     """
     server_dicts = []

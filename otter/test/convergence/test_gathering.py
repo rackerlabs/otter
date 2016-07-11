@@ -44,6 +44,7 @@ from otter.convergence.gathering import (
     get_scaling_group_stacks,
     mark_deleted_servers)
 from otter.convergence.model import (
+    CLB,
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
@@ -400,8 +401,23 @@ def lb_req(url, json_response, response):
 
 
 def nodes_req(lb_id, nodes):
+    """
+    Return a SequenceDispatcher two-tuple that matches a service request to
+    given load balancer ``nodes`` endpoint (using GET), and returns the given
+    ``nodes`` as the content in an HTTP 200 ``StubResponse``.
+    """
     return lb_req('loadbalancers/{}/nodes'.format(lb_id),
                   True, {'nodes': nodes})
+
+
+def lb_hm_req(lb_id, health_mon):
+    """
+    Return a SequenceDispatcher two-tuple that matches a service request to
+    given load balancer ``healthMonitor`` endpoint (using GET), and returns
+    the given ``health_mon`` as the content in an HTTP 200 ``StubResponse``.
+    """
+    return lb_req('loadbalancers/{}/healthmonitor'.format(lb_id), True,
+                  {'healthMonitor': health_mon})
 
 
 def node_feed_req(lb_id, node_id, response):
@@ -435,7 +451,7 @@ def node_feed_req(lb_id, node_id, response):
 def node(id, address, port=20, weight=2, condition='ENABLED',
          type='PRIMARY'):
     d = {'id': id, 'port': port, 'address': address, 'condition': condition,
-         'type': type}
+         'type': type, "status": "ONLINE"}
     if weight is not None:
         d['weight'] = weight
     return d
@@ -467,17 +483,22 @@ class GetCLBContentsTests(SynchronousTestCase):
             lb_req('loadbalancers', True,
                    {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             parallel_sequence([[nodes_req(1, [node11, node12])],
-                               [nodes_req(2, [node21, node22])]]),
+                               [nodes_req(2, [node21, node22])],
+                               [lb_hm_req(1, {"type": "CONNECT"})],
+                               [lb_hm_req(2, {})]]),
             parallel_sequence([[node_feed_req('1', '11', '11feed')],
                                [node_feed_req('2', '22', '22feed')]]),
         ]
         eff = get_clb_contents()
         self.assertEqual(
             perform_sequence(seq, eff),
-            [assoc_obj(CLBNode.from_node_json(1, node11), drained_at=1.0),
-             CLBNode.from_node_json(1, node12),
-             CLBNode.from_node_json(2, node21),
-             assoc_obj(CLBNode.from_node_json(2, node22), drained_at=2.0)])
+            ([assoc_obj(CLBNode.from_node_json(1, node11),
+                        drained_at=1.0),
+              CLBNode.from_node_json(1, node12),
+              CLBNode.from_node_json(2, node21),
+              assoc_obj(CLBNode.from_node_json(2, node22),
+                        drained_at=2.0)],
+             {'1': CLB(True), '2': CLB(False)}))
 
     def test_no_lb(self):
         """
@@ -489,7 +510,7 @@ class GetCLBContentsTests(SynchronousTestCase):
             parallel_sequence([]),  # No nodes to fetch
         ]
         eff = get_clb_contents()
-        self.assertEqual(perform_sequence(seq, eff), [])
+        self.assertEqual(perform_sequence(seq, eff), ([], {}))
 
     def test_no_nodes(self):
         """
@@ -498,10 +519,15 @@ class GetCLBContentsTests(SynchronousTestCase):
         seq = [
             lb_req('loadbalancers', True,
                    {'loadBalancers': [{'id': 1}, {'id': 2}]}),
-            parallel_sequence([[nodes_req(1, [])], [nodes_req(2, [])]]),
+            parallel_sequence([
+                [nodes_req(1, [])], [nodes_req(2, [])],
+                [lb_hm_req(1, {})], [lb_hm_req(2, {"type": "a"})]
+            ]),
             parallel_sequence([]),  # No nodes to fetch
         ]
-        self.assertEqual(perform_sequence(seq, get_clb_contents()), [])
+        self.assertEqual(
+            perform_sequence(seq, get_clb_contents()),
+            ([], {'1': CLB(False), '2': CLB(True)}))
 
     def test_no_draining(self):
         """
@@ -511,7 +537,9 @@ class GetCLBContentsTests(SynchronousTestCase):
             lb_req('loadbalancers', True,
                    {'loadBalancers': [{'id': 1}, {'id': 2}]}),
             parallel_sequence([[nodes_req(1, [node('11', 'a11')])],
-                               [nodes_req(2, [node('21', 'a21')])]]),
+                               [nodes_req(2, [node('21', 'a21')])],
+                               [lb_hm_req(1, {})],
+                               [lb_hm_req(2, {})]]),
             parallel_sequence([])  # No nodes to fetch
         ]
         make_desc = partial(CLBDescription, port=20, weight=2,
@@ -520,10 +548,11 @@ class GetCLBContentsTests(SynchronousTestCase):
         eff = get_clb_contents()
         self.assertEqual(
             perform_sequence(seq, eff),
-            [CLBNode(node_id='11', address='a11',
-                     description=make_desc(lb_id='1')),
-             CLBNode(node_id='21', address='a21',
-                     description=make_desc(lb_id='2'))])
+            ([CLBNode(node_id='11', address='a11',
+                      description=make_desc(lb_id='1')),
+              CLBNode(node_id='21', address='a21',
+                      description=make_desc(lb_id='2'))],
+             {'1': CLB(False), '2': CLB(False)}))
 
     def test_lb_disappeared_during_node_fetch(self):
         """
@@ -537,8 +566,11 @@ class GetCLBContentsTests(SynchronousTestCase):
                 [nodes_req(1, [node('11', 'a11')])],
                 [lb_req('loadbalancers/2/nodes', True,
                         CLBNotFoundError(lb_id=u'2'))],
+                [lb_hm_req(1, {"type": "CONNECT"})],
+                [lb_req('loadbalancers/2/healthmonitor', True,
+                        CLBNotFoundError(lb_id=u'2'))]
             ]),
-            parallel_sequence([])  # No nodes to fetch
+            parallel_sequence([])  # No node feeds to fetch
         ]
         make_desc = partial(CLBDescription, port=20, weight=2,
                             condition=CLBNodeCondition.ENABLED,
@@ -546,8 +578,9 @@ class GetCLBContentsTests(SynchronousTestCase):
         eff = get_clb_contents()
         self.assertEqual(
             perform_sequence(seq, eff),
-            [CLBNode(node_id='11', address='a11',
-                     description=make_desc(lb_id='1'))])
+            ([CLBNode(node_id='11', address='a11',
+                      description=make_desc(lb_id='1'))],
+             {'1': CLB(True)}))
 
     def test_lb_disappeared_during_feed_fetch(self):
         """
@@ -561,7 +594,9 @@ class GetCLBContentsTests(SynchronousTestCase):
             parallel_sequence([
                 [nodes_req(1, [node('11', 'a11', condition='DRAINING'),
                                node('12', 'a12')])],
-                [nodes_req(2, [node21])]
+                [nodes_req(2, [node21])],
+                [lb_hm_req(1, {"type": "CONNECT"})],
+                [lb_hm_req(2, {"type": "CONNECT"})]
             ]),
             parallel_sequence([
                 [node_feed_req('1', '11', CLBNotFoundError(lb_id=u'1'))],
@@ -570,7 +605,8 @@ class GetCLBContentsTests(SynchronousTestCase):
         eff = get_clb_contents()
         self.assertEqual(
             perform_sequence(seq, eff),
-            [assoc_obj(CLBNode.from_node_json(2, node21), drained_at=2.0)])
+            ([assoc_obj(CLBNode.from_node_json(2, node21), drained_at=2.0)],
+             {'2': CLB(True)}))
 
 
 class GetRCv3ContentsTests(SynchronousTestCase):
@@ -723,7 +759,8 @@ class GetAllLaunchServerDataTests(SynchronousTestCase):
             self.now,
             get_scaling_group_servers=_constant_as_eff(
                 ('tid', 'gid', self.now), self.servers),
-            get_clb_contents=_constant_as_eff((), clb_nodes),
+            get_clb_contents=_constant_as_eff(
+                (), (clb_nodes, {'lb1': CLB(True), 'lb2': CLB(False)})),
             get_rcv3_contents=_constant_as_eff((), rcv3_nodes))
 
         expected_servers = [
@@ -737,7 +774,8 @@ class GetAllLaunchServerDataTests(SynchronousTestCase):
         ]
         self.assertEqual(resolve_stubs(eff),
                          {'servers': expected_servers,
-                          'lb_nodes': clb_nodes + rcv3_nodes})
+                          'lb_nodes': clb_nodes + rcv3_nodes,
+                          'lbs': {'lb1': CLB(True), 'lb2': CLB(False)}})
 
     def test_no_group_servers(self):
         """
@@ -750,10 +788,12 @@ class GetAllLaunchServerDataTests(SynchronousTestCase):
             self.now,
             get_scaling_group_servers=_constant_as_eff(
                 ('tid', 'gid', self.now), []),
-            get_clb_contents=_constant_as_eff((), []),
+            get_clb_contents=_constant_as_eff((), ([], {'a': CLB(False)})),
             get_rcv3_contents=_constant_as_eff((), []))
 
-        self.assertEqual(resolve_stubs(eff), {'servers': [], 'lb_nodes': []})
+        self.assertEqual(
+            resolve_stubs(eff),
+            {'servers': [], 'lb_nodes': [], 'lbs': {'a': CLB(False)}})
 
 
 class GetAllStacksTests(SynchronousTestCase):

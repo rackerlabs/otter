@@ -120,7 +120,8 @@ class CLBNodeTests(SynchronousTestCase):
         An instance of :class:`CLBNode` provides :class:`ILBNode` and
         :class:`IDrainable`.
         """
-        node = CLBNode(node_id='1234', description=self.desc, address='10.1.1.1')
+        node = CLBNode(node_id='1234', description=self.desc,
+                       address='10.1.1.1')
         self.assertTrue(ILBNode.providedBy(node))
         self.assertTrue(IDrainable.providedBy(node))
 
@@ -164,7 +165,8 @@ class CLBNodeTests(SynchronousTestCase):
         :func:`CLBNode.currently_draining` returns `False` if
         `CLBNode.description.condition` is not :obj:`CLBNodeCondition.DRAINING`
         """
-        node = CLBNode(node_id='1234', description=self.desc, address='10.1.1.1')
+        node = CLBNode(
+            node_id='1234', description=self.desc, address='10.1.1.1')
         self.assertFalse(node.currently_draining())
 
     def test_done_draining_past_timeout_even_if_there_are_connections(self):
@@ -238,12 +240,14 @@ class CLBNodeTests(SynchronousTestCase):
         with a `CLBDescription`. When weight is not specified it defaults to 1.
         """
         node_json = {'id': 'node1', 'address': '1.2.3.4', 'port': 20,
-                     'condition': 'DRAINING', 'type': 'SECONDARY'}
+                     'condition': 'DRAINING', 'type': 'SECONDARY',
+                     'status': 'OFFLINE'}
         node = CLBNode.from_node_json(123, node_json)
         self.assertEqual(
             node,
             CLBNode(node_id='node1', address='1.2.3.4',
                     connections=None, drained_at=0.0,
+                    is_online=False,
                     description=CLBDescription(
                         lb_id='123', port=20,
                         weight=1,
@@ -257,12 +261,13 @@ class CLBNodeTests(SynchronousTestCase):
         """
         node_json = {'id': 'node1', 'address': '1.2.3.4', 'port': 20,
                      'condition': 'DRAINING', 'type': 'SECONDARY',
-                     'weight': 50}
+                     'weight': 50, 'status': 'OFFLINE'}
         node = CLBNode.from_node_json(123, node_json)
         self.assertEqual(
             node,
             CLBNode(node_id='node1', address='1.2.3.4',
                     connections=None, drained_at=0.0,
+                    is_online=False,
                     description=CLBDescription(
                         lb_id='123', port=20,
                         weight=50,

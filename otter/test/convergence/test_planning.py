@@ -7,6 +7,7 @@ from pyrsistent import b, pbag, pmap, pset, s
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence.model import (
+    CLB,
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
@@ -18,6 +19,7 @@ from otter.convergence.model import (
     RCv3Node,
     ServerState)
 from otter.convergence.planning import (
+    CLBHealthInfoNotFound,
     DRAINING_METADATA,
     Destiny,
     converge_launch_server,
@@ -68,7 +70,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
     address = '1.1.1.1'
 
     def assert_converge_clb_steps(self, clb_descs, clb_nodes, clb_steps,
-                                  draining_timeout, now):
+                                  draining_timeout, now, lbs={}):
         """
         Run the converge_launch_server function on a server with the given
         :class:`CLBDescription`s  and :class:`CLBNode`s, the given
@@ -91,6 +93,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
                      servicenet_address=self.address,
                      desired_lbs=s(*clb_descs))),
             s(*clb_nodes),
+            lbs,
             now=now)
 
         self.assertEqual(self._filter_only_lb_steps(without_rcv3_steps),
@@ -111,6 +114,7 @@ class RemoveFromLBWithDrainingTests(SynchronousTestCase):
             s(RCv3Node(node_id='43a39c18-8cad-4bb1-808e-450d950be289',
                        cloud_server_id='abc', description=rcv3_desc),
               *clb_nodes),
+            lbs,
             now=now)
 
         self.assertEqual(self._filter_only_lb_steps(with_rcv3_steps),
@@ -333,27 +337,60 @@ class ConvergeLBStateTests(SynchronousTestCase):
         If a desired LB config is not in the set of current configs,
         `converge_lb_state` returns the relevant adding-to-load-balancer
         steps (:class:`AddNodesToCLB` in the case of CLB,
-        :class:`BulkAddToRCv3` in the case of RCv3).
+        :class:`BulkAddToRCv3` in the case of RCv3). If desired description
+        has health monitor enabled then node is added as DRAINING
         """
         clb_desc = CLBDescription(lb_id='5', port=80)
+        clb_with_health_desc = CLBDescription(lb_id='3', port=80)
         rcv3_desc = RCv3Description(
             lb_id='c6fe49fa-114a-4ea4-9425-0af8b30ff1e7')
 
+        exp_clb_desc = copy_clb_desc(
+            clb_with_health_desc, condition=CLBNodeCondition.DRAINING)
+
         self.assertEqual(
             converge_launch_server(
-                DesiredServerGroupState(server_config={}, capacity=1),
+                DesiredServerGroupState(server_config={}, capacity=2),
                 set([server('abc', ServerState.ACTIVE,
                             servicenet_address='1.1.1.1',
-                            desired_lbs=s(clb_desc, rcv3_desc))]),
+                            desired_lbs=s(clb_desc, rcv3_desc)),
+                     server('hea', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.2',
+                            desired_lbs=s(clb_with_health_desc))]),
                 set(),
+                {"5": CLB(False), "3": CLB(True)},
                 0),
             pbag([
                 AddNodesToCLB(
                     lb_id='5',
                     address_configs=s(('1.1.1.1', clb_desc))),
+                AddNodesToCLB(
+                    lb_id='3',
+                    address_configs=s(('1.1.1.2', exp_clb_desc))),
                 BulkAddToRCv3(
                     lb_node_pairs=s(
                         ('c6fe49fa-114a-4ea4-9425-0af8b30ff1e7', 'abc')))
+            ]))
+
+    def test_add_to_lb_no_health_info(self):
+        """
+        If a desired LB config is not in the set of current configs
+        and desired LB's health monitor is not found then
+        `converge_lb_state` returns `FailConvergence` step
+        """
+        exc_info = (CLBHealthInfoNotFound, CLBHealthInfoNotFound("5"), None)
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        self.assertEqual(
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(clb_desc))]),
+                set(),
+                {},     # CLB 5 health monitor is not there
+                0),
+            pbag([
+                FailConvergence([ErrorReason.Exception(exc_info)])
             ]))
 
     def test_change_lb_node(self):
@@ -378,11 +415,97 @@ class ConvergeLBStateTests(SynchronousTestCase):
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(clb_desc, rcv3_desc))]),
                 set(current),
+                {"5": CLB(False)},
                 0),
             pbag([
                 ChangeCLBNode(lb_id='5', node_id='123', weight=1,
                               condition=CLBNodeCondition.ENABLED,
                               type=CLBNodeType.PRIMARY)]))
+
+    def test_change_lb_node_no_health(self):
+        """
+        If a desired CLB mapping is in the set of current configs,
+        but the configuration is wrong and there is no health monitor
+        health info then `converge_lb_state` returns :obj:`FailConvergence`
+        """
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        exc_info = (CLBHealthInfoNotFound, CLBHealthInfoNotFound("5"), None)
+        current = [CLBNode(node_id='123', address='1.1.1.1',
+                           description=copy_clb_desc(clb_desc, weight=5))]
+        self.assertEqual(
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(clb_desc))]),
+                set(current),
+                {},     # No health info for CLB 5
+                0),
+            pbag([
+                FailConvergence([ErrorReason.Exception(exc_info)])
+            ])
+        )
+
+    def _test_change_lb_node_draining(self, node_is_online, now, step):
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        current = [
+            CLBNode(
+                node_id='123', address='1.1.1.1', is_online=node_is_online,
+                description=copy_clb_desc(
+                    clb_desc, condition=CLBNodeCondition.DRAINING))]
+        self.assertEqual(
+            converge_launch_server(
+                DesiredServerGroupState(server_config={}, capacity=1),
+                set([server('abc', ServerState.ACTIVE,
+                            servicenet_address='1.1.1.1',
+                            desired_lbs=s(clb_desc))]),
+                set(current),
+                {"5": CLB(True)},
+                now),
+            pbag([step]))
+
+    def test_change_lb_node_draining(self):
+        """
+        If a desired CLB mapping is in the set of current configs,
+        and the configuration is wrong with CLB health monitor enabled
+        `converge_lb_state` returns a :class:`ChangeCLBNode` object to ENABLE
+        the node.
+        """
+        self._test_change_lb_node_draining(
+            True,
+            0,
+            ChangeCLBNode(lb_id='5', node_id='123', weight=1,
+                          condition=CLBNodeCondition.ENABLED,
+                          type=CLBNodeType.PRIMARY))
+
+    def test_change_lb_node_draining_timeout(self):
+        """
+        If a desired CLB mapping is in the set of current configs,
+        with wrong configuration with CLB health monitor enabled and
+        node has been OFFLINE and DRAINING for more than 1 hour, then
+        `converge_lb_state` returns a :class:`FailConvergence` object to
+        fail convergence.
+        """
+        self._test_change_lb_node_draining(
+            False,
+            3601,
+            FailConvergence(
+                [ErrorReason.String("Node 123 has remained OFFLINE "
+                                    "for more than 3600 seconds")]))
+
+    def test_change_lb_node_draining_converge_later(self):
+        """
+        If a desired CLB mapping is in the set of current configs,
+        with wrong configuration with CLB health monitor enabled and
+        node has been OFFLINE and DRAINING for less than 1 hour, then
+        `converge_lb_state` returns a :class:`ConvergeLater` object to
+        retry convergence.
+        """
+        self._test_change_lb_node_draining(
+            False,
+            300,
+            ConvergeLater(
+                [ErrorReason.String("Waiting for node 123 to come ONLINE")]))
 
     def test_do_nothing(self):
         """
@@ -405,6 +528,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                             servicenet_address='1.1.1.1',
                             desired_lbs=s(clb_desc, rcv3_desc))]),
                 set(current),
+                {'5': CLB(False)},
                 0),
             pbag([]))
 
@@ -433,6 +557,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                             servicenet_address='1.1.1.1',
                             desired_lbs=pset(descs))]),
                 set(current),
+                {'5': CLB(False), '6': CLB(False)},
                 0),
             pbag([
                 AddNodesToCLB(
@@ -464,6 +589,7 @@ class ConvergeLBStateTests(SynchronousTestCase):
                             servicenet_address='1.1.1.1',
                             desired_lbs=desired)]),
                 set(current),
+                {"5": CLB(False)},
                 0),
             pbag([
                 AddNodesToCLB(
@@ -504,6 +630,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                              description=self.clb_desc),
                      RCv3Node(node_id='2', cloud_server_id='abc',
                               description=self.rcv3_desc)]),
+                {},
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
@@ -525,6 +652,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                 set([server('abc', state=ServerState.ACTIVE,
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set(),
+                {},
                 0),
             pbag([DeleteServer(server_id='abc')]))
 
@@ -542,6 +670,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                             metadata=dict([DRAINING_METADATA]),
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set(),
+                {},
                 0),
             pbag([DeleteServer(server_id='abc')]))
 
@@ -561,6 +690,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                              description=self.clb_desc),
                      RCv3Node(node_id='2', cloud_server_id='abc',
                               description=self.rcv3_desc)]),
+                {},
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
@@ -587,6 +717,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                                  condition=CLBNodeCondition.DRAINING)),
                      RCv3Node(node_id='2', cloud_server_id='abc',
                               description=self.rcv3_desc)]),
+                {},
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
@@ -614,6 +745,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                                  lb_id='1', port=80,
                                  condition=CLBNodeCondition.DRAINING),
                              drained_at=1.0, connections=1)]),
+                {},
                 2),
             pbag([self.clstep]))
 
@@ -650,6 +782,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                     # This node is not drainable, it can be removed
                     RCv3Node(node_id='3', cloud_server_id='abc',
                              description=self.rcv3_desc)]),
+                {},
                 2),
             pbag([
                 RemoveNodesFromCLB(lb_id='9', node_ids=s('2')),
@@ -675,6 +808,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                              description=self.clb_desc),
                      RCv3Node(node_id='2', cloud_server_id='abc',
                               description=self.rcv3_desc)]),
+                {},
                 0),
             pbag([
                 ChangeCLBNode(lb_id='1', node_id='1', weight=1,
@@ -710,6 +844,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                                  self.clb_desc,
                                  condition=CLBNodeCondition.DRAINING),
                              connections=1, drained_at=0.0)]),
+                {},
                 1),
             pbag([
                 SetMetadataItemOnServer(server_id='abc',
@@ -740,6 +875,7 @@ class DrainAndDeleteServerTests(SynchronousTestCase):
                             desired_lbs=s(self.clb_desc, self.rcv3_desc))]),
                 set([CLBNode(node_id='1', address='1.1.1.1',
                              description=self.clb_desc)]),
+                {},
                 1),
             pbag([
                 ChangeCLBNode(lb_id='1', node_id='1', weight=1,
@@ -764,6 +900,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                 DesiredServerGroupState(server_config={}, capacity=1),
                 set(),
                 set(),
+                {},
                 0),
             pbag([CreateServer(server_config=pmap())]))
 
@@ -777,6 +914,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                 DesiredServerGroupState(server_config={}, capacity=2),
                 set(),
                 set(),
+                {},
                 0),
             pbag([
                 CreateServer(server_config=pmap()),
@@ -793,6 +931,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                 DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.BUILD)]),
                 set(),
+                {},
                 0),
             pbag([
                 ConvergeLater(
@@ -813,6 +952,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                 set([server('abc', ServerState.HARD_REBOOT),
                      server('def', ServerState.PASSWORD)]),
                 set(),
+                {},
                 0
             ),
             pbag([ConvergeLater(reasons=[msg1, msg2], limited=True)])
@@ -830,6 +970,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                 DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.RESCUE)]),
                 set(),
+                {},
                 0),
             pbag([]))
 
@@ -843,6 +984,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                 DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.ERROR)]),
                 set(),
+                {},
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
@@ -859,6 +1001,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                 DesiredServerGroupState(server_config={}, capacity=1),
                 set([server('abc', ServerState.UNKNOWN_TO_OTTER)]),
                 set(),
+                {},
                 0),
             pbag([
                 CreateServer(server_config=pmap()),
@@ -887,6 +1030,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                                                         port=8080)),
                      RCv3Node(node_id='123', cloud_server_id='abc',
                               description=RCv3Description(lb_id='6'))]),
+                {},
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
@@ -917,6 +1061,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                                                         port=8080)),
                      RCv3Node(node_id='123', cloud_server_id='abc',
                               description=RCv3Description(lb_id='6'))]),
+                {},
                 0),
             pbag([
                 RemoveNodesFromCLB(lb_id='5', node_ids=s('3')),
@@ -938,6 +1083,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                                           CLBDescription(lb_id='5', port=8080),
                                           RCv3Description(lb_id='6')))]),
                 set(),
+                {},
                 0),
             pbag([]))
 
@@ -949,6 +1095,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                 set([server('abc', ServerState.ACTIVE, created=0),
                      server('def', ServerState.ACTIVE, created=1)]),
                 set(),
+                {},
                 0),
             pbag([DeleteServer(server_id='abc')]))
 
@@ -966,6 +1113,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                      server('def', ServerState.BUILD, created=1),
                      server('ghi', ServerState.ACTIVE, created=2)]),
                 set(),
+                {},
                 0),
             pbag([DeleteServer(server_id='def')]))
 
@@ -1007,6 +1155,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                          server('def', examples[before], created=1),
                          server('ghi', examples[after], created=2)]),
                     set(),
+                    {},
                     0),
                 pbag([DeleteServer(server_id='def')] + also))
 
@@ -1023,6 +1172,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                 set([server('slowpoke', ServerState.BUILD, created=0),
                      server('ok', ServerState.ACTIVE, created=0)]),
                 set(),
+                {},
                 3600),
             pbag([
                 DeleteServer(server_id='slowpoke'),
@@ -1042,6 +1192,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                      server('old-ok', ServerState.ACTIVE, created=0),
                      server('new-ok', ServerState.ACTIVE, created=3600)]),
                 set(),
+                {},
                 3600),
             pbag([DeleteServer(server_id='slowpoke')]))
 
@@ -1063,6 +1214,7 @@ class ConvergeLaunchServerTests(SynchronousTestCase):
                             servicenet_address='2.2.2.2', created=1,
                             desired_lbs=desired_lbs)]),
                 set(),
+                {"5": CLB(False)},
                 0),
             pbag([
                 DeleteServer(server_id='abc'),
@@ -1093,7 +1245,8 @@ class PlanLaunchServerTests(SynchronousTestCase):
                          server('server2', state=ServerState.ACTIVE,
                                 servicenet_address='1.2.3.4',
                                 desired_lbs=desired_lbs)]),
-            lb_nodes=set())
+            lb_nodes=set(),
+            lbs={"5": CLB(False)})
 
         self.assertEqual(
             result,
@@ -1115,7 +1268,8 @@ class PlanLaunchServerTests(SynchronousTestCase):
             step_limits={},
             servers=set([server('server1', state=ServerState.BUILD,
                         servicenet_address='1.1.1.1', created=0)]),
-            lb_nodes=set())
+            lb_nodes=set(),
+            lbs={})
 
         self.assertEqual(
             result,

@@ -63,6 +63,8 @@
 
 from collections import defaultdict
 
+import attr
+
 from pyrsistent import pbag, pset
 
 from toolz.curried import filter
@@ -97,10 +99,18 @@ from otter.convergence.steps import (
     UpdateStack,
 )
 from otter.convergence.transforming import limit_steps_by_count, optimize_steps
-from otter.util.fp import partition_bool
+from otter.util.fp import assoc_obj, partition_bool
 
 
 DRAINING_METADATA = ('rax:autoscale:server:state', 'DRAINING')
+
+
+@attr.s
+class CLBHealthInfoNotFound(Exception):
+    """
+    Error to be raised when CLB health information is required and is not found
+    """
+    lb_id = attr.ib()
 
 
 def _remove_from_lb_with_draining(timeout, nodes, now):
@@ -158,7 +168,7 @@ def _remove_from_lb_with_draining(timeout, nodes, now):
     return removes + changes + retry
 
 
-def _converge_lb_state(server, current_lb_nodes):
+def _converge_lb_state(server, current_lb_nodes, load_balancers, now, timeout):
     """
     Produce a series of steps to converge a server's current load balancer
     state towards its desired load balancer state.
@@ -174,9 +184,11 @@ def _converge_lb_state(server, current_lb_nodes):
 
     :param server: The server to be converged.
     :type server: :class:`NovaServer`
+    :param list current_lb_nodes: ``list`` of :obj:`CLBNode`
+    :param float now: Current time in EPOCH
+    :param float timeout: How long can node remain OFFLINE after adding?
 
-    :param list current_lb_nodes: `list` of :obj:`CLBNode`
-
+    :return: steps to converge
     :rtype: `list` of :class:`IStep`
     """
     # list of desired configurations that match up with existing nodes
@@ -191,12 +203,13 @@ def _converge_lb_state(server, current_lb_nodes):
         met_desireds = ()
 
     adds = [
-        add_server_to_lb(server=server, description=desired)
+        add_server_to_lb(server, desired, load_balancers.get(desired.lb_id))
         for desired in server.desired_lbs - set(met_desireds)
     ]
 
     changes = [
-        change_lb_node(node=node, description=desired)
+        change_lb_node(node, desired, load_balancers.get(desired.lb_id),
+                       now, timeout)
         for desired, node in desired_matching_existing
         if node.description != desired
     ]
@@ -319,7 +332,8 @@ def get_destiny(server):
 
 
 def converge_launch_server(desired_state, servers_with_cheese,
-                           load_balancer_contents, now, timeout=3600):
+                           load_balancer_nodes, load_balancers,
+                           now, timeout=3600):
     """
     Create steps that indicate how to transition from the state provided
     by the given parameters to the :obj:`DesiredServerGroupState` described by
@@ -329,9 +343,12 @@ def converge_launch_server(desired_state, servers_with_cheese,
     :param set servers_with_cheese: a list of :obj:`NovaServer` instances.
         This must only contain servers that are being managed for the specified
         group.
-    :param load_balancer_contents: a set of :obj:`ILBNode` providers.  This
+    :param load_balancer_nodes: a set of :obj:`ILBNode` providers. This
         must contain all the load balancer mappings for all the load balancers
         (of all types) on the tenant.
+    :param dict load_balancers: Collection of load balancer objects accessed
+        based on its ID. The object is opaque and is not used by planner
+        directly. It is intended to contain extra info for specific LB provider
     :param float now: number of seconds since the POSIX epoch indicating the
         time at which the convergence was requested.
     :param float timeout: Number of seconds after which we will delete a server
@@ -376,7 +393,7 @@ def converge_launch_server(desired_state, servers_with_cheese,
         return _drain_and_delete(
             server,
             desired_state.draining_timeout,
-            [node for node in load_balancer_contents if node.matches(server)],
+            [node for node in load_balancer_nodes if node.matches(server)],
             now)
 
     scale_down_steps = list(mapcat(drain_and_delete_a_server,
@@ -392,7 +409,7 @@ def converge_launch_server(desired_state, servers_with_cheese,
     cleanup_errored_and_deleted_steps = [
         remove_node_from_lb(lb_node)
         for server in servers[Destiny.DELETE] + servers[Destiny.CLEANUP]
-        for lb_node in load_balancer_contents if lb_node.matches(server)]
+        for lb_node in load_balancer_nodes if lb_node.matches(server)]
 
     # converge all the servers that remain to their desired load balancer state
     still_active_servers = filter(lambda s: s not in servers_to_delete,
@@ -402,7 +419,12 @@ def converge_launch_server(desired_state, servers_with_cheese,
         for server in still_active_servers
         for step in _converge_lb_state(
             server,
-            [node for node in load_balancer_contents if node.matches(server)])
+            [node for node in load_balancer_nodes if node.matches(server)],
+            load_balancers,
+            now,
+            # Temporarily using build timeout as node offline timeout.
+            # See https://github.com/rackerlabs/otter/issues/1905
+            timeout)
         ]
 
     # Converge again if we expect state transitions on any servers
@@ -522,15 +544,15 @@ def converge_launch_stack(desired_state, stacks):
 
 
 def plan_launch_server(desired_group_state, now, build_timeout, step_limits,
-                       servers, lb_nodes):
+                       servers, lb_nodes, lbs):
     """
     Get an optimized convergence plan.
 
     Takes the same arguments as :func:`converge_launch_server`
     except `step_limits` which is dict of step class -> limit
     """
-    steps = converge_launch_server(desired_group_state, servers, lb_nodes, now,
-                                   timeout=build_timeout)
+    steps = converge_launch_server(desired_group_state, servers, lb_nodes, lbs,
+                                   now, timeout=build_timeout)
     steps = limit_steps_by_count(steps, step_limits)
     return optimize_steps(steps)
 
@@ -550,7 +572,7 @@ def plan_launch_stack(desired_group_state, now, build_timeout, step_limits,
     return optimize_steps(steps)
 
 
-def add_server_to_lb(server, description):
+def add_server_to_lb(server, description, load_balancer):
     """
     Add a server to a load balancing entity as described by `description`.
 
@@ -563,6 +585,15 @@ def add_server_to_lb(server, description):
     """
     if isinstance(description, CLBDescription):
         if server.servicenet_address:
+            if load_balancer is None:
+                return FailConvergence([
+                    ErrorReason.Exception(
+                        (CLBHealthInfoNotFound,
+                         CLBHealthInfoNotFound(description.lb_id),
+                         None))])
+            if load_balancer.health_monitor:
+                description = assoc_obj(description,
+                                        condition=CLBNodeCondition.DRAINING)
             return AddNodesToCLB(
                 lb_id=description.lb_id,
                 address_configs=pset(
@@ -587,24 +618,54 @@ def remove_node_from_lb(node):
             [(node.description.lb_id, node.cloud_server_id)]))
 
 
-def change_lb_node(node, description):
+def change_lb_node(node, description, lb, now, timeout):
     """
-    Change the configuration of a load balancer node.
+    Change the configuration of a load balancer node to desired description.
+    If CLB has health monitor enabled and the node is DRAINING then it will be
+    ENABLEDed.
 
-    :ivar node: The node to be changed.
+    :param node: The node to be changed.
     :type node: :class:`ILBNode` provider
-
-    :ivar description: The description of the load balancer and how to add
+    :param description: The description of the load balancer and how to add
         the server to it.
     :type description: :class:`ILBDescription` provider
+    :param float now: Number of seconds since EPOCH
+    :param float timeout: How long can node remain OFFLINE after adding
+        in seconds?
+
+    :return: :obj:`IStep` object or None
     """
-    if type(node.description) == type(description):
-        if isinstance(description, CLBDescription):
-            return ChangeCLBNode(lb_id=description.lb_id,
-                                 node_id=node.node_id,
-                                 condition=description.condition,
-                                 weight=description.weight,
-                                 type=description.type)
+    if (type(node.description) == type(description) and
+            isinstance(description, CLBDescription)):
+        if lb is None:
+            return FailConvergence([
+                ErrorReason.Exception(
+                    (CLBHealthInfoNotFound,
+                     CLBHealthInfoNotFound(description.lb_id),
+                     None))])
+        if (lb.health_monitor and
+                node.description.condition == CLBNodeCondition.DRAINING):
+            # Enable node if it is ONLINE
+            if node.is_online:
+                return ChangeCLBNode(lb_id=description.lb_id,
+                                     node_id=node.node_id,
+                                     condition=CLBNodeCondition.ENABLED,
+                                     weight=description.weight,
+                                     type=description.type)
+            elif now - node.drained_at > timeout:
+                rsfmt = ("Node {} has remained OFFLINE for more than "
+                         "{} seconds")
+                return FailConvergence(
+                    [ErrorReason.String(rsfmt.format(node.node_id, timeout))])
+            else:
+                return ConvergeLater(
+                    [ErrorReason.String(("Waiting for node {} to come "
+                                         "ONLINE").format(node.node_id))])
+        return ChangeCLBNode(lb_id=description.lb_id,
+                             node_id=node.node_id,
+                             condition=description.condition,
+                             weight=description.weight,
+                             type=description.type)
 
 
 def drain_lb_node(node):

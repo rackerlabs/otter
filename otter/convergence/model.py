@@ -563,11 +563,22 @@ class CLBDescription(object):
                 other_description.port == self.port)
 
 
+@attr.s
+class CLB(object):
+    """
+    Cloud load balancer
+    """
+    # Is health monitor enabled?
+    health_monitor = attr.ib(default=False)
+
+
 @implementer(ILBNode, IDrainable)
 @attributes([Attribute("node_id", instance_of=basestring),
              Attribute("description", instance_of=CLBDescription),
              Attribute("address", instance_of=basestring),
              Attribute("drained_at", default_value=0.0, instance_of=float),
+             Attribute("is_online", instance_of=bool,
+                       default_value=True),
              Attribute("connections", default_value=None)])
 class CLBNode(object):
     """
@@ -579,12 +590,13 @@ class CLBNode(object):
     :ivar description: The description of how the node should be set up. See
         :obj:`ILBNode.description`.
     :type description: :class:`CLBescription`
-
     :ivar str address: The IP address of the node.  The IP and port form a
         unique mapping on the CLB, which is assigned a node ID.  Two
         nodes with the same IP and port cannot exist on a single CLB.
     :ivar float drained_at: EPOCH at which this node was put in DRAINING.
         Should be 0 if node is not DRAINING.
+    :ivar bool is_online: Is this node ONLINE and receiving traffic? This field
+        corresponds to node's `status` field.
     :ivar int connections: The number of active connections on the node - this
         is None by default (the stat is not available yet).
     """
@@ -622,6 +634,7 @@ class CLBNode(object):
         return cls(
             node_id=str(json['id']),
             address=json['address'],
+            is_online=(json["status"] == "ONLINE"),
             description=CLBDescription(
                 lb_id=str(lb_id),
                 port=json['port'],

@@ -50,7 +50,6 @@ from otter.integration.lib.trial_tools import (
     random_string,
     region,
     skip_if,
-    skip_me,
     tag
 )
 from otter.integration.lib.utils import diagnose
@@ -1414,7 +1413,6 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             )
         )
 
-    @skip_me("Until #1870 is implemented")
     @skip_if(not_mimic, "Requires mimic for controling CLB node status")
     @inlineCallbacks
     def test_node_added_as_draining(self):
