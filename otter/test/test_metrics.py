@@ -329,6 +329,8 @@ class CollectMetricsTests(SynchronousTestCase):
              "launch_config": '{"type": "launch_server"}'},
             {"tenantId": "t1", "groupId": "g2",
              "launch_config": '{"type": "launch_server"}'},
+            {"tenantId": "t1", "groupId": "gp",
+             "launch_config": '{"type": "launch_server"}', "paused": True},
             {"tenantId": "t1", "groupId": "g12",
              "launch_config": '{"type": "launch_stack"}'},
             {"tenantId": "t3", "groupId": "g3",
