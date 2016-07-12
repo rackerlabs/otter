@@ -10,7 +10,7 @@ import json
 from functools import partial
 
 from otter import controller
-from otter.controller import CannotExecutePolicyError
+from otter.controller import CannotExecutePolicyError, GroupPausedError
 from otter.json_schema import group_schemas
 from otter.json_schema import rest_schemas
 from otter.log import log
@@ -359,6 +359,7 @@ class OtterExecute(object):
         def log_informational_webhook_failure(failure):
             failure.trap(UnrecognizedCapabilityError,
                          CannotExecutePolicyError,
+                         GroupPausedError,
                          NoSuchPolicyError,
                          NoSuchScalingGroupError)
             logl[0].msg("Non-fatal error during webhook execution: {exc!r}",
