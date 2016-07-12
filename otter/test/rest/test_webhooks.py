@@ -11,7 +11,7 @@ import mock
 from twisted.internet import defer
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.controller import CannotExecutePolicyError
+from otter.controller import CannotExecutePolicyError, GroupPausedError
 from otter.json_schema import rest_schemas, validate
 from otter.models.interface import (
     NoSuchPolicyError, NoSuchScalingGroupError, NoSuchWebhookError,
@@ -537,6 +537,7 @@ class OneWebhookTestCase(RestAPITestMixin, SynchronousTestCase):
         cap_log = log.bind.return_value.bind.return_value
         exceptions = [
             CannotExecutePolicyError('tenant', 'group', 'policy', 'test'),
+            GroupPausedError('tenant', 'group', 'execute_webhook'),
             NoSuchPolicyError('tenant', 'group', 'policy'),
             NoSuchScalingGroupError('tenant', 'group'),
             UnrecognizedCapabilityError("11111", 1)]
