@@ -267,10 +267,12 @@ def collect_metrics(reactor, config, log, client=None, authenticator=None,
     dispatcher = get_dispatcher(reactor, authenticator, log,
                                 get_service_configs(config), store)
 
-    # calculate metrics on launch_server groups
+    # calculate metrics on launch_server and non-paused groups
     groups = yield perform(dispatcher, Effect(GetAllValidGroups()))
-    groups = [g for g in groups
-              if json.loads(g["launch_config"]).get("type") == "launch_server"]
+    groups = [
+        g for g in groups
+        if json.loads(g["launch_config"]).get("type") == "launch_server" and
+        (not g.get("paused", False))]
     tenanted_groups = groupby(lambda g: g["tenantId"], groups)
     group_metrics = yield get_all_metrics(
         dispatcher, tenanted_groups, log, _print=_print)
