@@ -46,6 +46,7 @@ from otter.effect_dispatcher import get_full_dispatcher
 from otter.metrics import connect_cass_servers
 from otter.models.cass import CassScalingGroupCollection, DEFAULT_CONSISTENCY
 from otter.test.utils import mock_log
+from otter.util.config import set_config_data
 from otter.util.cqlbatch import batch
 from otter.util.http import append_segments, check_success, headers
 from otter.util.timestamp import datetime_to_epoch
@@ -290,6 +291,7 @@ def main(reactor):
     parsed = parser.parse_args()
     conf = json.load(open(parsed.config))
 
+    set_config_data(conf)
     cass_client = connect_cass_servers(reactor, conf["cassandra"])
     authenticator = generate_authenticator(reactor, conf["identity"])
     store = CassScalingGroupCollection(cass_client, reactor, 1000)
