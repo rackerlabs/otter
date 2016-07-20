@@ -159,7 +159,10 @@ def active_servers_count(servers):
     """
     counts = defaultdict(lambda: 0)
     counts.update(countby(get_destiny, servers))
-    return counts[Destiny.CONSIDER_AVAILABLE] + counts[Destiny.AVOID_REPLACING]
+    return (counts[Destiny.CONSIDER_AVAILABLE] +
+            counts[Destiny.AVOID_REPLACING] +
+            counts[Destiny.WAIT] +
+            counts[Destiny.WAIT_WITH_TIMEOUT])
 
 
 @do
