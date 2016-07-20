@@ -15,6 +15,7 @@ from __future__ import print_function
 
 import json
 from argparse import ArgumentParser
+from collections import defaultdict
 from datetime import datetime
 from functools import partial
 from pprint import pprint
@@ -25,6 +26,7 @@ from effect.do import do, do_return
 from toolz.curried import filter
 from toolz.dicttoolz import assoc
 from toolz.itertoolz import concat
+from toolz.recipes import countby
 
 import treq
 
@@ -38,6 +40,7 @@ from otter.auth import generate_authenticator, public_endpoint_url
 from otter.cloud_client import TenantScope
 from otter.constants import get_service_configs
 from otter.convergence.gathering import get_all_launch_server_data
+from otter.convergence.planning import Destiny, get_destiny
 from otter.convergence.service import convergence_exec_data, get_executor
 from otter.effect_dispatcher import get_full_dispatcher
 from otter.metrics import connect_cass_servers
@@ -146,6 +149,22 @@ def get_groups(parsed, store, conf):
     return d
 
 
+def active_servers_count(servers):
+    """
+    Return number of active servers based on their destiny.
+
+    :param list servers: List of :obj:`NovaServer`
+
+    :return: Number of servers as ``int``
+    """
+    counts = defaultdict(lambda: 0)
+    counts.update(countby(get_destiny, servers))
+    return (counts[Destiny.CONSIDER_AVAILABLE] +
+            counts[Destiny.AVOID_REPLACING] +
+            counts[Destiny.WAIT] +
+            counts[Destiny.WAIT_WITH_TIMEOUT])
+
+
 @do
 def group_steps(group):
     """
@@ -162,11 +181,12 @@ def group_steps(group):
         yield do_return((e, 0))
     (executor, scaling_group, group_state, desired_group_state,
      resources) = all_data
-    delta = desired_group_state.capacity - len(resources['servers'])
-    desired_group_state.capacity = len(resources['servers'])
+    active_servers = active_servers_count(resources['servers'])
+    delta = desired_group_state.capacity - active_servers
+    desired_group_state.capacity = active_servers
     steps = executor.plan(desired_group_state, datetime_to_epoch(now_dt),
                           3600, {}, **resources)
-    yield do_return((steps, delta))
+    yield do_return((steps, desired_group_state.capacity, delta))
 
 
 def groups_steps(groups, reactor, store, cass_client, authenticator, conf):
@@ -191,7 +211,7 @@ def set_desired_to_actual_group(dispatcher, cass_client, group):
             group["tenantId"], group["groupId"], datetime.utcnow())
         eff = Effect(TenantScope(res_eff, group["tenantId"]))
         resources = yield perform(dispatcher, eff)
-        actual = len(resources["servers"])
+        actual = active_servers_count(resources["servers"])
         print("group", group, "setting desired to ", actual)
         yield cass_client.execute(
             ('UPDATE scaling_group SET desired=:desired WHERE '
