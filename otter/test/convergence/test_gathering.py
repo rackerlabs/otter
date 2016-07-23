@@ -363,13 +363,13 @@ class ExtractDrainedTests(SynchronousTestCase):
         """
         feed = self.parsed_feed(
             ("summary", self.updated1), ("don't care", self.updated2))
-        self.assertIsNone(extract_clb_drained_at(feed))
+        self.assertEqual(extract_clb_drained_at(feed), 0)
 
     def test_empty(self):
         """
         Returns None when there are no entries in the feed
         """
-        self.assertIsNone(extract_clb_drained_at([]))
+        self.assertEqual(extract_clb_drained_at([]), 0)
 
 
 def lb_req(url, json_response, response):
