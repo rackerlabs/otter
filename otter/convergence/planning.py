@@ -99,6 +99,7 @@ from otter.convergence.steps import (
     UpdateStack,
 )
 from otter.convergence.transforming import limit_steps_by_count, optimize_steps
+from otter.util.excp import raise_to_exc_info
 from otter.util.fp import assoc_obj, partition_bool
 
 
@@ -111,6 +112,13 @@ class CLBHealthInfoNotFound(Exception):
     Error to be raised when CLB health information is required and is not found
     """
     lb_id = attr.ib()
+
+
+def fail_convergence(excp):
+    """
+    Return `FailConvergence` step with excp info in it
+    """
+    return FailConvergence([ErrorReason.Exception(raise_to_exc_info(excp))])
 
 
 def _remove_from_lb_with_draining(timeout, nodes, now):
@@ -586,11 +594,8 @@ def add_server_to_lb(server, description, load_balancer):
     if isinstance(description, CLBDescription):
         if server.servicenet_address:
             if load_balancer is None:
-                return FailConvergence([
-                    ErrorReason.Exception(
-                        (CLBHealthInfoNotFound,
-                         CLBHealthInfoNotFound(description.lb_id),
-                         None))])
+                return fail_convergence(
+                    CLBHealthInfoNotFound(description.lb_id))
             if load_balancer.health_monitor:
                 description = assoc_obj(description,
                                         condition=CLBNodeCondition.DRAINING)
@@ -638,11 +643,7 @@ def change_lb_node(node, description, lb, now, timeout):
     if (type(node.description) == type(description) and
             isinstance(description, CLBDescription)):
         if lb is None:
-            return FailConvergence([
-                ErrorReason.Exception(
-                    (CLBHealthInfoNotFound,
-                     CLBHealthInfoNotFound(description.lb_id),
-                     None))])
+            return fail_convergence(CLBHealthInfoNotFound(description.lb_id))
         if (lb.health_monitor and
                 node.description.condition == CLBNodeCondition.DRAINING):
             # Enable node if it is ONLINE
@@ -652,7 +653,10 @@ def change_lb_node(node, description, lb, now, timeout):
                                      condition=CLBNodeCondition.ENABLED,
                                      weight=description.weight,
                                      type=description.type)
-            elif now - node.drained_at > timeout:
+            if node.drained_at is None:
+                return fail_convergence(
+                    DrainingUnavailable(description.lb_id, node.node_id))
+            if now - node.drained_at > timeout:
                 rsfmt = ("Node {} has remained OFFLINE for more than "
                          "{} seconds")
                 return FailConvergence(

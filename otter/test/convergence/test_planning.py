@@ -1,5 +1,7 @@
 """Tests for convergence planning."""
 
+from mock import ANY
+
 from itertools import combinations
 
 from pyrsistent import b, pbag, pmap, pset, s
@@ -14,6 +16,7 @@ from otter.convergence.model import (
     CLBNodeType,
     DesiredServerGroupState,
     DesiredStackGroupState,
+    DrainingUnavailable,
     ErrorReason,
     RCv3Description,
     RCv3Node,
@@ -378,20 +381,20 @@ class ConvergeLBStateTests(SynchronousTestCase):
         and desired LB's health monitor is not found then
         `converge_lb_state` returns `FailConvergence` step
         """
-        exc_info = (CLBHealthInfoNotFound, CLBHealthInfoNotFound("5"), None)
+        exc_info = (CLBHealthInfoNotFound, CLBHealthInfoNotFound("5"), ANY)
         clb_desc = CLBDescription(lb_id='5', port=80)
         self.assertEqual(
-            converge_launch_server(
-                DesiredServerGroupState(server_config={}, capacity=1),
-                set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1',
-                            desired_lbs=s(clb_desc))]),
-                set(),
-                {},     # CLB 5 health monitor is not there
-                0),
-            pbag([
-                FailConvergence([ErrorReason.Exception(exc_info)])
-            ]))
+            list(
+                converge_launch_server(
+                    DesiredServerGroupState(server_config={}, capacity=1),
+                    set([server('abc', ServerState.ACTIVE,
+                                servicenet_address='1.1.1.1',
+                                desired_lbs=s(clb_desc))]),
+                    set(),
+                    {},     # CLB 5 health monitor is not there
+                    0)),
+            [FailConvergence([ErrorReason.Exception(exc_info)])]
+        )
 
     def test_change_lb_node(self):
         """
@@ -429,21 +432,45 @@ class ConvergeLBStateTests(SynchronousTestCase):
         health info then `converge_lb_state` returns :obj:`FailConvergence`
         """
         clb_desc = CLBDescription(lb_id='5', port=80)
-        exc_info = (CLBHealthInfoNotFound, CLBHealthInfoNotFound("5"), None)
+        exc_info = (CLBHealthInfoNotFound, CLBHealthInfoNotFound("5"), ANY)
         current = [CLBNode(node_id='123', address='1.1.1.1',
                            description=copy_clb_desc(clb_desc, weight=5))]
         self.assertEqual(
-            converge_launch_server(
-                DesiredServerGroupState(server_config={}, capacity=1),
-                set([server('abc', ServerState.ACTIVE,
-                            servicenet_address='1.1.1.1',
-                            desired_lbs=s(clb_desc))]),
-                set(current),
-                {},     # No health info for CLB 5
-                0),
-            pbag([
-                FailConvergence([ErrorReason.Exception(exc_info)])
-            ])
+            list(
+                converge_launch_server(
+                    DesiredServerGroupState(server_config={}, capacity=1),
+                    set([server('abc', ServerState.ACTIVE,
+                                servicenet_address='1.1.1.1',
+                                desired_lbs=s(clb_desc))]),
+                    set(current),
+                    {},     # No health info for CLB 5
+                    0)),
+            [FailConvergence([ErrorReason.Exception(exc_info)])]
+        )
+
+    def test_change_lb_node_no_draining(self):
+        """
+        If a desired CLB mapping is in the set of current configs,
+        but the configuration is wrong and there is health monitor
+        but there is no draining info then `converge_lb_state` returns
+        :obj:`FailConvergence` with `DrainingUnavailable` exception
+        """
+        clb_desc = CLBDescription(lb_id='5', port=80)
+        exc_info = (DrainingUnavailable, DrainingUnavailable("5", "123"), ANY)
+        current = [CLBNode(node_id='123', address='1.1.1.1',
+                           drained_at=None,
+                           description=copy_clb_desc(clb_desc, weight=5))]
+        self.assertEqual(
+            list(
+                converge_launch_server(
+                    DesiredServerGroupState(server_config={}, capacity=1),
+                    set([server('abc', ServerState.ACTIVE,
+                                servicenet_address='1.1.1.1',
+                                desired_lbs=s(clb_desc))]),
+                    set(current),
+                    {CLB(True)},
+                    0)),
+            [FailConvergence([ErrorReason.Exception(exc_info)])]
         )
 
     def _test_change_lb_node_draining(self, node_is_online, now, step):

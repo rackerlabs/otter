@@ -13,7 +13,7 @@ from otter.cloud_client import (
 from otter.convergence.errors import present_reasons, structure_reason
 from otter.convergence.model import ErrorReason
 from otter.convergence.planning import CLBHealthInfoNotFound
-from otter.test.utils import raise_to_exc_info
+from otter.util.excp import raise_to_exc_info
 
 
 class PresentReasonsTests(SynchronousTestCase):

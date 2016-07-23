@@ -572,6 +572,15 @@ class CLB(object):
     health_monitor = attr.ib(default=False)
 
 
+@attr.s
+class DrainingUnavailable(Exception):
+    """
+    Exception raised when draining info is required but is not available
+    """
+    lb_id = attr.ib()
+    node_id = attr.ib()
+
+
 @implementer(ILBNode, IDrainable)
 @attributes([Attribute("node_id", instance_of=basestring),
              Attribute("description", instance_of=CLBDescription),
@@ -617,6 +626,8 @@ class CLBNode(object):
         """
         See :func:`IDrainable.is_done_draining`.
         """
+        if self.drained_at is None:
+            raise DrainingUnavailable(self.description.lb_id, self.node_id)
         return now - self.drained_at >= timeout or self.connections == 0
 
     def is_active(self):
