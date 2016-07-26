@@ -191,9 +191,9 @@ def get_clb_contents():
         lb_id: [CLBNode.from_node_json(lb_id, node)
                 for node in nodes]
         for lb_id, nodes in zip(lb_ids, all_nodes)}
-    clbs = pmap({
+    clbs = {
         str(lb_id): CLB(bool(health_mon))
-        for lb_id, health_mon in zip(lb_ids, hms) if health_mon is not None})
+        for lb_id, health_mon in zip(lb_ids, hms) if health_mon is not None}
     draining = [n for n in concat(lb_nodes.values())
                 if n.description.condition == CLBNodeCondition.DRAINING]
     feeds = yield parallel(
@@ -217,7 +217,7 @@ def get_clb_contents():
     nodes = map(update_drained_at, concat(lb_nodes.values()))
     yield do_return((
         list(filter(bool, nodes)),
-        keyfilter(lambda k: k not in deleted_lbs, clbs)))
+        pmap(keyfilter(lambda k: k not in deleted_lbs, clbs))))
 
 
 _DRAINING_CREATED_RE = (
@@ -289,9 +289,10 @@ def get_all_launch_server_data(
     Gather all launch_server data relevant for convergence w.r.t given time,
     in parallel where possible.
 
-    Returns an Effect of {'servers': [NovaServer], 'lb_nodes': [LBNode]}.
+    Returns an Effect of {'servers': [NovaServer], 'lb_nodes': [LBNode],
+                          'lbs': pmap(LB_ID -> CLB)}.
     """
-    eff = parallel(
+    return parallel(
         [get_scaling_group_servers(tenant_id, group_id, now)
          .on(map(NovaServer.from_server_details_json)).on(list),
          get_clb_contents(),
@@ -301,7 +302,6 @@ def get_all_launch_server_data(
         'lb_nodes': clb_nodes_and_clbs[0] + rcv3_nodes,
         'lbs': clb_nodes_and_clbs[1]
     })
-    return eff
 
 
 def get_all_launch_stack_data(
