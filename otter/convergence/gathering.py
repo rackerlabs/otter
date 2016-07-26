@@ -5,6 +5,8 @@ from functools import partial
 from effect import catch, parallel
 from effect.do import do, do_return
 
+from pyrsistent import pmap
+
 from toolz.curried import filter, groupby, keyfilter, map
 from toolz.dicttoolz import assoc, get_in, merge
 from toolz.functoolz import compose, curry, identity
@@ -159,7 +161,14 @@ def get_scaling_group_stacks(group_id, get_all_stacks=get_all_stacks):
 
 @do
 def get_clb_contents():
-    """Get Rackspace Cloud Load Balancer contents as list of `CLBNode`."""
+    """
+    Get Rackspace Cloud Load Balancer contents as list of `CLBNode`. CLB
+    health monitor information is also returned as a pmap of :obj:`CLB` objects
+    mapped on LB ID.
+
+    :return: Effect of (``list`` of :obj:`CLBNode`, `pmap` of :obj:`CLB`)
+    :rtype: :obj:`Effect`
+    """
     # If we get a CLBNotFoundError while fetching feeds, we should throw away
     # all nodes related to that load balancer, because we don't want to act on
     # data that we know is invalid/outdated (for example, if we can't fetch a
@@ -182,9 +191,9 @@ def get_clb_contents():
         lb_id: [CLBNode.from_node_json(lb_id, node)
                 for node in nodes]
         for lb_id, nodes in zip(lb_ids, all_nodes)}
-    clbs = {
+    clbs = pmap({
         str(lb_id): CLB(bool(health_mon))
-        for lb_id, health_mon in zip(lb_ids, hms) if health_mon is not None}
+        for lb_id, health_mon in zip(lb_ids, hms) if health_mon is not None})
     draining = [n for n in concat(lb_nodes.values())
                 if n.description.condition == CLBNodeCondition.DRAINING]
     feeds = yield parallel(
