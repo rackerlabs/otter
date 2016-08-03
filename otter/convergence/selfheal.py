@@ -19,9 +19,9 @@ from txeffect import deferred_performer, perform
 
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.service import trigger_convergence
-from otter.log.intents import with_log
+from otter.log.intents import msg, with_log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
-from otter.models.interface import ScalingGroupStatus
+from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util.zk import AcquireLock, GetChildren
 
 
@@ -183,14 +183,19 @@ def check_and_trigger(tenant_id, group_id):
     """
     Trigger convergence on given group if it is ACTIVE and not paused
     """
-    group, info = yield Effect(
-        GetScalingGroupInfo(tenant_id=tenant_id, group_id=group_id))
-    state = info["state"]
-
-    if state.status == ScalingGroupStatus.ACTIVE and (not state.paused):
-        yield with_log(
-            trigger_convergence(tenant_id, group_id),
-            tenant_id=tenant_id, scaling_group_id=group_id)
+    try:
+        group, info = yield Effect(
+            GetScalingGroupInfo(tenant_id=tenant_id, group_id=group_id))
+    except NoSuchScalingGroupError:
+        # Nothing to do if group has been deleted
+        yield msg("selfheal-group-deleted",
+                  tenant_id=tenant_id, scaling_group_id=group_id)
+    else:
+        state = info["state"]
+        if state.status == ScalingGroupStatus.ACTIVE and (not state.paused):
+            yield with_log(
+                trigger_convergence(tenant_id, group_id),
+                tenant_id=tenant_id, scaling_group_id=group_id)
 
 
 @do
