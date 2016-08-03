@@ -14,9 +14,10 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence import selfheal as sh
-from otter.log.intents import BoundFields
+from otter.log.intents import BoundFields, Log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
-from otter.models.interface import GroupState, ScalingGroupStatus
+from otter.models.interface import (
+    GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
 from otter.test.util.test_zk import ZKCrudModel, ZKLock
 from otter.test.utils import (
     CheckFailure, const, intent_func, mock_log, nested_sequence, noop, patch,
@@ -285,6 +286,20 @@ class CheckTriggerTests(SynchronousTestCase):
         seq = [
             (GetScalingGroupInfo(tenant_id="tid", group_id="gid"),
              const(("group", self.manifest))),
+        ]
+        self.assertIsNone(
+            perform_sequence(seq, sh.check_and_trigger("tid", "gid")))
+
+    def test_group_deleted(self):
+        """
+        Does nothing if group has been deleted
+        """
+        seq = [
+            (GetScalingGroupInfo(tenant_id="tid", group_id="gid"),
+             lambda i: raise_(NoSuchScalingGroupError("tid", "gid"))),
+            (Log("selfheal-group-deleted",
+                 dict(tenant_id="tid", scaling_group_id="gid")),
+             noop)
         ]
         self.assertIsNone(
             perform_sequence(seq, sh.check_and_trigger("tid", "gid")))
