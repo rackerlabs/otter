@@ -799,7 +799,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.kz_client.Lock.assert_called_once_with(
             '/locks/' + self.group.uuid)
 
-        self.lock._acquire.assert_called_once_with(timeout=120)
+        self.lock._acquire.assert_called_once_with(timeout=10)
         self.lock.release.assert_called_once_with()
 
     def test_modify_state_local_lock_before_kz_lock(self):
@@ -840,7 +840,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.assertFalse(self.lock._acquire.called)
         # After local lock acquired, kz lock is acquired
         local_acquire_d.callback(None)
-        self.lock._acquire.assert_called_once_with(timeout=120)
+        self.lock._acquire.assert_called_once_with(timeout=10)
         # first kz lock is released
         self.lock.release.assert_called_once_with()
         self.assertFalse(llock.release.called)
@@ -871,7 +871,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.assertEqual(self.connection.execute.call_count, 0)
         self.kz_client.Lock.assert_called_once_with(
             '/locks/' + self.group.uuid)
-        self.lock._acquire.assert_called_once_with(timeout=120)
+        self.lock._acquire.assert_called_once_with(timeout=10)
         self.assertEqual(self.lock.release.call_count, 0)
 
     def test_modify_state_lock_log_category_locking(self):
