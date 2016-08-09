@@ -1,17 +1,26 @@
 """Tests for otter.util.zk"""
 
+import time
+import uuid
+
 from functools import partial
 
 from characteristic import attributes
 
-from effect import ComposedDispatcher, Effect, TypeDispatcher, sync_perform
+from effect import (
+    ComposedDispatcher, Constant, Delay, Effect, Func, TypeDispatcher,
+    sync_perform)
+from effect.testing import SequenceDispatcher, perform_sequence
 
-from kazoo.exceptions import BadVersionError, NoNodeError, NodeExistsError
+from kazoo.exceptions import (
+    BadVersionError, LockTimeout, NoNodeError, NodeExistsError,
+    SessionExpiredError)
 
 from twisted.internet.defer import fail, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.test.utils import test_dispatcher
+from otter.test.utils import const, conste, intent_func, noop, test_dispatcher
+from otter.util import zk
 from otter.util.zk import (
     AcquireLock, CreateOrSet, CreateOrSetLoopLimitReachedError,
     DeleteNode, GetChildren, GetChildrenWithStats,
@@ -36,13 +45,15 @@ class ZKCrudModel(object):
     """
     def __init__(self):
         self.nodes = {}
+        self.create_makepath = True
 
-    def create(self, path, content, makepath=False):
+    def create(self, path, value="", acl=None, ephemeral=False, sequence=False,
+               makepath=False):
         """Create a node."""
-        assert makepath is True, "makepath must be True"
+        assert makepath == self.create_makepath
         if path in self.nodes:
             return fail(NodeExistsError("{} already exists".format(path)))
-        self.nodes[path] = (content, 0)
+        self.nodes[path] = (value, 0)
         return succeed(path)
 
     def get(self, path):
@@ -246,7 +257,7 @@ class GetStatTests(SynchronousTestCase):
 
     def test_get_stat(self):
         """Returns the ZnodeStat when the node exists."""
-        self.model.create('/foo/bar', content='foo', makepath=True)
+        self.model.create('/foo/bar', value='foo', makepath=True)
         result = self._gs('/foo/bar')
         self.assertEqual(result, ZNodeStatStub(version=0))
 
@@ -270,6 +281,18 @@ class DeleteTests(SynchronousTestCase):
         self.assertEqual(result, 'delete return value')
 
 
+class CreateTests(SynchronousTestCase):
+    """Tests for :obj:`CreateNode`."""
+    def test_create(self):
+        model = ZKCrudModel()
+        model.create_makepath = False
+        eff = Effect(zk.CreateNode(path='/foo', value="v"))
+        dispatcher = get_zk_dispatcher(model)
+        result = sync_perform(dispatcher, eff)
+        self.assertEqual(model.nodes, {"/foo": ("v", 0)})
+        self.assertEqual(result, '/foo')
+
+
 class AcquireLockTests(SynchronousTestCase):
     """Tests for :obj:`AcquireLock`."""
     def test_success(self):
@@ -279,3 +302,267 @@ class AcquireLockTests(SynchronousTestCase):
         dispatcher = get_zk_dispatcher("client")
         result = sync_perform(dispatcher, eff)
         self.assertIs(result, True)
+
+
+class PollingLockTests(SynchronousTestCase):
+
+    def setUp(self):
+        self.lock = zk.PollingLock("disp", "/testlock", "id")
+
+    def test_acquire_success(self):
+        """
+        acquire_eff creates child and gets lock as it is the smallest one
+        """
+        seq = [
+            (Constant(None), noop),
+            (zk.CreateNode("/testlock"), conste(NodeExistsError())),
+            (Func(uuid.uuid4), const("prefix")),
+            (zk.CreateNode(
+                "/testlock/prefix", value="id",
+                ephemeral=True, sequence=True),
+             const("/testlock/prefix0000000000")),
+            (GetChildren("/testlock"), const(["prefix0000000000"]))
+        ]
+        self.assertTrue(
+            perform_sequence(seq, self.lock.acquire_eff(False, None)))
+
+    def test_acquire_create_path_success(self):
+        """
+        acquire creates provided path if it doesn't exist
+        """
+        seq = [
+            (Constant(None), noop),
+            (zk.CreateNode("/testlock"), const("/testlock")),
+            (Func(uuid.uuid4), const("prefix")),
+            (zk.CreateNode(
+                "/testlock/prefix", value="id",
+                ephemeral=True, sequence=True),
+             const("/testlock/prefix0000000000")),
+            (GetChildren("/testlock"), const(["prefix0000000000"]))
+        ]
+        self.assertTrue(
+            perform_sequence(seq, self.lock.acquire_eff(False, None)))
+
+    def test_acquire_delete_child(self):
+        """
+        acquire deletes existing child if it exists
+        """
+        self.lock._node = "/testlock/prefix000000002"
+        seq = [
+            (DeleteNode(path="/testlock/prefix000000002", version=-1), noop),
+            (zk.CreateNode("/testlock"), conste(NodeExistsError())),
+            (Func(uuid.uuid4), const("prefix")),
+            (zk.CreateNode(
+                "/testlock/prefix", value="id",
+                ephemeral=True, sequence=True),
+             const("/testlock/prefix0000000000")),
+            (GetChildren("/testlock"), const(["prefix0000000000"]))
+        ]
+        self.assertTrue(
+            perform_sequence(seq, self.lock.acquire_eff(False, None)))
+
+    def test_acquire_blocking_success(self):
+        """
+        acquire_eff creates child, realizes its not the smallest. Tries again
+        every 0.01 seconds until it succeeds
+        """
+        seq = [
+            (Constant(None), noop),
+            (zk.CreateNode("/testlock"), const("/testlock")),
+            (Func(uuid.uuid4), const("prefix")),
+            (zk.CreateNode(
+                "/testlock/prefix", value="id",
+                ephemeral=True, sequence=True),
+             const("/testlock/prefix0000000001")),
+            (GetChildren("/testlock"),
+             const(["prefix0000000000", "prefix0000000001"])),
+            (Func(time.time), const(0)),
+            (Delay(0.1), noop),
+            (GetChildren("/testlock"),
+             const(["prefix0000000000", "prefix0000000001"])),
+            (Func(time.time), const(0.2)),
+            (Delay(0.1), noop),
+            (GetChildren("/testlock"), const(["prefix0000000001"]))
+        ]
+        self.assertTrue(
+            perform_sequence(seq, self.lock.acquire_eff(True, 1)))
+
+    def test_acquire_blocking_no_timeout(self):
+        """
+        When acquire_eff is called without timeout, it creates child, realizes
+        its not the smallest, tries again every 0.1 seconds without checking
+        time and succeeds if its the smallest node
+        """
+        seq = [
+            (Constant(None), noop),
+            (zk.CreateNode("/testlock"), const("/testlock")),
+            (Func(uuid.uuid4), const("prefix")),
+            (zk.CreateNode(
+                "/testlock/prefix", value="id",
+                ephemeral=True, sequence=True),
+             const("/testlock/prefix0000000001")),
+            (GetChildren("/testlock"),
+             const(["prefix0000000000", "prefix0000000001"])),
+            (Func(time.time), const(0)),
+            (Delay(0.1), noop),
+            (GetChildren("/testlock"),
+             const(["prefix0000000000", "prefix0000000001"])),
+            (Delay(0.1), noop),
+            (GetChildren("/testlock"), const(["prefix0000000001"]))
+        ]
+        self.assertTrue(
+            perform_sequence(seq, self.lock.acquire_eff(True, None)))
+
+    def test_acquire_nonblocking_fails(self):
+        """
+        acquire creates child and returns False immediately after finding its
+        not the smallest child when blocking=False. It deletes child node
+        before returning.
+        """
+        seq = [
+            (Constant(None), noop),
+            (zk.CreateNode("/testlock"), const("/testlock")),
+            (Func(uuid.uuid4), const("prefix")),
+            (zk.CreateNode(
+                "/testlock/prefix", value="id",
+                ephemeral=True, sequence=True),
+             const("/testlock/prefix0000000001")),
+            (GetChildren("/testlock"),
+             const(["prefix0000000000", "prefix0000000001"])),
+            (DeleteNode(path="/testlock/prefix0000000001", version=-1), noop)
+        ]
+        self.assertFalse(
+            perform_sequence(seq, self.lock.acquire_eff(False, None)))
+
+    def test_acquire_timeout(self):
+        """
+        acquire creates child node and keeps checking if it is smallest and
+        eventually gives up by raising `LockTimeout`. It deletes child node
+        before returning.
+        """
+        seq = [
+            (Constant(None), noop),
+            (zk.CreateNode("/testlock"), const("/testlock")),
+            (Func(uuid.uuid4), const("prefix")),
+            (zk.CreateNode(
+                "/testlock/prefix", value="id",
+                ephemeral=True, sequence=True),
+             const("/testlock/prefix0000000001")),
+            (GetChildren("/testlock"),
+             const(["prefix0000000000", "prefix0000000001"])),
+            (Func(time.time), const(0)),
+            (Delay(0.1), noop),
+            (GetChildren("/testlock"),
+             const(["prefix0000000000", "prefix0000000001"])),
+            (Func(time.time), const(0.12)),
+            (Delay(0.1), noop),
+            (GetChildren("/testlock"),
+             const(["prefix0000000000", "prefix0000000001"])),
+            (Func(time.time), const(0.4)),
+            (DeleteNode(path="/testlock/prefix0000000001", version=-1), noop)
+        ]
+        self.assertRaises(
+            LockTimeout, perform_sequence, seq,
+            self.lock.acquire_eff(True, 0.3))
+
+    def test_acquire_other_error(self):
+        """
+        If acquire internally raises any error then it tries to delete child
+        node before returning.
+        """
+        seq = [
+            (Constant(None), noop),
+            (zk.CreateNode("/testlock"), const("/testlock")),
+            (Func(uuid.uuid4), const("prefix")),
+            (zk.CreateNode(
+                "/testlock/prefix", value="id",
+                ephemeral=True, sequence=True),
+             const("/testlock/prefix0000000001")),
+            (GetChildren("/testlock"), conste(SessionExpiredError())),
+            (DeleteNode(path="/testlock/prefix0000000001", version=-1),
+             conste(SessionExpiredError()))
+        ]
+        self.assertRaises(
+            SessionExpiredError, perform_sequence, seq,
+            self.lock.acquire_eff(True, 0.3))
+
+    def test_is_acquired_no_node(self):
+        """
+        is_acquired_eff returns False if there is no child node
+        """
+        self.assertFalse(perform_sequence([], self.lock.is_acquired_eff()))
+
+    def test_is_acquired_no_children(self):
+        """
+        is_acquired_eff returns False if there are no children
+        """
+        self.lock._node = "/testlock/prefix000000000"
+        seq = [(GetChildren("/testlock"), const([]))]
+        self.assertFalse(perform_sequence(seq, self.lock.is_acquired_eff()))
+
+    def test_is_acquired_first_child(self):
+        """
+        is_acquired_eff returns True if it's node is the first child
+        """
+        self.lock._node = "/testlock/prefix0000000000"
+        seq = [
+            (GetChildren("/testlock"),
+             const(["prefix0000000001", "prefix0000000000"]))
+        ]
+        self.assertTrue(perform_sequence(seq, self.lock.is_acquired_eff()))
+
+    def test_is_acquired_not_first_child(self):
+        """
+        is_acquired_eff returns False if its not is not the first child
+        """
+        self.lock._node = "/testlock/prefix0000000001"
+        seq = [
+            (GetChildren("/testlock"),
+             const(["prefix0000000000", "prefix0000000001"]))
+        ]
+        self.assertFalse(perform_sequence(seq, self.lock.is_acquired_eff()))
+
+    def test_release_deletes_child(self):
+        """
+        release deletes child stored in self._node and sets it to None
+        before deleting
+        """
+        self.lock._node = "/testlock/prefix0000000001"
+        seq = [(DeleteNode(path=self.lock._node, version=-1), noop)]
+        self.assertIsNone(perform_sequence(seq, self.lock.release_eff()))
+        self.assertIsNone(self.lock._node)
+
+    def test_release_does_nothing(self):
+        """
+        If self._node is None, release does nothing
+        """
+        self.assertIsNone(perform_sequence([], self.lock.release_eff()))
+
+    def test_acquire_performs(self):
+        """
+        acquire performs effect from acquire_eff
+        """
+        self.lock.dispatcher = SequenceDispatcher([
+            (("acquire", "blocking", "timeout"), const("ret"))])
+        self.lock.acquire_eff = intent_func("acquire")
+        self.assertEqual(
+            self.successResultOf(self.lock.acquire("blocking", "timeout")),
+            "ret")
+
+    def test_release_performs(self):
+        """
+        release performs effect from release_eff
+        """
+        self.lock.dispatcher = SequenceDispatcher([
+            (("release",), const("ret"))])
+        self.lock.release_eff = intent_func("release")
+        self.assertEqual(self.successResultOf(self.lock.release()), "ret")
+
+    def test_is_acquired_performs(self):
+        """
+        is_acquired performs effect from is_acquired_eff
+        """
+        self.lock.dispatcher = SequenceDispatcher([
+            (("is_acquired",), const("ret"))])
+        self.lock.is_acquired_eff = intent_func("is_acquired")
+        self.assertEqual(self.successResultOf(self.lock.is_acquired()), "ret")

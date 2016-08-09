@@ -1,15 +1,19 @@
+import time
+import uuid
+
 from functools import partial
 
 import attr
 
 from characteristic import attributes
 
-from effect import Effect, TypeDispatcher, parallel, sync_performer
+from effect import (
+    Constant, Delay, Effect, Func, TypeDispatcher, parallel, sync_performer)
 from effect.do import do, do_return
 
-from kazoo.exceptions import NoNodeError, NodeExistsError
+from kazoo.exceptions import LockTimeout, NoNodeError, NodeExistsError
 
-from txeffect import deferred_performer
+from txeffect import deferred_performer, perform
 
 from otter.util.deferredutils import catch_failure
 
@@ -19,6 +23,30 @@ CREATE_OR_SET_LOOP_LIMIT = 50
 A limit on the number of times we'll jump between trying to create a node
 vs trying to set a node's contents in perform_create_or_set.
 """
+
+
+@attr.s
+class CreateNode(object):
+    """
+    Intent to create znode
+    """
+    path = attr.ib()
+    value = attr.ib(default="")
+    ephemeral = attr.ib(default=False)
+    sequence = attr.ib(default=False)
+
+
+@deferred_performer
+def perform_create(kz_client, dispatcher, intent):
+    """Perform :obj:`CreateNode`.
+
+    :param kz_client: txKazoo client
+    :param dispatcher: dispatcher, supplied by perform
+    :param CreateNode intent: the intent
+    """
+    return kz_client.create(
+        intent.path, value=intent.value, ephemeral=intent.ephemeral,
+        sequence=intent.sequence)
 
 
 @attributes(['path', 'content'])
@@ -158,6 +186,7 @@ def perform_acquire_lock(dispatcher, intent):
 def get_zk_dispatcher(kz_client):
     """Get a dispatcher that can support all of the ZooKeeper intents."""
     return TypeDispatcher({
+        CreateNode: partial(perform_create, kz_client),
         CreateOrSet:
             partial(perform_create_or_set, kz_client),
         DeleteNode:
@@ -170,3 +199,92 @@ def get_zk_dispatcher(kz_client):
             partial(perform_get_stat, kz_client),
         AcquireLock: perform_acquire_lock
     })
+
+
+class PollingLock(object):
+    """
+    Zookeeper lock recipe that polls the children on interval basis instead
+    of leaving a watch on previous child
+    """
+
+    def __init__(self, dispatcher, path, identifier=""):
+        self.dispatcher = dispatcher
+        self.path = path
+        self.identifier = identifier
+        self._node = None
+
+    def acquire(self, blocking=True, timeout=None):
+        """
+        Acquire the lock. This must be called only ONCE on an object. To
+        acquire lock again on same path, create another `PollingLock` object
+        """
+        return perform(self.dispatcher, self.acquire_eff(blocking, timeout))
+
+    @do
+    def acquire_eff(self, blocking, timeout):
+        try:
+            yield self.release_eff()
+            try:
+                yield Effect(CreateNode(self.path))
+            except NodeExistsError:
+                pass
+            prefix = yield Effect(Func(uuid.uuid4))
+            create_intent = CreateNode(
+                "{}/{}".format(self.path, prefix),
+                value=self.identifier, ephemeral=True, sequence=True)
+            self._node = yield Effect(create_intent)
+            acquired = yield self._acquire_loop(blocking, timeout)
+            if not acquired:
+                yield self.release_eff()
+            yield do_return(acquired)
+        except Exception as e:
+            yield self.release_eff()
+            raise e
+
+    @do
+    def _acquire_loop(self, blocking, timeout):
+        acquired = yield self.is_acquired_eff()
+        if acquired or not blocking:
+            yield do_return(acquired)
+        start = yield Effect(Func(time.time))
+        while True:
+            yield Effect(Delay(0.1))
+            if (yield self.is_acquired_eff()):
+                yield do_return(True)
+            if timeout is not None:
+                now = yield Effect(Func(time.time))
+                if now - start > timeout:
+                    raise LockTimeout(
+                        "Failed to acquire lock on {} in {} seconds".format(
+                            self.path, now - start))
+
+    def is_acquired(self):
+        return perform(self.dispatcher, self.is_acquired_eff())
+
+    @do
+    def is_acquired_eff(self):
+        """
+        Is the given lock object currently acquired by this worker?
+
+        :return: `Effect` of `bool`
+        """
+        if self._node is None:
+            yield do_return(False)
+        children = yield Effect(GetChildren(self.path))
+        if not children:
+            yield do_return(False)
+        # The last 10 characters are sequence number as per
+        # https://zookeeper.apache.org/doc/current/zookeeperProgrammers.html#Sequence+Nodes+--+Unique+Naming
+        basename = self._node.rsplit("/")[-1]
+        yield do_return(sorted(children, key=lambda c: c[-10:])[0] == basename)
+
+    def release(self):
+        return perform(self.dispatcher, self.release_eff())
+
+    def release_eff(self):
+        if self._node is not None:
+            node = self._node
+            self._node = None
+            return Effect(DeleteNode(path=node, version=-1))
+        else:
+            return Effect(Constant(None))

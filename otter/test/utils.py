@@ -925,6 +925,14 @@ def const(v):
     return lambda i: v
 
 
+def conste(e):
+    """
+    Like ``const`` but takes and exception and returns function that raises
+    the exception
+    """
+    return lambda i: raise_(e)
+
+
 def intent_func(fname):
     """
     Return function that returns Effect of tuple of fname and its args. Useful
