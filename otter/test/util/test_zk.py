@@ -328,7 +328,7 @@ class PollingLockTests(SynchronousTestCase):
 
     def test_acquire_create_path_success(self):
         """
-        acquire creates provided path if it doesn't exist
+        acquire_eff creates provided path if it doesn't exist
         """
         seq = [
             (Constant(None), noop),
@@ -345,7 +345,7 @@ class PollingLockTests(SynchronousTestCase):
 
     def test_acquire_delete_child(self):
         """
-        acquire deletes existing child if it exists
+        acquire_eff deletes existing child if it exists
         """
         self.lock._node = "/testlock/prefix000000002"
         seq = [
@@ -415,8 +415,8 @@ class PollingLockTests(SynchronousTestCase):
 
     def test_acquire_nonblocking_fails(self):
         """
-        acquire creates child and returns False immediately after finding its
-        not the smallest child when blocking=False. It deletes child node
+        acquire_eff creates child and returns False immediately after finding
+        its not the smallest child when blocking=False. It deletes child node
         before returning.
         """
         seq = [
@@ -436,7 +436,7 @@ class PollingLockTests(SynchronousTestCase):
 
     def test_acquire_timeout(self):
         """
-        acquire creates child node and keeps checking if it is smallest and
+        acquire_eff creates child node and keeps checking if it is smallest and
         eventually gives up by raising `LockTimeout`. It deletes child node
         before returning.
         """
@@ -467,8 +467,8 @@ class PollingLockTests(SynchronousTestCase):
 
     def test_acquire_other_error(self):
         """
-        If acquire internally raises any error then it tries to delete child
-        node before returning.
+        If acquire_eff internally raises any error then it tries to delete
+        child node before returning.
         """
         seq = [
             (Constant(None), noop),
@@ -524,13 +524,26 @@ class PollingLockTests(SynchronousTestCase):
 
     def test_release_deletes_child(self):
         """
-        release deletes child stored in self._node and sets it to None
+        release_eff deletes child stored in self._node and sets it to None
         before deleting
         """
         self.lock._node = "/testlock/prefix0000000001"
         seq = [(DeleteNode(path=self.lock._node, version=-1), noop)]
         self.assertIsNone(perform_sequence(seq, self.lock.release_eff()))
         self.assertIsNone(self.lock._node)
+
+    def test_release_no_node_reset(self):
+        """
+        If release_eff fails to delete child node, it will not set self._node
+        to None
+        """
+        node = self.lock._node = "/testlock/prefix0000000001"
+        seq = [(DeleteNode(path=self.lock._node, version=-1),
+                conste(SessionExpiredError()))]
+        self.assertRaises(
+            SessionExpiredError, perform_sequence, seq,
+            self.lock.release_eff())
+        self.assertIs(self.lock._node, node)
 
     def test_release_does_nothing(self):
         """

@@ -204,7 +204,9 @@ def get_zk_dispatcher(kz_client):
 class PollingLock(object):
     """
     Zookeeper lock recipe that polls the children on interval basis instead
-    of leaving a watch on previous child
+    of leaving a watch on previous child. It's supposed to replace
+    :obj:`kazoo.recipe.lock.Lock` and has same signature and _similar_ behavior
+    for ``acquire`` and ``release`` methods.
     """
 
     def __init__(self, dispatcher, path, identifier=""):
@@ -215,13 +217,19 @@ class PollingLock(object):
 
     def acquire(self, blocking=True, timeout=None):
         """
-        Acquire the lock. This must be called only ONCE on an object. To
-        acquire lock again on same path, create another `PollingLock` object
+        Same as :meth:`kazoo.recipe.lock.Lock.acquire` except that this can be
+        called again on an object that has been released. It will start fresh
+        process to acquire the lock.
         """
         return perform(self.dispatcher, self.acquire_eff(blocking, timeout))
 
     @do
     def acquire_eff(self, blocking, timeout):
+        """
+        Effect implementation of ``acquire`` method.
+
+        :return: ``Effect`` of ``bool``
+        """
         try:
             yield self.release_eff()
             try:
@@ -259,14 +267,20 @@ class PollingLock(object):
                             self.path, now - start))
 
     def is_acquired(self):
+        """
+        Is the lock already acquired? This method does not exist in kazoo
+        lock recipe and is a nice addition to it.
+
+        :return: :obj:`Deferred` of ``bool``
+        """
         return perform(self.dispatcher, self.is_acquired_eff())
 
     @do
     def is_acquired_eff(self):
         """
-        Is the given lock object currently acquired by this worker?
+        Effect implementation of ``is_acquired``.
 
-        :return: `Effect` of `bool`
+        :return: ``Effect`` of ``bool``
         """
         if self._node is None:
             yield do_return(False)
@@ -279,12 +293,19 @@ class PollingLock(object):
         yield do_return(sorted(children, key=lambda c: c[-10:])[0] == basename)
 
     def release(self):
+        """
+        Same as :meth:`kazoo.recipe.lock.Lock.release`
+        """
         return perform(self.dispatcher, self.release_eff())
 
     def release_eff(self):
+        """
+        Effect implementation of ``release``.
+
+        :return: ``Effect`` of ``None``
+        """
         if self._node is not None:
-            node = self._node
-            self._node = None
-            return Effect(DeleteNode(path=node, version=-1))
+            return Effect(DeleteNode(path=self._node, version=-1)).on(
+                lambda _: setattr(self, "_node", None))
         else:
             return Effect(Constant(None))
