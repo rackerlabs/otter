@@ -57,6 +57,7 @@ from otter.util.deferredutils import with_lock
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util.retry import repeating_interval, retry, retry_times
 from otter.util.weaklocks import WeakLocks
+from otter.util.zk import PollingLock
 
 
 LOCK_PATH = '/locks'
@@ -634,7 +635,7 @@ class CassScalingGroup(object):
 
     """
     def __init__(self, log, tenant_id, uuid, connection, buckets, kz_client,
-                 reactor, local_locks):
+                 reactor, local_locks, dispatcher):
         """
         Creates a CassScalingGroup object.
         """
@@ -648,6 +649,7 @@ class CassScalingGroup(object):
         self.kz_client = kz_client
         self.reactor = reactor
         self.local_locks = local_locks
+        self.dispatcher = dispatcher
 
         self.group_table = "scaling_group"
         self.launch_table = "launch_config"
@@ -822,14 +824,13 @@ class CassScalingGroup(object):
                 self, state, *args, **kwargs))
             return d.addCallback(_write_state)
 
-        lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
+        lock = PollingLock(self.dispatcher, LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=10)
-        local_lock = self.local_locks.get_lock(self.uuid)
-        return local_lock.run(
-            with_lock, self.reactor, lock, _modify_state,
+        #local_lock = self.local_locks.get_lock(self.uuid)
+        return with_lock(
+            self.reactor, lock, _modify_state,
             log.bind(category='locking', lock_reason='modify_state'),
-            acquire_timeout=11,
-            release_timeout=10)
+            acquire_timeout=11, release_timeout=10)
 
     def update_status(self, status):
         """
@@ -1387,6 +1388,7 @@ class CassScalingGroupCollection:
         self.event_table = "scaling_schedule_v2"
         self.buckets = None
         self.kz_client = None
+        self.dispatcher = None
 
     def set_scheduler_buckets(self, buckets):
         """
@@ -1518,7 +1520,8 @@ class CassScalingGroupCollection:
         """
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection, self.buckets, self.kz_client,
-                                self.reactor, self.local_locks)
+                                self.reactor, self.local_locks,
+                                self.dispatcher)
 
     def fetch_and_delete(self, bucket, now, size=100):
         """

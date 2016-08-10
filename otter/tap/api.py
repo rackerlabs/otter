@@ -294,6 +294,7 @@ def makeService(config):
             # not finished and the kz_client is not set in which case
             # policy execution and group delete will fail
             store.kz_client = kz_client
+            store.dispatcher = dispatcher
 
             # Setup kazoo to stop when shutting down
             parent.addService(FunctionalService(
