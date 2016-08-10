@@ -825,12 +825,16 @@ class CassScalingGroup(object):
             return d.addCallback(_write_state)
 
         lock = PollingLock(self.dispatcher, LOCK_PATH + '/' + self.uuid)
-        lock.acquire = functools.partial(lock.acquire, timeout=10)
-        #local_lock = self.local_locks.get_lock(self.uuid)
-        return with_lock(
-            self.reactor, lock, _modify_state,
+        lock.acquire = functools.partial(lock.acquire, timeout=20)
+        local_lock = self.local_locks.get_lock(self.uuid)
+        return local_lock.run(
+            with_lock, self.reactor, lock, _modify_state,
             log.bind(category='locking', lock_reason='modify_state'),
-            acquire_timeout=11, release_timeout=10)
+            acquire_timeout=25, release_timeout=10)
+        #return with_lock(
+        #    self.reactor, lock, _modify_state,
+        #    log.bind(category='locking', lock_reason='modify_state'),
+        #    acquire_timeout=25, release_timeout=10)
 
     def update_status(self, status):
         """
