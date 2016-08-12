@@ -307,7 +307,7 @@ class AcquireLockTests(SynchronousTestCase):
 class PollingLockTests(SynchronousTestCase):
 
     def setUp(self):
-        self.lock = zk.PollingLock("disp", "/testlock", "id")
+        self.lock = zk.PollingLock("disp", "/testlock", "id", 0.1)
 
     def test_acquire_success(self):
         """

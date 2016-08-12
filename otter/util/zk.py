@@ -210,10 +210,11 @@ class PollingLock(object):
     for ``acquire`` and ``release`` methods.
     """
 
-    def __init__(self, dispatcher, path, identifier=""):
+    def __init__(self, dispatcher, path, identifier="", interval=0.1):
         self.dispatcher = dispatcher
         self.path = path
         self.identifier = identifier
+        self._interval = interval
         # Child node described in
         # https://zookeeper.apache.org/doc/trunk/recipes.html#sc_recipes_Locks
         self._node = None
@@ -265,7 +266,7 @@ class PollingLock(object):
             yield do_return(acquired)
         start = yield Effect(Func(time.time))
         while True:
-            yield Effect(Delay(0.1))
+            yield Effect(Delay(self._interval))
             if (yield self.is_acquired_eff()):
                 yield do_return(True)
             if timeout is not None:
