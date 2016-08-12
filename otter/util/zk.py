@@ -214,7 +214,8 @@ class PollingLock(object):
         self.dispatcher = dispatcher
         self.path = path
         self.identifier = identifier
-        # Child node described in https://zookeeper.apache.org/doc/trunk/recipes.html#sc_recipes_Locks
+        # Child node described in
+        # https://zookeeper.apache.org/doc/trunk/recipes.html#sc_recipes_Locks
         self._node = None
 
     def acquire(self, blocking=True, timeout=None):
