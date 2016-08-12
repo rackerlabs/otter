@@ -574,7 +574,8 @@ class APIMakeServiceTests(SynchronousTestCase):
         start_d.callback(None)
         mock_setup_scheduler.assert_called_once_with(
             parent, "disp", self.store, kz_client)
-        self.assertEqual(self.store.kz_client, kz_client)
+        self.assertIs(self.store.kz_client, kz_client)
+        self.assertEqual(self.store.dispatcher, "disp")
         sch = mock_setup_scheduler.return_value
         self.assertEqual(self.health_checker.checks['scheduler'],
                          sch.health_check)
