@@ -8,7 +8,8 @@ import attr
 from characteristic import attributes
 
 from effect import (
-    Constant, Delay, Effect, Func, TypeDispatcher, parallel, sync_performer)
+    Constant, Delay, Effect, Func, TypeDispatcher, catch, parallel,
+    sync_performer)
 from effect.do import do, do_return
 
 from kazoo.exceptions import LockTimeout, NoNodeError, NodeExistsError
@@ -304,8 +305,11 @@ class PollingLock(object):
 
         :return: ``Effect`` of ``None``
         """
+        def reset_node(_):
+            self._node = None
+
         if self._node is not None:
             return Effect(DeleteNode(path=self._node, version=-1)).on(
-                lambda _: setattr(self, "_node", None))
+                success=reset_node, error=catch(NoNodeError, reset_node))
         else:
             return Effect(Constant(None))

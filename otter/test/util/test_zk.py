@@ -525,10 +525,22 @@ class PollingLockTests(SynchronousTestCase):
     def test_release_deletes_child(self):
         """
         release_eff deletes child stored in self._node and sets it to None
-        before deleting
+        after deleting
         """
         self.lock._node = "/testlock/prefix0000000001"
         seq = [(DeleteNode(path=self.lock._node, version=-1), noop)]
+        self.assertIsNone(perform_sequence(seq, self.lock.release_eff()))
+        self.assertIsNone(self.lock._node)
+
+    def test_release_nonodeerror(self):
+        """
+        release_eff deletes child stored in self._node and sets it to None
+        if delete raises NoNodeError
+        """
+        self.lock._node = "/testlock/prefix0000000001"
+        seq = [
+            (DeleteNode(path=self.lock._node, version=-1),
+             conste(NoNodeError()))]
         self.assertIsNone(perform_sequence(seq, self.lock.release_eff()))
         self.assertIsNone(self.lock._node)
 
