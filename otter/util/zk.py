@@ -214,6 +214,7 @@ class PollingLock(object):
         self.dispatcher = dispatcher
         self.path = path
         self.identifier = identifier
+        # Child node described in https://zookeeper.apache.org/doc/trunk/recipes.html#sc_recipes_Locks
         self._node = None
 
     def acquire(self, blocking=True, timeout=None):
@@ -232,12 +233,18 @@ class PollingLock(object):
         :return: ``Effect`` of ``bool``
         """
         try:
+            # Before acquiring, lets delete any child node which may be
+            # lingering from previous acquire. Ideally this should happen only
+            # when acquire is called again before release. This shouldn't
+            # happen this is called after release or after is_acquired returns
+            # False. In any case, its the safest thing to do
             yield self.release_eff()
             try:
                 yield Effect(CreateNode(self.path))
             except NodeExistsError:
                 pass
             prefix = yield Effect(Func(uuid.uuid4))
+            # TODO: https://github.com/rackerlabs/otter/issues/1926
             create_intent = CreateNode(
                 "{}/{}".format(self.path, prefix),
                 value=self.identifier, ephemeral=True, sequence=True)
