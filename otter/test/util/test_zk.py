@@ -16,7 +16,7 @@ from kazoo.exceptions import (
     BadVersionError, LockTimeout, NoNodeError, NodeExistsError,
     SessionExpiredError)
 
-from twisted.internet.defer import fail, succeed
+from twisted.internet.defer import fail, maybeDeferred, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.utils import const, conste, intent_func, noop, test_dispatcher
@@ -107,20 +107,29 @@ class ZKLock(object):
     """
     Stub for :obj:`kazoo.recipe.lock.KazooLock`
     """
+
     def __init__(self, client, path):
         self.client = client
         self.path = path
         self.acquired = False
-        self.acquire_calls = {}
+        # tuple of (blocking, timeout, return_value) to be set by test
+        self.acquire_call = ()
+        # release return value
+        self.release_call = None
+
+    def _set_acquired(self, r, acquired):
+        self.acquired = acquired
+        return r
 
     def acquire(self, blocking=True, timeout=None):
         assert not self.acquired
-        self.acquired = self.acquire_calls[(blocking, timeout)]
-        return succeed(self.acquired)
+        assert (blocking, timeout) == self.acquire_call[:2]
+        d = maybeDeferred(lambda: self.acquire_call[-1])
+        return d.addCallback(self._set_acquired, True)
 
     def release(self):
-        self.acquired = False
-        return succeed(None)
+        d = maybeDeferred(lambda: self.release_call)
+        return d.addCallback(self._set_acquired, False)
 
 
 class CreateOrSetTests(SynchronousTestCase):
@@ -297,7 +306,7 @@ class AcquireLockTests(SynchronousTestCase):
     """Tests for :obj:`AcquireLock`."""
     def test_success(self):
         lock = ZKLock("client", "path")
-        lock.acquire_calls[(True, 0.3)] = True
+        lock.acquire_call = (True, 0.3, True)
         eff = Effect(AcquireLock(lock, True, 0.3))
         dispatcher = get_zk_dispatcher("client")
         result = sync_perform(dispatcher, eff)

@@ -50,14 +50,13 @@ from otter.models.interface import (
     UnrecognizedCapabilityError,
     WebhooksOverLimitError,
     next_cron_occurrence)
-from otter.util import timestamp
+from otter.util import timestamp, zk
 from otter.util.config import config_value
 from otter.util.cqlbatch import Batch, batch
 from otter.util.deferredutils import with_lock
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util.retry import repeating_interval, retry, retry_times
 from otter.util.weaklocks import WeakLocks
-from otter.util.zk import PollingLock
 
 
 LOCK_PATH = '/locks'
@@ -824,17 +823,13 @@ class CassScalingGroup(object):
                 self, state, *args, **kwargs))
             return d.addCallback(_write_state)
 
-        lock = PollingLock(self.dispatcher, LOCK_PATH + '/' + self.uuid)
-        lock.acquire = functools.partial(lock.acquire, timeout=20)
+        lock = zk.PollingLock(self.dispatcher, LOCK_PATH + '/' + self.uuid)
+        lock.acquire = functools.partial(lock.acquire, timeout=10)
         local_lock = self.local_locks.get_lock(self.uuid)
         return local_lock.run(
             with_lock, self.reactor, lock, _modify_state,
             log.bind(category='locking', lock_reason='modify_state'),
-            acquire_timeout=25, release_timeout=10)
-        #return with_lock(
-        #    self.reactor, lock, _modify_state,
-        #    log.bind(category='locking', lock_reason='modify_state'),
-        #    acquire_timeout=25, release_timeout=10)
+            acquire_timeout=15, release_timeout=10)
 
     def update_status(self, status):
         """
@@ -1323,12 +1318,12 @@ class CassScalingGroup(object):
                     exc=f.value,
                     otter_msg_type="ignore-delete-lock-error"))
 
-        lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
-        lock.acquire = functools.partial(lock.acquire, timeout=120)
+        lock = zk.PollingLock(self.dispatcher, LOCK_PATH + '/' + self.uuid)
+        lock.acquire = functools.partial(lock.acquire, timeout=10)
         d = with_lock(self.reactor, lock, _delete_group,
                       log.bind(category='locking', lock_reason='delete_group'),
-                      acquire_timeout=150,
-                      release_timeout=30)
+                      acquire_timeout=15,
+                      release_timeout=10)
         # Cleanup /locks/<groupID> znode as it will not be required anymore
         d.addCallback(_delete_lock_znode)
         d.addCallback(lambda _: None)
