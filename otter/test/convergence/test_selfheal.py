@@ -2,10 +2,8 @@
 Tests for :mod:`otter.convergence.selfheal`
 """
 
-from effect import Effect
+from effect import Effect, base_dispatcher, sync_perform
 from effect.testing import SequenceDispatcher
-
-from kazoo.exceptions import LockTimeout
 
 import mock
 
@@ -18,22 +16,10 @@ from otter.log.intents import BoundFields, Log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
 from otter.models.interface import (
     GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
-from otter.test.util.test_zk import ZKCrudModel, ZKLock
+from otter.test.util.test_zk import ZKLock
 from otter.test.utils import (
     CheckFailure, const, intent_func, mock_log, nested_sequence, noop, patch,
     perform_sequence, raise_)
-from otter.util.zk import AcquireLock, GetChildren
-
-
-@attr.s
-class Lock(object):
-    """
-    Stub lock with eff impl of acquire and is_acquired
-    """
-    dispatcher = attr.ib()
-    path = attr.ib()
-    acquire_eff = intent_func("acquire")
-    is_acquired_eff = intent_func("is_acquired")
 
 
 class SelfHealTests(SynchronousTestCase):
@@ -47,7 +33,8 @@ class SelfHealTests(SynchronousTestCase):
         self.ggtc = patch(
             self, "otter.convergence.selfheal.get_groups_to_converge",
             side_effect=intent_func("ggtc"))
-        self.patch(sh, "PollingLock", Lock)
+        from otter.convergence.selfheal import zk
+        self.patch(zk, "PollingLock", ZKLock)
         self.s = sh.SelfHeal("disp", 300, self.log, self.clock, "cf")
 
     def test_setup_again(self):
@@ -142,14 +129,14 @@ class SelfHealTests(SynchronousTestCase):
         """
         Health check returns about lock being acquired
         """
-        self.lock.acquired = True
-        self.s.disp = SequenceDispatcher([
-            (("ila", self.s.lock), const(True))])
+        self.s.disp = base_dispatcher
+
+        self.s.lock.acquired = True
         self.assertEqual(
             self.successResultOf(self.s.health_check()),
             (True, {"has_lock": True}))
-        self.s.disp = SequenceDispatcher([
-            (("ila", self.s.lock), const(False))])
+
+        self.s.lock.acquired = False
         self.assertEqual(
             self.successResultOf(self.s.health_check()),
             (True, {"has_lock": False}))
@@ -179,15 +166,14 @@ class SelfHealTests(SynchronousTestCase):
         ``call_if_acquired``
         """
 
-        def cia(l, e):
-            self.assertIs(l, self.s.lock)
-            return e
+        self.s.lock.acquired = False
+        self.s.lock.acquire_call = (False, None, True)
+        self.s.disp = base_dispatcher
+        self.s._setup_convergences = mock.Mock(return_value=succeed("ret"))
 
-        self.patch(sh, "call_if_acquired", cia)
-        self.s.disp = SequenceDispatcher([])
-        self.s._setup_convergences = mock.Mock(return_value=succeed(True))
         d = self.s._setup_if_locked("cf", 35)
-        self.assertIsNone(self.successResultOf(d))
+
+        self.assertEqual(self.successResultOf(d), "ret")
         self.s._setup_convergences.assert_called_once_with("cf", 35)
         self.log.msg.assert_called_once_with(
             "self-heal-lock-acquired", otter_service="selfheal")
@@ -198,18 +184,18 @@ class CallIfAcquiredTests(SynchronousTestCase):
     Tests for :func:`call_if_acquired`
     """
     def setUp(self):
-        self.lock = Lock()
+        self.lock = ZKLock("client", "path")
 
     def test_lock_not_acquired(self):
         """
         When lock is not acquired, it is tried and if failed does not
         call eff
         """
-        seq = [(("is_acquired", self.lock), const(False)),
-               (("acquire", self.lock, False, None), const(False))]
+        self.lock.acquired = False
+        self.lock.acquire_call = (False, None, False)
         self.assertEqual(
-            perform_sequence(
-                seq,
+            sync_perform(
+                base_dispatcher,
                 sh.call_if_acquired(self.lock, Effect("call"))),
             (sh.NOT_CALLED, False))
 
@@ -217,9 +203,9 @@ class CallIfAcquiredTests(SynchronousTestCase):
         """
         When lock is not acquired, it is tried and if successful calls eff
         """
-        seq = [(("is_acquired", self.lock), const(False)),
-               (("acquire", self.lock, False, None), const(True)),
-               ("call", const("eff_return"))]
+        self.lock.acquired = False
+        self.lock.acquire_call = (False, None, True)
+        seq = [("call", const("eff_return"))]
         self.assertEqual(
             perform_sequence(
                 seq,
@@ -230,8 +216,8 @@ class CallIfAcquiredTests(SynchronousTestCase):
         """
         If lock is already acquired, it will just call eff
         """
-        seq = [(("is_acquired", self.lock), const(True)),
-               ("call", const("eff_return"))]
+        self.lock.acquired = True
+        seq = [("call", const("eff_return"))]
         self.assertEqual(
             perform_sequence(
                 seq,
@@ -320,44 +306,3 @@ class CheckTriggerTests(SynchronousTestCase):
         ]
         self.assertIsNone(
             perform_sequence(seq, sh.check_and_trigger("tid", "gid")))
-
-
-class IsLockAcquiredTests(SynchronousTestCase):
-    """
-    Tests for :func:`is_lock_acquired` and :func:`is_lock_acquired_eff`
-    """
-
-    def test_no_children(self):
-        """
-        If lock node does not have any children, it does not have lock
-        """
-        lock = ZKLock("client", "/lock")
-        seq = [(GetChildren("/lock"), const([]))]
-        self.assertFalse(perform_sequence(seq, sh.is_lock_acquired(lock)))
-
-    def test_has_lock(self):
-        """
-        Lock node's first child belongs to given object. Hence has the lock
-        """
-        prefix = "someprefix__lock__"
-        lock = ZKLock("client", "/lock")
-        lock.prefix = prefix
-        children = ["errrprefix__lock__0000000004",
-                    "{}0000000001".format(prefix),
-                    "whyprefix__lock__0000000002"]
-        seq = [(GetChildren("/lock"), const(children))]
-        self.assertTrue(perform_sequence(seq, sh.is_lock_acquired(lock)))
-
-    def test_no_lock(self):
-        """
-        If lock's node is not the first in the sorted list of children, then
-        it does not have the lock
-        """
-        prefix = "whyprefix__lock__"
-        lock = ZKLock("client", "/lock")
-        lock.prefix = prefix
-        children = ["errrprefix__lock__0000000004",
-                    "someprefix__lock__0000000001",
-                    "{}0000000002".format(prefix)]
-        seq = [(GetChildren("/lock"), const(children))]
-        self.assertFalse(perform_sequence(seq, sh.is_lock_acquired(lock)))

@@ -8,7 +8,7 @@ from functools import partial
 from characteristic import attributes
 
 from effect import (
-    ComposedDispatcher, Constant, Delay, Effect, Func, TypeDispatcher,
+    ComposedDispatcher, Constant, Delay, Effect, Error, Func, TypeDispatcher,
     sync_perform)
 from effect.testing import SequenceDispatcher, perform_sequence
 
@@ -22,7 +22,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.test.utils import const, conste, intent_func, noop, test_dispatcher
 from otter.util import zk
 from otter.util.zk import (
-    AcquireLock, CreateOrSet, CreateOrSetLoopLimitReachedError,
+    CreateOrSet, CreateOrSetLoopLimitReachedError,
     DeleteNode, GetChildren, GetChildrenWithStats,
     GetStat,
     get_zk_dispatcher,
@@ -118,12 +118,26 @@ class ZKLock(object):
         # release return value
         self.release_call = None
 
+    def is_acquired(self):
+        return succeed(self.acquired)
+
+    def is_acquired_eff(self):
+        return Effect(Constant(self.acquired))
+
+    def acquire_eff(self, blocking, timeout):
+        assert not self.acquired
+        assert (blocking, timeout) == self.acquire_call[:2]
+        ret = self.acquire_call[-1]
+        if isinstance(ret, Exception):
+            self.acquired = False
+            return Effect(Error(ret))
+        else:
+            self.acquired = ret
+            return Effect(Constant(ret))
+
     def _set_acquired(self, r, acquired):
         self.acquired = acquired
         return r
-
-    def is_acquired_eff(self):
-        return Effect(Const(self.acquired))
 
     def acquire(self, blocking=True, timeout=None):
         assert not self.acquired
@@ -304,17 +318,6 @@ class CreateTests(SynchronousTestCase):
         result = sync_perform(dispatcher, eff)
         self.assertEqual(model.nodes, {"/foo": ("v", 0)})
         self.assertEqual(result, '/foo')
-
-
-class AcquireLockTests(SynchronousTestCase):
-    """Tests for :obj:`AcquireLock`."""
-    def test_success(self):
-        lock = ZKLock("client", "path")
-        lock.acquire_call = (True, 0.3, True)
-        eff = Effect(AcquireLock(lock, True, 0.3))
-        dispatcher = get_zk_dispatcher("client")
-        result = sync_perform(dispatcher, eff)
-        self.assertIs(result, True)
 
 
 class PollingLockTests(SynchronousTestCase):

@@ -7,8 +7,6 @@ groups.
 from effect import ComposedDispatcher, Effect, TypeDispatcher
 from effect.do import do, do_return
 
-from kazoo.exceptions import LockTimeout
-
 from toolz.curried import filter
 
 from twisted.application.internet import TimerService
@@ -131,11 +129,16 @@ class SelfHeal(MultiService, object):
         dispatcher = ComposedDispatcher([
             TypeDispatcher({SetupConvergences: sc_performer}), self.disp])
 
+        def log_acquired(r):
+            result, acquired = r
+            if acquired:
+                self.log.msg("self-heal-lock-acquired")
+            return result
+
         d = perform(
             dispatcher,
             call_if_acquired(self.lock, Effect(SetupConvergences())))
-        return d.addCallback(
-            lambda (r, b): self.log.msg("self-heal-lock-acquired") if b else None)
+        return d.addCallback(log_acquired)
 
 
 # Sentinet object representing the fact that eff passed in ``call_if_acquired``
@@ -155,7 +158,7 @@ def call_if_acquired(lock, eff):
     :param lock: Lock object from :obj:`TxKazooClient`
     :param eff: ``Effect`` to call if lock is/was acquired
 
-    :return: (eff return, lock acquired bool) tuple. eff return may be
+    :return: (eff return, lock acquired bool) tuple. first element may be
         ``NOT_CALLED`` of eff was not called
     :rtype: ``Effect`` of ``bool``
     """
