@@ -22,7 +22,7 @@ from otter.convergence.service import trigger_convergence
 from otter.log.intents import msg, with_log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
-from otter.util.zk import AcquireLock, GetChildren
+from otter.util import zk
 
 
 class SelfHeal(MultiService, object):
@@ -41,8 +41,7 @@ class SelfHeal(MultiService, object):
         represents scheduled call to trigger convergence on a group
     """
 
-    def __init__(self, dispatcher, kz_client, interval, log, clock,
-                 config_func):
+    def __init__(self, dispatcher, interval, log, clock, config_func):
         """
         :var float interval: All groups will be scheduled to be triggered
             within this time
@@ -52,8 +51,7 @@ class SelfHeal(MultiService, object):
         super(SelfHeal, self).__init__()
         self.disp = dispatcher
         self.log = log.bind(otter_service="selfheal")
-        self.lock = kz_client.Lock("/selfheallock")
-        self.kz_client = kz_client
+        self.lock = zk.PollingLock(dispatcher, "/selfheallock")
         self.clock = clock
         self.calls = []
         timer = TimerService(
@@ -90,7 +88,7 @@ class SelfHeal(MultiService, object):
         """
         Return about whether this object has lock
         """
-        d = perform(self.disp, is_lock_acquired(self.lock))
+        d = self.lock.is_acquired()
         return d.addCallback(lambda b: (True, {"has_lock": b}))
 
     @inlineCallbacks
@@ -137,7 +135,12 @@ class SelfHeal(MultiService, object):
             dispatcher,
             call_if_acquired(self.lock, Effect(SetupConvergences())))
         return d.addCallback(
-            lambda b: self.log.msg("self-heal-lock-acquired") if b else None)
+            lambda (r, b): self.log.msg("self-heal-lock-acquired") if b else None)
+
+
+# Sentinet object representing the fact that eff passed in ``call_if_acquired``
+# was not called
+NOT_CALLED = object()
 
 
 @do
@@ -150,22 +153,21 @@ def call_if_acquired(lock, eff):
     acquired.
 
     :param lock: Lock object from :obj:`TxKazooClient`
-    :param eff: ``Effect`` to call if/when lock is acquired
+    :param eff: ``Effect`` to call if lock is/was acquired
 
-    :return: True if lock was acquired by this function, False otherwise
+    :return: (eff return, lock acquired bool) tuple. eff return may be
+        ``NOT_CALLED`` of eff was not called
     :rtype: ``Effect`` of ``bool``
     """
-    if (yield is_lock_acquired(lock)):
-        yield eff
+    if (yield lock.is_acquired_eff()):
+        ret = yield eff
+        yield do_return((ret, False))
     else:
-        try:
-            yield Effect(AcquireLock(lock, True, 0.1))
-            yield eff
-            yield do_return(True)
-        except LockTimeout:
-            # expected. Nothing to do here.
-            pass
-    yield do_return(False)
+        if (yield lock.acquire_eff(False, None)):
+            ret = yield eff
+            yield do_return((ret, True))
+        else:
+            yield do_return((NOT_CALLED, False))
 
 
 def get_groups_to_converge(config_func):
@@ -196,19 +198,3 @@ def check_and_trigger(tenant_id, group_id):
             yield with_log(
                 trigger_convergence(tenant_id, group_id),
                 tenant_id=tenant_id, scaling_group_id=group_id)
-
-
-@do
-def is_lock_acquired(lock):
-    """
-    Is the given lock object currently acquired by this worker?
-
-    :return: `Effect` of `bool`
-    """
-    children = yield Effect(GetChildren(lock.path))
-    if not children:
-        yield do_return(False)
-    # The last 10 characters are sequence number as per
-    # https://zookeeper.apache.org/doc/current/zookeeperProgrammers.html#Sequence+Nodes+--+Unique+Naming
-    yield do_return(
-        sorted(children, key=lambda c: c[-10:])[0][:-10] == lock.prefix)

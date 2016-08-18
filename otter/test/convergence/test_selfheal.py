@@ -25,19 +25,30 @@ from otter.test.utils import (
 from otter.util.zk import AcquireLock, GetChildren
 
 
+@attr.s
+class Lock(object):
+    """
+    Stub lock with eff impl of acquire and is_acquired
+    """
+    dispatcher = attr.ib()
+    path = attr.ib()
+    acquire_eff = intent_func("acquire")
+    is_acquired_eff = intent_func("is_acquired")
+
+
 class SelfHealTests(SynchronousTestCase):
     """
     Tests for :obj:`SelfHeal`
     """
 
     def setUp(self):
-        self.kzc = ZKCrudModel()
         self.clock = Clock()
         self.log = mock_log()
         self.ggtc = patch(
             self, "otter.convergence.selfheal.get_groups_to_converge",
             side_effect=intent_func("ggtc"))
-        self.s = sh.SelfHeal("disp", self.kzc, 300, self.log, self.clock, "cf")
+        self.patch(sh, "PollingLock", Lock)
+        self.s = sh.SelfHeal("disp", 300, self.log, self.clock, "cf")
 
     def test_setup_again(self):
         """
@@ -131,7 +142,7 @@ class SelfHealTests(SynchronousTestCase):
         """
         Health check returns about lock being acquired
         """
-        self.patch(sh, "is_lock_acquired", intent_func("ila"))
+        self.lock.acquired = True
         self.s.disp = SequenceDispatcher([
             (("ila", self.s.lock), const(True))])
         self.assertEqual(
@@ -187,39 +198,45 @@ class CallIfAcquiredTests(SynchronousTestCase):
     Tests for :func:`call_if_acquired`
     """
     def setUp(self):
-        self.patch(sh, "is_lock_acquired", intent_func("ila"))
+        self.lock = Lock()
 
     def test_lock_not_acquired(self):
         """
         When lock is not acquired, it is tried and if failed does not
         call eff
         """
-        lock = object()
-        seq = [(("ila", lock), const(False)),
-               (AcquireLock(lock, True, 0.1), lambda i: raise_(LockTimeout()))]
-        self.assertFalse(
-            perform_sequence(seq, sh.call_if_acquired(lock, Effect("call"))))
+        seq = [(("is_acquired", self.lock), const(False)),
+               (("acquire", self.lock, False, None), const(False))]
+        self.assertEqual(
+            perform_sequence(
+                seq,
+                sh.call_if_acquired(self.lock, Effect("call"))),
+            (sh.NOT_CALLED, False))
 
     def test_lock_acquired(self):
         """
         When lock is not acquired, it is tried and if successful calls eff
         """
-        lock = object()
-        seq = [(("ila", lock), const(False)),
-               (AcquireLock(lock, True, 0.1), const(True)),
-               ("call", noop)]
-        self.assertTrue(
-            perform_sequence(seq, sh.call_if_acquired(lock, Effect("call"))))
+        seq = [(("is_acquired", self.lock), const(False)),
+               (("acquire", self.lock, False, None), const(True)),
+               ("call", const("eff_return"))]
+        self.assertEqual(
+            perform_sequence(
+                seq,
+                sh.call_if_acquired(self.lock, Effect("call"))),
+            ("eff_return", True))
 
     def test_lock_already_acquired(self):
         """
         If lock is already acquired, it will just call eff
         """
-        lock = object()
-        seq = [(("ila", lock), const(True)),
-               ("call", noop)]
-        self.assertFalse(
-            perform_sequence(seq, sh.call_if_acquired(lock, Effect("call"))))
+        seq = [(("is_acquired", self.lock), const(True)),
+               ("call", const("eff_return"))]
+        self.assertEqual(
+            perform_sequence(
+                seq,
+                sh.call_if_acquired(self.lock, Effect("call"))),
+            ("eff_return", False))
 
 
 class GetGroupsToConvergeTests(SynchronousTestCase):

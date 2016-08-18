@@ -122,6 +122,9 @@ class ZKLock(object):
         self.acquired = acquired
         return r
 
+    def is_acquired_eff(self):
+        return Effect(Const(self.acquired))
+
     def acquire(self, blocking=True, timeout=None):
         assert not self.acquired
         assert (blocking, timeout) == self.acquire_call[:2]
