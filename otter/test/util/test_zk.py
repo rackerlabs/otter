@@ -105,7 +105,8 @@ class ZKCrudModel(object):
 
 class ZKLock(object):
     """
-    Stub for :obj:`kazoo.recipe.lock.KazooLock`
+    Stub for :obj:`kazoo.recipe.lock.KazooLock` and :obj:`PollingLock`
+    since ``PollingLock`` provides ``KazooLock`` interface.
     """
 
     def __init__(self, client, path):
