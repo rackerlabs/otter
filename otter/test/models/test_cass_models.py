@@ -29,12 +29,14 @@ from toolz.dicttoolz import assoc, merge
 
 from twisted.internet import defer
 from twisted.internet.task import Clock
+from twisted.python.failure import Failure
 from twisted.trial.unittest import SynchronousTestCase
 
 from txeffect import deferred_performer
 
 from otter.json_schema import group_examples
 from otter.models.cass import (
+    ACQUIRE_TIMEOUT,
     CQLQueryExecute,
     CassAdmin,
     CassScalingGroup,
@@ -66,6 +68,7 @@ from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingScheduleCollectionProviderMixin
 )
+from otter.test.util.test_zk import ZKCrudModel, ZKLock
 from otter.test.utils import (
     DummyException,
     LockMixin,
@@ -411,10 +414,21 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin,
         self.policies = []
         self.mock_log = mock.MagicMock()
 
-        self.kz_client = mock.Mock()
-        self.lock = self.mock_lock()
-        self.kz_client.Lock.return_value = self.lock
-        self.kz_client.delete.return_value = defer.succeed('something else')
+        self.kz_client = ZKCrudModel()
+        self.kz_client.nodes = {"/locks/" + self.group_id: ("", 0)}
+
+        self.acquire_call = (True, ACQUIRE_TIMEOUT, True)
+        self.release_call = None
+
+        def create_ZKLock(disp, path):
+            self.assertEqual(disp, "dispatcher")
+            self.lock = ZKLock("client", path)
+            self.lock.acquire_call = self.acquire_call
+            self.lock.release_call = self.release_call
+            return self.lock
+
+        from otter.models.cass import zk
+        self.patch(zk, "PollingLock", create_ZKLock)
 
         self.clock = Clock()
         locks = WeakLocks()
@@ -426,7 +440,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin,
                                       itertools.cycle(range(2, 10)),
                                       self.kz_client,
                                       self.clock,
-                                      locks)
+                                      locks,
+                                      "dispatcher")
         self.assertIs(self.group.local_locks, locks)
         self.mock_log.bind.assert_called_once_with(
             system='CassScalingGroup',
@@ -796,58 +811,60 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
-        self.kz_client.Lock.assert_called_once_with(
-            '/locks/' + self.group.uuid)
-
-        self.lock._acquire.assert_called_once_with(timeout=10)
-        self.lock.release.assert_called_once_with()
+        self.assertEqual(self.lock.path, '/locks/' + self.group.uuid)
+        self.assertFalse(self.lock.acquired)
 
     def test_modify_state_local_lock_before_kz_lock(self):
         """
         ``modify_state`` first acquires local lock then acquires kz lock
         """
+        modifier_d = defer.Deferred()
+        group_state = GroupState(tenant_id=self.tenant_id,
+                                 group_id=self.group_id,
+                                 group_name='a',
+                                 active={},
+                                 pending={},
+                                 group_touched=None,
+                                 policy_touched={},
+                                 paused=True,
+                                 status=ScalingGroupStatus.ACTIVE,
+                                 desired=5)
+
         def modifier(_group, _state):
-            group_state = GroupState(tenant_id=self.tenant_id,
-                                     group_id=self.group_id,
-                                     group_name='a',
-                                     active={},
-                                     pending={},
-                                     group_touched=None,
-                                     policy_touched={},
-                                     paused=True,
-                                     status=ScalingGroupStatus.ACTIVE,
-                                     desired=5)
-            return group_state
+            return modifier_d
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
-        # setup local lock
+
         llock = defer.DeferredLock()
-        self.group.local_locks = mock.Mock(
-            get_lock=mock.Mock(return_value=llock))
+
+        class Locks(object):
+            def get_lock(lself, key):
+                self.assertEqual(key, self.group_id)
+                return llock
+
+        # setup local lock
+        self.group.local_locks = Locks()
 
         # setup local and kz lock acquire and release returns
-        local_acquire_d = defer.Deferred()
-        llock.acquire = mock.Mock(return_value=local_acquire_d)
-        llock.release = mock.Mock(return_value=defer.succeed(None))
-        release_d = defer.Deferred()
-        self.lock.release.side_effect = lambda: release_d
+        kz_acquire_d = defer.Deferred()
+        self.acquire_call = (True, ACQUIRE_TIMEOUT, kz_acquire_d)
+        kz_release_d = defer.Deferred()
+        self.release_call = kz_release_d
 
         d = self.group.modify_state(modifier)
 
         self.assertNoResult(d)
-        # local lock was tried, but kz lock was not
-        llock.acquire.assert_called_once_with()
-        self.assertFalse(self.lock._acquire.called)
-        # After local lock acquired, kz lock is acquired
-        local_acquire_d.callback(None)
-        self.lock._acquire.assert_called_once_with(timeout=10)
-        # first kz lock is released
-        self.lock.release.assert_called_once_with()
-        self.assertFalse(llock.release.called)
-        # then local lock is relased
-        release_d.callback(None)
-        llock.release.assert_called_once_with()
-
+        # local lock was acquired first then kz lock
+        self.assertTrue(llock.locked)
+        self.assertFalse(self.lock.acquired)
+        kz_acquire_d.callback(True)
+        self.assertTrue(self.lock.acquired)
+        # after modification kz lock is released then local lock
+        modifier_d.callback(group_state)
+        self.assertTrue(llock.locked)
+        kz_release_d.callback(None)
+        self.assertFalse(self.lock.acquired)
+        self.assertFalse(llock.locked)
         self.assertEqual(self.successResultOf(d), None)
 
     @mock.patch('otter.models.cass.serialize_json_data',
@@ -857,22 +874,16 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         ``modify_state`` raises error if lock is not acquired and does not
         do anything else
         """
-        self.lock.acquire.side_effect = \
-            lambda timeout: defer.fail(ValueError('a'))
+        self.acquire_call = (True, ACQUIRE_TIMEOUT, Failure(ValueError("eh")))
 
         def modifier(group, state):
             raise
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
-
         d = self.group.modify_state(modifier)
         self.failureResultOf(d, ValueError)
-
         self.assertEqual(self.connection.execute.call_count, 0)
-        self.kz_client.Lock.assert_called_once_with(
-            '/locks/' + self.group.uuid)
-        self.lock._acquire.assert_called_once_with(timeout=10)
-        self.assertEqual(self.lock.release.call_count, 0)
+        self.assertFalse(self.lock.acquired)
 
     def test_modify_state_lock_log_category_locking(self):
         """
@@ -901,6 +912,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             system='CassScalingGroup.modify_state')
         log.bind().bind.assert_called_once_with(
             category='locking', lock_reason='modify_state')
+        self.assertFalse(self.lock.acquired)
 
     def test_modify_state_propagates_modifier_error_and_does_not_save(self):
         """
@@ -913,9 +925,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
         d = self.group.modify_state(modifier)
-        f = self.failureResultOf(d)
-        self.assertTrue(f.check(NoSuchScalingGroupError))
+        self.failureResultOf(d, NoSuchScalingGroupError)
         self.assertEqual(self.connection.execute.call_count, 0)
+        self.assertFalse(self.lock.acquired)
 
     def test_modify_state_asserts_error_if_tenant_id_mismatch(self):
         """
@@ -938,9 +950,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
         d = self.group.modify_state(modifier)
-        f = self.failureResultOf(d)
-        self.assertTrue(f.check(AssertionError))
+        self.failureResultOf(d, AssertionError)
         self.assertEqual(self.connection.execute.call_count, 0)
+        self.assertFalse(self.lock.acquired)
 
     def test_modify_state_asserts_error_if_group_id_mismatch(self):
         """
@@ -963,9 +975,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
         d = self.group.modify_state(modifier)
-        f = self.failureResultOf(d)
-        self.assertTrue(f.check(AssertionError))
+        self.failureResultOf(d, AssertionError)
         self.assertEqual(self.connection.execute.call_count, 0)
+        self.assertFalse(self.lock.acquired)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
@@ -1942,6 +1954,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, '', {'1': {}}, {}, None, {}, False,
             ScalingGroupStatus.ACTIVE))
+        znodes = self.kz_client.nodes
         self.failureResultOf(self.group.delete_group(), GroupNotEmptyError)
 
         # nothing else called except view
@@ -1949,7 +1962,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.assertFalse(self.connection.execute.called)
         self.flushLoggedErrors(GroupNotEmptyError)
         # locks znode is not deleted
-        self.assertFalse(self.kz_client.delete.called)
+        self.assertIs(self.kz_client.nodes, znodes)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')
@@ -2020,12 +2033,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.QUORUM)
 
-        self.kz_client.Lock.assert_called_once_with(
-            '/locks/' + self.group.uuid)
-        self.lock._acquire.assert_called_once_with(timeout=120)
-        self.lock.release.assert_called_once_with()
-        self.kz_client.delete.assert_called_once_with(
-            '/locks/' + self.group.uuid)
+        self.assertFalse(self.lock.acquired)
+        self.assertEqual(self.kz_client.nodes, {})
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_all_webhooks')
@@ -2069,20 +2078,15 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.QUORUM)
 
-        self.kz_client.Lock.assert_called_once_with(
-            '/locks/' + self.group.uuid)
-        self.lock._acquire.assert_called_once_with(timeout=120)
-        self.lock.release.assert_called_once_with()
-        self.kz_client.delete.assert_called_once_with(
-            '/locks/' + self.group.uuid)
+        self.assertFalse(self.lock.acquired)
+        self.assertEqual(self.kz_client.nodes, {})
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     def test_delete_lock_not_acquired(self, mock_view_state):
         """
         If the lock is not acquired, do not delete the group.
         """
-        self.lock.acquire.side_effect = \
-            lambda timeout: defer.fail(ValueError('a'))
+        self.acquire_call = (True, 10, Failure(ValueError('a')))
 
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, 'a', {}, {}, None, {}, False,
@@ -2092,11 +2096,9 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.failureResultOf(d, ValueError)
 
         self.assertFalse(self.connection.execute.called)
-        self.kz_client.Lock.assert_called_once_with(
-            '/locks/' + self.group.uuid)
-        self.lock._acquire.assert_called_once_with(timeout=120)
+        self.assertFalse(self.lock.acquired)
         # locks znode is not deleted
-        self.assertFalse(self.kz_client.delete.called)
+        self.assertIn("/locks/" + self.group.uuid, self.kz_client.nodes)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     def test_delete_lock_with_log_category_locking(self, mock_view_state):
@@ -2132,7 +2134,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             self.assertEqual(lockpath, '/locks/' + self.group.uuid)
             return defer.fail(NotEmptyError((), {}))
 
-        self.kz_client.delete.side_effect = not_empty_error
+        self.kz_client.delete = not_empty_error
 
         self.returns = [None]
         self.clock.advance(34.575)

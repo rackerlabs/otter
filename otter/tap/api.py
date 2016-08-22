@@ -289,11 +289,12 @@ def makeService(config):
             # Give dispatcher to Otter REST object
             otter.dispatcher = dispatcher
 
-            # Set the client after starting
+            # Set the client and dispatcher after starting
             # NOTE: There is small amount of time when the start is
             # not finished and the kz_client is not set in which case
             # policy execution and group delete will fail
             store.kz_client = kz_client
+            store.dispatcher = dispatcher
 
             # Setup kazoo to stop when shutting down
             parent.addService(FunctionalService(
