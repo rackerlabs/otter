@@ -65,6 +65,15 @@ DEFAULT_CONSISTENCY = ConsistencyLevel.QUORUM
 
 QUERY_LIMIT = 10000
 
+# Max number of seconds to wait to acquire group kazoo lock. This should
+# not be held for more than 10-15ms in normal circumstances but we keep it high
+# for safety sake. We don't want it to be < 30 since any request will be
+# terminated by CLB by then.
+ACQUIRE_TIMEOUT = 10
+# Ideally release should not even timeout but keep this to capture any unwanted
+# error
+RELEASE_TIMEOUT = 10
+
 
 @attributes(['query', 'params', 'consistency_level'])
 class CQLQueryExecute(object):
@@ -824,12 +833,13 @@ class CassScalingGroup(object):
             return d.addCallback(_write_state)
 
         lock = zk.PollingLock(self.dispatcher, LOCK_PATH + '/' + self.uuid)
-        lock.acquire = functools.partial(lock.acquire, timeout=10)
+        lock.acquire = functools.partial(lock.acquire, timeout=ACQUIRE_TIMEOUT)
         local_lock = self.local_locks.get_lock(self.uuid)
         return local_lock.run(
             with_lock, self.reactor, lock, _modify_state,
             log.bind(category='locking', lock_reason='modify_state'),
-            acquire_timeout=15, release_timeout=10)
+            acquire_timeout=ACQUIRE_TIMEOUT + 5,
+            release_timeout=RELEASE_TIMEOUT)
 
     def update_status(self, status):
         """
@@ -1319,11 +1329,11 @@ class CassScalingGroup(object):
                     otter_msg_type="ignore-delete-lock-error"))
 
         lock = zk.PollingLock(self.dispatcher, LOCK_PATH + '/' + self.uuid)
-        lock.acquire = functools.partial(lock.acquire, timeout=10)
+        lock.acquire = functools.partial(lock.acquire, timeout=ACQUIRE_TIMEOUT)
         d = with_lock(self.reactor, lock, _delete_group,
                       log.bind(category='locking', lock_reason='delete_group'),
-                      acquire_timeout=15,
-                      release_timeout=10)
+                      acquire_timeout=ACQUIRE_TIMEOUT + 5,
+                      release_timeout=RELEASE_TIMEOUT)
         # Cleanup /locks/<groupID> znode as it will not be required anymore
         d.addCallback(_delete_lock_znode)
         d.addCallback(lambda _: None)

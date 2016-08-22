@@ -36,6 +36,7 @@ from txeffect import deferred_performer
 
 from otter.json_schema import group_examples
 from otter.models.cass import (
+    ACQUIRE_TIMEOUT,
     CQLQueryExecute,
     CassAdmin,
     CassScalingGroup,
@@ -416,7 +417,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin,
         self.kz_client = ZKCrudModel()
         self.kz_client.nodes = {"/locks/" + self.group_id: ("", 0)}
 
-        self.acquire_call = (True, 10, True)
+        self.acquire_call = (True, ACQUIRE_TIMEOUT, True)
         self.release_call = None
 
         def create_ZKLock(disp, path):
@@ -428,8 +429,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin,
 
         from otter.models.cass import zk
         self.patch(zk, "PollingLock", create_ZKLock)
-        self.addCleanup(setattr, self, "acquire_call", (True, 10, True))
-        self.addCleanup(setattr, self, "release_call", None)
 
         self.clock = Clock()
         locks = WeakLocks()
@@ -848,7 +847,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         # setup local and kz lock acquire and release returns
         kz_acquire_d = defer.Deferred()
-        self.acquire_call = (True, 10, kz_acquire_d)
+        self.acquire_call = (True, ACQUIRE_TIMEOUT, kz_acquire_d)
         kz_release_d = defer.Deferred()
         self.release_call = kz_release_d
 
@@ -875,7 +874,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         ``modify_state`` raises error if lock is not acquired and does not
         do anything else
         """
-        self.acquire_call = (True, 10, Failure(ValueError("eh")))
+        self.acquire_call = (True, ACQUIRE_TIMEOUT, Failure(ValueError("eh")))
 
         def modifier(group, state):
             raise
