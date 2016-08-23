@@ -46,6 +46,8 @@ class SelfHeal(MultiService, object):
             within this time
         :var callable config_func: Callable used when calling
             :func:`tenant_is_enabled`
+        :var lock: lock object used primarily for testing. If not given, a new
+            lock will be created from ``zk.PollingLock``
         """
         super(SelfHeal, self).__init__()
         self.disp = dispatcher
