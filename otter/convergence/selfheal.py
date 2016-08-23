@@ -39,7 +39,8 @@ class SelfHeal(MultiService, object):
         represents scheduled call to trigger convergence on a group
     """
 
-    def __init__(self, dispatcher, interval, log, clock, config_func):
+    def __init__(self, dispatcher, interval, log, clock, config_func,
+                 lock=None):
         """
         :var float interval: All groups will be scheduled to be triggered
             within this time
@@ -49,7 +50,7 @@ class SelfHeal(MultiService, object):
         super(SelfHeal, self).__init__()
         self.disp = dispatcher
         self.log = log.bind(otter_service="selfheal")
-        self.lock = zk.PollingLock(dispatcher, "/selfheallock")
+        self.lock = lock or zk.PollingLock(dispatcher, "/selfheallock")
         self.clock = clock
         self.calls = []
         timer = TimerService(

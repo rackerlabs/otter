@@ -16,7 +16,7 @@ from otter.log.intents import BoundFields, Log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
 from otter.models.interface import (
     GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
-from otter.test.util.test_zk import ZKLock
+from otter.test.util.test_zk import create_fake_lock
 from otter.test.utils import (
     CheckFailure, const, intent_func, mock_log, nested_sequence, noop, patch,
     perform_sequence, raise_)
@@ -33,9 +33,9 @@ class SelfHealTests(SynchronousTestCase):
         self.ggtc = patch(
             self, "otter.convergence.selfheal.get_groups_to_converge",
             side_effect=intent_func("ggtc"))
-        from otter.convergence.selfheal import zk
-        self.patch(zk, "PollingLock", ZKLock)
-        self.s = sh.SelfHeal("disp", 300, self.log, self.clock, "cf")
+        self.lb, lock = create_fake_lock()
+        self.s = sh.SelfHeal("disp", 300, self.log, self.clock, "cf",
+                             lock=lock)
 
     def test_setup_again(self):
         """
@@ -131,12 +131,12 @@ class SelfHealTests(SynchronousTestCase):
         """
         self.s.disp = base_dispatcher
 
-        self.s.lock.acquired = True
+        self.lb.acquired = True
         self.assertEqual(
             self.successResultOf(self.s.health_check()),
             (True, {"has_lock": True}))
 
-        self.s.lock.acquired = False
+        self.lb.acquired = False
         self.assertEqual(
             self.successResultOf(self.s.health_check()),
             (True, {"has_lock": False}))
@@ -146,7 +146,7 @@ class SelfHealTests(SynchronousTestCase):
         `stopService` will stop the timer, cancel any scheduled calls and
         release lock
         """
-        self.s.lock.acquired = True
+        self.lb.acquired = True
         self.test_setup_convergences()
         calls = self.s.calls[:]
         d = self.s.stopService()
@@ -154,7 +154,7 @@ class SelfHealTests(SynchronousTestCase):
         self.assertTrue(all(not c.active() for c in calls))
         # lock released
         self.assertIsNone(self.successResultOf(d))
-        self.assertFalse(self.s.lock.acquired)
+        self.assertFalse(self.lb.acquired)
         # timer stopped; having bad dispatcher would raise error if perform
         # was called again
         self.s.disp = "bad"
@@ -166,8 +166,8 @@ class SelfHealTests(SynchronousTestCase):
         ``call_if_acquired``
         """
 
-        self.s.lock.acquired = False
-        self.s.lock.acquire_call = (False, None, True)
+        self.lb.acquired = False
+        self.lb.acquire_call = (False, None, True)
         self.s.disp = base_dispatcher
         self.s._setup_convergences = mock.Mock(return_value=succeed("ret"))
 
@@ -184,15 +184,15 @@ class CallIfAcquiredTests(SynchronousTestCase):
     Tests for :func:`call_if_acquired`
     """
     def setUp(self):
-        self.lock = ZKLock("client", "path")
+        self.lb, self.lock = create_fake_lock()
 
     def test_lock_not_acquired(self):
         """
         When lock is not acquired, it is tried and if failed does not
         call eff
         """
-        self.lock.acquired = False
-        self.lock.acquire_call = (False, None, False)
+        self.lb.acquired = False
+        self.lb.acquire_call = (False, None, False)
         self.assertEqual(
             sync_perform(
                 base_dispatcher,
@@ -203,8 +203,8 @@ class CallIfAcquiredTests(SynchronousTestCase):
         """
         When lock is not acquired, it is tried and if successful calls eff
         """
-        self.lock.acquired = False
-        self.lock.acquire_call = (False, None, True)
+        self.lb.acquired = False
+        self.lb.acquire_call = (False, None, True)
         seq = [("call", const("eff_return"))]
         self.assertEqual(
             perform_sequence(
@@ -216,7 +216,7 @@ class CallIfAcquiredTests(SynchronousTestCase):
         """
         If lock is already acquired, it will just call eff
         """
-        self.lock.acquired = True
+        self.lb.acquired = True
         seq = [("call", const("eff_return"))]
         self.assertEqual(
             perform_sequence(

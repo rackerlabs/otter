@@ -5,6 +5,8 @@ import uuid
 
 from functools import partial
 
+import attr
+
 from characteristic import attributes
 
 from effect import (
@@ -99,55 +101,69 @@ class ZKCrudModel(object):
         else:
             return None
 
-    def Lock(self, path):
-        return ZKLock(self, path)
 
-
-class ZKLock(object):
+class _ZKLock(object):
     """
     Stub for :obj:`kazoo.recipe.lock.KazooLock` and :obj:`PollingLock`
     since ``PollingLock`` provides ``KazooLock`` interface.
-    """
 
-    def __init__(self, client, path):
-        self.client = client
-        self.path = path
-        self.acquired = False
-        # tuple of (blocking, timeout, return_value) to be set by test
-        self.acquire_call = ()
-        # release return value
-        self.release_call = None
+    This class is private. Get its object and control it by calling
+    ``create_fake_lock``
+    """
+    def __init__(self, behavior):
+        self._behavior = behavior
 
     def is_acquired(self):
-        return succeed(self.acquired)
+        return succeed(self._behavior.acquired)
 
     def is_acquired_eff(self):
-        return Effect(Constant(self.acquired))
+        return Effect(Constant(self._behavior.acquired))
 
     def acquire_eff(self, blocking, timeout):
-        assert not self.acquired
-        assert (blocking, timeout) == self.acquire_call[:2]
-        ret = self.acquire_call[-1]
+        assert not self._behavior.acquired
+        assert (blocking, timeout) == self._behavior.acquire_call[:2]
+        ret = self._behavior.acquire_call[-1]
         if isinstance(ret, Exception):
-            self.acquired = False
+            self._behavior.acquired = False
             return Effect(Error(ret))
         else:
-            self.acquired = ret
+            self._behavior.acquired = ret
             return Effect(Constant(ret))
 
     def _set_acquired(self, r, acquired):
-        self.acquired = acquired
+        self._behavior.acquired = acquired
         return r
 
     def acquire(self, blocking=True, timeout=None):
-        assert not self.acquired
-        assert (blocking, timeout) == self.acquire_call[:2]
-        d = maybeDeferred(lambda: self.acquire_call[-1])
+        assert not self._behavior.acquired
+        assert (blocking, timeout) == self._behavior.acquire_call[:2]
+        d = maybeDeferred(lambda: self._behavior.acquire_call[-1])
         return d.addCallback(self._set_acquired, True)
 
     def release(self):
-        d = maybeDeferred(lambda: self.release_call)
+        d = maybeDeferred(lambda: self._behavior.release_call)
         return d.addCallback(self._set_acquired, False)
+
+
+@attr.s
+class LockBehavior(object):
+    """
+    Use this class to control behavior of ``_ZKLock`` object
+    """
+    # tuple of (blocking, timeout, return_value) to be set by test
+    acquire_call = attr.ib()
+    # release return value
+    release_call = attr.ib()
+    # Is lock acquired?
+    acquired = attr.ib(default=False)
+
+
+def create_fake_lock(acquire_call=None, release_call=None):
+    """
+    Create fake ZKLock object and return it along with its behavior class
+    """
+    b = LockBehavior(acquire_call, release_call)
+    return b, _ZKLock(b)
 
 
 class CreateOrSetTests(SynchronousTestCase):

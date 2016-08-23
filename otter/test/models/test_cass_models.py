@@ -68,7 +68,7 @@ from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingScheduleCollectionProviderMixin
 )
-from otter.test.util.test_zk import ZKCrudModel, ZKLock
+from otter.test.util.test_zk import ZKCrudModel, create_fake_lock
 from otter.test.utils import (
     DummyException,
     LockMixin,
@@ -422,10 +422,10 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin,
 
         def create_ZKLock(disp, path):
             self.assertEqual(disp, "dispatcher")
-            self.lock = ZKLock("client", path)
-            self.lock.acquire_call = self.acquire_call
-            self.lock.release_call = self.release_call
-            return self.lock
+            self.assertEqual(path, "/locks/" + self.group_id)
+            self.lb, lock = create_fake_lock(self.acquire_call,
+                                             self.release_call)
+            return lock
 
         from otter.models.cass import zk
         self.patch(zk, "PollingLock", create_ZKLock)
@@ -811,8 +811,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
-        self.assertEqual(self.lock.path, '/locks/' + self.group.uuid)
-        self.assertFalse(self.lock.acquired)
+        self.assertFalse(self.lb.acquired)
 
     def test_modify_state_local_lock_before_kz_lock(self):
         """
@@ -856,14 +855,14 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.assertNoResult(d)
         # local lock was acquired first then kz lock
         self.assertTrue(llock.locked)
-        self.assertFalse(self.lock.acquired)
+        self.assertFalse(self.lb.acquired)
         kz_acquire_d.callback(True)
-        self.assertTrue(self.lock.acquired)
+        self.assertTrue(self.lb.acquired)
         # after modification kz lock is released then local lock
         modifier_d.callback(group_state)
         self.assertTrue(llock.locked)
         kz_release_d.callback(None)
-        self.assertFalse(self.lock.acquired)
+        self.assertFalse(self.lb.acquired)
         self.assertFalse(llock.locked)
         self.assertEqual(self.successResultOf(d), None)
 
@@ -883,7 +882,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.modify_state(modifier)
         self.failureResultOf(d, ValueError)
         self.assertEqual(self.connection.execute.call_count, 0)
-        self.assertFalse(self.lock.acquired)
+        self.assertFalse(self.lb.acquired)
 
     def test_modify_state_lock_log_category_locking(self):
         """
@@ -912,7 +911,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             system='CassScalingGroup.modify_state')
         log.bind().bind.assert_called_once_with(
             category='locking', lock_reason='modify_state')
-        self.assertFalse(self.lock.acquired)
+        self.assertFalse(self.lb.acquired)
 
     def test_modify_state_propagates_modifier_error_and_does_not_save(self):
         """
@@ -927,7 +926,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.modify_state(modifier)
         self.failureResultOf(d, NoSuchScalingGroupError)
         self.assertEqual(self.connection.execute.call_count, 0)
-        self.assertFalse(self.lock.acquired)
+        self.assertFalse(self.lb.acquired)
 
     def test_modify_state_asserts_error_if_tenant_id_mismatch(self):
         """
@@ -952,7 +951,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.modify_state(modifier)
         self.failureResultOf(d, AssertionError)
         self.assertEqual(self.connection.execute.call_count, 0)
-        self.assertFalse(self.lock.acquired)
+        self.assertFalse(self.lb.acquired)
 
     def test_modify_state_asserts_error_if_group_id_mismatch(self):
         """
@@ -977,7 +976,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.modify_state(modifier)
         self.failureResultOf(d, AssertionError)
         self.assertEqual(self.connection.execute.call_count, 0)
-        self.assertFalse(self.lock.acquired)
+        self.assertFalse(self.lb.acquired)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
@@ -2033,7 +2032,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.QUORUM)
 
-        self.assertFalse(self.lock.acquired)
+        self.assertFalse(self.lb.acquired)
         self.assertEqual(self.kz_client.nodes, {})
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
@@ -2078,7 +2077,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.QUORUM)
 
-        self.assertFalse(self.lock.acquired)
+        self.assertFalse(self.lb.acquired)
         self.assertEqual(self.kz_client.nodes, {})
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
@@ -2096,7 +2095,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.failureResultOf(d, ValueError)
 
         self.assertFalse(self.connection.execute.called)
-        self.assertFalse(self.lock.acquired)
+        self.assertFalse(self.lb.acquired)
         # locks znode is not deleted
         self.assertIn("/locks/" + self.group.uuid, self.kz_client.nodes)
 
