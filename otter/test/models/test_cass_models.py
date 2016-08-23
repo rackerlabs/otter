@@ -855,7 +855,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.assertNoResult(d)
         # local lock was acquired first then kz lock
         self.assertTrue(llock.locked)
-        self.assertFalse(self.lb.acquired)
+        self.assertIs(self.lb.acquired, self.lb.NOT_STARTED)
         kz_acquire_d.callback(True)
         self.assertTrue(self.lb.acquired)
         # after modification kz lock is released then local lock
@@ -882,7 +882,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.modify_state(modifier)
         self.failureResultOf(d, ValueError)
         self.assertEqual(self.connection.execute.call_count, 0)
-        self.assertFalse(self.lb.acquired)
+        self.assertIs(self.lb.acquired, self.lb.NOT_STARTED)
 
     def test_modify_state_lock_log_category_locking(self):
         """
@@ -2095,7 +2095,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.failureResultOf(d, ValueError)
 
         self.assertFalse(self.connection.execute.called)
-        self.assertFalse(self.lb.acquired)
+        self.assertIs(self.lb.acquired, self.lb.NOT_STARTED)
         # locks znode is not deleted
         self.assertIn("/locks/" + self.group.uuid, self.kz_client.nodes)
 

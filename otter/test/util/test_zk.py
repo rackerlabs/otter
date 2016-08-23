@@ -120,7 +120,8 @@ class _ZKLock(object):
         return Effect(Constant(self._behavior.acquired))
 
     def acquire_eff(self, blocking, timeout):
-        assert not self._behavior.acquired
+        assert (self._behavior.acquired is LockBehavior.NOT_STARTED or
+                (not self._behavior.acquired))
         assert (blocking, timeout) == self._behavior.acquire_call[:2]
         ret = self._behavior.acquire_call[-1]
         if isinstance(ret, Exception):
@@ -135,7 +136,8 @@ class _ZKLock(object):
         return r
 
     def acquire(self, blocking=True, timeout=None):
-        assert not self._behavior.acquired
+        assert (self._behavior.acquired is LockBehavior.NOT_STARTED or
+                (not self._behavior.acquired))
         assert (blocking, timeout) == self._behavior.acquire_call[:2]
         d = maybeDeferred(lambda: self._behavior.acquire_call[-1])
         return d.addCallback(self._set_acquired, True)
@@ -154,8 +156,11 @@ class LockBehavior(object):
     acquire_call = attr.ib()
     # release return value
     release_call = attr.ib()
+    # SENTINEL object to represent the fact that lock has initialized but
+    # not yet acquired
+    NOT_STARTED = object()
     # Is lock acquired?
-    acquired = attr.ib(default=False)
+    acquired = attr.ib(default=NOT_STARTED)
 
 
 def create_fake_lock(acquire_call=None, release_call=None):
