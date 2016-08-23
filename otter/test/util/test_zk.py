@@ -104,8 +104,9 @@ class ZKCrudModel(object):
 
 class _ZKLock(object):
     """
-    Stub for :obj:`kazoo.recipe.lock.KazooLock` and :obj:`PollingLock`
-    since ``PollingLock`` provides ``KazooLock`` interface.
+    Stub for :obj:`kazoo.recipe.lock.KazooLock` and :obj:`PollingLock`.
+    It provides *_eff implementations based on ``LockBehavior`` for
+    ``PollingLock``
 
     This class is private. Get its object and control it by calling
     ``create_fake_lock``
