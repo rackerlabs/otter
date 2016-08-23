@@ -14,6 +14,7 @@ from otter.integration.lib.nova import NovaServer
 from otter.integration.lib.resources import TestResources
 from otter.integration.lib.trial_tools import (
     TestHelper,
+    convergence_exec_time,
     get_identity,
     get_resource_mapping,
     region,
@@ -48,6 +49,7 @@ class SelfHealTests(TestCase):
         """
         SelfHeal service will replace deleted server
         """
+        sh_interval = float(os.environ["AS_SELFHEAL_INTERVAL"])
         group, _ = self.helper.create_group(min_entities=1)
         yield group.start(self.rcs, self)
         yield group.wait_for_state(
@@ -63,7 +65,7 @@ class SelfHealTests(TestCase):
             ContainsDict(
                 {"active": MatchesListwise([
                     ContainsDict({"id": NotEquals(server_id)})])}),
-            timeout=float(os.environ["AS_SELFHEAL_INTERVAL"]) * 2)
+            timeout=(sh_interval + convergence_exec_time) * 2)
         # Delete new server again and see if it comes back. It should be
         # back within selfheal interval
         server_id = yield only_server_id(self.rcs, group)
@@ -73,4 +75,4 @@ class SelfHealTests(TestCase):
             ContainsDict(
                 {"active": MatchesListwise([
                     ContainsDict({"id": NotEquals(server_id)})])}),
-            timeout=float(os.environ["AS_SELFHEAL_INTERVAL"]))
+            timeout=sh_interval + convergence_exec_time)
