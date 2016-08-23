@@ -26,7 +26,7 @@ def only_server_id(rcs, group):
     Extract only server id in the group
     """
     d = group.get_scaling_group_state(rcs, [200])
-    return d.addCallback(lambda (_, state): extract_active_ids(state))
+    return d.addCallback(lambda (_, state): extract_active_ids(state)[0])
 
 
 class SelfHealTests(TestCase):
