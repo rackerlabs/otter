@@ -100,9 +100,12 @@ class SelfHealTests(SynchronousTestCase):
         If there are scheduled calls when perform is called, they are
         cancelled and err is logged. Future calls are scheduled as usual
         """
-        call1 = self.clock.callLater(1, noop, 2)
-        call2 = self.clock.callLater(2, noop, 3)
-        self.s.calls = [call1, call2]
+        self.clock.advance(-0.6)
+        call1 = self.clock.callLater(1, noop, None)
+        call2 = self.clock.callLater(0, noop, None)
+        call3 = self.clock.callLater(2, noop, None)
+        self.clock.advance(0.6)
+        self.s.calls = [call1, call2, call3]
         self.test_setup_convergences()
         self.log.err.assert_called_once_with(
             mock.ANY, "self-heal-calls-err", active=2,
@@ -165,7 +168,6 @@ class SelfHealTests(SynchronousTestCase):
         :func:`_setup_if_locked` calls ``self._setup_convergences`` through
         ``call_if_acquired``
         """
-
         self.lb.acquired = False
         self.lb.acquire_call = (False, None, True)
         self.s.disp = base_dispatcher
@@ -177,6 +179,22 @@ class SelfHealTests(SynchronousTestCase):
         self.s._setup_convergences.assert_called_once_with("cf", 35)
         self.log.msg.assert_called_once_with(
             "self-heal-lock-acquired", otter_service="selfheal")
+
+    def test_setup_if_locked_no_lock(self):
+        """
+        :func:`_setup_if_locked` does not call :func:`_setup_convergences` if
+        lock is not acquired
+        """
+        self.lb.acquired = False
+        self.lb.acquire_call = (False, None, False)
+        self.s.disp = base_dispatcher
+        self.s._setup_convergences = mock.Mock(return_value=succeed("ret"))
+
+        d = self.s._setup_if_locked("cf", 35)
+
+        self.assertEqual(self.successResultOf(d), sh.NOT_CALLED)
+        self.assertFalse(self.s._setup_convergences.called)
+        self.assertFalse(self.log.msg.called)
 
 
 class CallIfAcquiredTests(SynchronousTestCase):
