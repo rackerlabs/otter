@@ -310,9 +310,8 @@ def makeService(config):
 
             # Setup selfheal service
             shsvc = SelfHeal(
-                dispatcher, kz_client,
-                config_value("selfheal.interval") or 300, log, reactor,
-                config_value)
+                dispatcher, config_value("selfheal.interval") or 300,
+                log, reactor, config_value)
             health_checker.checks["selfheal"] = shsvc.health_check
             shsvc.setServiceParent(parent)
 
