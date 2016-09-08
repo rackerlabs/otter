@@ -309,16 +309,21 @@ def makeService(config):
                 config_value('converger.step_limits') or {})
 
             # Setup selfheal service
-            shsvc = SelfHeal(
-                dispatcher, config_value("selfheal.interval") or 300,
-                log, reactor, config_value)
-            health_checker.checks["selfheal"] = shsvc.health_check
-            shsvc.setServiceParent(parent)
+            setup_selfheal_service(dispatcher, parent, health_checker, log)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
 
     return parent
+
+
+def setup_selfheal_service(dispatcher, parent, health_checker, log):
+    interval = config_value("selfheal.interval") or 300
+    selfheal = SelfHeal(dispatcher, config_value, interval, log)
+    shsvc = LockedTimerService(
+        reactor, dispatcher, "/selfheallock", interval, selfheal)
+    health_checker.checks["selfheal"] = shsvc.health_check
+    shsvc.setServiceParent(parent)
 
 
 def setup_converger(parent, kz_client, dispatcher, interval, build_timeout,

@@ -23,7 +23,7 @@ from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 from otter.util import zk
 
 
-class SelfHeal(MultiService, object):
+class SelfHeal(object):
     """
     A service that triggers convergence on all the groups on interval basis.
     Only one node is allowed to do this.
@@ -39,8 +39,7 @@ class SelfHeal(MultiService, object):
         represents scheduled call to trigger convergence on a group
     """
 
-    def __init__(self, dispatcher, interval, log, clock, config_func,
-                 lock=None):
+    def __init__(self, dispatcher, config_func, time_range, log):
         """
         :var float interval: All groups will be scheduled to be triggered
             within this time
@@ -49,27 +48,21 @@ class SelfHeal(MultiService, object):
         :var lock: lock object used primarily for testing. If not given, a new
             lock will be created from ``zk.PollingLock``
         """
-        super(SelfHeal, self).__init__()
-        self.disp = dispatcher
+        self.dispatcher = dispatcher
+        self.config_func = config_func
+        self.time_range = time_range
         self.log = log.bind(otter_service="selfheal")
-        self.lock = lock or zk.PollingLock(dispatcher, "/selfheallock")
-        self.clock = clock
         self.calls = []
-        timer = TimerService(
-            interval,
-            lambda: self._setup_if_locked(config_func, interval).addErrback(
-                self.log.err, "self-heal-setup-err"))
-        timer.clock = clock
-        timer.setServiceParent(self)
 
-    def stopService(self):
+    def call(self):
+        d = self._setup_convergences()
+        return d.addErrback(self.log.err, "self-heal-setup-err")
+
+    def stop(self):
         """
-        Stop service by cancelling any remaining scheduled calls and releasing
-        the lock
+        Stop by cancel any remaining scheduled calls
         """
-        super(SelfHeal, self).stopService()
         self._cancel_scheduled_calls()
-        return self.lock.release()
 
     def _cancel_scheduled_calls(self):
         """
@@ -85,22 +78,15 @@ class SelfHeal(MultiService, object):
         self.calls = []
         return active
 
-    def health_check(self):
-        """
-        Return about whether this object has lock
-        """
-        d = self.lock.is_acquired()
-        return d.addCallback(lambda b: (True, {"has_lock": b}))
-
     @inlineCallbacks
-    def _setup_convergences(self, config_func, time_range):
+    def _setup_convergences(self):
         """
         Get groups to converge and setup scheduled calls to trigger convergence
         on each of them within time_range. For parameters, see
         :func:`__init__` docs.
         """
         groups = yield perform(self.disp,
-                               get_groups_to_converge(config_func))
+                               get_groups_to_converge(self.config_func))
         active = self._cancel_scheduled_calls()
         if active:
             # This should never happen
@@ -108,72 +94,13 @@ class SelfHeal(MultiService, object):
                          "self-heal-calls-err", active=active)
         if not groups:
             returnValue(None)
-        wait_time = float(time_range) / len(groups)
+        wait_time = float(self.time_range) / len(groups)
         for i, group in enumerate(groups):
             self.calls.append(
                 self.clock.callLater(
                     i * wait_time, perform, self.disp,
                     check_and_trigger(group["tenantId"], group["groupId"]))
             )
-
-    def _setup_if_locked(self, config_func, time_range):
-        """
-        Setup convergence triggering on all groups by acquiring the lock and
-        calling ``_setup_convergences``. For parameters, see
-        :func:`__init__` docs.
-        """
-        class SetupConvergences(object):
-            pass
-
-        @deferred_performer
-        def sc_performer(d, i):
-            return self._setup_convergences(config_func, time_range)
-
-        dispatcher = ComposedDispatcher([
-            TypeDispatcher({SetupConvergences: sc_performer}), self.disp])
-
-        def log_acquired(r):
-            result, acquired = r
-            if acquired:
-                self.log.msg("self-heal-lock-acquired")
-            return result
-
-        d = perform(
-            dispatcher,
-            call_if_acquired(self.lock, Effect(SetupConvergences())))
-        return d.addCallback(log_acquired)
-
-
-# Sentinet object representing the fact that eff passed in ``call_if_acquired``
-# was not called
-NOT_CALLED = object()
-
-
-@do
-def call_if_acquired(lock, eff):
-    """
-    Call ``eff`` if ``lock`` is acquired. If not, try to acquire the lock
-    and call ``eff``. This function is different from
-    :func:`otter.util.deferredutils.with_lock` where this does not release
-    the lock after calling ``func``. Also it expects that lock may already be
-    acquired.
-
-    :param lock: Lock object from :obj:`TxKazooClient`
-    :param eff: ``Effect`` to call if lock is/was acquired
-
-    :return: (eff return, lock acquired bool) tuple. first element may be
-        ``NOT_CALLED`` of eff was not called
-    :rtype: ``Effect`` of ``bool``
-    """
-    if (yield lock.is_acquired_eff()):
-        ret = yield eff
-        yield do_return((ret, False))
-    else:
-        if (yield lock.acquire_eff(False, None)):
-            ret = yield eff
-            yield do_return((ret, True))
-        else:
-            yield do_return((NOT_CALLED, False))
 
 
 def get_groups_to_converge(config_func):
