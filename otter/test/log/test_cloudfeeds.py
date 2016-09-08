@@ -32,10 +32,10 @@ from otter.test.utils import (
     CheckFailure,
     mock_log,
     nested_sequence,
-    raise_,
     retry_sequence,
     stub_pure_response
 )
+from otter.util.fp import raise_
 from otter.util.http import APIError
 from otter.util.retry import (
     Retry,

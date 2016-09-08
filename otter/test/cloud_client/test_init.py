@@ -31,6 +31,7 @@ from otter.cloud_client import (
     CLBImmutableError,
     CLBNodeLimitError,
     CLBNotActiveError,
+    CLBPartialNodesRemoved,
     CLBRateLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
@@ -75,13 +76,13 @@ from otter.test.utils import (
     const,
     nested_sequence,
     noop,
-    raise_,
     resolve_effect,
     stub_json_response,
     stub_pure_response
 )
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.config import set_config_data
+from otter.util.fp import raise_
 from otter.util.http import APIError, headers
 from otter.util.pure_http import Request, has_code
 from otter.util.weaklocks import WeakLocks
@@ -912,6 +913,21 @@ class CLBClientTests(SynchronousTestCase):
              service_request_eqf(response2))
         ]
         self.assertIs(perform_sequence(seq, eff), None)
+
+    def test_remove_clb_nodes_partial_success(self):
+        """
+        ``remove_clb_nodes`` removes only 10 nodes and raises
+        ``CLBPartialNodesRemoved`` with remaining nodes
+        """
+        eff = remove_clb_nodes(self.lb_id, range(12))
+        seq = [
+            (self.expected_node_removal_req(range(10)).intent,
+             service_request_eqf(stub_pure_response({}, 202))),
+        ]
+        with self.assertRaises(CLBPartialNodesRemoved) as ce:
+            perform_sequence(seq, eff)
+        self.assertEqual(ce.exception,
+                         CLBPartialNodesRemoved(self.lb_id, [10, 11]))
 
     def test_get_clbs(self):
         """Returns all the load balancer details from the LBs endpoint."""

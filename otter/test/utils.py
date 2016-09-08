@@ -44,7 +44,7 @@ from otter.models.interface import IScalingGroup, IScalingGroupServersCache
 from otter.supervisor import ISupervisor
 from otter.util.config import set_config_data, update_config_data
 from otter.util.deferredutils import DeferredPool
-from otter.util.fp import set_in
+from otter.util.fp import raise_, set_in
 from otter.util.retry import Retry, ShouldDelayAndRetry, perform_retry
 
 
@@ -884,11 +884,6 @@ def match_all(things):
     the given things.
     """
     return transform_eq(lambda o: [o]*len(things), things)
-
-
-def raise_(e):
-    """Raise the exception. Useful for lambdas."""
-    raise e
 
 
 def raise_to_exc_info(e):

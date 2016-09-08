@@ -67,11 +67,11 @@ from otter.test.utils import (
     intent_func,
     matches,
     noop,
-    raise_,
     resolve_effect,
     stack,
     stub_pure_response,
     transform_eq)
+from otter.util.fp import raise_
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError
 from otter.util.retry import (

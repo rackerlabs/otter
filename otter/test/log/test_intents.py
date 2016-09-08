@@ -26,7 +26,8 @@ from otter.log.intents import (
     msg_with_time,
     with_log)
 from otter.test.utils import (
-    CheckFailureValue, IsBoundWith, matches, mock_log, raise_)
+    CheckFailureValue, IsBoundWith, matches, mock_log)
+from otter.util.fp import raise_
 
 
 class LogDispatcherTests(SynchronousTestCase):

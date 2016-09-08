@@ -70,9 +70,9 @@ from otter.test.utils import (
     mock_group, mock_log,
     nested_sequence,
     noop,
-    raise_,
     raise_to_exc_info,
     transform_eq)
+from otter.util.fp import raise_
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
 
 

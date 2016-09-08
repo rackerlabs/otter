@@ -16,7 +16,8 @@ from otter.log.spec import (
     split_execute_convergence,
     split_list_servers
 )
-from otter.test.utils import CheckFailureValue, raise_
+from otter.test.utils import CheckFailureValue
+from otter.util.fp import raise_
 
 
 class SpecificationObserverWrapperTests(SynchronousTestCase):

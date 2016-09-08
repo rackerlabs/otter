@@ -33,6 +33,7 @@ from otter.constants import ServiceType
 from otter.indexer import atom
 from otter.log.intents import msg as msg_effect
 from otter.util.config import config_value
+from otter.util.fp import raise_
 from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (
@@ -501,6 +502,15 @@ class CLBNodeLimitError(Exception):
     """
 
 
+@attr.s
+class CLBPartialNodesRemoved(Exception):
+    """
+    Exception raised when some of the nodes are removed.
+    """
+    lb_id = attr.ib()
+    node_ids = attr.ib()    # Node ids not removed
+
+
 def _match_errors(code_keys_exc_mapping, status_code, response_dict):
     """
     Take a list of tuples of:
@@ -652,6 +662,11 @@ def remove_clb_nodes(lb_id, node_ids):
     This function will handle the case where *some* of the nodes are valid and
     some aren't, by retrying deleting only the valid ones.
     """
+    partial = None
+    if len(node_ids) > 10:
+        # Limit number of nodes to 10 due to CLB's limit
+        partial = CLBPartialNodesRemoved(lb_id, node_ids[10:])
+        node_ids = node_ids[:10]
     node_ids = map(str, node_ids)
     eff = service_request(
         ServiceType.CLOUD_LOAD_BALANCERS,
@@ -680,7 +695,7 @@ def remove_clb_nodes(lb_id, node_ids):
     ).on(
         error=_only_json_api_errors(
             lambda c, b: _process_clb_api_error(c, b, lb_id))
-    ).on(success=lambda _: None)
+    ).on(success=lambda _: raise_(partial) if partial is not None else None)
     # CLB 202 responses here has no body, so no response logging needed.
 
 

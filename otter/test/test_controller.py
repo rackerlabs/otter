@@ -42,11 +42,10 @@ from otter.test.utils import (
     nested_sequence,
     noop,
     patch,
-    raise_,
     set_non_conv_tenant,
     test_dispatcher)
 from otter.util.config import set_config_data
-from otter.util.fp import assoc_obj
+from otter.util.fp import assoc_obj, raise_
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN

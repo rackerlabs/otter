@@ -14,9 +14,9 @@ from zope.interface import Attribute, Interface
 
 from otter.test.utils import (
     iMock,
-    raise_,
     retry_sequence
 )
+from otter.util.fp import raise_
 from otter.util.retry import (
     Retry,
     ShouldDelayAndRetry,
