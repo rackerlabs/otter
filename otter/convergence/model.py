@@ -148,6 +148,10 @@ class ConvergenceIterationStatus(object):
 class ErrorReason(object):
     """A reason for a step to be in a RETRY or FAILURE state."""
     Exception = constructor('exc_info')
+    # This is different from Exception where this only stores Exception object
+    # instead of exception tuple. Using this makes the object comparable and
+    # hashable keeping the planner pure
+    ExceptionObject = constructor('exc_obj')
     String = constructor(reason=attr.ib(validator=instance_of((unicode, str))))
     Structured = constructor('structure')
     UserMessage = constructor('message')
@@ -521,6 +525,7 @@ class IDrainable(Interface):
 
         :return: Whether the node is done draining.
         :rtype: `bool`
+        :raises: ``DrainingUnavailable`` if draining info is not available
         """
 
 
@@ -585,7 +590,7 @@ class DrainingUnavailable(Exception):
 @attributes([Attribute("node_id", instance_of=basestring),
              Attribute("description", instance_of=CLBDescription),
              Attribute("address", instance_of=basestring),
-             Attribute("drained_at", default_value=0.0, instance_of=float),
+             Attribute("drained_at", default_value=None),
              Attribute("is_online", instance_of=bool,
                        default_value=True),
              Attribute("connections", default_value=None)])
@@ -602,8 +607,9 @@ class CLBNode(object):
     :ivar str address: The IP address of the node.  The IP and port form a
         unique mapping on the CLB, which is assigned a node ID.  Two
         nodes with the same IP and port cannot exist on a single CLB.
-    :ivar float drained_at: EPOCH at which this node was put in DRAINING.
-        Should be 0 if node is not DRAINING.
+    :ivar float drained_at: Seconds since EPOCH at which this node was put in
+        DRAINING.  Should be None if node is not DRAINING or when this info is
+        not available.
     :ivar bool is_online: Is this node ONLINE and receiving traffic? This field
         corresponds to node's `status` field.
     :ivar int connections: The number of active connections on the node - this

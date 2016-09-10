@@ -246,7 +246,7 @@ class CLBNodeTests(SynchronousTestCase):
         self.assertEqual(
             node,
             CLBNode(node_id='node1', address='1.2.3.4',
-                    connections=None, drained_at=0.0,
+                    connections=None, drained_at=None,
                     is_online=False,
                     description=CLBDescription(
                         lb_id='123', port=20,
@@ -266,7 +266,7 @@ class CLBNodeTests(SynchronousTestCase):
         self.assertEqual(
             node,
             CLBNode(node_id='node1', address='1.2.3.4',
-                    connections=None, drained_at=0.0,
+                    connections=None, drained_at=None,
                     is_online=False,
                     description=CLBDescription(
                         lb_id='123', port=20,

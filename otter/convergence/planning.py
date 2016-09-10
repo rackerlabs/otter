@@ -76,6 +76,7 @@ from otter.convergence.model import (
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
+    DrainingUnavailable,
     ErrorReason,
     IDrainable,
     RCv3Description,
@@ -99,7 +100,6 @@ from otter.convergence.steps import (
     UpdateStack,
 )
 from otter.convergence.transforming import limit_steps_by_count, optimize_steps
-from otter.util.excp import raise_to_exc_info
 from otter.util.fp import assoc_obj, partition_bool
 
 
@@ -116,9 +116,9 @@ class CLBHealthInfoNotFound(Exception):
 
 def fail_convergence(excp):
     """
-    Return `FailConvergence` step with excp info in it
+    Return `FailConvergence` step with excp in it
     """
-    return FailConvergence([ErrorReason.Exception(raise_to_exc_info(excp))])
+    return FailConvergence([ErrorReason.ExceptionObject(excp)])
 
 
 def _remove_from_lb_with_draining(timeout, nodes, now):
@@ -404,8 +404,12 @@ def converge_launch_server(desired_state, servers_with_cheese,
             [node for node in load_balancer_nodes if node.matches(server)],
             now)
 
-    scale_down_steps = list(mapcat(drain_and_delete_a_server,
-                                   servers_to_delete + servers[Destiny.DRAIN]))
+    try:
+        scale_down_steps = list(
+                mapcat(drain_and_delete_a_server,
+                       servers_to_delete + servers[Destiny.DRAIN]))
+    except DrainingUnavailable as de:
+        return pbag([fail_convergence(de)])
 
     # delete all servers in error - draining does not need to be
     # handled because servers in error presumably are not serving

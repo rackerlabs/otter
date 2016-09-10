@@ -32,6 +32,12 @@ class PresentReasonsTests(SynchronousTestCase):
         self.assertEqual(present_reasons([ErrorReason.Exception(exc_info)]),
                          [])
 
+    def test_present_arbitrary_exception_object(self):
+        """Arbitrary exceptions are not presented."""
+        self.assertEqual(
+            present_reasons([ErrorReason.ExceptionObject(ValueError())]),
+            [])
+
     def test_present_exceptions(self):
         """Some exceptions are presented."""
         excs = {
@@ -56,6 +62,10 @@ class PresentReasonsTests(SynchronousTestCase):
             present_reasons([ErrorReason.Exception(raise_to_exc_info(exc))
                              for (exc, _) in excs]),
             [reason for (_, reason) in excs])
+        self.assertEqual(
+            present_reasons([ErrorReason.ExceptionObject(exc)
+                             for (exc, _) in excs]),
+            [reason for (_, reason) in excs])
 
 
 class StructureReasonsTests(SynchronousTestCase):
@@ -70,6 +80,16 @@ class StructureReasonsTests(SynchronousTestCase):
             structure_reason(reason),
             {'exception': "ZeroDivisionError('foo',)",
              'traceback': expected_tb}
+        )
+
+    def test_exception_object(self):
+        """
+        Exception objects are serialized
+        """
+        reason = ErrorReason.ExceptionObject(ZeroDivisionError('foo'))
+        self.assertEqual(
+            structure_reason(reason),
+            {'exception': "ZeroDivisionError('foo',)"}
         )
 
     def test_string(self):
