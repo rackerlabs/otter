@@ -148,10 +148,6 @@ class ConvergenceIterationStatus(object):
 class ErrorReason(object):
     """A reason for a step to be in a RETRY or FAILURE state."""
     Exception = constructor('exc_info')
-    # This is different from Exception where this only stores Exception object
-    # instead of exception tuple. Using this makes the object comparable and
-    # hashable keeping the planner pure
-    ExceptionObject = constructor('exc_obj')
     String = constructor(reason=attr.ib(validator=instance_of((unicode, str))))
     Structured = constructor('structure')
     UserMessage = constructor('message')

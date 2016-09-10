@@ -28,9 +28,6 @@ def present_reasons(reasons):
         def Exception(exc_info):
             return _present_exception(exc_info[1])
 
-        def ExceptionObject(exc_obj):
-            return _present_exception(exc_obj)
-
         def UserMessage(message):
             return message
 
@@ -98,9 +95,6 @@ class structure_reason(object):
         return {
             'exception': serialize_to_jsonable(exc_info[1]),
             'traceback': ''.join(traceback.format_exception(*exc_info))}
-
-    def ExceptionObject(exc_obj):
-        return {'exception': serialize_to_jsonable(exc_obj)}
 
     def String(string):
         # So that the "reasons" are all the same structure, so that it can be

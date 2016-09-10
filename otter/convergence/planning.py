@@ -118,7 +118,7 @@ def fail_convergence(excp):
     """
     Return `FailConvergence` step with excp in it
     """
-    return FailConvergence([ErrorReason.ExceptionObject(excp)])
+    return FailConvergence([ErrorReason.Exception((type(excp), excp, None))])
 
 
 def _remove_from_lb_with_draining(timeout, nodes, now):
