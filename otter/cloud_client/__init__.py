@@ -649,6 +649,11 @@ def change_clb_node(lb_id, node_id, condition, weight, _type="PRIMARY"):
     # CLB 202 response here has no body, so no response logging needed
 
 
+# Number of nodes that can be deleted in DELETE ../nodes call as per
+#https://developer.rackspace.com/docs/cloud-load-balancers/v1/api-reference/nodes/#bulk-delete-nodes
+CLB_BATCH_DELETE_LIMIT = 10
+
+
 def remove_clb_nodes(lb_id, node_ids):
     """
     Remove multiple nodes from a load balancer.
@@ -663,7 +668,7 @@ def remove_clb_nodes(lb_id, node_ids):
     some aren't, by retrying deleting only the valid ones.
     """
     partial = None
-    if len(node_ids) > 10:
+    if len(node_ids) > CLB_BATCH_DELETE_LIMIT:
         # Limit number of nodes to 10 due to CLB's limit
         node_ids = list(node_ids)
         partial = CLBPartialNodesRemoved(lb_id, node_ids[10:])
