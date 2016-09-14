@@ -650,7 +650,7 @@ def change_clb_node(lb_id, node_id, condition, weight, _type="PRIMARY"):
 
 
 # Number of nodes that can be deleted in DELETE ../nodes call as per
-#https://developer.rackspace.com/docs/cloud-load-balancers/v1/api-reference/nodes/#bulk-delete-nodes
+# https://developer.rackspace.com/docs/cloud-load-balancers/v1/api-reference/nodes/#bulk-delete-nodes
 CLB_BATCH_DELETE_LIMIT = 10
 
 
