@@ -665,6 +665,7 @@ def remove_clb_nodes(lb_id, node_ids):
     partial = None
     if len(node_ids) > 10:
         # Limit number of nodes to 10 due to CLB's limit
+        node_ids = list(node_ids)
         partial = CLBPartialNodesRemoved(lb_id, node_ids[10:])
         node_ids = node_ids[:10]
     node_ids = map(str, node_ids)
