@@ -197,52 +197,6 @@ class SelfHealTests(SynchronousTestCase):
         self.assertFalse(self.log.msg.called)
 
 
-class CallIfAcquiredTests(SynchronousTestCase):
-    """
-    Tests for :func:`call_if_acquired`
-    """
-    def setUp(self):
-        self.lb, self.lock = create_fake_lock()
-
-    def test_lock_not_acquired(self):
-        """
-        When lock is not acquired, it is tried and if failed does not
-        call eff
-        """
-        self.lb.acquired = False
-        self.lb.acquire_call = (False, None, False)
-        self.assertEqual(
-            sync_perform(
-                base_dispatcher,
-                sh.call_if_acquired(self.lock, Effect("call"))),
-            (sh.NOT_CALLED, False))
-
-    def test_lock_acquired(self):
-        """
-        When lock is not acquired, it is tried and if successful calls eff
-        """
-        self.lb.acquired = False
-        self.lb.acquire_call = (False, None, True)
-        seq = [("call", const("eff_return"))]
-        self.assertEqual(
-            perform_sequence(
-                seq,
-                sh.call_if_acquired(self.lock, Effect("call"))),
-            ("eff_return", True))
-
-    def test_lock_already_acquired(self):
-        """
-        If lock is already acquired, it will just call eff
-        """
-        self.lb.acquired = True
-        seq = [("call", const("eff_return"))]
-        self.assertEqual(
-            perform_sequence(
-                seq,
-                sh.call_if_acquired(self.lock, Effect("call"))),
-            ("eff_return", False))
-
-
 class GetGroupsToConvergeTests(SynchronousTestCase):
     """
     Tests for :func:`get_groups_to_converge`

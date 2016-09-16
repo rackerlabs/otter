@@ -5,8 +5,6 @@ A service that ensures only one node calls a given function on interval basis
 from effect import ComposedDispatcher, Effect, TypeDispatcher
 from effect.do import do, do_return
 
-from otter.util import zk
-
 from twisted.application.internet import TimerService
 from twisted.application.service import MultiService
 from twisted.internet.defer import maybeDeferred
@@ -14,6 +12,8 @@ from twisted.internet.defer import maybeDeferred
 from txeffect import deferred_performer, perform
 
 from zope.interface import Attribute, Interface
+
+from otter.util import zk
 
 
 class ILockedTimerFunc(Interface):
@@ -24,13 +24,13 @@ class ILockedTimerFunc(Interface):
     name = Attribute("name of this service")
     log = Attribute("This service's logger")
 
-    def call(self):
+    def call():
         """
         This will be called on interval basis by ``LockedTimerService``. It can
         return a `Deferred`.
         """
 
-    def stop(self):
+    def stop():
         """
         This will be called when ``LockedTimerService`` is shutting down
         """
@@ -65,7 +65,7 @@ class LockedTimerService(MultiService, object):
         self.lock = lock or zk.PollingLock(dispatcher, path)
         self.clock = clock
         self.func = func
-        timer = TimerService(interval, self._check_and_call)
+        timer = TimerService(interval, self._lock_and_call)
         timer.clock = clock
         timer.setServiceParent(self)
 
@@ -84,7 +84,7 @@ class LockedTimerService(MultiService, object):
         d = self.lock.is_acquired()
         return d.addCallback(lambda b: (True, {"has_lock": b}))
 
-    def _check_and_call(self):
+    def _lock_and_call(self):
         """
         Call ``func`` if this node has the lock
         """
