@@ -93,7 +93,7 @@ class SelfHeal(object):
         Get groups to converge and setup scheduled calls to trigger convergence
         on each of them within time_range.
         """
-        groups = yield perform(self.disp,
+        groups = yield perform(self.dispatcher,
                                get_groups_to_converge(self.config_func))
         active = self._cancel_scheduled_calls()
         if active:
@@ -106,7 +106,7 @@ class SelfHeal(object):
         for i, group in enumerate(groups):
             self.calls.append(
                 self.clock.callLater(
-                    i * wait_time, perform, self.disp,
+                    i * wait_time, perform, self.dispatcher,
                     check_and_trigger(group["tenantId"], group["groupId"]))
             )
 

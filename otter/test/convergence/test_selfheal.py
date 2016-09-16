@@ -44,7 +44,7 @@ class SelfHealTests(SynchronousTestCase):
         ``SelfHeal.call`` will setup convergences to be triggered over
         specified time range
         """
-        self.s.disp = SequenceDispatcher(
+        self.s.dispatcher = SequenceDispatcher(
             [(("ggtc", "cf"), const(self.groups))])
         d = self.s.call()
         self.successResultOf(d)
@@ -53,13 +53,14 @@ class SelfHealTests(SynchronousTestCase):
         for i, c in enumerate(calls):
             self.assertEqual(c.getTime(), i * 60)
             self.assertEqual(c.func, sh.perform)
-            self.assertEqual(c.args, (self.s.disp, "t{}g{}".format(i, i)))
+            self.assertEqual(c.args,
+                             (self.s.dispatcher, "t{}g{}".format(i, i)))
 
     def test_call_err(self):
         """
         ``SelfHeal.call`` will log any error and return success
         """
-        self.s.disp = SequenceDispatcher(
+        self.s.dispatcher = SequenceDispatcher(
             [(("ggtc", "cf"), conste(ValueError("h")))])
         d = self.s.call()
         self.successResultOf(d)
@@ -71,7 +72,7 @@ class SelfHealTests(SynchronousTestCase):
         """
         Gets groups and does nothing if there are no groups
         """
-        self.s.disp = SequenceDispatcher([(("ggtc", "cf"), const([]))])
+        self.s.dispatcher = SequenceDispatcher([(("ggtc", "cf"), const([]))])
         self.s.call()
         self.assertEqual(self.s.calls, [])
         self.assertEqual(self.clock.getDelayedCalls(), [])
@@ -87,7 +88,7 @@ class SelfHealTests(SynchronousTestCase):
         call3 = self.clock.callLater(2, noop, None)
         self.clock.advance(0.6)
         self.s.calls = [call1, call2, call3]
-        self.s.disp = SequenceDispatcher(
+        self.s.dispatcher = SequenceDispatcher(
             [(("ggtc", "cf"), const(self.groups))])
         self.s.call()
         self.log.err.assert_called_once_with(
