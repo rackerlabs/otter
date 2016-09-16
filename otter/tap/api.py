@@ -36,6 +36,7 @@ from otter.constants import (
 from otter.convergence.selfheal import SelfHeal
 from otter.convergence.service import Converger
 from otter.effect_dispatcher import get_full_dispatcher
+from otter.lockedtimerservice import LockedTimerService
 from otter.log import log
 from otter.log.cloudfeeds import CloudFeedsObserver
 from otter.log.formatters import add_to_fanout
@@ -319,7 +320,7 @@ def makeService(config):
 
 def setup_selfheal_service(dispatcher, parent, health_checker, log):
     interval = config_value("selfheal.interval") or 300
-    selfheal = SelfHeal(dispatcher, config_value, interval, log)
+    selfheal = SelfHeal(reactor, dispatcher, config_value, interval, log)
     shsvc = LockedTimerService(
         reactor, dispatcher, "/selfheallock", interval, selfheal)
     health_checker.checks["selfheal"] = shsvc.health_check
