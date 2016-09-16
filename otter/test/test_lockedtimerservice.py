@@ -2,6 +2,10 @@
 Tests for `LockedTimerService`
 """
 
+class FakeTimerFunc(ILockedTimerFunc):
+    def __init__(self, testcase):
+        self.testcase = testcase
+
 class LTSService(SynchronousTestCase):
     """
     Tests for :obj:`LockedTimerService`
@@ -10,9 +14,9 @@ class LTSService(SynchronousTestCase):
     def setUp(self):
         self.clock = Clock()
         self.log = mock_log()
-        self.ggtc = patch(
-            self, "otter.convergence.selfheal.get_groups_to_converge",
-            side_effect=intent_func("ggtc"))
         self.lb, lock = create_fake_lock()
-        self.s = sh.SelfHeal("disp", 300, self.log, self.clock, "cf",
-                             lock=lock)
+        self.func = iMock(ILockedTimerFunc)
+        self.s = lts.LockedTimerService(
+            self.clock, "disp", "/path", 10, self.func, lock=lock)
+
+    def

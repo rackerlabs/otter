@@ -1,10 +1,27 @@
+"""
+A service that ensures only one node calls a given function on interval basis
+"""
+
+from effect import ComposedDispatcher, Effect, TypeDispatcher
+from effect.do import do, do_return
+
+from otter.util import zk
+
+from twisted.application.internet import TimerService
+from twisted.application.service import MultiService
+from twisted.internet.defer import maybeDeferred
+
+from txeffect import deferred_performer, perform
+
+from zope.interface import Attribute, Interface
+
 
 class ILockedTimerFunc(Interface):
     """
     Object used by :obj:`LockedTimerService` that provides the function to
     call on interval basis.
     """
-    name = Attribute("name of service used")
+    name = Attribute("name of this service")
     log = Attribute("This service's logger")
 
     def call(self):
@@ -54,10 +71,9 @@ class LockedTimerService(MultiService, object):
 
     def stopService(self):
         """
-        Stop service by cancelling any remaining scheduled calls and releasing
-        the lock
+        Stop service by calling ``self.func.stop`` and releasing the lock
         """
-        super(SelfHeal, self).stopService()
+        super(LockedTimerService, self).stopService()
         return maybeDeferred(self.func.stop).addCallback(
             lambda _: self.lock.release())
 

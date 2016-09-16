@@ -20,7 +20,6 @@ from otter.convergence.service import trigger_convergence
 from otter.log.intents import msg, with_log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
-from otter.util import zk
 
 
 class SelfHeal(object):
@@ -53,6 +52,7 @@ class SelfHeal(object):
         self.time_range = time_range
         self.log = log.bind(otter_service="selfheal")
         self.calls = []
+        self.name = "selfheal"
 
     def call(self):
         d = self._setup_convergences()
