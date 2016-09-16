@@ -319,6 +319,15 @@ def makeService(config):
 
 
 def setup_selfheal_service(dispatcher, parent, health_checker, log):
+    """
+    Setup SelfHeal service and add it to ``parent``
+
+    :param dispatcher: Effect dispatcher
+    :param parent: SelfHeal service created will become its child
+    :param health_checker: ``HealthChecker`` containing all service's health
+        checks
+    :param log: Logger
+    """
     interval = config_value("selfheal.interval") or 300
     selfheal = SelfHeal(reactor, dispatcher, config_value, interval, log)
     shsvc = LockedTimerService(

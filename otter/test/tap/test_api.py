@@ -522,7 +522,8 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.assertEqual(get_fanout(), None)
 
-    @mock.patch('otter.tap.api.SelfHeal')
+    @mock.patch('otter.tap.api.setup_selfheal_service')
+    @mock.patch('otter.tap.api.setup_converger')
     @mock.patch('otter.tap.api.get_full_dispatcher', return_value="disp")
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
@@ -531,7 +532,8 @@ class APIMakeServiceTests(SynchronousTestCase):
     @mock.patch('otter.tap.api.TxLogger')
     def test_kazoo_client_success(self, mock_tx_logger, mock_thread_pool,
                                   mock_kazoo_client, mock_txkz,
-                                  mock_setup_scheduler, mock_gfd, mock_sh):
+                                  mock_setup_scheduler, mock_gfd, mock_cvg,
+                                  mock_shsvc):
         """
         TxKazooClient is started and calls `setup_scheduler`. Its instance
         is also set in store.kz_client after start has finished, and the
@@ -540,6 +542,9 @@ class APIMakeServiceTests(SynchronousTestCase):
         config = test_config.copy()
         config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
         config["selfheal"] = {"interval": 200}
+        config["converger"] = {
+            "interval": 20, "build_timeout": 300,
+            "limited_retry_iterations": 15, "step_limits": {"s": "l"}}
 
         kz_client = mock.Mock(spec=['start', 'stop'])
         start_d = defer.Deferred()
@@ -565,8 +570,9 @@ class APIMakeServiceTests(SynchronousTestCase):
         mock_thread_pool.assert_called_once_with(maxthreads=20)
         kz_client.start.assert_called_once_with(timeout=None)
 
-        # setup_scheduler and store.kz_client is not called yet, and nothing
-        # added to the health checker
+        # setup_scheduler, setup_converger, setup_selfheal_service and
+        # store.kz_client is not called yet, and nothing added to the
+        # health checker
         self.assertFalse(mock_setup_scheduler.called)
         self.assertIsNone(self.store.kz_client)
 
@@ -580,6 +586,10 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.assertEqual(self.health_checker.checks['scheduler'],
                          sch.health_check)
         self.assertEqual(self.Otter.return_value.scheduler, sch)
+        mock_cvg.assert_called_once_with(
+            parent, kz_client, "disp", 20, 300, 15, {"s": "l"})
+        mock_shsvc.assert_called_once_with(
+            "disp", parent, self.health_checker, self.log)
 
         # Check for no logs case also
         mock_txkz.reset_mock()
