@@ -15,13 +15,17 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 
 from txeffect import deferred_performer, perform
 
+from zope.interface import implementer
+
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.service import trigger_convergence
+from otter import lockedtimerservice as lts
 from otter.log.intents import msg, with_log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 
 
+@implementer(lts.ILockedTimerFunc)
 class SelfHeal(object):
     """
     A service that triggers convergence on all the groups on interval basis.
@@ -38,7 +42,9 @@ class SelfHeal(object):
         represents scheduled call to trigger convergence on a group
     """
 
-    def __init__(self, dispatcher, config_func, time_range, log):
+    name = "selfheal"
+
+    def __init__(self, clock, dispatcher, config_func, time_range, log):
         """
         :var float interval: All groups will be scheduled to be triggered
             within this time
@@ -47,16 +53,19 @@ class SelfHeal(object):
         :var lock: lock object used primarily for testing. If not given, a new
             lock will be created from ``zk.PollingLock``
         """
+        self.clock = clock
         self.dispatcher = dispatcher
         self.config_func = config_func
         self.time_range = time_range
-        self.log = log.bind(otter_service="selfheal")
+        self.log = log.bind(otter_service=self.name)
         self.calls = []
-        self.name = "selfheal"
 
     def call(self):
+        """
+        Setup convergencence triggerring and capture any error occurred
+        """
         d = self._setup_convergences()
-        return d.addErrback(self.log.err, "self-heal-setup-err")
+        return d.addErrback(self.log.err, "selfheal-setup-err")
 
     def stop(self):
         """
@@ -82,16 +91,15 @@ class SelfHeal(object):
     def _setup_convergences(self):
         """
         Get groups to converge and setup scheduled calls to trigger convergence
-        on each of them within time_range. For parameters, see
-        :func:`__init__` docs.
+        on each of them within time_range.
         """
         groups = yield perform(self.disp,
                                get_groups_to_converge(self.config_func))
         active = self._cancel_scheduled_calls()
         if active:
             # This should never happen
-            self.log.err(RuntimeError("self-heal-calls-err"),
-                         "self-heal-calls-err", active=active)
+            self.log.err(RuntimeError("selfheal-calls-err"),
+                         "selfheal-calls-err", active=active)
         if not groups:
             returnValue(None)
         wait_time = float(self.time_range) / len(groups)
