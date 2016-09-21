@@ -505,10 +505,18 @@ class CLBNodeLimitError(Exception):
 @attr.s
 class CLBPartialNodesRemoved(Exception):
     """
-    Exception raised when some of the nodes are removed.
+    Exception raised when only some of the nodes are removed.
+
+    :ivar lb_id: CLB ID
+    :type: :obj:`six.text_type`
+    :ivar list not_removed_node_ids: List of node_ids not removed where each
+        node_id is :obj:`six.text_type`
+    :ivar list removed_node_ids: List of node_ids removed where each node_id
+        is :obj:`six.text_type`
     """
-    lb_id = attr.ib()
-    node_ids = attr.ib()    # Node ids not removed
+    lb_id = attr.ib(validator=attr.validators.instance_of(six.text_type))
+    not_removed_node_ids = attr.ib(validator=attr.validators.instance_of(list))
+    removed_node_ids = attr.ib(validator=attr.validators.instance_of(list))
 
 
 def _match_errors(code_keys_exc_mapping, status_code, response_dict):
@@ -649,7 +657,7 @@ def change_clb_node(lb_id, node_id, condition, weight, _type="PRIMARY"):
     # CLB 202 response here has no body, so no response logging needed
 
 
-# Number of nodes that can be deleted in DELETE ../nodes call as per
+# Number of nodes that can be deleted in `DELETE ../nodes` call as per
 # https://developer.rackspace.com/docs/cloud-load-balancers/v1/api-reference/nodes/#bulk-delete-nodes
 CLB_BATCH_DELETE_LIMIT = 10
 
@@ -667,18 +675,19 @@ def remove_clb_nodes(lb_id, node_ids):
     This function will handle the case where *some* of the nodes are valid and
     some aren't, by retrying deleting only the valid ones.
     """
+    node_ids = list(node_ids)
     partial = None
     if len(node_ids) > CLB_BATCH_DELETE_LIMIT:
-        # Limit number of nodes to 10 due to CLB's limit
-        node_ids = list(node_ids)
-        partial = CLBPartialNodesRemoved(lb_id, node_ids[10:])
-        node_ids = node_ids[:10]
-    node_ids = map(str, node_ids)
+        not_removing = node_ids[CLB_BATCH_DELETE_LIMIT:]
+        node_ids = node_ids[:CLB_BATCH_DELETE_LIMIT]
+        partial = CLBPartialNodesRemoved(six.text_type(lb_id),
+                                         map(six.text_type, not_removing),
+                                         map(six.text_type, node_ids))
     eff = service_request(
         ServiceType.CLOUD_LOAD_BALANCERS,
         'DELETE',
         append_segments('loadbalancers', lb_id, 'nodes'),
-        params={'id': node_ids},
+        params={'id': map(str, node_ids)},
         success_pred=has_code(202))
 
     def check_invalid_nodes(exc_info):
@@ -701,7 +710,7 @@ def remove_clb_nodes(lb_id, node_ids):
     ).on(
         error=_only_json_api_errors(
             lambda c, b: _process_clb_api_error(c, b, lb_id))
-    ).on(success=lambda _: raise_(partial) if partial is not None else None)
+    ).on(success=lambda _: None if partial is None else raise_(partial))
     # CLB 202 responses here has no body, so no response logging needed.
 
 
