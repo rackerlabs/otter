@@ -7,7 +7,8 @@ from datetime import datetime
 import attr
 
 from effect import (
-    ComposedDispatcher, Effect, Error, Func, base_dispatcher, sync_perform)
+    ComposedDispatcher, Effect, Error, Func, base_dispatcher, raise_,
+    sync_perform)
 from effect.ref import (
     ModifyReference, ReadReference, Reference, reference_dispatcher)
 from effect.testing import (
@@ -70,7 +71,6 @@ from otter.test.utils import (
     mock_group, mock_log,
     nested_sequence,
     noop,
-    raise_,
     raise_to_exc_info,
     transform_eq)
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat

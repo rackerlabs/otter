@@ -10,6 +10,7 @@ from effect import (
     Effect,
     TypeDispatcher,
     base_dispatcher,
+    raise_,
     sync_perform)
 from effect.testing import EQFDispatcher, SequenceDispatcher, perform_sequence
 
@@ -31,7 +32,9 @@ from otter.cloud_client import (
     CLBImmutableError,
     CLBNodeLimitError,
     CLBNotActiveError,
+    CLBPartialNodesRemoved,
     CLBRateLimitError,
+    CLB_BATCH_DELETE_LIMIT,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
     NoSuchCLBError,
@@ -75,7 +78,6 @@ from otter.test.utils import (
     const,
     nested_sequence,
     noop,
-    raise_,
     resolve_effect,
     stub_json_response,
     stub_pure_response
@@ -852,7 +854,7 @@ class CLBClientTests(SynchronousTestCase):
         A DELETE request is sent, and the Effect returns None if 202 is
         returned.
         """
-        eff = remove_clb_nodes(self.lb_id, [1, 2])
+        eff = remove_clb_nodes(self.lb_id, ["1", "2"])
         seq = [
             (self.expected_node_removal_req().intent,
              service_request_eqf(stub_pure_response({}, 202))),
@@ -865,13 +867,13 @@ class CLBClientTests(SynchronousTestCase):
         Common CLB errors about it being in a deleted state, pending update,
         etc. are handled.
         """
-        eff = remove_clb_nodes(self.lb_id, [1, 2])
+        eff = remove_clb_nodes(self.lb_id, ["1", "2"])
         assert_parses_common_clb_errors(
             self, self.expected_node_removal_req().intent, eff, "123456")
 
     def test_remove_clb_nodes_non_202(self):
         """Any random HTTP response code is bubbled up as an APIError."""
-        eff = remove_clb_nodes(self.lb_id, [1, 2])
+        eff = remove_clb_nodes(self.lb_id, ["1", "2"])
         seq = [
             (self.expected_node_removal_req().intent,
              service_request_eqf(stub_pure_response({}, 200))),
@@ -887,7 +889,7 @@ class CLBClientTests(SynchronousTestCase):
             "random non-json"
         ]
         for body in error_bodies:
-            eff = remove_clb_nodes(self.lb_id, [1, 2])
+            eff = remove_clb_nodes(self.lb_id, ["1", "2"])
             seq = [
                 (self.expected_node_removal_req().intent,
                  service_request_eqf(stub_pure_response(body, 400))),
@@ -899,19 +901,41 @@ class CLBClientTests(SynchronousTestCase):
         When CLB returns an error indicating that some of the nodes are
         invalid, the request is retried without the offending nodes.
         """
-        eff = remove_clb_nodes(self.lb_id, [1, 2, 3, 4])
+        node_ids = map(str, range(1, 5))
+        eff = remove_clb_nodes(self.lb_id, node_ids)
         response = stub_pure_response(
             {'validationErrors': {'messages': [
                 'Node ids 1,3 are not a part of your loadbalancer']}},
             400)
         response2 = stub_pure_response({}, 202)
         seq = [
-            (self.expected_node_removal_req([1, 2, 3, 4]).intent,
+            (self.expected_node_removal_req(node_ids).intent,
              service_request_eqf(response)),
-            (self.expected_node_removal_req([2, 4]).intent,
+            (self.expected_node_removal_req(["2", "4"]).intent,
              service_request_eqf(response2))
         ]
         self.assertIs(perform_sequence(seq, eff), None)
+
+    def test_remove_clb_nodes_partial_success(self):
+        """
+        ``remove_clb_nodes`` removes only CLB_BATCH_DELETE_LIMIT nodes and
+        raises ``CLBPartialNodesRemoved`` with remaining nodes
+        """
+        limit = CLB_BATCH_DELETE_LIMIT
+        node_ids = map(str, range(limit + 2))
+        removed = map(six.text_type, range(limit))
+        not_removed = map(six.text_type, range(limit, limit + 2))
+        eff = remove_clb_nodes(self.lb_id, node_ids)
+        seq = [
+            (self.expected_node_removal_req(removed).intent,
+             service_request_eqf(stub_pure_response({}, 202))),
+        ]
+        with self.assertRaises(CLBPartialNodesRemoved) as ce:
+            perform_sequence(seq, eff)
+        self.assertEqual(
+            ce.exception,
+            CLBPartialNodesRemoved(
+                six.text_type(self.lb_id), not_removed, removed))
 
     def test_get_clbs(self):
         """Returns all the load balancer details from the LBs endpoint."""

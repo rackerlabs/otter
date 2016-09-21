@@ -1,7 +1,8 @@
 """
 Tests for :obj:`otter.test.utils`.
 """
-from effect import ComposedDispatcher, Effect, base_dispatcher, sync_performer
+from effect import (
+    ComposedDispatcher, Effect, base_dispatcher, raise_, sync_performer)
 from effect.testing import perform_sequence
 
 from mock import ANY
@@ -14,7 +15,6 @@ from zope.interface import Attribute, Interface
 
 from otter.test.utils import (
     iMock,
-    raise_,
     retry_sequence
 )
 from otter.util.retry import (

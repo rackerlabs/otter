@@ -2,7 +2,7 @@
 Tests for :mod:`otter.convergence.selfheal`
 """
 
-from effect import Effect, base_dispatcher, sync_perform
+from effect import Effect, base_dispatcher, raise_, sync_perform
 from effect.testing import SequenceDispatcher
 
 import mock
@@ -19,7 +19,7 @@ from otter.models.interface import (
 from otter.test.util.test_zk import create_fake_lock
 from otter.test.utils import (
     CheckFailure, const, intent_func, mock_log, nested_sequence, noop, patch,
-    perform_sequence, raise_)
+    perform_sequence)
 
 
 class SelfHealTests(SynchronousTestCase):

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from effect import (
     ComposedDispatcher,
     Effect,
+    raise_,
     sync_perform)
 from effect.testing import (
     SequenceDispatcher, parallel_sequence, perform_sequence)
@@ -42,7 +43,6 @@ from otter.test.utils import (
     nested_sequence,
     noop,
     patch,
-    raise_,
     set_non_conv_tenant,
     test_dispatcher)
 from otter.util.config import set_config_data

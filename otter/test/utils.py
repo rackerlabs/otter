@@ -10,7 +10,7 @@ from operator import attrgetter
 
 from effect import (
     ComposedDispatcher, Constant, Effect, ParallelEffects, TypeDispatcher,
-    base_dispatcher)
+    base_dispatcher, raise_)
 from effect.async import perform_parallel_async
 from effect.testing import (
     perform_sequence,
@@ -884,11 +884,6 @@ def match_all(things):
     the given things.
     """
     return transform_eq(lambda o: [o]*len(things), things)
-
-
-def raise_(e):
-    """Raise the exception. Useful for lambdas."""
-    raise e
 
 
 def raise_to_exc_info(e):

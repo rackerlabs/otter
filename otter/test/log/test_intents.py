@@ -7,6 +7,7 @@ from effect import (
     Constant,
     Effect,
     base_dispatcher,
+    raise_,
     sync_perform)
 from effect.testing import perform_sequence
 
@@ -26,7 +27,7 @@ from otter.log.intents import (
     msg_with_time,
     with_log)
 from otter.test.utils import (
-    CheckFailureValue, IsBoundWith, matches, mock_log, raise_)
+    CheckFailureValue, IsBoundWith, matches, mock_log)
 
 
 class LogDispatcherTests(SynchronousTestCase):
