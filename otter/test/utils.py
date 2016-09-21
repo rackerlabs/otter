@@ -10,7 +10,7 @@ from operator import attrgetter
 
 from effect import (
     ComposedDispatcher, Constant, Effect, ParallelEffects, TypeDispatcher,
-    base_dispatcher)
+    base_dispatcher, raise_)
 from effect.async import perform_parallel_async
 from effect.testing import (
     perform_sequence,
@@ -44,7 +44,7 @@ from otter.models.interface import IScalingGroup, IScalingGroupServersCache
 from otter.supervisor import ISupervisor
 from otter.util.config import set_config_data, update_config_data
 from otter.util.deferredutils import DeferredPool
-from otter.util.fp import raise_, set_in
+from otter.util.fp import set_in
 from otter.util.retry import Retry, ShouldDelayAndRetry, perform_retry
 
 

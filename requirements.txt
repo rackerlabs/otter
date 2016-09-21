@@ -12,7 +12,7 @@ testtools==1.9.0
 croniter==0.3.5
 txkazoo==0.0.6b2
 kazoo==2.2.1
-effect==0.10
+effect==0.10.1
 txeffect==0.9
 characteristic==14.3.0
 attrs==15.0.0

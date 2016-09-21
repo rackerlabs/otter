@@ -122,8 +122,3 @@ def set_in(mapping, keys, new_value):
     else:
         child = mapping.get(keys[0], pmap())
         return mapping.set(keys[0], set_in(child, keys[1:], new_value))
-
-
-def raise_(e):
-    """Raise the exception. Useful for lambdas."""
-    raise e

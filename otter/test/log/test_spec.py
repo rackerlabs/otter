@@ -3,6 +3,8 @@ Tests for log_spec.py
 """
 import json
 
+from effect import raise_
+
 from toolz.dicttoolz import assoc, dissoc
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -17,7 +19,6 @@ from otter.log.spec import (
     split_list_servers
 )
 from otter.test.utils import CheckFailureValue
-from otter.util.fp import raise_
 
 
 class SpecificationObserverWrapperTests(SynchronousTestCase):

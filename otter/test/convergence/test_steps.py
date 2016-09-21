@@ -2,7 +2,7 @@
 import json
 from uuid import uuid4
 
-from effect import Effect, Func, base_dispatcher, sync_perform
+from effect import Effect, Func, base_dispatcher, raise_, sync_perform
 from effect.testing import SequenceDispatcher, perform_sequence
 
 from mock import ANY, patch
@@ -71,7 +71,6 @@ from otter.test.utils import (
     stack,
     stub_pure_response,
     transform_eq)
-from otter.util.fp import raise_
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError
 from otter.util.retry import (

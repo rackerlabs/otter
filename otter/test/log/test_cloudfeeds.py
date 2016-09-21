@@ -3,7 +3,7 @@ Tests for otter.cloudfeeds
 """
 from functools import partial
 
-from effect import Effect, TypeDispatcher
+from effect import Effect, TypeDispatcher, raise_
 from effect.testing import perform_sequence
 
 import mock
@@ -35,7 +35,6 @@ from otter.test.utils import (
     retry_sequence,
     stub_pure_response
 )
-from otter.util.fp import raise_
 from otter.util.http import APIError
 from otter.util.retry import (
     Retry,

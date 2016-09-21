@@ -10,6 +10,7 @@ from effect import (
     Effect,
     TypeDispatcher,
     base_dispatcher,
+    raise_,
     sync_perform)
 from effect.testing import EQFDispatcher, SequenceDispatcher, perform_sequence
 
@@ -83,7 +84,6 @@ from otter.test.utils import (
 )
 from otter.test.worker.test_launch_server_v1 import fake_service_catalog
 from otter.util.config import set_config_data
-from otter.util.fp import raise_
 from otter.util.http import APIError, headers
 from otter.util.pure_http import Request, has_code
 from otter.util.weaklocks import WeakLocks

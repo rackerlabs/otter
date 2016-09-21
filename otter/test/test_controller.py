@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from effect import (
     ComposedDispatcher,
     Effect,
+    raise_,
     sync_perform)
 from effect.testing import (
     SequenceDispatcher, parallel_sequence, perform_sequence)
@@ -45,7 +46,7 @@ from otter.test.utils import (
     set_non_conv_tenant,
     test_dispatcher)
 from otter.util.config import set_config_data
-from otter.util.fp import assoc_obj, raise_
+from otter.util.fp import assoc_obj
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import MIN

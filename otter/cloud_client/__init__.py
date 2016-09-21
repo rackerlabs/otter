@@ -15,6 +15,7 @@ from effect import (
     TypeDispatcher,
     catch,
     perform,
+    raise_,
     sync_performer)
 from effect.do import do, do_return
 
@@ -33,7 +34,6 @@ from otter.constants import ServiceType
 from otter.indexer import atom
 from otter.log.intents import msg as msg_effect
 from otter.util.config import config_value
-from otter.util.fp import raise_
 from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.http import headers as otter_headers
 from otter.util.pure_http import (

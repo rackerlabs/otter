@@ -1,7 +1,8 @@
 """
 Tests for :obj:`otter.test.utils`.
 """
-from effect import ComposedDispatcher, Effect, base_dispatcher, sync_performer
+from effect import (
+    ComposedDispatcher, Effect, base_dispatcher, raise_, sync_performer)
 from effect.testing import perform_sequence
 
 from mock import ANY
@@ -16,7 +17,6 @@ from otter.test.utils import (
     iMock,
     retry_sequence
 )
-from otter.util.fp import raise_
 from otter.util.retry import (
     Retry,
     ShouldDelayAndRetry,
