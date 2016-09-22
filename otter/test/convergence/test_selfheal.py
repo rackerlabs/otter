@@ -34,19 +34,20 @@ class SelfHealTests(SynchronousTestCase):
         self.log = mock_log()
         self.patch(sh, "get_groups_to_converge", intent_func("ggtc"))
         self.patch(sh, "check_and_trigger", lambda t, g: t + g)
-        self.s = sh.SelfHeal(self.clock, base_dispatcher, "cf", 300.0, self.log)
+        self.s = sh.SelfHeal(self.clock, base_dispatcher, "cf", 300.0,
+                             self.log)
         self.groups = [
             {"tenantId": "t{}".format(i), "groupId": "g{}".format(i)}
             for i in range(5)]
 
     def test_call(self):
         """
-        ``SelfHeal.call`` will setup convergences to be triggered over
-        specified time range
+        ``self.s()`` will setup convergences to be triggered over specified
+        time range
         """
         self.s.dispatcher = SequenceDispatcher(
             [(("ggtc", "cf"), const(self.groups))])
-        d = self.s.call()
+        d = self.s()
         self.successResultOf(d)
         calls = self.clock.getDelayedCalls()
         self.assertEqual(self.s._calls, calls)
@@ -58,11 +59,11 @@ class SelfHealTests(SynchronousTestCase):
 
     def test_call_err(self):
         """
-        ``SelfHeal.call`` will log any error and return success
+        ``self.s()`` will log any error and return success
         """
         self.s.dispatcher = SequenceDispatcher(
             [(("ggtc", "cf"), conste(ValueError("h")))])
-        d = self.s.call()
+        d = self.s()
         self.successResultOf(d)
         self.log.err.assert_called_once_with(
             CheckFailure(ValueError), "selfheal-setup-err",
@@ -73,7 +74,8 @@ class SelfHealTests(SynchronousTestCase):
         Gets groups and does nothing if there are no groups
         """
         self.s.dispatcher = SequenceDispatcher([(("ggtc", "cf"), const([]))])
-        self.s.call()
+        d = self.s()
+        self.successResultOf(d)
         self.assertEqual(self.s._calls, [])
         self.assertEqual(self.clock.getDelayedCalls(), [])
 
@@ -90,22 +92,13 @@ class SelfHealTests(SynchronousTestCase):
         self.s._calls = [call1, call2, call3]
         self.s.dispatcher = SequenceDispatcher(
             [(("ggtc", "cf"), const(self.groups))])
-        self.s.call()
+        d = self.s()
+        self.successResultOf(d)
         self.log.err.assert_called_once_with(
             matches(IsInstance(RuntimeError)), "selfheal-calls-err", active=2,
             otter_service="selfheal")
         self.assertFalse(call1.active())
         self.assertFalse(call2.active())
-
-    def test_stop(self):
-        """
-        `stop` will cancel any scheduled calls
-        """
-        self.test_call()
-        calls = self.s._calls[:]
-        d = self.s.stop()
-        # calls cancelled
-        self.assertTrue(all(not c.active() for c in calls))
 
 
 class GetGroupsToConvergeTests(SynchronousTestCase):

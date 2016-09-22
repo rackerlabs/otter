@@ -29,12 +29,11 @@ from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 
 
-@implementer(lts.ILockedTimerFunc)
 @attr.s
 class SelfHeal(object):
     """
     A class that triggers convergence on all the groups over a time range when
-    its ``call`` method is called
+    its called as a function
 
     :ivar clock: Reactor providing timing APIs
     :vartype: :obj:`IReactorTime`
@@ -51,7 +50,6 @@ class SelfHeal(object):
         represents scheduled call to trigger convergence on a group
     """
 
-    name = "selfheal"
     clock = attr.ib(validator=attr.validators.provides(IReactorTime))
     dispatcher = attr.ib(
         validator=attr.validators.instance_of((ComposedDispatcher,
@@ -60,21 +58,15 @@ class SelfHeal(object):
     time_range = attr.ib(validator=attr.validators.instance_of(float))
     log = attr.ib(
         validator=attr.validators.instance_of(BoundLog),
-        convert=lambda l: l.bind(otter_service=SelfHeal.name))
+        convert=lambda l: l.bind(otter_service="selfheal"))
     _calls = attr.ib(default=attr.Factory(list))
 
-    def call(self):
+    def __call__(self):
         """
         Setup convergencence triggerring and capture any error occurred
         """
         d = self._setup_convergences()
         return d.addErrback(self.log.err, "selfheal-setup-err")
-
-    def stop(self):
-        """
-        Stop by cancel any remaining scheduled calls
-        """
-        self._cancel_scheduled_calls()
 
     def _cancel_scheduled_calls(self):
         """
