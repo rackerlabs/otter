@@ -310,7 +310,8 @@ def makeService(config):
                 config_value('converger.step_limits') or {})
 
             # Setup selfheal service
-            setup_selfheal_service(dispatcher, parent, health_checker, log)
+            setup_selfheal_service(config, dispatcher, parent, health_checker,
+                                   log)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
@@ -318,7 +319,7 @@ def makeService(config):
     return parent
 
 
-def setup_selfheal_service(dispatcher, parent, health_checker, log):
+def setup_selfheal_service(config, dispatcher, parent, health_checker, log):
     """
     Setup SelfHeal service and add it to ``parent``
 
@@ -328,7 +329,7 @@ def setup_selfheal_service(dispatcher, parent, health_checker, log):
         checks
     :param log: Logger
     """
-    interval = config_value("selfheal.interval") or 300
+    interval = get_in(["selfheal", "interval"], config, default=300)
     selfheal = SelfHeal(reactor, dispatcher, config_value, interval, log)
     shsvc = LockedTimerService(
         reactor, dispatcher, "/selfheallock", interval, selfheal)

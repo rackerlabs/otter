@@ -771,6 +771,36 @@ class APIMakeServiceTests(SynchronousTestCase):
         self._test_selfheal_service(mock_sc, mock_txkz, mock_sh, {}, 300)
 
 
+class SetupSelfhealTests(SynchronousTestCase):
+    """
+    Test for :func:`setup_selfheal_service`
+    """
+
+    def test_setup_from_config(self):
+        """
+        SelfHeal service is configured via LockedTimerService
+        """
+        parent = MultiService()
+        health_checker = HealthChecker("clock" {})
+
+        setup_selfheal_service(
+            {"selfheal": {"interval": 30}},
+            "dispatcher",
+            parent,
+            health_checker,
+            "log")
+
+        shsvc = mock_lts.return_value
+        from otter.tap.api import reactor
+        mock_lts.assert_called_once_with(
+            reactor, "dispatcher", "/selfheallock", 30, mock.ANY)
+        sh = mock_lts.mock_calls
+        self.assertIs(next(list(parent)), shsvc)
+        self.assertIs(health_checker.checks["selfheal"], shsvc.health_check)
+        self.assertEqual()
+
+
+
 class ConvergerSetupTests(SynchronousTestCase):
     """Tests for :func:`setup_converger`."""
 
