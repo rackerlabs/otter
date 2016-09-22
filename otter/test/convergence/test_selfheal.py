@@ -34,7 +34,7 @@ class SelfHealTests(SynchronousTestCase):
         self.log = mock_log()
         self.patch(sh, "get_groups_to_converge", intent_func("ggtc"))
         self.patch(sh, "check_and_trigger", lambda t, g: t + g)
-        self.s = sh.SelfHeal(self.clock, "disp", "cf", 300, self.log)
+        self.s = sh.SelfHeal(self.clock, base_dispatcher, "cf", 300.0, self.log)
         self.groups = [
             {"tenantId": "t{}".format(i), "groupId": "g{}".format(i)}
             for i in range(5)]
@@ -49,7 +49,7 @@ class SelfHealTests(SynchronousTestCase):
         d = self.s.call()
         self.successResultOf(d)
         calls = self.clock.getDelayedCalls()
-        self.assertEqual(self.s.calls, calls)
+        self.assertEqual(self.s._calls, calls)
         for i, c in enumerate(calls):
             self.assertEqual(c.getTime(), i * 60)
             self.assertEqual(c.func, sh.perform)
@@ -74,7 +74,7 @@ class SelfHealTests(SynchronousTestCase):
         """
         self.s.dispatcher = SequenceDispatcher([(("ggtc", "cf"), const([]))])
         self.s.call()
-        self.assertEqual(self.s.calls, [])
+        self.assertEqual(self.s._calls, [])
         self.assertEqual(self.clock.getDelayedCalls(), [])
 
     def test_call_still_active(self):
@@ -87,7 +87,7 @@ class SelfHealTests(SynchronousTestCase):
         call2 = self.clock.callLater(0, noop, None)
         call3 = self.clock.callLater(2, noop, None)
         self.clock.advance(0.6)
-        self.s.calls = [call1, call2, call3]
+        self.s._calls = [call1, call2, call3]
         self.s.dispatcher = SequenceDispatcher(
             [(("ggtc", "cf"), const(self.groups))])
         self.s.call()
@@ -102,7 +102,7 @@ class SelfHealTests(SynchronousTestCase):
         `stop` will cancel any scheduled calls
         """
         self.test_call()
-        calls = self.s.calls[:]
+        calls = self.s._calls[:]
         d = self.s.stop()
         # calls cancelled
         self.assertTrue(all(not c.active() for c in calls))

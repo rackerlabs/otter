@@ -4,6 +4,8 @@ distributing the triggering over a period of time in effect "heal"ing the
 groups.
 """
 
+import attr
+
 from effect import ComposedDispatcher, Effect, TypeDispatcher
 from effect.do import do, do_return
 
@@ -12,6 +14,7 @@ from toolz.curried import filter
 from twisted.application.internet import TimerService
 from twisted.application.service import MultiService
 from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.interfaces import IReactorTime
 
 from txeffect import deferred_performer, perform
 
@@ -20,45 +23,45 @@ from zope.interface import implementer
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.service import trigger_convergence
 from otter import lockedtimerservice as lts
+from otter.log import BoundLog
 from otter.log.intents import msg, with_log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 
 
 @implementer(lts.ILockedTimerFunc)
+@attr.s
 class SelfHeal(object):
     """
-    A service that triggers convergence on all the groups on interval basis.
-    Only one node is allowed to do this.
+    A class that triggers convergence on all the groups over a time range when
+    its ``call`` method is called
 
-    :ivar disp: Effect dispatcher to perform all effects (ZK, CASS, log, etc)
-    :type disp: Either :obj:`ComposedDispatcher` or :obj:`TypeDispatcher`
-
-    :ivar log: Twisted logger with .msg and .err methods
-    :ivar lock: Lock object from :obj:`TxKazooClient`
-    :ivar TxKazooClient kz_client: Twistified kazoo client object
-    :ivar IReactorTime clock: Reactor providing timing APIs
-    :ivar list calls: List of `IDelayedCall` objects. Each object
+    :ivar clock: Reactor providing timing APIs
+    :vartype: :obj:`IReactorTime`
+    :ivar dispatcher: Effect dispatcher to perform all effects
+        (ZK, CASS, log, etc)
+    :vartype dispatcher: Either :obj:`ComposedDispatcher` or
+        :obj:`TypeDispatcher`
+    :ivar callable config_func: Callable used when calling
+        :func:`tenant_is_enabled`
+    :ivar float time_range: Seconds over which convergence triggerring will be
+        spread evenly
+    :ivar log: :obj:`BoundLog` object used to log messages
+    :ivar list _calls: List of :obj:`IDelayedCall` objects. Each object
         represents scheduled call to trigger convergence on a group
     """
 
     name = "selfheal"
-
-    def __init__(self, clock, dispatcher, config_func, time_range, log):
-        """
-        :var float interval: All groups will be scheduled to be triggered
-            within this time
-        :var callable config_func: Callable used when calling
-            :func:`tenant_is_enabled`
-        :var lock: lock object used primarily for testing. If not given, a new
-            lock will be created from ``zk.PollingLock``
-        """
-        self.clock = clock
-        self.dispatcher = dispatcher
-        self.config_func = config_func
-        self.time_range = time_range
-        self.log = log.bind(otter_service=self.name)
-        self.calls = []
+    clock = attr.ib(validator=attr.validators.provides(IReactorTime))
+    dispatcher = attr.ib(
+        validator=attr.validators.instance_of((ComposedDispatcher,
+                                               TypeDispatcher)))
+    config_func = attr.ib()
+    time_range = attr.ib(validator=attr.validators.instance_of(float))
+    log = attr.ib(
+        validator=attr.validators.instance_of(BoundLog),
+        convert=lambda l: l.bind(otter_service=SelfHeal.name))
+    _calls = attr.ib(default=attr.Factory(list))
 
     def call(self):
         """
@@ -80,11 +83,11 @@ class SelfHeal(object):
         :return: Number of remaining active scheduled calls before cancelling
         """
         active = 0
-        for call in self.calls:
+        for call in self._calls:
             if call.active():
                 active += 1
                 call.cancel()
-        self.calls = []
+        self._calls = []
         return active
 
     @inlineCallbacks
@@ -104,7 +107,7 @@ class SelfHeal(object):
             returnValue(None)
         wait_time = float(self.time_range) / len(groups)
         for i, group in enumerate(groups):
-            self.calls.append(
+            self._calls.append(
                 self.clock.callLater(
                     i * wait_time, perform, self.dispatcher,
                     check_and_trigger(group["tenantId"], group["groupId"]))
