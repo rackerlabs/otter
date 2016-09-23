@@ -9,7 +9,6 @@ import mock
 
 from testtools.matchers import IsInstance
 
-from twisted.internet.defer import fail, succeed
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -18,10 +17,9 @@ from otter.log.intents import BoundFields, Log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
 from otter.models.interface import (
     GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
-from otter.test.util.test_zk import create_fake_lock
 from otter.test.utils import (
     CheckFailure, const, conste, intent_func, matches, mock_log,
-    nested_sequence, noop, patch, perform_sequence)
+    nested_sequence, noop, perform_sequence)
 
 
 class SelfHealTests(SynchronousTestCase):
