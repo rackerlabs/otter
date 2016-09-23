@@ -7,22 +7,17 @@ groups.
 import attr
 
 from effect import ComposedDispatcher, Effect, TypeDispatcher
-from effect.do import do, do_return
+from effect.do import do
 
 from toolz.curried import filter
 
-from twisted.application.internet import TimerService
-from twisted.application.service import MultiService
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.interfaces import IReactorTime
 
-from txeffect import deferred_performer, perform
-
-from zope.interface import implementer
+from txeffect import perform
 
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.service import trigger_convergence
-from otter import lockedtimerservice as lts
 from otter.log import BoundLog
 from otter.log.intents import msg, with_log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
