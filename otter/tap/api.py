@@ -51,7 +51,7 @@ from otter.supervisor import SupervisorService, set_supervisor
 from otter.util.config import config_value, set_config_data
 from otter.util.cqlbatch import TimingOutCQLClient
 from otter.util.deferredutils import timeout_deferred
-from otter.util.zk import locked_logged_func, create_health_check
+from otter.util.zk import create_health_check, locked_logged_func
 from otter.util.zkpartitioner import Partitioner
 
 assert os.environ.get("PYRSISTENT_NO_C_EXTENSION"), (
@@ -322,15 +322,21 @@ def makeService(config):
     return parent
 
 
-def setup_selfheal_service(clock, config, dispatcher, parent, health_checker, log):
+def setup_selfheal_service(clock, config, dispatcher, parent, health_checker,
+                           log):
     """
-    Setup SelfHeal service and add it to ``parent``
+    Setup selfheal timer service and add it to ``parent``
 
+    :param clock: :obj:`IReactorTime` provider
+    :param dict config: Configuration dict containing selfheal info
     :param dispatcher: Effect dispatcher
     :param parent: SelfHeal service created will become its child
-    :param health_checker: ``HealthChecker`` containing all service's health
-        checks
-    :param log: Logger
+    :type: :obj:`MultiService`
+    :param health_checker: ``HealthChecker`` object where SelfHeal's health
+        check will be added
+    :param log: :obj:`BoundLog` logger used by service
+
+    :return: None
     """
     interval = get_in(["selfheal", "interval"], config, default=300)
     selfheal = SelfHeal(clock, dispatcher, config_value, interval, log)
