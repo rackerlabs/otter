@@ -21,7 +21,8 @@ from kazoo.exceptions import (
 from twisted.internet.defer import fail, maybeDeferred, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.test.utils import const, conste, intent_func, mock_log, noop, test_dispatcher
+from otter.test.utils import (
+    const, conste, intent_func, mock_log, noop, test_dispatcher)
 from otter.util import zk
 from otter.util.zk import (
     CreateOrSet, CreateOrSetLoopLimitReachedError,
@@ -683,11 +684,7 @@ class LockedTests(SynchronousTestCase):
     """
 
     def setUp(self):
-        self.i = 0
-        def f():
-            self.i += 1
-            return succeed("ret" + str(self.i))
-        self.func = f
+        self.func = lambda: succeed("ret")
         self.lb, lock = create_fake_lock()
         self.lf = zk.locked(lock, base_dispatcher, self.func)
 
@@ -698,7 +695,7 @@ class LockedTests(SynchronousTestCase):
         """
         self.lb.acquired = True
         d = self.lf()
-        self.assertEqual(self.successResultOf(d), ("ret1", False))
+        self.assertEqual(self.successResultOf(d), ("ret", False))
 
     def test_func_called_lock_acquired(self):
         """
@@ -708,7 +705,7 @@ class LockedTests(SynchronousTestCase):
         self.lb.acquired = False
         self.lb.acquire_call = (False, None, True)
         d = self.lf()
-        self.assertEqual(self.successResultOf(d), ("ret1", True))
+        self.assertEqual(self.successResultOf(d), ("ret", True))
 
     def test_func_not_called(self):
         """
