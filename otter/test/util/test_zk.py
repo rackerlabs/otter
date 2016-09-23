@@ -11,7 +11,7 @@ from characteristic import attributes
 
 from effect import (
     ComposedDispatcher, Constant, Delay, Effect, Error, Func, TypeDispatcher,
-    sync_perform)
+    base_dispatcher, sync_perform)
 from effect.testing import SequenceDispatcher, perform_sequence
 
 from kazoo.exceptions import (
@@ -21,7 +21,7 @@ from kazoo.exceptions import (
 from twisted.internet.defer import fail, maybeDeferred, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.test.utils import const, conste, intent_func, noop, test_dispatcher
+from otter.test.utils import const, conste, intent_func, mock_log, noop, test_dispatcher
 from otter.util import zk
 from otter.util.zk import (
     CreateOrSet, CreateOrSetLoopLimitReachedError,
@@ -629,3 +629,186 @@ class PollingLockTests(SynchronousTestCase):
             (("is_acquired",), const("ret"))])
         self.lock.is_acquired_eff = intent_func("is_acquired")
         self.assertEqual(self.successResultOf(self.lock.is_acquired()), "ret")
+
+
+class CallIfAcquiredTests(SynchronousTestCase):
+    """
+    Tests for :func:`call_if_acquired`
+    """
+    def setUp(self):
+        self.lb, self.lock = create_fake_lock()
+
+    def test_lock_not_acquired(self):
+        """
+        When lock is not acquired, it is tried and if failed does not
+        call eff
+        """
+        self.lb.acquired = False
+        self.lb.acquire_call = (False, None, False)
+        self.assertEqual(
+            sync_perform(
+                base_dispatcher,
+                zk.call_if_acquired(self.lock, Effect("call"))),
+            (zk.NOT_CALLED, False))
+
+    def test_lock_acquired(self):
+        """
+        When lock is not acquired, it is tried and if successful calls eff
+        """
+        self.lb.acquired = False
+        self.lb.acquire_call = (False, None, True)
+        seq = [("call", const("eff_return"))]
+        self.assertEqual(
+            perform_sequence(
+                seq,
+                zk.call_if_acquired(self.lock, Effect("call"))),
+            ("eff_return", True))
+
+    def test_lock_already_acquired(self):
+        """
+        If lock is already acquired, it will just call eff
+        """
+        self.lb.acquired = True
+        seq = [("call", const("eff_return"))]
+        self.assertEqual(
+            perform_sequence(
+                seq,
+                zk.call_if_acquired(self.lock, Effect("call"))),
+            ("eff_return", False))
+
+
+class LockedTests(SynchronousTestCase):
+    """
+    Tests for :func:`locked`
+    """
+
+    def setUp(self):
+        self.i = 0
+        def f():
+            self.i += 1
+            return succeed("ret" + str(self.i))
+        self.func = f
+        self.lb, lock = create_fake_lock()
+        self.lf = zk.locked(lock, base_dispatcher, self.func)
+
+    def test_func_called_lock_already_acquired(self):
+        """
+        `self.func` is called if ``call_if_acquired`` returns the fact that
+        lock is already acquired
+        """
+        self.lb.acquired = True
+        d = self.lf()
+        self.assertEqual(self.successResultOf(d), ("ret1", False))
+
+    def test_func_called_lock_acquired(self):
+        """
+        ``self.func`` is called if ``call_if_acquired`` calls effect after
+        acquiring the lock and acquired message is logged
+        """
+        self.lb.acquired = False
+        self.lb.acquire_call = (False, None, True)
+        d = self.lf()
+        self.assertEqual(self.successResultOf(d), ("ret1", True))
+
+    def test_func_not_called(self):
+        """
+        ``self.func`` is not called if ``call_if_acquired`` returns lock not
+        acquired
+        """
+        self.lb.acquired = False
+        self.lb.acquire_call = (False, None, False)
+        d = self.lf()
+        self.assertEqual(self.successResultOf(d), (zk.NOT_CALLED, False))
+
+
+class AddAcquiredLogTests(SynchronousTestCase):
+    """
+    Tests for :func:`add_acquired_log`
+    """
+
+    def setUp(self):
+        self.log = mock_log()
+        self.ret = ("r", True)
+        self.func = lambda: succeed(self.ret)
+        self.wf = zk.add_acquired_log(self.log, "m", self.func)
+
+    def test_message_logged(self):
+        """
+        Message is logged when function returns True as second element. Returns
+        first element.
+        """
+        d = self.wf()
+        self.assertEqual(self.successResultOf(d), "r")
+        self.log.msg.assert_called_once_with("m")
+
+    def test_not_logged(self):
+        """
+        Message is not logged when function returns True as second element.
+        Returns first element.
+        """
+        self.ret = ("r", False)
+        d = self.wf()
+        self.assertEqual(self.successResultOf(d), "r")
+        self.assertFalse(self.log.msg.called)
+
+
+class LockedLoggedFuncTests(SynchronousTestCase):
+    """
+    Tests for :func:`locked_logged_func`
+    """
+
+    def test_composition(self):
+        """
+        Ensure :func:`locked` and :func:`add_acquired_log` are called in
+        sequence with correct parameters
+        """
+
+        def PL(d, p):
+            self.assertEqual((d, p), ("disp", "/path"))
+            return "lock"
+
+        def locked(l, d, f, a):
+            self.assertEqual((l, d, f, a), ("lock", "disp", "func", 1))
+            return "locked_f"
+
+        def aal(l, m, f):
+            self.assertEqual((l, m, f), ("log", "msg", "locked_f"))
+            return "llf"
+
+        self.patch(zk, "PollingLock", PL)
+        self.patch(zk, "locked", locked)
+        self.patch(zk, "add_acquired_log", aal)
+
+        wf, lock = zk.locked_logged_func("disp", "/path", "log", "msg",
+                                         "func", 1)
+
+        self.assertEqual(wf, "llf")
+        self.assertEqual(lock, "lock")
+
+
+class CreateHealthCheckTests(SynchronousTestCase):
+    """
+    Tests for :func:`create_health_check`
+    """
+
+    def setUp(self):
+        self.lb, lock = create_fake_lock()
+        self.health_check = zk.create_health_check(lock)
+
+    def test_acquired(self):
+        """
+        Returned function returns True when lock is acquired
+        """
+        self.lb.acquired = True
+        self.assertEqual(
+            self.successResultOf(self.health_check()),
+            (True, {"has_lock": True}))
+
+    def test_not_acquired(self):
+        """
+        Returned function returns False when lock is not acquired
+        """
+        self.lb.acquired = False
+        self.assertEqual(
+            self.successResultOf(self.health_check()),
+            (True, {"has_lock": False}))

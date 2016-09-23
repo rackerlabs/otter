@@ -8,11 +8,13 @@ import attr
 from characteristic import attributes
 
 from effect import (
-    Constant, Delay, Effect, Func, TypeDispatcher, catch, parallel,
-    sync_performer)
+    ComposedDispatcher, Constant, Delay, Effect, Func, TypeDispatcher, catch,
+    parallel, sync_performer)
 from effect.do import do, do_return
 
 from kazoo.exceptions import LockTimeout, NoNodeError, NodeExistsError
+
+from twisted.internet.defer import maybeDeferred
 
 from txeffect import deferred_performer, perform
 
@@ -303,3 +305,110 @@ class PollingLock(object):
                 success=reset_node, error=catch(NoNodeError, reset_node))
         else:
             return Effect(Constant(None))
+
+
+# Sentinet object representing the fact that eff passed in ``call_if_acquired``
+# was not called
+NOT_CALLED = object()
+
+
+@do
+def call_if_acquired(lock, eff):
+    """
+    Call ``eff`` if ``lock`` is acquired. If not, try to acquire the lock
+    and call ``eff``. This function is different from
+    :func:`otter.util.deferredutils.with_lock` where this does not release
+    the lock after calling ``func``. Also it expects that lock may already be
+    acquired.
+
+    :param lock: Lock object from :obj:`TxKazooClient`
+    :param eff: ``Effect`` to call if lock is/was acquired
+
+    :return: (eff return, lock acquired bool) tuple. first element may be
+        ``NOT_CALLED`` of eff was not called
+    :rtype: ``Effect`` of ``bool``
+    """
+    if (yield lock.is_acquired_eff()):
+        ret = yield eff
+        yield do_return((ret, False))
+    else:
+        if (yield lock.acquire_eff(False, None)):
+            ret = yield eff
+            yield do_return((ret, True))
+        else:
+            yield do_return((NOT_CALLED, False))
+
+
+def locked(lock, dispatcher, func, *args, **kwargs):
+    """
+    Deferred wrapper of :func:`call_if_acquired`. Return function that will
+    call ``func`` if given ``lock`` is acquired. That function will return
+    Deferred fired with (func return, lock acquired bool) tuple. First element
+    may be ``NOT_CALLED`` of func was not called.
+
+    Note: Signature change is one of the reasons why this is not decorator.
+
+    :return: no-argument callable that wraps given ``func``
+    """
+
+    def check_and_call():
+
+        class DoFunc(object):
+            pass
+
+        @deferred_performer
+        def func_performer(d, i):
+            return maybeDeferred(func, *args, **kwargs)
+
+        comp_dispatcher = ComposedDispatcher([
+            TypeDispatcher({DoFunc: func_performer}), dispatcher])
+        return perform(
+            comp_dispatcher,
+            call_if_acquired(lock, Effect(DoFunc())))
+
+    return check_and_call
+
+
+def add_acquired_log(log, message, func):
+    """
+    Add log message if func returns the fact that lock is acquired. This
+    function should be in conjunction with :func:`locked`.
+
+    :return: no-argument callable that returns result of function wrapped
+        in :func:`locked`
+    """
+
+    def log_acquired(r):
+        result, acquired = r
+        if acquired:
+            log.msg(message)
+        return result
+
+    def f():
+        return func().addCallback(log_acquired)
+
+    return f
+
+
+def locked_logged_func(dispatcher, path, log, message, func, *args, **kwargs):
+    """
+    Composition of :func:`locked` and :func:`add_acquired_log` function. The
+    only extra thing this does is creating the lock.
+
+    :return: (wrapped function, lock object) tuple
+    """
+    lock = PollingLock(dispatcher, path)
+    f = locked(lock, dispatcher, func, *args, **kwargs)
+    return add_acquired_log(log, message, f), lock
+
+
+def create_health_check(lock):
+    """
+    Return health check function that captures whether the lock is acquired
+    """
+
+    def health_check():
+        d = lock.is_acquired()
+        return d.addCallback(lambda b: (True, {"has_lock": b}))
+
+    return health_check

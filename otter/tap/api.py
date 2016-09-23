@@ -13,6 +13,9 @@ from kazoo.client import KazooClient
 from silverberg.cluster import RoundRobinCassandraCluster
 from silverberg.logger import LoggingCQLClient
 
+from toolz.dicttoolz import get_in
+
+from twisted.application.internet import TimerService
 from twisted.application.service import MultiService, Service
 from twisted.application.strports import service
 from twisted.internet import reactor
@@ -36,7 +39,6 @@ from otter.constants import (
 from otter.convergence.selfheal import SelfHeal
 from otter.convergence.service import Converger
 from otter.effect_dispatcher import get_full_dispatcher
-from otter.lockedtimerservice import LockedTimerService
 from otter.log import log
 from otter.log.cloudfeeds import CloudFeedsObserver
 from otter.log.formatters import add_to_fanout
@@ -49,6 +51,7 @@ from otter.supervisor import SupervisorService, set_supervisor
 from otter.util.config import config_value, set_config_data
 from otter.util.cqlbatch import TimingOutCQLClient
 from otter.util.deferredutils import timeout_deferred
+from otter.util.zk import locked_logged_func, create_health_check
 from otter.util.zkpartitioner import Partitioner
 
 assert os.environ.get("PYRSISTENT_NO_C_EXTENSION"), (
@@ -310,8 +313,8 @@ def makeService(config):
                 config_value('converger.step_limits') or {})
 
             # Setup selfheal service
-            setup_selfheal_service(config, dispatcher, parent, health_checker,
-                                   log)
+            setup_selfheal_service(reactor, config, dispatcher, parent,
+                                   health_checker, log)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
@@ -319,7 +322,7 @@ def makeService(config):
     return parent
 
 
-def setup_selfheal_service(config, dispatcher, parent, health_checker, log):
+def setup_selfheal_service(clock, config, dispatcher, parent, health_checker, log):
     """
     Setup SelfHeal service and add it to ``parent``
 
@@ -330,11 +333,13 @@ def setup_selfheal_service(config, dispatcher, parent, health_checker, log):
     :param log: Logger
     """
     interval = get_in(["selfheal", "interval"], config, default=300)
-    selfheal = SelfHeal(reactor, dispatcher, config_value, interval, log)
-    shsvc = LockedTimerService(
-        reactor, dispatcher, "/selfheallock", interval, selfheal)
-    health_checker.checks["selfheal"] = shsvc.health_check
-    shsvc.setServiceParent(parent)
+    selfheal = SelfHeal(clock, dispatcher, config_value, interval, log)
+    func, lock = locked_logged_func(
+        dispatcher, "/selfheallock", log, "selfheal-lock-acquired", selfheal)
+    health_checker.checks["selfheal"] = create_health_check(lock)
+    sh_timer = TimerService(interval, func)
+    sh_timer.clock = clock
+    sh_timer.setServiceParent(parent)
 
 
 def setup_converger(parent, kz_client, dispatcher, interval, build_timeout,
