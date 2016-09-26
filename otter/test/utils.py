@@ -953,6 +953,14 @@ def exp_seq_func(testcase, seq):
     return func
 
 
+def exp_func(testcase, retval, *args, **kwargs):
+    """
+    Single sequence instance of :func:`exp_seq_func`
+    """
+    seq = [(args, kwargs, retval)]
+    return exp_seq_func(testcase, seq)
+
+
 def set_non_conv_tenant(tenant_id, testcase):
     """
     Set tenant_id as non convergence tenant
