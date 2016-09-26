@@ -2,7 +2,7 @@
 Tests for :mod:`otter.convergence.selfheal`
 """
 
-from effect import Effect, base_dispatcher, raise_, sync_perform
+from effect import base_dispatcher, raise_
 from effect.testing import SequenceDispatcher
 
 import mock
