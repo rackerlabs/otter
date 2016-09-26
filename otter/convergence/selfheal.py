@@ -53,7 +53,8 @@ class SelfHeal(object):
     time_range = attr.ib(validator=attr.validators.instance_of(float))
     log = attr.ib(
         validator=attr.validators.instance_of(BoundLog),
-        convert=lambda l: l.bind(otter_service="selfheal"))
+        convert=lambda l: l.bind(otter_service="selfheal"),
+        cmp=False)
     _calls = attr.ib(default=attr.Factory(list))
 
     def __call__(self):

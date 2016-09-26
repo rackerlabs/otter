@@ -48,10 +48,10 @@ from otter.rest.application import Otter
 from otter.rest.bobby import set_bobby
 from otter.scheduler import SchedulerService
 from otter.supervisor import SupervisorService, set_supervisor
+from otter.util import zk
 from otter.util.config import config_value, set_config_data
 from otter.util.cqlbatch import TimingOutCQLClient
 from otter.util.deferredutils import timeout_deferred
-from otter.util.zk import create_health_check, locked_logged_func
 from otter.util.zkpartitioner import Partitioner
 
 assert os.environ.get("PYRSISTENT_NO_C_EXTENSION"), (
@@ -313,8 +313,9 @@ def makeService(config):
                 config_value('converger.step_limits') or {})
 
             # Setup selfheal service
-            setup_selfheal_service(reactor, config, dispatcher, parent,
-                                   health_checker, log)
+            sh_svc = setup_selfheal_service(
+                reactor, config, dispatcher, health_checker, log)
+            parent.addService(sh_svc)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
@@ -322,30 +323,28 @@ def makeService(config):
     return parent
 
 
-def setup_selfheal_service(clock, config, dispatcher, parent, health_checker,
-                           log):
+def setup_selfheal_service(clock, config, dispatcher, health_checker, log):
     """
     Setup selfheal timer service and add it to ``parent``
 
     :param clock: :obj:`IReactorTime` provider
     :param dict config: Configuration dict containing selfheal info
     :param dispatcher: Effect dispatcher
-    :param parent: SelfHeal service created will become its child
-    :type: :obj:`MultiService`
     :param health_checker: ``HealthChecker`` object where SelfHeal's health
         check will be added
     :param log: :obj:`BoundLog` logger used by service
 
-    :return: None
+    :return: selfheal service
+    :rtype: :obj:`IService`
     """
-    interval = get_in(["selfheal", "interval"], config, default=300)
+    interval = get_in(["selfheal", "interval"], config, default=300.0)
     selfheal = SelfHeal(clock, dispatcher, config_value, interval, log)
-    func, lock = locked_logged_func(
+    func, lock = zk.locked_logged_func(
         dispatcher, "/selfheallock", log, "selfheal-lock-acquired", selfheal)
-    health_checker.checks["selfheal"] = create_health_check(lock)
+    health_checker.checks["selfheal"] = zk.create_health_check(lock)
     sh_timer = TimerService(interval, func)
     sh_timer.clock = clock
-    sh_timer.setServiceParent(parent)
+    return sh_timer
 
 
 def setup_converger(parent, kz_client, dispatcher, interval, build_timeout,
