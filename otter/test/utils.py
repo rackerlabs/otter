@@ -936,6 +936,23 @@ def intent_func(fname):
     return lambda *a: Effect((fname,) + a)
 
 
+def exp_seq_func(testcase, seq):
+    """
+    Return function that expects arguments as per ``seq``
+
+    :param testcase: :obj:`Testcase` where this is being used
+    :param list seq: list of (args tuple, kwargs dict, return value) tuple
+    """
+
+    def func(*args, **kwargs):
+        exp_args, exp_kwargs, retval = seq.pop(0)
+        testcase.assertEqual(args, exp_args)
+        testcase.assertEqual(kwargs, exp_kwargs)
+        return retval
+
+    return func
+
+
 def set_non_conv_tenant(tenant_id, testcase):
     """
     Set tenant_id as non convergence tenant
