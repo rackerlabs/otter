@@ -38,7 +38,7 @@ from otter.tap.api import (
 from otter.test.test_auth import identity_config
 from otter.test.test_effect_dispatcher import full_intents
 from otter.test.utils import (
-    CheckFailure, exp_seq_func, matches, mock_log, patch)
+    CheckFailure, exp_func, matches, mock_log, patch)
 from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
 from otter.util.zkpartitioner import Partitioner
@@ -646,7 +646,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
                                              'Could not start TxKazooClient')
 
-    @mock.patch('otter.tap.api.SelfHeal')
+    @mock.patch('otter.tap.api.setup_selfheal_service')
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
     @mock.patch('otter.tap.api.setup_converger')
@@ -674,7 +674,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         kz_client.stop.return_value.callback(None)
         self.successResultOf(d)
 
-    @mock.patch('otter.tap.api.SelfHeal')
+    @mock.patch('otter.tap.api.setup_selfheal_service')
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
     @mock.patch('otter.tap.api.setup_converger')
@@ -753,13 +753,12 @@ class SetupSelfhealTests(SynchronousTestCase):
         from otter.util.config import config_value
         selfheal = SelfHeal(clock, base_dispatcher, config_value, interval,
                             log)
-        llf_args = (base_dispatcher, "/selfheallock", log,
-                    "selfheal-lock-acquired", selfheal)
         self.patch(
             zk, "locked_logged_func",
-            exp_seq_func(self, [(llf_args, {}, ("func", "lock"))]))
+            exp_func(self, ("func", "lock"), base_dispatcher, "/selfheallock",
+                     log, "selfheal-lock-acquired", selfheal))
         self.patch(zk, "create_health_check",
-                   exp_seq_func(self, [(("lock",), {}, "hc_func")]))
+                   exp_func(self, "hc_func", "lock"))
 
         svc = setup_selfheal_service(
             clock,
