@@ -22,7 +22,7 @@ from twisted.internet.defer import fail, maybeDeferred, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.test.utils import (
-    const, conste, intent_func, mock_log, noop, test_dispatcher)
+    const, conste, exp_func, intent_func, mock_log, noop, test_dispatcher)
 from otter.util import zk
 from otter.util.zk import (
     CreateOrSet, CreateOrSetLoopLimitReachedError,
@@ -759,22 +759,11 @@ class LockedLoggedFuncTests(SynchronousTestCase):
         Ensure :func:`locked` and :func:`add_acquired_log` are called in
         sequence with correct parameters
         """
-
-        def PL(d, p):
-            self.assertEqual((d, p), ("disp", "/path"))
-            return "lock"
-
-        def locked(l, d, f, a):
-            self.assertEqual((l, d, f, a), ("lock", "disp", "func", 1))
-            return "locked_f"
-
-        def aal(l, m, f):
-            self.assertEqual((l, m, f), ("log", "msg", "locked_f"))
-            return "llf"
-
-        self.patch(zk, "PollingLock", PL)
-        self.patch(zk, "locked", locked)
-        self.patch(zk, "add_acquired_log", aal)
+        self.patch(zk, "PollingLock", exp_func(self, "lock", "disp", "/path"))
+        self.patch(zk, "locked",
+                   exp_func(self, "locked_f", "lock", "disp", "func", 1))
+        self.patch(zk, "add_acquired_log",
+                   exp_func(self, "llf", "log", "msg", "locked_f"))
 
         wf, lock = zk.locked_logged_func("disp", "/path", "log", "msg",
                                          "func", 1)
