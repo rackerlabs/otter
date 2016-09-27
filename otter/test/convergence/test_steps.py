@@ -2,7 +2,7 @@
 import json
 from uuid import uuid4
 
-from effect import Effect, Func, base_dispatcher, sync_perform
+from effect import Effect, Func, base_dispatcher, raise_, sync_perform
 from effect.testing import SequenceDispatcher, perform_sequence
 
 from mock import ANY, patch
@@ -67,7 +67,6 @@ from otter.test.utils import (
     intent_func,
     matches,
     noop,
-    raise_,
     resolve_effect,
     stack,
     stub_pure_response,

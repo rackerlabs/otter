@@ -1254,6 +1254,31 @@ class ConvergenceTestsWith1CLB(unittest.TestCase):
             )
         )
 
+    @inlineCallbacks
+    def test_clb_batch_delete_beyond_limit(self):
+        """
+        Ensure that CLB nodes > 10 are deleted 10 at a time by convergence.
+        """
+        # Create group with 11 servers
+        group, _ = self.helper.create_group(min_entities=11)
+        yield self.helper.start_group_and_wait(group, self.rcs)
+
+        # Update min/max to 0 to trigger scale down and check group is ACTIVE
+        yield group.update_group_config(self.rcs, minEntities=0, maxEntities=0)
+        yield group.wait_for_state(
+            self.rcs,
+            ContainsDict({"activeCapacity": Equals(0),
+                          "pendingCapacity": Equals(0),
+                          "desiredCapacity": Equals(0),
+                          "status": Equals("ACTIVE")}))
+
+        # CLB nodes should be gone
+        clb = self.helper.clbs[0]
+        yield clb.wait_for_nodes(
+            self.rcs,
+            HasLength(0),
+            1)  # timeout
+
     @tag("CATC-020")
     def test_delete_all_loadbalancers_and_scale_up(self, delete_clb=None):
         """

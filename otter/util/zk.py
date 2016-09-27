@@ -1,15 +1,20 @@
+import time
+import uuid
+
 from functools import partial
 
 import attr
 
 from characteristic import attributes
 
-from effect import Effect, TypeDispatcher, parallel, sync_performer
+from effect import (
+    Constant, Delay, Effect, Func, TypeDispatcher, catch, parallel,
+    sync_performer)
 from effect.do import do, do_return
 
-from kazoo.exceptions import NoNodeError, NodeExistsError
+from kazoo.exceptions import LockTimeout, NoNodeError, NodeExistsError
 
-from txeffect import deferred_performer
+from txeffect import deferred_performer, perform
 
 from otter.util.deferredutils import catch_failure
 
@@ -19,6 +24,30 @@ CREATE_OR_SET_LOOP_LIMIT = 50
 A limit on the number of times we'll jump between trying to create a node
 vs trying to set a node's contents in perform_create_or_set.
 """
+
+
+@attr.s
+class CreateNode(object):
+    """
+    Intent to create znode
+    """
+    path = attr.ib()
+    value = attr.ib(default="")
+    ephemeral = attr.ib(default=False)
+    sequence = attr.ib(default=False)
+
+
+@deferred_performer
+def perform_create(kz_client, dispatcher, intent):
+    """Perform :obj:`CreateNode`.
+
+    :param kz_client: txKazoo client
+    :param dispatcher: dispatcher, supplied by perform
+    :param CreateNode intent: the intent
+    """
+    return kz_client.create(
+        intent.path, value=intent.value, ephemeral=intent.ephemeral,
+        sequence=intent.sequence)
 
 
 @attributes(['path', 'content'])
@@ -137,27 +166,10 @@ def perform_delete_node(kz_client, dispatcher, intent):
     return kz_client.delete(intent.path, version=intent.version)
 
 
-@attr.s
-class AcquireLock(object):
-    """
-    Intent to acquire lock
-    """
-    lock = attr.ib()
-    blocking = attr.ib(default=True)
-    timeout = attr.ib(default=None)
-
-
-@deferred_performer
-def perform_acquire_lock(dispatcher, intent):
-    """
-    Perform :obj:`AcquireLock`.
-    """
-    return intent.lock.acquire(intent.blocking, intent.timeout)
-
-
 def get_zk_dispatcher(kz_client):
     """Get a dispatcher that can support all of the ZooKeeper intents."""
     return TypeDispatcher({
+        CreateNode: partial(perform_create, kz_client),
         CreateOrSet:
             partial(perform_create_or_set, kz_client),
         DeleteNode:
@@ -167,6 +179,127 @@ def get_zk_dispatcher(kz_client):
         GetChildren:
             partial(perform_get_children, kz_client),
         GetStat:
-            partial(perform_get_stat, kz_client),
-        AcquireLock: perform_acquire_lock
+            partial(perform_get_stat, kz_client)
     })
+
+
+class PollingLock(object):
+    """
+    Zookeeper lock recipe that polls the children on interval basis instead
+    of leaving a watch on previous child. It's supposed to replace
+    :obj:`kazoo.recipe.lock.Lock` and has same signature and _similar_ behavior
+    for ``acquire`` and ``release`` methods.
+    """
+
+    def __init__(self, dispatcher, path, identifier="", interval=0.1):
+        self.dispatcher = dispatcher
+        self.path = path
+        self.identifier = identifier
+        self._interval = interval
+        # Child node described in
+        # https://zookeeper.apache.org/doc/trunk/recipes.html#sc_recipes_Locks
+        self._node = None
+
+    def acquire(self, blocking=True, timeout=None):
+        """
+        Same as :meth:`kazoo.recipe.lock.Lock.acquire` except that this can be
+        called again on an object that has been released. It will start fresh
+        process to acquire the lock.
+        """
+        return perform(self.dispatcher, self.acquire_eff(blocking, timeout))
+
+    @do
+    def acquire_eff(self, blocking, timeout):
+        """
+        Effect implementation of ``acquire`` method.
+
+        :return: ``Effect`` of ``bool``
+        """
+        try:
+            # Before acquiring, lets delete any child node which may be
+            # lingering from previous acquire. Ideally this should happen only
+            # when acquire is called again before release. This shouldn't
+            # happen this is called after release or after is_acquired returns
+            # False. In any case, its the safest thing to do
+            yield self.release_eff()
+            try:
+                yield Effect(CreateNode(self.path))
+            except NodeExistsError:
+                pass
+            prefix = yield Effect(Func(uuid.uuid4))
+            # TODO: https://github.com/rackerlabs/otter/issues/1926
+            create_intent = CreateNode(
+                "{}/{}".format(self.path, prefix),
+                value=self.identifier, ephemeral=True, sequence=True)
+            self._node = yield Effect(create_intent)
+            acquired = yield self._acquire_loop(blocking, timeout)
+            if not acquired:
+                yield self.release_eff()
+            yield do_return(acquired)
+        except Exception as e:
+            yield self.release_eff()
+            raise e
+
+    @do
+    def _acquire_loop(self, blocking, timeout):
+        acquired = yield self.is_acquired_eff()
+        if acquired or not blocking:
+            yield do_return(acquired)
+        start = yield Effect(Func(time.time))
+        while True:
+            yield Effect(Delay(self._interval))
+            if (yield self.is_acquired_eff()):
+                yield do_return(True)
+            if timeout is not None:
+                now = yield Effect(Func(time.time))
+                if now - start > timeout:
+                    raise LockTimeout(
+                        "Failed to acquire lock on {} in {} seconds".format(
+                            self.path, now - start))
+
+    def is_acquired(self):
+        """
+        Is the lock already acquired? This method does not exist in kazoo
+        lock recipe and is a nice addition to it.
+
+        :return: :obj:`Deferred` of ``bool``
+        """
+        return perform(self.dispatcher, self.is_acquired_eff())
+
+    @do
+    def is_acquired_eff(self):
+        """
+        Effect implementation of ``is_acquired``.
+
+        :return: ``Effect`` of ``bool``
+        """
+        if self._node is None:
+            yield do_return(False)
+        children = yield Effect(GetChildren(self.path))
+        if not children:
+            yield do_return(False)
+        # The last 10 characters are sequence number as per
+        # https://zookeeper.apache.org/doc/current/zookeeperProgrammers.html#Sequence+Nodes+--+Unique+Naming
+        basename = self._node.rsplit("/")[-1]
+        yield do_return(sorted(children, key=lambda c: c[-10:])[0] == basename)
+
+    def release(self):
+        """
+        Same as :meth:`kazoo.recipe.lock.Lock.release`
+        """
+        return perform(self.dispatcher, self.release_eff())
+
+    def release_eff(self):
+        """
+        Effect implementation of ``release``.
+
+        :return: ``Effect`` of ``None``
+        """
+        def reset_node(_):
+            self._node = None
+
+        if self._node is not None:
+            return Effect(DeleteNode(path=self._node, version=-1)).on(
+                success=reset_node, error=catch(NoNodeError, reset_node))
+        else:
+            return Effect(Constant(None))

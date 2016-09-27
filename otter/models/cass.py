@@ -50,7 +50,7 @@ from otter.models.interface import (
     UnrecognizedCapabilityError,
     WebhooksOverLimitError,
     next_cron_occurrence)
-from otter.util import timestamp
+from otter.util import timestamp, zk
 from otter.util.config import config_value
 from otter.util.cqlbatch import Batch, batch
 from otter.util.deferredutils import with_lock
@@ -64,6 +64,15 @@ LOCK_PATH = '/locks'
 DEFAULT_CONSISTENCY = ConsistencyLevel.QUORUM
 
 QUERY_LIMIT = 10000
+
+# Max number of seconds to wait to acquire group kazoo lock. This should
+# not be held for more than 10-15ms in normal circumstances but we keep it high
+# for safety sake. We don't want it to be < 30 since any request will be
+# terminated by CLB by then.
+ACQUIRE_TIMEOUT = 10
+# Ideally release should not even timeout but keep this to capture any unwanted
+# error
+RELEASE_TIMEOUT = 10
 
 
 @attributes(['query', 'params', 'consistency_level'])
@@ -634,7 +643,7 @@ class CassScalingGroup(object):
 
     """
     def __init__(self, log, tenant_id, uuid, connection, buckets, kz_client,
-                 reactor, local_locks):
+                 reactor, local_locks, dispatcher):
         """
         Creates a CassScalingGroup object.
         """
@@ -648,6 +657,7 @@ class CassScalingGroup(object):
         self.kz_client = kz_client
         self.reactor = reactor
         self.local_locks = local_locks
+        self.dispatcher = dispatcher
 
         self.group_table = "scaling_group"
         self.launch_table = "launch_config"
@@ -822,14 +832,14 @@ class CassScalingGroup(object):
                 self, state, *args, **kwargs))
             return d.addCallback(_write_state)
 
-        lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
-        lock.acquire = functools.partial(lock.acquire, timeout=120)
+        lock = zk.PollingLock(self.dispatcher, LOCK_PATH + '/' + self.uuid)
+        lock.acquire = functools.partial(lock.acquire, timeout=ACQUIRE_TIMEOUT)
         local_lock = self.local_locks.get_lock(self.uuid)
         return local_lock.run(
             with_lock, self.reactor, lock, _modify_state,
             log.bind(category='locking', lock_reason='modify_state'),
-            acquire_timeout=150,
-            release_timeout=30)
+            acquire_timeout=ACQUIRE_TIMEOUT + 5,
+            release_timeout=RELEASE_TIMEOUT)
 
     def update_status(self, status):
         """
@@ -1318,12 +1328,12 @@ class CassScalingGroup(object):
                     exc=f.value,
                     otter_msg_type="ignore-delete-lock-error"))
 
-        lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
-        lock.acquire = functools.partial(lock.acquire, timeout=120)
+        lock = zk.PollingLock(self.dispatcher, LOCK_PATH + '/' + self.uuid)
+        lock.acquire = functools.partial(lock.acquire, timeout=ACQUIRE_TIMEOUT)
         d = with_lock(self.reactor, lock, _delete_group,
                       log.bind(category='locking', lock_reason='delete_group'),
-                      acquire_timeout=150,
-                      release_timeout=30)
+                      acquire_timeout=ACQUIRE_TIMEOUT + 5,
+                      release_timeout=RELEASE_TIMEOUT)
         # Cleanup /locks/<groupID> znode as it will not be required anymore
         d.addCallback(_delete_lock_znode)
         d.addCallback(lambda _: None)
@@ -1387,6 +1397,7 @@ class CassScalingGroupCollection:
         self.event_table = "scaling_schedule_v2"
         self.buckets = None
         self.kz_client = None
+        self.dispatcher = None
 
     def set_scheduler_buckets(self, buckets):
         """
@@ -1518,7 +1529,8 @@ class CassScalingGroupCollection:
         """
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection, self.buckets, self.kz_client,
-                                self.reactor, self.local_locks)
+                                self.reactor, self.local_locks,
+                                self.dispatcher)
 
     def fetch_and_delete(self, bucket, now, size=100):
         """

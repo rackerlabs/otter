@@ -5,6 +5,8 @@ from functools import partial
 from effect import catch, parallel
 from effect.do import do, do_return
 
+from pyrsistent import pmap
+
 from toolz.curried import filter, groupby, keyfilter, map
 from toolz.dicttoolz import assoc, get_in, merge
 from toolz.functoolz import compose, curry, identity
@@ -159,7 +161,14 @@ def get_scaling_group_stacks(group_id, get_all_stacks=get_all_stacks):
 
 @do
 def get_clb_contents():
-    """Get Rackspace Cloud Load Balancer contents as list of `CLBNode`."""
+    """
+    Get Rackspace Cloud Load Balancer contents as list of `CLBNode`. CLB
+    health monitor information is also returned as a pmap of :obj:`CLB` objects
+    mapped on LB ID.
+
+    :return: Effect of (``list`` of :obj:`CLBNode`, `pmap` of :obj:`CLB`)
+    :rtype: :obj:`Effect`
+    """
     # If we get a CLBNotFoundError while fetching feeds, we should throw away
     # all nodes related to that load balancer, because we don't want to act on
     # data that we know is invalid/outdated (for example, if we can't fetch a
@@ -208,7 +217,7 @@ def get_clb_contents():
     nodes = map(update_drained_at, concat(lb_nodes.values()))
     yield do_return((
         list(filter(bool, nodes)),
-        keyfilter(lambda k: k not in deleted_lbs, clbs)))
+        pmap(keyfilter(lambda k: k not in deleted_lbs, clbs))))
 
 
 _DRAINING_CREATED_RE = (
@@ -280,9 +289,10 @@ def get_all_launch_server_data(
     Gather all launch_server data relevant for convergence w.r.t given time,
     in parallel where possible.
 
-    Returns an Effect of {'servers': [NovaServer], 'lb_nodes': [LBNode]}.
+    Returns an Effect of {'servers': [NovaServer], 'lb_nodes': [LBNode],
+                          'lbs': pmap(LB_ID -> CLB)}.
     """
-    eff = parallel(
+    return parallel(
         [get_scaling_group_servers(tenant_id, group_id, now)
          .on(map(NovaServer.from_server_details_json)).on(list),
          get_clb_contents(),
@@ -292,7 +302,6 @@ def get_all_launch_server_data(
         'lb_nodes': clb_nodes_and_clbs[0] + rcv3_nodes,
         'lbs': clb_nodes_and_clbs[1]
     })
-    return eff
 
 
 def get_all_launch_stack_data(

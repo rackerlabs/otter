@@ -574,7 +574,8 @@ class APIMakeServiceTests(SynchronousTestCase):
         start_d.callback(None)
         mock_setup_scheduler.assert_called_once_with(
             parent, "disp", self.store, kz_client)
-        self.assertEqual(self.store.kz_client, kz_client)
+        self.assertIs(self.store.kz_client, kz_client)
+        self.assertEqual(self.store.dispatcher, "disp")
         sch = mock_setup_scheduler.return_value
         self.assertEqual(self.health_checker.checks['scheduler'],
                          sch.health_check)
@@ -629,13 +630,15 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
                                              'Could not start TxKazooClient')
 
+    @mock.patch('otter.tap.api.SelfHeal')
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
     @mock.patch('otter.tap.api.setup_converger')
     def test_kazoo_client_stops(self,
                                 mock_setup_converger,
                                 mock_txkz,
-                                mock_setup_scheduler):
+                                mock_setup_scheduler,
+                                mock_sh):
         """
         TxKazooClient is stopped when parent service stops
         """
@@ -655,13 +658,15 @@ class APIMakeServiceTests(SynchronousTestCase):
         kz_client.stop.return_value.callback(None)
         self.successResultOf(d)
 
+    @mock.patch('otter.tap.api.SelfHeal')
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
     @mock.patch('otter.tap.api.setup_converger')
     def test_kazoo_client_stops_after_supervisor(self,
                                                  mock_setup_converger,
                                                  mock_txkz,
-                                                 mock_setup_scheduler):
+                                                 mock_setup_scheduler,
+                                                 mock_sh):
         """
         Kazoo is stopped after supervisor stops
         """
@@ -728,7 +733,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         from otter.tap import api
         shsvc = mock_sh.return_value
         mock_sh.assert_called_once_with(
-            self.Otter.return_value.dispatcher, kz_client, interval, self.log,
+            self.Otter.return_value.dispatcher, interval, self.log,
             self.reactor, api.config_value)
         self.assertEqual(
             self.health_checker.checks["selfheal"],

@@ -2,10 +2,8 @@
 Tests for :mod:`otter.convergence.selfheal`
 """
 
-from effect import Effect
+from effect import Effect, base_dispatcher, raise_, sync_perform
 from effect.testing import SequenceDispatcher
-
-from kazoo.exceptions import LockTimeout
 
 import mock
 
@@ -14,14 +12,14 @@ from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.convergence import selfheal as sh
-from otter.log.intents import BoundFields
+from otter.log.intents import BoundFields, Log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
-from otter.models.interface import GroupState, ScalingGroupStatus
-from otter.test.util.test_zk import ZKCrudModel, ZKLock
+from otter.models.interface import (
+    GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
+from otter.test.util.test_zk import create_fake_lock
 from otter.test.utils import (
     CheckFailure, const, intent_func, mock_log, nested_sequence, noop, patch,
-    perform_sequence, raise_)
-from otter.util.zk import AcquireLock, GetChildren
+    perform_sequence)
 
 
 class SelfHealTests(SynchronousTestCase):
@@ -30,13 +28,14 @@ class SelfHealTests(SynchronousTestCase):
     """
 
     def setUp(self):
-        self.kzc = ZKCrudModel()
         self.clock = Clock()
         self.log = mock_log()
         self.ggtc = patch(
             self, "otter.convergence.selfheal.get_groups_to_converge",
             side_effect=intent_func("ggtc"))
-        self.s = sh.SelfHeal("disp", self.kzc, 300, self.log, self.clock, "cf")
+        self.lb, lock = create_fake_lock()
+        self.s = sh.SelfHeal("disp", 300, self.log, self.clock, "cf",
+                             lock=lock)
 
     def test_setup_again(self):
         """
@@ -101,9 +100,12 @@ class SelfHealTests(SynchronousTestCase):
         If there are scheduled calls when perform is called, they are
         cancelled and err is logged. Future calls are scheduled as usual
         """
-        call1 = self.clock.callLater(1, noop, 2)
-        call2 = self.clock.callLater(2, noop, 3)
-        self.s.calls = [call1, call2]
+        self.clock.advance(-0.6)
+        call1 = self.clock.callLater(1, noop, None)
+        call2 = self.clock.callLater(0, noop, None)
+        call3 = self.clock.callLater(2, noop, None)
+        self.clock.advance(0.6)
+        self.s.calls = [call1, call2, call3]
         self.test_setup_convergences()
         self.log.err.assert_called_once_with(
             mock.ANY, "self-heal-calls-err", active=2,
@@ -130,14 +132,14 @@ class SelfHealTests(SynchronousTestCase):
         """
         Health check returns about lock being acquired
         """
-        self.patch(sh, "is_lock_acquired", intent_func("ila"))
-        self.s.disp = SequenceDispatcher([
-            (("ila", self.s.lock), const(True))])
+        self.s.disp = base_dispatcher
+
+        self.lb.acquired = True
         self.assertEqual(
             self.successResultOf(self.s.health_check()),
             (True, {"has_lock": True}))
-        self.s.disp = SequenceDispatcher([
-            (("ila", self.s.lock), const(False))])
+
+        self.lb.acquired = False
         self.assertEqual(
             self.successResultOf(self.s.health_check()),
             (True, {"has_lock": False}))
@@ -147,7 +149,7 @@ class SelfHealTests(SynchronousTestCase):
         `stopService` will stop the timer, cancel any scheduled calls and
         release lock
         """
-        self.s.lock.acquired = True
+        self.lb.acquired = True
         self.test_setup_convergences()
         calls = self.s.calls[:]
         d = self.s.stopService()
@@ -155,7 +157,7 @@ class SelfHealTests(SynchronousTestCase):
         self.assertTrue(all(not c.active() for c in calls))
         # lock released
         self.assertIsNone(self.successResultOf(d))
-        self.assertFalse(self.s.lock.acquired)
+        self.assertFalse(self.lb.acquired)
         # timer stopped; having bad dispatcher would raise error if perform
         # was called again
         self.s.disp = "bad"
@@ -166,19 +168,33 @@ class SelfHealTests(SynchronousTestCase):
         :func:`_setup_if_locked` calls ``self._setup_convergences`` through
         ``call_if_acquired``
         """
+        self.lb.acquired = False
+        self.lb.acquire_call = (False, None, True)
+        self.s.disp = base_dispatcher
+        self.s._setup_convergences = mock.Mock(return_value=succeed("ret"))
 
-        def cia(l, e):
-            self.assertIs(l, self.s.lock)
-            return e
-
-        self.patch(sh, "call_if_acquired", cia)
-        self.s.disp = SequenceDispatcher([])
-        self.s._setup_convergences = mock.Mock(return_value=succeed(True))
         d = self.s._setup_if_locked("cf", 35)
-        self.assertIsNone(self.successResultOf(d))
+
+        self.assertEqual(self.successResultOf(d), "ret")
         self.s._setup_convergences.assert_called_once_with("cf", 35)
         self.log.msg.assert_called_once_with(
             "self-heal-lock-acquired", otter_service="selfheal")
+
+    def test_setup_if_locked_no_lock(self):
+        """
+        :func:`_setup_if_locked` does not call :func:`_setup_convergences` if
+        lock is not acquired
+        """
+        self.lb.acquired = False
+        self.lb.acquire_call = (False, None, False)
+        self.s.disp = base_dispatcher
+        self.s._setup_convergences = mock.Mock(return_value=succeed("ret"))
+
+        d = self.s._setup_if_locked("cf", 35)
+
+        self.assertEqual(self.successResultOf(d), sh.NOT_CALLED)
+        self.assertFalse(self.s._setup_convergences.called)
+        self.assertFalse(self.log.msg.called)
 
 
 class CallIfAcquiredTests(SynchronousTestCase):
@@ -186,39 +202,45 @@ class CallIfAcquiredTests(SynchronousTestCase):
     Tests for :func:`call_if_acquired`
     """
     def setUp(self):
-        self.patch(sh, "is_lock_acquired", intent_func("ila"))
+        self.lb, self.lock = create_fake_lock()
 
     def test_lock_not_acquired(self):
         """
         When lock is not acquired, it is tried and if failed does not
         call eff
         """
-        lock = object()
-        seq = [(("ila", lock), const(False)),
-               (AcquireLock(lock, True, 0.1), lambda i: raise_(LockTimeout()))]
-        self.assertFalse(
-            perform_sequence(seq, sh.call_if_acquired(lock, Effect("call"))))
+        self.lb.acquired = False
+        self.lb.acquire_call = (False, None, False)
+        self.assertEqual(
+            sync_perform(
+                base_dispatcher,
+                sh.call_if_acquired(self.lock, Effect("call"))),
+            (sh.NOT_CALLED, False))
 
     def test_lock_acquired(self):
         """
         When lock is not acquired, it is tried and if successful calls eff
         """
-        lock = object()
-        seq = [(("ila", lock), const(False)),
-               (AcquireLock(lock, True, 0.1), const(True)),
-               ("call", noop)]
-        self.assertTrue(
-            perform_sequence(seq, sh.call_if_acquired(lock, Effect("call"))))
+        self.lb.acquired = False
+        self.lb.acquire_call = (False, None, True)
+        seq = [("call", const("eff_return"))]
+        self.assertEqual(
+            perform_sequence(
+                seq,
+                sh.call_if_acquired(self.lock, Effect("call"))),
+            ("eff_return", True))
 
     def test_lock_already_acquired(self):
         """
         If lock is already acquired, it will just call eff
         """
-        lock = object()
-        seq = [(("ila", lock), const(True)),
-               ("call", noop)]
-        self.assertFalse(
-            perform_sequence(seq, sh.call_if_acquired(lock, Effect("call"))))
+        self.lb.acquired = True
+        seq = [("call", const("eff_return"))]
+        self.assertEqual(
+            perform_sequence(
+                seq,
+                sh.call_if_acquired(self.lock, Effect("call"))),
+            ("eff_return", False))
 
 
 class GetGroupsToConvergeTests(SynchronousTestCase):
@@ -289,43 +311,16 @@ class CheckTriggerTests(SynchronousTestCase):
         self.assertIsNone(
             perform_sequence(seq, sh.check_and_trigger("tid", "gid")))
 
-
-class IsLockAcquiredTests(SynchronousTestCase):
-    """
-    Tests for :func:`is_lock_acquired` and :func:`is_lock_acquired_eff`
-    """
-
-    def test_no_children(self):
+    def test_group_deleted(self):
         """
-        If lock node does not have any children, it does not have lock
+        Does nothing if group has been deleted
         """
-        lock = ZKLock("client", "/lock")
-        seq = [(GetChildren("/lock"), const([]))]
-        self.assertFalse(perform_sequence(seq, sh.is_lock_acquired(lock)))
-
-    def test_has_lock(self):
-        """
-        Lock node's first child belongs to given object. Hence has the lock
-        """
-        prefix = "someprefix__lock__"
-        lock = ZKLock("client", "/lock")
-        lock.prefix = prefix
-        children = ["errrprefix__lock__0000000004",
-                    "{}0000000001".format(prefix),
-                    "whyprefix__lock__0000000002"]
-        seq = [(GetChildren("/lock"), const(children))]
-        self.assertTrue(perform_sequence(seq, sh.is_lock_acquired(lock)))
-
-    def test_no_lock(self):
-        """
-        If lock's node is not the first in the sorted list of children, then
-        it does not have the lock
-        """
-        prefix = "whyprefix__lock__"
-        lock = ZKLock("client", "/lock")
-        lock.prefix = prefix
-        children = ["errrprefix__lock__0000000004",
-                    "someprefix__lock__0000000001",
-                    "{}0000000002".format(prefix)]
-        seq = [(GetChildren("/lock"), const(children))]
-        self.assertFalse(perform_sequence(seq, sh.is_lock_acquired(lock)))
+        seq = [
+            (GetScalingGroupInfo(tenant_id="tid", group_id="gid"),
+             lambda i: raise_(NoSuchScalingGroupError("tid", "gid"))),
+            (Log("selfheal-group-deleted",
+                 dict(tenant_id="tid", scaling_group_id="gid")),
+             noop)
+        ]
+        self.assertIsNone(
+            perform_sequence(seq, sh.check_and_trigger("tid", "gid")))
