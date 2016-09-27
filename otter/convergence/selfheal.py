@@ -50,7 +50,8 @@ class SelfHeal(object):
         validator=attr.validators.instance_of((ComposedDispatcher,
                                                TypeDispatcher)))
     config_func = attr.ib()
-    time_range = attr.ib(validator=attr.validators.instance_of(float))
+    time_range = attr.ib(validator=attr.validators.instance_of(float),
+                         convert=float)
     log = attr.ib(
         validator=attr.validators.instance_of(BoundLog),
         convert=lambda l: l.bind(otter_service="selfheal"),
