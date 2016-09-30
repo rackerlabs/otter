@@ -14,6 +14,8 @@ from effect.do import do, do_return
 
 from kazoo.exceptions import LockTimeout, NoNodeError, NodeExistsError
 
+import six
+
 from twisted.internet.defer import maybeDeferred
 
 from txeffect import deferred_performer, perform
@@ -166,6 +168,17 @@ def perform_delete_node(kz_client, dispatcher, intent):
     :param DeleteNode intent: the intent
     """
     return kz_client.delete(intent.path, version=intent.version)
+
+
+@attr.s
+class GetNode(object):
+    path = attr.ib(validator=attr.validators.instance_of(six.string_types))
+
+
+@attr.s
+class UpdateNode(object):
+    path = attr.ib(validator=attr.validators.instance_of(six.string_types))
+    value = attr.ib(validator=attr.validators.instance_of(six.binary_type))
 
 
 def get_zk_dispatcher(kz_client):

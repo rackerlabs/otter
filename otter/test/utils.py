@@ -40,7 +40,8 @@ from zope.interface.verify import verifyObject
 
 from otter.convergence.model import HeatStack, NovaServer, ServerState
 from otter.log.bound import BoundLog, bound_log_kwargs
-from otter.models.interface import IScalingGroup, IScalingGroupServersCache
+from otter.models.interface import (
+    GroupState, IScalingGroup, IScalingGroupServersCache)
 from otter.supervisor import ISupervisor
 from otter.util.config import set_config_data, update_config_data
 from otter.util.deferredutils import DeferredPool
@@ -1009,3 +1010,10 @@ def server(id, state, created=0, image_id='image', flavor_id='flavor',
 def stack(id, name='foostack', action='CREATE', status='COMPLETE'):
     """Convenience for creating a :obj:`HeatStack`."""
     return HeatStack(id=id, name=name, action=action, status=status)
+
+
+def group_state(tenant_id, group_id, group_name="group", active={}, pending={},
+                group_touched=None, policy_touched=None, paused=False,
+                status="ACTIVE"):
+    return GroupState(tenant_id, group_id, group_name, active, pending,
+                      group_touched, policy_touched, paused, status)

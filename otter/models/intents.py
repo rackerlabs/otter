@@ -66,6 +66,11 @@ def perform_delete_group(log, store, dispatcher, intent):
     return group.delete_group()
 
 
+@attr.s
+class GetTenantGroups(object):
+    tenant_id = attr.ib()
+
+
 @attributes(['scaling_group', 'status'])
 class UpdateGroupStatus(object):
     """An Effect intent which updates the status of a scaling group."""
