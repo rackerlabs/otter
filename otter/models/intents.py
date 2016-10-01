@@ -49,11 +49,13 @@ def perform_get_scaling_group_info(log, store, dispatcher, intent):
     returnValue((group, manifest))
 
 
-@attributes(['tenant_id', 'group_id'])
+@attr.s
 class DeleteGroup(object):
     """
     Delete scaling group
     """
+    tenant_id = attr.ib()
+    group_id = attr.ib()
 
 
 @deferred_performer

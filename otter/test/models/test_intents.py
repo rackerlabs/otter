@@ -96,7 +96,7 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         """
         self.group.delete_group.return_value = succeed('del')
         result = self.perform_with_group(
-            Effect(DeleteGroup(tenant_id='00', group_id='g1')),
+            Effect(DeleteGroup('00', 'g1')),
             (self.log, '00', 'g1'), self.group)
         self.assertEqual(result, 'del')
 
@@ -109,7 +109,7 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         expected_lookup = (matches(IsBoundWith(base_log=True, effectful=True)),
                            '00', 'g1')
         result = self.perform_with_group(
-            Effect(DeleteGroup(tenant_id='00', group_id='g1')),
+            Effect(DeleteGroup('00', 'g1')),
             expected_lookup, self.group,
             fallback_dispatcher=get_log_dispatcher(self.log,
                                                    {'effectful': True}))
