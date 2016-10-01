@@ -6,7 +6,7 @@ import json
 
 import mock
 
-from effect.testing import parallel_sequence
+from effect.testing import SequenceDispatcher, parallel_sequence
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -19,7 +19,49 @@ from otter.models.intents import (
 from otter.models.interface import ScalingGroupStatus
 from otter.util import zk
 from otter.test.utils import (
-    const, group_state, intent_func, nested_sequence, noop, perform_sequence)
+    CheckFailure, const, conste, group_state, intent_func, nested_sequence,
+    noop, perform_sequence)
+
+
+class TerminatorTests(SynchronousTestCase):
+    """
+    Tests for :func:`terminator`
+    """
+
+    def setUp(self):
+        self.patch(t, "read_and_process", intent_func("rap"))
+
+    def test_success(self):
+        """
+        Calls :func:`read_and_process` wrapped in logging context and performs
+        it with given dispatcher
+        """
+        seqd = SequenceDispatcher([
+            (BoundFields(mock.ANY, dict(otter_service="terminator")),
+             nested_sequence([
+                 (("rap", "customer_access_events/events", "/path"), noop)
+             ])
+            )
+        ])
+        d = t.terminator(seqd, "/path")
+        self.successResultOf(d)
+
+    def test_error(self):
+        """
+        Any error occurring in :func:`read_and_process` is captured and logged
+        with {"otter_service": "terminator"} field. Returns success.
+        """
+        seqd = SequenceDispatcher([
+            (BoundFields(mock.ANY, dict(otter_service="terminator")),
+             nested_sequence([
+                 (("rap", "customer_access_events/events", "/path"),
+                  conste(ValueError("h"))),
+                 (LogErr(CheckFailure(ValueError), "terminator-err", {}), noop)
+             ])
+            )
+        ])
+        d = t.terminator(seqd, "/path")
+        self.successResultOf(d)
 
 
 class ReadAndProcessTests(SynchronousTestCase):

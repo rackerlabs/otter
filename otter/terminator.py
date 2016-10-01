@@ -18,23 +18,35 @@ from txeffect import perform
 from otter.cloud_client.cloudfeeds import Direction, read_entries
 from otter.indexer import atom
 from otter.log.cloudfeeds import cf_err, cf_msg
-from otter.log.intents import with_log
+from otter.log.intents import err_exc_info, with_log
 from otter.models.interface import ScalingGroupStatus
 from otter.models.intents import (
     DeleteGroup, GetTenantGroups, UpdateGroupErrorReasons, UpdateGroupStatus)
 from otter.util import zk
 
 
-def terminator(dispatcher, log, zk_prev_path):
+def terminator(dispatcher, zk_prev_path):
+    """
+    Main entry point of this module. Basically performs and logs effect
+    returned by :func:`read_and_process`
+
+    :return: ``Deferred`` of None
+    """
     eff = with_log(
-        read_and_process("customer_access_events/events", zk_prev_path),
+        read_and_process("customer_access_events/events", zk_prev_path).on(
+            error=err_exc_info("terminator-err")),
         otter_service="terminator")
-    d = perform(dispatcher, eff)
-    return d.addErrback(log.err, "terminator-err", otter_service="terminator")
+    return perform(dispatcher, eff)
 
 
 @do
 def read_and_process(url, zk_prev_path):
+    """
+    Read entries from last used "previous parameters" in ZK, process them
+    and update the latest "previous parameters" back to ZK
+
+    :return: ``Effect``
+    """
     prev_params_json, stat = yield Effect(zk.GetNode(zk_prev_path))
     prev_params = json.loads(prev_params_json.decode("utf-8"))
     entries, prev_params = yield read_entries(url, prev_params,
@@ -57,6 +69,8 @@ class TenantStatus(object):
 def enable_group(group):
     """
     Change any SUSPENDED groups to ACTIVE and log about the update
+
+    :return: ``Effect``
     """
     if group.status == ScalingGroupStatus.SUSPENDED:
         yield Effect(UpdateGroupStatus(scaling_group=group,
@@ -68,6 +82,8 @@ def enable_group(group):
 def suspend_group(group):
     """
     SUSPEND the group and send CF log about it
+
+    :return: ``Effect``
     """
     yield Effect(UpdateGroupStatus(scaling_group=group,
                                    status=ScalingGroupStatus.SUSPENDED))
@@ -78,6 +94,8 @@ def suspend_group(group):
 def delete_group(group):
     """
     Delete the group and send CF log about it
+
+    :return: ``Effect``
     """
     yield Effect(DeleteGroup(group.tenant_id, group.group_id))
     yield cf_err("group-status-terminated")
@@ -86,6 +104,8 @@ def delete_group(group):
 def process_entry(entry):
     """
     Process the groups of tenant in the entry based on the status in the entry
+
+    :return: ``Effect``
     """
     tenant_id, status = extract_info(entry)
     process_group_mapping = {
@@ -106,7 +126,9 @@ def process_entry(entry):
 
 def extract_info(entry):
     """
-    Extract tenant_id and status from entry XML node
+    Extract tenant_id and status from entry XML node.
+
+    :return: (tenant_id, status) tuple
     """
     content = atom.xpath("./atom:content", entry)[0]
     ns = {"event": "http://docs.rackspace.com/core/event",
