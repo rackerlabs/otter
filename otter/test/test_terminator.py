@@ -13,7 +13,10 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter import terminator as t
 from otter.cloud_client.cloudfeeds import Direction
 from otter.indexer import atom
-from otter.models.intents import DeleteGroup, GetTenantGroups
+from otter.log.intents import BoundFields, Log, LogErr
+from otter.models.intents import (
+    DeleteGroup, GetTenantGroups, UpdateGroupErrorReasons, UpdateGroupStatus)
+from otter.models.interface import ScalingGroupStatus
 from otter.util import zk
 from otter.test.utils import (
     const, group_state, intent_func, nested_sequence, noop, perform_sequence)
@@ -41,6 +44,59 @@ class ReadAndProcessTests(SynchronousTestCase):
             ])
         ]
         perform_sequence(seq, t.read_and_process("url", "/prevpath"))
+
+
+class ProcessGroupTests(SynchronousTestCase):
+    """
+    Tests for group processing functions
+    """
+
+    def test_enable_group_suspended(self):
+        """
+        :func:`enable_group` changes group status to ACTIVE and logs about it
+        if group's status is SUSPENDED
+        """
+        group = group_state("t1", "g1", status=ScalingGroupStatus.SUSPENDED)
+        seq = [
+            (UpdateGroupStatus(scaling_group=group,
+                               status=ScalingGroupStatus.ACTIVE), noop),
+            (Log("group-resume-active", dict(cloud_feed=True)), noop)
+        ]
+        perform_sequence(seq, t.enable_group(group))
+
+    def test_enable_group(self):
+        """
+        :func:`enable_group` does nothing if group is not SUSPENDED
+        """
+        group = group_state("t1", "g1")
+        perform_sequence([], t.enable_group(group))
+
+    def test_suspend_group(self):
+        """
+        :func:`suspend_group` updates group status to SUSPENDED and logs to
+        CF about it
+        """
+        group = group_state("t1", "g1")
+        seq = [
+            (UpdateGroupStatus(scaling_group=group,
+                               status=ScalingGroupStatus.SUSPENDED), noop),
+            (Log("group-status-suspended",
+                 dict(cloud_feed=True, isError=True)), noop)
+        ]
+        perform_sequence(seq, t.suspend_group(group))
+
+    def test_delete_group(self):
+        """
+        :func:`delete_group` deletes the group logs to CF about it
+        """
+        group = group_state("t1", "g1")
+        seq = [
+            (DeleteGroup("t1", "g1"), noop),
+            (Log("group-status-terminated",
+                 dict(cloud_feed=True, isError=True)), noop)
+        ]
+        perform_sequence(seq, t.delete_group(group))
+
 
 
 entrystr = """
@@ -72,12 +128,16 @@ class ProcessEntryTests(SynchronousTestCase):
         entry = atom.parse(entrystr.format(tenant_id="23", status=status))
         self.patch(t, func_name, intent_func("group_func"))
         groups = [group_state("t1", "g1"), group_state("t1", "g2")]
+
+        def group_seq(g):
+            boundfields = BoundFields(
+                mock.ANY,
+                dict(tenant_id=g.tenant_id, scaling_group_id=g.group_id))
+            return (boundfields, nested_sequence([(("group_func", g), noop)]))
+
         seq = [
             (GetTenantGroups("23"), const(groups)),
-            parallel_sequence([
-                [(("group_func", groups[0]), noop)],
-                [(("group_func", groups[1]), noop)]
-            ])
+            parallel_sequence([[group_seq(g)] for g in groups])
         ]
         perform_sequence(seq, t.process_entry(entry))
 

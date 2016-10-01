@@ -17,14 +17,19 @@ from txeffect import perform
 
 from otter.cloud_client.cloudfeeds import Direction, read_entries
 from otter.indexer import atom
-from otter.models.intents import DeleteGroup, GetTenantGroups
+from otter.log.cloudfeeds import cf_err, cf_msg
+from otter.log.intents import with_log
+from otter.models.interface import ScalingGroupStatus
+from otter.models.intents import (
+    DeleteGroup, GetTenantGroups, UpdateGroupErrorReasons, UpdateGroupStatus)
 from otter.util import zk
 
 
 def terminator(dispatcher, log, zk_prev_path):
-    d = perform(
-        dispatcher,
-        read_and_process("customer_access_events/events", zk_prev_path))
+    eff = with_log(
+        read_and_process("customer_access_events/events", zk_prev_path),
+        otter_service="terminator")
+    d = perform(dispatcher, eff)
     return d.addErrback(log.err, "terminator-err", otter_service="terminator")
 
 
@@ -48,20 +53,34 @@ class TenantStatus(object):
     TERMINATED = "TERMINATED"
 
 
+@do
 def enable_group(group):
     """
-    Change any ERROR groups to ACTIVE and log about the update
+    Change any SUSPENDED groups to ACTIVE and log about the update
     """
+    if group.status == ScalingGroupStatus.SUSPENDED:
+        yield Effect(UpdateGroupStatus(scaling_group=group,
+                                       status=ScalingGroupStatus.ACTIVE))
+        yield cf_msg('group-resume-active')
 
 
+@do
 def suspend_group(group):
     """
+    SUSPEND the group and send CF log about it
     """
+    yield Effect(UpdateGroupStatus(scaling_group=group,
+                                   status=ScalingGroupStatus.SUSPENDED))
+    yield cf_err('group-status-suspended')
 
 
+@do
 def delete_group(group):
-    pass
-
+    """
+    Delete the group and send CF log about it
+    """
+    yield Effect(DeleteGroup(group.tenant_id, group.group_id))
+    yield cf_err("group-status-terminated")
 
 
 def process_entry(entry):
@@ -69,12 +88,18 @@ def process_entry(entry):
     Process the groups of tenant in the entry based on the status in the entry
     """
     tenant_id, status = extract_info(entry)
-    process_group = {
+    process_group_mapping = {
         TenantStatus.FULL: enable_group,
         TenantStatus.SUSPENDED: suspend_group,
         TenantStatus.TERMINATED: delete_group
     }
-    process_groups = compose(parallel, map(process_group[status]))
+    process_func = process_group_mapping[status]
+
+    def proc_with_log(group):
+        return with_log(process_func(group), tenant_id=group.tenant_id,
+                        scaling_group_id=group.group_id)
+
+    process_groups = compose(parallel, map(proc_with_log))
     return Effect(GetTenantGroups(tenant_id)).on(
         lambda groups: process_groups(groups) if groups else None)
 
