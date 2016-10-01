@@ -98,6 +98,16 @@ class GroupPausedError(Exception):
             fmt.format(t=tenant_id, g=group_id, o=operation))
 
 
+class TenantSuspendedError(Exception):
+    """
+    Exception to be raised when an operation cannot be performed because
+    tenantid is suspended.
+    """
+    def __init__(self, tenant_id):
+        fmt = "Tenant {t} is SUSPENDED."
+        super(TenantSuspendedError, self).__init__(fmt.format(t=tenant_id))
+
+
 def conv_pause_group_eff(group, transaction_id):
     """
     Pause scaling group of convergence enabled tenant
@@ -420,6 +430,8 @@ def maybe_execute_scaling_policy(
     if state.paused:
         raise GroupPausedError(scaling_group.tenant_id, scaling_group.uuid,
                                "execute policy {}".format(policy_id))
+    if state.status == ScalingGroupStatus.SUSPENDED:
+        raise TenantSuspendedError(scaling_group.tenant_id)
 
     # make sure that the policy (and the group) exists before doing
     # anything else
