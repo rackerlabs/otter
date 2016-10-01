@@ -75,7 +75,7 @@ def enable_group(group):
     if group.status == ScalingGroupStatus.SUSPENDED:
         yield Effect(UpdateGroupStatus(scaling_group=group,
                                        status=ScalingGroupStatus.ACTIVE))
-        yield cf_msg('group-resume-active')
+        yield cf_msg('group-status-active')
 
 
 @do

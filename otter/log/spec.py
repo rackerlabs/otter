@@ -204,6 +204,10 @@ msg_types = {
     "group-status-error": split_cf_messages(
         "Group's status is changed to ERROR. Reasons: {reasons}", "reasons",
         separator='; '),
+    "group-status-suspended": ("Group has been suspended because associated "
+        "tenant is suspended. Please contact support"),
+    "group-status-terminated": ("Group has been deleted because associated "
+        "tenant is terminated."),
     "sch-cannot-exec": (
         "Cannot execute scheduled policy {policy_id} because there is no "
         "change in desired number of servers. Either group min or max "

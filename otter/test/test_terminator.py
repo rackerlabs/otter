@@ -102,7 +102,7 @@ class ProcessGroupTests(SynchronousTestCase):
         seq = [
             (UpdateGroupStatus(scaling_group=group,
                                status=ScalingGroupStatus.ACTIVE), noop),
-            (Log("group-resume-active", dict(cloud_feed=True)), noop)
+            (Log("group-status-active", dict(cloud_feed=True)), noop)
         ]
         perform_sequence(seq, t.enable_group(group))
 
