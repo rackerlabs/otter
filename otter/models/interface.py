@@ -274,6 +274,12 @@ class ScalingGroupStatus(Names):
     are getting deleted
     """
 
+    SUSPENDED = NamedConstant()
+    """
+    Associated tenant is SUSPENDED. And so is the group. During this phase,
+    scheduled policies will not be executed
+    """
+
 
 class IScalingGroup(Interface):
     """
