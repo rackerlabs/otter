@@ -8,12 +8,18 @@ CONVERGENCE_PARTITIONER_PATH = '/convergence-partitioner'
 
 
 class ServiceType(Names):
-    """Constants representing Rackspace cloud services."""
+    """
+    Constants representing Rackspace cloud services.
+
+    Note: CLOUD_FEEDS_CAP represents customer access policy events which like
+    CLOUD_FEEDS is fixed URL but different from CLOUD_FEEDS.
+    """
     CLOUD_SERVERS = NamedConstant()
     CLOUD_LOAD_BALANCERS = NamedConstant()
     RACKCONNECT_V3 = NamedConstant()
     CLOUD_METRICS_INGEST = NamedConstant()
     CLOUD_FEEDS = NamedConstant()
+    CLOUD_FEEDS_CAP = NamedConstant()
     CLOUD_ORCHESTRATION = NamedConstant()
 
 
@@ -54,8 +60,9 @@ def get_service_configs(config):
 
     cf = config.get('cloudfeeds')
     if cf is not None:
-        configs[ServiceType.CLOUD_FEEDS] = {
-            'name': cf['service'], 'region': config['region'],
-            'url': cf['url']}
+        configs[ServiceType.CLOUD_FEEDS] = {'url': cf['url']}
+        customer_access_url = cf.get("customer_access_events_url")
+        if customer_access_url is not None:
+            configs[ServiceType.CLOUD_FEEDS_CAP] = {'url': customer_access_url}
 
     return configs
