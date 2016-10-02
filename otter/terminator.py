@@ -16,27 +16,28 @@ from toolz.curried import map
 from txeffect import perform
 
 from otter.constants import ServiceType
+from otter.cloud_client import TenantScope
 from otter.cloud_client.cloudfeeds import Direction, read_entries
 from otter.indexer import atom
 from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err_exc_info, with_log
 from otter.models.interface import ScalingGroupStatus
 from otter.models.intents import (
-    DeleteGroup, GetTenantGroups, UpdateGroupErrorReasons, UpdateGroupStatus)
+    DeleteGroup, GetTenantGroups, UpdateGroupErrorReasons, LoadAndUpdateGroupStatus)
 from otter.util import zk
 
 
-def terminator(dispatcher, zk_prev_path):
+def terminator(dispatcher, zk_prev_path, tenant_id):
     """
     Main entry point of this module. Basically performs and logs effect
     returned by :func:`read_and_process`
 
     :return: ``Deferred`` of None
     """
-    eff = with_log(
-        read_and_process("customer_access_policy/events", zk_prev_path).on(
-            error=err_exc_info("terminator-err")),
-        otter_service="terminator")
+    rap_eff = read_and_process("customer_access_policy/events", zk_prev_path)
+    tscope_eff = Effect(TenantScope(rap_eff, tenant_id))
+    eff = with_log(tscope_eff.on(error=err_exc_info("terminator-err")),
+                   otter_service="terminator")
     return perform(dispatcher, eff)
 
 
@@ -74,8 +75,9 @@ def enable_group(group):
     :return: ``Effect``
     """
     if group.status == ScalingGroupStatus.SUSPENDED:
-        yield Effect(UpdateGroupStatus(scaling_group=group,
-                                       status=ScalingGroupStatus.ACTIVE))
+        yield Effect(
+            LoadAndUpdateGroupStatus(group.tenant_id, group.group_id,
+                                     ScalingGroupStatus.ACTIVE))
         yield cf_msg('group-status-active')
 
 
@@ -86,8 +88,9 @@ def suspend_group(group):
 
     :return: ``Effect``
     """
-    yield Effect(UpdateGroupStatus(scaling_group=group,
-                                   status=ScalingGroupStatus.SUSPENDED))
+    yield Effect(
+        LoadAndUpdateGroupStatus(group.tenant_id, group.group_id,
+                                 ScalingGroupStatus.SUSPENDED))
     yield cf_err('group-status-suspended')
 
 

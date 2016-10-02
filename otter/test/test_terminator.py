@@ -12,11 +12,13 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter import terminator as t
 from otter.constants import ServiceType
+from otter.cloud_client import TenantScope
 from otter.cloud_client.cloudfeeds import Direction
 from otter.indexer import atom
 from otter.log.intents import BoundFields, Log, LogErr
 from otter.models.intents import (
-    DeleteGroup, GetTenantGroups, UpdateGroupErrorReasons, UpdateGroupStatus)
+    DeleteGroup, GetTenantGroups, UpdateGroupErrorReasons,
+    LoadAndUpdateGroupStatus)
 from otter.models.interface import ScalingGroupStatus
 from otter.util import zk
 from otter.test.utils import (
@@ -40,11 +42,15 @@ class TerminatorTests(SynchronousTestCase):
         seqd = SequenceDispatcher([
             (BoundFields(mock.ANY, dict(otter_service="terminator")),
              nested_sequence([
-                 (("rap", "customer_access_policy/events", "/path"), noop)
+                 (TenantScope(mock.ANY, "tid"),
+                  nested_sequence([
+                      (("rap", "customer_access_policy/events", "/path"), noop)
+                  ])
+                 )
              ])
             )
         ])
-        d = t.terminator(seqd, "/path")
+        d = t.terminator(seqd, "/path", "tid")
         self.successResultOf(d)
 
     def test_error(self):
@@ -55,13 +61,17 @@ class TerminatorTests(SynchronousTestCase):
         seqd = SequenceDispatcher([
             (BoundFields(mock.ANY, dict(otter_service="terminator")),
              nested_sequence([
-                 (("rap", "customer_access_policy/events", "/path"),
-                  conste(ValueError("h"))),
+                 (TenantScope(mock.ANY, "tid"),
+                  nested_sequence([
+                      (("rap", "customer_access_policy/events", "/path"),
+                       conste(ValueError("g")))
+                  ])
+                 ),
                  (LogErr(CheckFailure(ValueError), "terminator-err", {}), noop)
              ])
             )
         ])
-        d = t.terminator(seqd, "/path")
+        d = t.terminator(seqd, "/path", "tid")
         self.successResultOf(d)
 
 
@@ -107,8 +117,8 @@ class ProcessGroupTests(SynchronousTestCase):
         """
         group = group_state("t1", "g1", status=ScalingGroupStatus.SUSPENDED)
         seq = [
-            (UpdateGroupStatus(scaling_group=group,
-                               status=ScalingGroupStatus.ACTIVE), noop),
+            (LoadAndUpdateGroupStatus("t1", "g1", ScalingGroupStatus.ACTIVE),
+             noop),
             (Log("group-status-active", dict(cloud_feed=True)), noop)
         ]
         perform_sequence(seq, t.enable_group(group))
@@ -127,10 +137,12 @@ class ProcessGroupTests(SynchronousTestCase):
         """
         group = group_state("t1", "g1")
         seq = [
-            (UpdateGroupStatus(scaling_group=group,
-                               status=ScalingGroupStatus.SUSPENDED), noop),
+            (LoadAndUpdateGroupStatus(
+                "t1", "g1", ScalingGroupStatus.SUSPENDED),
+             noop),
             (Log("group-status-suspended",
-                 dict(cloud_feed=True, isError=True)), noop)
+                 dict(cloud_feed=True, isError=True)),
+             noop)
         ]
         perform_sequence(seq, t.suspend_group(group))
 
