@@ -39,7 +39,7 @@ class TerminatorTests(SynchronousTestCase):
         seqd = SequenceDispatcher([
             (BoundFields(mock.ANY, dict(otter_service="terminator")),
              nested_sequence([
-                 (("rap", "customer_access_events/events", "/path"), noop)
+                 (("rap", "customer_access_policy/events", "/path"), noop)
              ])
             )
         ])
@@ -54,7 +54,7 @@ class TerminatorTests(SynchronousTestCase):
         seqd = SequenceDispatcher([
             (BoundFields(mock.ANY, dict(otter_service="terminator")),
              nested_sequence([
-                 (("rap", "customer_access_events/events", "/path"),
+                 (("rap", "customer_access_policy/events", "/path"),
                   conste(ValueError("h"))),
                  (LogErr(CheckFailure(ValueError), "terminator-err", {}), noop)
              ])

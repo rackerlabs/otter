@@ -33,7 +33,7 @@ def terminator(dispatcher, zk_prev_path):
     :return: ``Deferred`` of None
     """
     eff = with_log(
-        read_and_process("customer_access_events/events", zk_prev_path).on(
+        read_and_process("customer_access_policy/events", zk_prev_path).on(
             error=err_exc_info("terminator-err")),
         otter_service="terminator")
     return perform(dispatcher, eff)
