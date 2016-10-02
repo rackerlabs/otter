@@ -70,6 +70,10 @@ def perform_delete_group(log, store, dispatcher, intent):
 
 @attr.s
 class GetTenantGroups(object):
+    """
+    Intent to get groups of a tenant. Its performer will return list of
+    :obj:`GroupState` objects
+    """
     tenant_id = attr.ib()
 
 
@@ -170,4 +174,7 @@ def get_model_dispatcher(log, store):
             partial(perform_update_error_reasons, log, store),
         ModifyGroupStatePaused: perform_modify_group_state_paused,
         GetAllValidGroups: partial(perform_get_all_valid_groups, store),
+        GetTenantGroups:
+            deferred_performer(
+                lambda d, i: store.list_scaling_group_states(log, i.tenant_id))
     })

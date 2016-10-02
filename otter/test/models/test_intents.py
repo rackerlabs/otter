@@ -10,13 +10,13 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.log.intents import get_log_dispatcher
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, LoadAndUpdateGroupStatus,
+    DeleteGroup, GetScalingGroupInfo, GetTenantGroups, LoadAndUpdateGroupStatus,
     ModifyGroupStatePaused, UpdateGroupErrorReasons, UpdateGroupStatus,
     UpdateServersCache, get_model_dispatcher)
 from otter.models.interface import (
     GroupState, IScalingGroupCollection, ScalingGroupStatus)
 from otter.test.utils import (
-    EffectServersCache, IsBoundWith, iMock, matches, mock_group, mock_log)
+    EffectServersCache, IsBoundWith, iMock, exp_func, matches, mock_group, mock_log)
 
 
 class ScalingGroupIntentsTests(SynchronousTestCase):
@@ -184,3 +184,15 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         self.assertEqual(modified_state.paused, False)
         modified_state.paused = True
         self.assertEqual(self.state, modified_state)
+
+    def test_get_tenant_groups(self):
+        """
+        Performing :obj:`GetTenantGroups` calls
+        :func:`list_scaling_group_states`
+        """
+        store = self.get_store()
+        func = exp_func(self, succeed(["gs1", "gs2"]), self.log, "tid")
+        store.list_scaling_group_states.side_effect = func
+        dispatcher = self.get_dispatcher(store)
+        r = sync_perform(dispatcher, Effect(GetTenantGroups("tid")))
+        self.assertEqual(r, ["gs1", "gs2"])
