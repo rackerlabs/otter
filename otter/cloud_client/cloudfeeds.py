@@ -32,14 +32,26 @@ def publish_autoscale_event(event, log=None):
 
 
 class Direction(Names):
+    """
+    Which direction to follow the feeds?
+    """
     PREVIOUS = NamedConstant()
     NEXT = NamedConstant()
 
 
 @do
-def read_entries(url, params, direction):
+def read_entries(service_type, url, params, direction):
     """
-    Read feed entries on given direction until it is empty
+    Read all feed entries and follow in given direction until it is empty
+
+    :param service_type: Either CLOUD_FEEDS or CLOUD_FEEDS_CAP
+    :type service_type: A member of :class:`ServiceType`
+    :param str url: CF URL to append
+    :param dict params: HTTP parameters
+    :param direction: Where to continue fetching?
+    :type direction: A member of :class:`Direction`
+
+    :return: (``list`` of :obj:`Element`, last fetched params) tuple
     """
     if direction == Direction.PREVIOUS:
         direction_link = atom.previous_link
@@ -50,7 +62,7 @@ def read_entries(url, params, direction):
     all_entries = []
     while True:
         resp, feed_str = yield service_request(
-            ServiceType.CLOUD_FEEDS, "GET", url, params=params,
+            service_type, "GET", url, params=params,
             json_response=False)
         feed = atom.parse(feed_str)
         entries = atom.entries(feed)

@@ -57,10 +57,11 @@ class ReadEntriesTests(SynchronousTestCase):
     url = "http://url"
     directions = {"previous": cf.Direction.PREVIOUS,
                   "next": cf.Direction.NEXT}
+    service_type = ServiceType.CLOUD_FEEDS
 
     def svc_intent(self, params={}):
         return service_request(
-            ServiceType.CLOUD_FEEDS, "GET",
+            self.service_type, "GET",
             self.url, params=params, json_response=False).intent
 
     def feed(self, rel, link, summaries):
@@ -70,13 +71,14 @@ class ReadEntriesTests(SynchronousTestCase):
 
     def _test_empty(self, rel):
         """
-        Does not go further when there are no entries and returns []
+        Does not go further when there are no entries and return []
         """
         feedstr = self.feed(rel, "link-doesnt-matter", [])
         seq = [
             (self.svc_intent(), const(stub_json_response(feedstr)))
         ]
-        entries_eff = cf.read_entries(self.url, {}, self.directions[rel])
+        entries_eff = cf.read_entries(
+            self.service_type, self.url, {}, self.directions[rel])
         self.assertEqual(perform_sequence(seq, entries_eff), ([], {}))
 
     def test_empty_previous(self):
@@ -98,7 +100,9 @@ class ReadEntriesTests(SynchronousTestCase):
              const(stub_json_response(feed2str)))
         ]
         entries, params = perform_sequence(
-            seq, cf.read_entries(self.url, {"a": "b"}, self.directions[rel]))
+            seq,
+            cf.read_entries(
+                self.service_type, self.url, {"a": "b"}, self.directions[rel]))
         self.assertEqual(
             [atom.summary(entry) for entry in entries],
             ["summary1", "summ2"])
@@ -126,7 +130,9 @@ class ReadEntriesTests(SynchronousTestCase):
              const(stub_json_response(feed3_str))),
         ]
         entries, params = perform_sequence(
-            seq, cf.read_entries(self.url, {}, self.directions[rel]))
+            seq,
+            cf.read_entries(
+                self.service_type, self.url, {}, self.directions[rel]))
         self.assertEqual(
             [atom.summary(entry) for entry in entries],
             ["summ1", "summ2", "summ3", "summ4"])
@@ -149,7 +155,9 @@ class ReadEntriesTests(SynchronousTestCase):
             (self.svc_intent({"a": "b"}), const(stub_json_response(feedstr)))
         ]
         entries, params = perform_sequence(
-            seq, cf.read_entries(self.url, {"a": "b"}, self.directions[rel]))
+            seq,
+            cf.read_entries(
+                self.service_type, self.url, {"a": "b"}, self.directions[rel]))
         self.assertEqual(atom.summary(entries[0]), "summary")
         self.assertEqual(params, {"a": "b"})
 
@@ -165,4 +173,4 @@ class ReadEntriesTests(SynchronousTestCase):
         """
         self.assertRaises(
             ValueError, sync_perform, base_dispatcher,
-            cf.read_entries(self.url, {}, "bad"))
+            cf.read_entries(self.service_type, self.url, {}, "bad"))
