@@ -15,6 +15,7 @@ from toolz.curried import map
 
 from txeffect import perform
 
+from otter.constants import ServiceType
 from otter.cloud_client.cloudfeeds import Direction, read_entries
 from otter.indexer import atom
 from otter.log.cloudfeeds import cf_err, cf_msg
@@ -49,8 +50,8 @@ def read_and_process(url, zk_prev_path):
     """
     prev_params_json, stat = yield Effect(zk.GetNode(zk_prev_path))
     prev_params = json.loads(prev_params_json.decode("utf-8"))
-    entries, prev_params = yield read_entries(url, prev_params,
-                                              Direction.PREVIOUS)
+    entries, prev_params = yield read_entries(
+        ServiceType.CLOUD_FEEDS_CAP, url, prev_params, Direction.PREVIOUS)
     yield Effect(
         zk.UpdateNode(zk_prev_path, json.dumps(prev_params).encode("utf-8")))
     yield parallel(map(process_entry, entries))

@@ -11,6 +11,7 @@ from effect.testing import SequenceDispatcher, parallel_sequence
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter import terminator as t
+from otter.constants import ServiceType
 from otter.cloud_client.cloudfeeds import Direction
 from otter.indexer import atom
 from otter.log.intents import BoundFields, Log, LogErr
@@ -70,6 +71,10 @@ class ReadAndProcessTests(SynchronousTestCase):
     """
 
     def test_success(self):
+        """
+        Read entries from last used "previous parameters" in ZK, updates the
+        latest "previous parameters" back to ZK and process entries in parallel
+        """
         self.patch(t, "read_entries", intent_func("re"))
         self.patch(t, "process_entry", intent_func("pe"))
         entries = ["element node1", "element node2"]
@@ -79,7 +84,9 @@ class ReadAndProcessTests(SynchronousTestCase):
         new_params_json = json.dumps(new_params).encode("utf-8")
         seq = [
             (zk.GetNode("/prevpath"), const((params_json, "stat"))),
-            (("re", "url", params, Direction.PREVIOUS), const((entries, new_params))),
+            (("re", ServiceType.CLOUD_FEEDS_CAP, "url", params,
+              Direction.PREVIOUS),
+             const((entries, new_params))),
             (zk.UpdateNode("/prevpath", new_params_json), noop),
             parallel_sequence([
                 [(("pe", entries[0]), noop)], [(("pe", entries[1]), noop)]
