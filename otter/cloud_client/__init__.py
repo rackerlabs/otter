@@ -187,8 +187,6 @@ def concretize_service_request(
         log = service_request.log
 
     service_config = service_configs[service_request.service_type]
-    region = service_config['region']
-    service_name = service_config['name']
 
     def got_auth((token, catalog)):
         request_ = add_headers(otter_headers(token), request)
@@ -198,6 +196,8 @@ def concretize_service_request(
         if 'url' in service_config:
             request_ = add_bind_root(service_config['url'], request_)
         else:
+            region = service_config['region']
+            service_name = service_config['name']
             request_ = add_bind_service(
                 catalog, service_name, region, log, request_)
         request_ = add_error_handling(
