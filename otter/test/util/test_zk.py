@@ -317,30 +317,57 @@ class GetStatTests(SynchronousTestCase):
         self.assertEqual(result, None)
 
 
-class DeleteTests(SynchronousTestCase):
-    """Tests for :obj:`DeleteNode`."""
+class NodeCRUDTests(SynchronousTestCase):
+    """
+    Tests for Node CRUD intents
+    """
+
+    def setUp(self):
+        self.model = ZKCrudModel()
+
+    def test_create(self):
+        """
+        Performing :obj:`CreateNode` calls client.create()
+        """
+        self.model.create_makepath = False
+        eff = Effect(zk.CreateNode(path='/foo', value="v"))
+        dispatcher = get_zk_dispatcher(self.model)
+        result = sync_perform(dispatcher, eff)
+        self.assertEqual(self.model.nodes, {"/foo": ("v", 0)})
+        self.assertEqual(result, '/foo')
+
     def test_delete(self):
-        model = ZKCrudModel()
+        """
+        Performing :obj:`DeleteNode` calls client.delete()
+        """
         eff = Effect(DeleteNode(path='/foo', version=1))
-        model.create('/foo', 'initial', makepath=True)
-        model.set('/foo', 'bar')
-        performer = partial(perform_delete_node, model)
+        self.model.create('/foo', 'initial', makepath=True)
+        self.model.set('/foo', 'bar')
+        performer = partial(perform_delete_node, self.model)
         dispatcher = TypeDispatcher({DeleteNode: performer})
         result = sync_perform(dispatcher, eff)
-        self.assertEqual(model.nodes, {})
+        self.assertEqual(self.model.nodes, {})
         self.assertEqual(result, 'delete return value')
 
+    def test_get_node(self):
+        """
+        Performing `GetNode` calls kz_client.get()
+        """
+        self.model.nodes["/path"] = ("value", 0)
+        eff = Effect(zk.GetNode("/path"))
+        result = sync_perform(get_zk_dispatcher(self.model), eff)
+        self.assertEqual(result, ("value", ZNodeStatStub(version=0)))
 
-class CreateTests(SynchronousTestCase):
-    """Tests for :obj:`CreateNode`."""
-    def test_create(self):
-        model = ZKCrudModel()
-        model.create_makepath = False
-        eff = Effect(zk.CreateNode(path='/foo', value="v"))
-        dispatcher = get_zk_dispatcher(model)
-        result = sync_perform(dispatcher, eff)
-        self.assertEqual(model.nodes, {"/foo": ("v", 0)})
-        self.assertEqual(result, '/foo')
+    def test_update_node(self):
+        """
+        Performing `UpdateNode` calls kz_client.set()
+        """
+        self.model.nodes["/path"] = ("value", 0)
+        eff = Effect(zk.UpdateNode("/path", "newvalue"))
+        result = sync_perform(get_zk_dispatcher(self.model), eff)
+        self.assertEqual(result, ZNodeStatStub(version=1))
+        self.assertEqual(self.model.nodes["/path"], ("newvalue", 1))
+
 
 
 class PollingLockTests(SynchronousTestCase):

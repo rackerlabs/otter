@@ -172,11 +172,22 @@ def perform_delete_node(kz_client, dispatcher, intent):
 
 @attr.s
 class GetNode(object):
+    """
+    Intent to get node details. It will return tuple of (data, stat)
+
+    :ivar str path: Path of znode
+    """
     path = attr.ib(validator=attr.validators.instance_of(six.string_types))
 
 
 @attr.s
 class UpdateNode(object):
+    """
+    Intent to update node data. Will return updated ZNodeStat
+
+    :ivar str path: Path of znode
+    :ivar bytes value: Content to update
+    """
     path = attr.ib(validator=attr.validators.instance_of(six.string_types))
     value = attr.ib(validator=attr.validators.instance_of(six.binary_type))
 
@@ -194,7 +205,10 @@ def get_zk_dispatcher(kz_client):
         GetChildren:
             partial(perform_get_children, kz_client),
         GetStat:
-            partial(perform_get_stat, kz_client)
+            partial(perform_get_stat, kz_client),
+        GetNode: deferred_performer(lambda d, i: kz_client.get(i.path)),
+        UpdateNode: deferred_performer(
+            lambda d, i: kz_client.set(i.path, i.value))
     })
 
 
