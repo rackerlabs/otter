@@ -213,12 +213,11 @@ msg_types = {
     "sch-exec-pol-err": "Error executing scheduled policy {policy_id}",
 
     # Selfheal service
-    "self-heal-setup-err": (
+    "selfheal-setup-err": (
         "SelfHeal service errored occurred when scheduling convergence"),
-    "self-heal-calls-err": "SelfHeal service has {active} scheduled calls",
-    "self-heal-kz-state": (
-        "SelfHeal service kazoo client is not connected. State: {state}"),
-    "self-heal-lock-acquired": "SelfHeal service acquired lock"
+    "selfheal-calls-err": "SelfHeal service has {active} scheduled calls",
+    "selfheal-lock-acquired": "SelfHeal service acquired lock",
+    "selfheal-group-deleted": "Group deleted when selfhealing"
 }
 
 

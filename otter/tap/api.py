@@ -13,6 +13,9 @@ from kazoo.client import KazooClient
 from silverberg.cluster import RoundRobinCassandraCluster
 from silverberg.logger import LoggingCQLClient
 
+from toolz.dicttoolz import get_in
+
+from twisted.application.internet import TimerService
 from twisted.application.service import MultiService, Service
 from twisted.application.strports import service
 from twisted.internet import reactor
@@ -45,6 +48,7 @@ from otter.rest.application import Otter
 from otter.rest.bobby import set_bobby
 from otter.scheduler import SchedulerService
 from otter.supervisor import SupervisorService, set_supervisor
+from otter.util import zk
 from otter.util.config import config_value, set_config_data
 from otter.util.cqlbatch import TimingOutCQLClient
 from otter.util.deferredutils import timeout_deferred
@@ -309,16 +313,42 @@ def makeService(config):
                 config_value('converger.step_limits') or {})
 
             # Setup selfheal service
-            shsvc = SelfHeal(
-                dispatcher, config_value("selfheal.interval") or 300,
-                log, reactor, config_value)
-            health_checker.checks["selfheal"] = shsvc.health_check
-            shsvc.setServiceParent(parent)
+            sh_svc = setup_selfheal_service(
+                reactor, config, dispatcher, health_checker, log)
+            if sh_svc is not None:
+                parent.addService(sh_svc)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
 
     return parent
+
+
+def setup_selfheal_service(clock, config, dispatcher, health_checker, log):
+    """
+    Setup selfheal timer service and return it.
+
+    :param clock: :obj:`IReactorTime` provider
+    :param dict config: Configuration dict containing selfheal info
+    :param dispatcher: Effect dispatcher
+    :param health_checker: ``HealthChecker`` object where SelfHeal's health
+        check will be added
+    :param log: :obj:`BoundLog` logger used by service
+
+    :return: selfheal service or None if relevant config is not found
+    :rtype: :obj:`IService`
+    """
+    if "selfheal" not in config:
+        return None
+    interval = get_in(["selfheal", "interval"], config, no_default=True)
+    selfheal = SelfHeal(clock, dispatcher, config_value, interval, log)
+    func, lock = zk.locked_logged_func(
+        dispatcher, "/selfheallock", log, "selfheal-lock-acquired",
+        selfheal.setup)
+    health_checker.checks["selfheal"] = zk.create_health_check(lock)
+    sh_timer = TimerService(interval, func)
+    sh_timer.clock = clock
+    return sh_timer
 
 
 def setup_converger(parent, kz_client, dispatcher, interval, build_timeout,

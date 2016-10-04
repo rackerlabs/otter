@@ -4,72 +4,65 @@ distributing the triggering over a period of time in effect "heal"ing the
 groups.
 """
 
+import attr
+
 from effect import ComposedDispatcher, Effect, TypeDispatcher
-from effect.do import do, do_return
+from effect.do import do
 
 from toolz.curried import filter
 
-from twisted.application.internet import TimerService
-from twisted.application.service import MultiService
 from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.interfaces import IReactorTime
 
-from txeffect import deferred_performer, perform
+from txeffect import perform
 
 from otter.convergence.composition import tenant_is_enabled
 from otter.convergence.service import trigger_convergence
+from otter.log import BoundLog
 from otter.log.intents import msg, with_log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
 from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
-from otter.util import zk
 
 
-class SelfHeal(MultiService, object):
+@attr.s
+class SelfHeal(object):
     """
-    A service that triggers convergence on all the groups on interval basis.
-    Only one node is allowed to do this.
+    A class that triggers convergence on all the groups over a time range.
 
-    :ivar disp: Effect dispatcher to perform all effects (ZK, CASS, log, etc)
-    :type disp: Either :obj:`ComposedDispatcher` or :obj:`TypeDispatcher`
-
-    :ivar log: Twisted logger with .msg and .err methods
-    :ivar lock: Lock object from :obj:`TxKazooClient`
-    :ivar TxKazooClient kz_client: Twistified kazoo client object
-    :ivar IReactorTime clock: Reactor providing timing APIs
-    :ivar list calls: List of `IDelayedCall` objects. Each object
+    :ivar clock: Reactor providing timing APIs
+    :vartype: :obj:`IReactorTime`
+    :ivar dispatcher: Effect dispatcher to perform all effects
+        (ZK, CASS, log, etc)
+    :vartype dispatcher: Either :obj:`ComposedDispatcher` or
+        :obj:`TypeDispatcher`
+    :ivar callable config_func: Callable used when calling
+        :func:`tenant_is_enabled`
+    :ivar float time_range: Seconds over which convergence triggerring will be
+        spread evenly
+    :ivar log: :obj:`BoundLog` object used to log messages
+    :ivar list _calls: List of :obj:`IDelayedCall` objects. Each object
         represents scheduled call to trigger convergence on a group
     """
 
-    def __init__(self, dispatcher, interval, log, clock, config_func,
-                 lock=None):
-        """
-        :var float interval: All groups will be scheduled to be triggered
-            within this time
-        :var callable config_func: Callable used when calling
-            :func:`tenant_is_enabled`
-        :var lock: lock object used primarily for testing. If not given, a new
-            lock will be created from ``zk.PollingLock``
-        """
-        super(SelfHeal, self).__init__()
-        self.disp = dispatcher
-        self.log = log.bind(otter_service="selfheal")
-        self.lock = lock or zk.PollingLock(dispatcher, "/selfheallock")
-        self.clock = clock
-        self.calls = []
-        timer = TimerService(
-            interval,
-            lambda: self._setup_if_locked(config_func, interval).addErrback(
-                self.log.err, "self-heal-setup-err"))
-        timer.clock = clock
-        timer.setServiceParent(self)
+    clock = attr.ib(validator=attr.validators.provides(IReactorTime))
+    dispatcher = attr.ib(
+        validator=attr.validators.instance_of((ComposedDispatcher,
+                                               TypeDispatcher)))
+    config_func = attr.ib()
+    time_range = attr.ib(validator=attr.validators.instance_of(float),
+                         convert=float)
+    log = attr.ib(
+        validator=attr.validators.instance_of(BoundLog),
+        convert=lambda l: l.bind(otter_service="selfheal"),
+        cmp=False)
+    _calls = attr.ib(default=attr.Factory(list))
 
-    def stopService(self):
+    def setup(self):
         """
-        Stop service by cancelling any remaining scheduled calls and releasing
-        the lock
+        Setup convergencence triggerring and capture any error occurred
         """
-        super(SelfHeal, self).stopService()
-        self._cancel_scheduled_calls()
-        return self.lock.release()
+        d = self._setup_convergences()
+        return d.addErrback(self.log.err, "selfheal-setup-err")
 
     def _cancel_scheduled_calls(self):
         """
@@ -78,102 +71,35 @@ class SelfHeal(MultiService, object):
         :return: Number of remaining active scheduled calls before cancelling
         """
         active = 0
-        for call in self.calls:
+        for call in self._calls:
             if call.active():
                 active += 1
                 call.cancel()
-        self.calls = []
+        self._calls = []
         return active
 
-    def health_check(self):
-        """
-        Return about whether this object has lock
-        """
-        d = self.lock.is_acquired()
-        return d.addCallback(lambda b: (True, {"has_lock": b}))
-
     @inlineCallbacks
-    def _setup_convergences(self, config_func, time_range):
+    def _setup_convergences(self):
         """
         Get groups to converge and setup scheduled calls to trigger convergence
-        on each of them within time_range. For parameters, see
-        :func:`__init__` docs.
+        on each of them within time_range.
         """
-        groups = yield perform(self.disp,
-                               get_groups_to_converge(config_func))
+        groups = yield perform(self.dispatcher,
+                               get_groups_to_converge(self.config_func))
         active = self._cancel_scheduled_calls()
         if active:
             # This should never happen
-            self.log.err(RuntimeError("self-heal-calls-err"),
-                         "self-heal-calls-err", active=active)
+            self.log.err(RuntimeError("selfheal-calls-err"),
+                         "selfheal-calls-err", active=active)
         if not groups:
             returnValue(None)
-        wait_time = float(time_range) / len(groups)
+        wait_time = self.time_range / len(groups)
         for i, group in enumerate(groups):
-            self.calls.append(
+            self._calls.append(
                 self.clock.callLater(
-                    i * wait_time, perform, self.disp,
+                    i * wait_time, perform, self.dispatcher,
                     check_and_trigger(group["tenantId"], group["groupId"]))
             )
-
-    def _setup_if_locked(self, config_func, time_range):
-        """
-        Setup convergence triggering on all groups by acquiring the lock and
-        calling ``_setup_convergences``. For parameters, see
-        :func:`__init__` docs.
-        """
-        class SetupConvergences(object):
-            pass
-
-        @deferred_performer
-        def sc_performer(d, i):
-            return self._setup_convergences(config_func, time_range)
-
-        dispatcher = ComposedDispatcher([
-            TypeDispatcher({SetupConvergences: sc_performer}), self.disp])
-
-        def log_acquired(r):
-            result, acquired = r
-            if acquired:
-                self.log.msg("self-heal-lock-acquired")
-            return result
-
-        d = perform(
-            dispatcher,
-            call_if_acquired(self.lock, Effect(SetupConvergences())))
-        return d.addCallback(log_acquired)
-
-
-# Sentinet object representing the fact that eff passed in ``call_if_acquired``
-# was not called
-NOT_CALLED = object()
-
-
-@do
-def call_if_acquired(lock, eff):
-    """
-    Call ``eff`` if ``lock`` is acquired. If not, try to acquire the lock
-    and call ``eff``. This function is different from
-    :func:`otter.util.deferredutils.with_lock` where this does not release
-    the lock after calling ``func``. Also it expects that lock may already be
-    acquired.
-
-    :param lock: Lock object from :obj:`TxKazooClient`
-    :param eff: ``Effect`` to call if lock is/was acquired
-
-    :return: (eff return, lock acquired bool) tuple. first element may be
-        ``NOT_CALLED`` of eff was not called
-    :rtype: ``Effect`` of ``bool``
-    """
-    if (yield lock.is_acquired_eff()):
-        ret = yield eff
-        yield do_return((ret, False))
-    else:
-        if (yield lock.acquire_eff(False, None)):
-            ret = yield eff
-            yield do_return((ret, True))
-        else:
-            yield do_return((NOT_CALLED, False))
 
 
 def get_groups_to_converge(config_func):

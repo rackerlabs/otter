@@ -5,12 +5,13 @@ Tests for the otter-api tap plugin.
 import json
 from copy import deepcopy
 
+from effect import base_dispatcher
+
 import mock
 
 from testtools.matchers import Contains, IsInstance
 
-from toolz.dicttoolz import merge
-
+from twisted.application.internet import TimerService
 from twisted.application.service import MultiService
 from twisted.internet import defer
 from twisted.internet.task import Clock
@@ -19,6 +20,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.auth import CachingAuthenticator, SingleTenantAuthenticator
 from otter.constants import (
     CONVERGENCE_DIRTY_DIR, ServiceType, get_service_configs)
+from otter.convergence.selfheal import SelfHeal
 from otter.convergence.service import Converger
 from otter.log.cloudfeeds import CloudFeedsObserver
 from otter.log.formatters import get_fanout, set_fanout
@@ -30,11 +32,13 @@ from otter.tap.api import (
     call_after_supervisor,
     makeService,
     setup_converger,
-    setup_scheduler
+    setup_scheduler,
+    setup_selfheal_service
 )
 from otter.test.test_auth import identity_config
 from otter.test.test_effect_dispatcher import full_intents
-from otter.test.utils import CheckFailure, matches, patch
+from otter.test.utils import (
+    CheckFailure, exp_func, matches, mock_log, patch)
 from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
 from otter.util.zkpartitioner import Partitioner
@@ -522,7 +526,8 @@ class APIMakeServiceTests(SynchronousTestCase):
 
         self.assertEqual(get_fanout(), None)
 
-    @mock.patch('otter.tap.api.SelfHeal')
+    @mock.patch('otter.tap.api.setup_selfheal_service')
+    @mock.patch('otter.tap.api.setup_converger')
     @mock.patch('otter.tap.api.get_full_dispatcher', return_value="disp")
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
@@ -531,7 +536,8 @@ class APIMakeServiceTests(SynchronousTestCase):
     @mock.patch('otter.tap.api.TxLogger')
     def test_kazoo_client_success(self, mock_tx_logger, mock_thread_pool,
                                   mock_kazoo_client, mock_txkz,
-                                  mock_setup_scheduler, mock_gfd, mock_sh):
+                                  mock_setup_scheduler, mock_gfd, mock_cvg,
+                                  mock_shsvc):
         """
         TxKazooClient is started and calls `setup_scheduler`. Its instance
         is also set in store.kz_client after start has finished, and the
@@ -540,6 +546,9 @@ class APIMakeServiceTests(SynchronousTestCase):
         config = test_config.copy()
         config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
         config["selfheal"] = {"interval": 200}
+        config["converger"] = {
+            "interval": 20, "build_timeout": 300,
+            "limited_retry_iterations": 15, "step_limits": {"s": "l"}}
 
         kz_client = mock.Mock(spec=['start', 'stop'])
         start_d = defer.Deferred()
@@ -565,10 +574,12 @@ class APIMakeServiceTests(SynchronousTestCase):
         mock_thread_pool.assert_called_once_with(maxthreads=20)
         kz_client.start.assert_called_once_with(timeout=None)
 
-        # setup_scheduler and store.kz_client is not called yet, and nothing
-        # added to the health checker
+        # setup_scheduler, setup_converger, setup_selfheal_service and
+        # store.kz_client is not called yet, and nothing added to the
+        # health checker
         self.assertFalse(mock_setup_scheduler.called)
         self.assertIsNone(self.store.kz_client)
+        self.assertFalse(mock_shsvc.called)
 
         # they are called after start completes
         start_d.callback(None)
@@ -580,6 +591,18 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.assertEqual(self.health_checker.checks['scheduler'],
                          sch.health_check)
         self.assertEqual(self.Otter.return_value.scheduler, sch)
+        mock_cvg.assert_called_once_with(
+            parent, kz_client, "disp", 20, 300, 15, {"s": "l"})
+        mock_shsvc.assert_called_once_with(
+            self.reactor, config, "disp", self.health_checker, self.log)
+        self.assertTrue(mock_shsvc.return_value in list(parent))
+
+        # check no selfheal config case
+        mock_txkz.reset_mock()
+        mock_shsvc.return_value = None
+        # would traceback on if service was added
+        parent = makeService(config)
+        self.assertIsInstance(parent, MultiService)
 
         # Check for no logs case also
         mock_txkz.reset_mock()
@@ -630,7 +653,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
                                              'Could not start TxKazooClient')
 
-    @mock.patch('otter.tap.api.SelfHeal')
+    @mock.patch('otter.tap.api.setup_selfheal_service')
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
     @mock.patch('otter.tap.api.setup_converger')
@@ -658,7 +681,7 @@ class APIMakeServiceTests(SynchronousTestCase):
         kz_client.stop.return_value.callback(None)
         self.successResultOf(d)
 
-    @mock.patch('otter.tap.api.SelfHeal')
+    @mock.patch('otter.tap.api.setup_selfheal_service')
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
     @mock.patch('otter.tap.api.setup_converger')
@@ -718,47 +741,68 @@ class APIMakeServiceTests(SynchronousTestCase):
         for intent in full_intents():
             self.assertIsNot(dispatcher(intent), None)
 
-    def _test_selfheal_service(self, mock_sc, mock_txkz, mock_sh, sh_conf,
-                               interval):
-        config = test_config.copy()
-        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
-        kz_client = mock.Mock(spec=['start', 'stop'])
-        kz_client.start.return_value = defer.succeed(None)
-        mock_txkz.return_value = kz_client
-        config = merge(config, sh_conf)
 
-        parent = makeService(config)
+class SetupSelfhealTests(SynchronousTestCase):
+    """
+    Test for :func:`setup_selfheal_service`
+    """
 
-        # selfheal service is setup
-        from otter.tap import api
-        shsvc = mock_sh.return_value
-        mock_sh.assert_called_once_with(
-            self.Otter.return_value.dispatcher, interval, self.log,
-            self.reactor, api.config_value)
-        self.assertEqual(
-            self.health_checker.checks["selfheal"],
-            shsvc.health_check)
-        shsvc.setServiceParent.assert_called_once_with(parent)
+    def _test_setup(self, config, interval):
+        """
+        SelfHeal function wrapped with locking and logging is setup to call
+        again using TimerService. It is setup on given interval based on
+        config
+        """
+        clock = Clock()
+        log = mock_log()
+        health_checker = HealthChecker("clock", {})
+        from otter.tap.api import zk
+        from otter.util.config import config_value
+        selfheal = SelfHeal(clock, base_dispatcher, config_value, interval,
+                            log)
+        self.patch(
+            zk, "locked_logged_func",
+            exp_func(self, ("func", "lock"), base_dispatcher, "/selfheallock",
+                     log, "selfheal-lock-acquired", selfheal.setup))
+        self.patch(zk, "create_health_check",
+                   exp_func(self, "hc_func", "lock"))
 
-    @mock.patch('otter.tap.api.SelfHeal')
-    @mock.patch('otter.tap.api.TxKazooClient')
-    @mock.patch('otter.tap.api.setup_converger')
-    def test_selfheal_service(self, mock_sc, mock_txkz, mock_sh):
-        """
-        After TxKazooClient successfully starts, `SelfHeal` service is setup
-        """
-        self._test_selfheal_service(
-            mock_sc, mock_txkz, mock_sh, {"selfheal": {"interval": 200}}, 200)
+        svc = setup_selfheal_service(
+            clock,
+            config,
+            base_dispatcher,
+            health_checker,
+            log)
 
-    @mock.patch('otter.tap.api.SelfHeal')
-    @mock.patch('otter.tap.api.TxKazooClient')
-    @mock.patch('otter.tap.api.setup_converger')
-    def test_selfheal_service_default(self, mock_sc, mock_txkz, mock_sh):
+        self.assertIsInstance(svc, TimerService)
+        self.assertEqual(svc.call, ("func", (), {}))
+        self.assertIs(svc.clock, clock)
+        self.assertIs(health_checker.checks["selfheal"], "hc_func")
+
+    def test_setup_from_config(self):
         """
-        After TxKazooClient successfully starts, `SelfHeal` service is setup
-        with default interval of 300 if "selfheal.interval" config is not found
+        SelfHeal service is configured with interval taken from config
         """
-        self._test_selfheal_service(mock_sc, mock_txkz, mock_sh, {}, 300)
+        self._test_setup({"selfheal": {"interval": 30.0}}, 30.0)
+
+    def test_no_config(self):
+        """
+        returns None if "selfheal" config is not there
+        """
+        svc = setup_selfheal_service(
+            "clock",
+            {},
+            "disp",
+            "health_checker",
+            "log")
+        self.assertIsNone(svc)
+
+    def test_no_default(self):
+        """
+        fails if configuration doesn't have interval config
+        """
+        self.assertRaises(
+            KeyError, self._test_setup, {"selfheal": {"unknown": 30.0}}, 20)
 
 
 class ConvergerSetupTests(SynchronousTestCase):

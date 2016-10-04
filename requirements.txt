@@ -15,7 +15,7 @@ kazoo==2.2.1
 effect==0.10.1
 txeffect==0.9
 characteristic==14.3.0
-attrs==15.0.0
+attrs==16.2.0
 toolz==0.7.4
 pyrsistent==0.11.10
 singledispatch==3.4.0.3
