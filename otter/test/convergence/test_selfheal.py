@@ -38,14 +38,14 @@ class SelfHealTests(SynchronousTestCase):
             {"tenantId": "t{}".format(i), "groupId": "g{}".format(i)}
             for i in range(5)]
 
-    def test_call(self):
+    def test_setup(self):
         """
-        ``self.s()`` will setup convergences to be triggered over specified
-        time range
+        ``self.s.setup()`` will setup convergences to be triggered over
+        specified time range
         """
         self.s.dispatcher = SequenceDispatcher(
             [(("ggtc", "cf"), const(self.groups))])
-        d = self.s()
+        d = self.s.setup()
         self.successResultOf(d)
         calls = self.clock.getDelayedCalls()
         self.assertEqual(self.s._calls, calls)
@@ -55,29 +55,29 @@ class SelfHealTests(SynchronousTestCase):
             self.assertEqual(c.args,
                              (self.s.dispatcher, "t{}g{}".format(i, i)))
 
-    def test_call_err(self):
+    def test_setup_err(self):
         """
-        ``self.s()`` will log any error and return success
+        ``self.s.setup()`` will log any error and return success
         """
         self.s.dispatcher = SequenceDispatcher(
             [(("ggtc", "cf"), conste(ValueError("h")))])
-        d = self.s()
+        d = self.s.setup()
         self.successResultOf(d)
         self.log.err.assert_called_once_with(
             CheckFailure(ValueError), "selfheal-setup-err",
             otter_service="selfheal")
 
-    def test_call_no_groups(self):
+    def test_setup_no_groups(self):
         """
-        Gets groups and does nothing if there are no groups
+        ``self.s.setup()`` gets groups and does nothing if there are no groups
         """
         self.s.dispatcher = SequenceDispatcher([(("ggtc", "cf"), const([]))])
-        d = self.s()
+        d = self.s.setup()
         self.successResultOf(d)
         self.assertEqual(self.s._calls, [])
         self.assertEqual(self.clock.getDelayedCalls(), [])
 
-    def test_call_still_active(self):
+    def test_setup_still_active(self):
         """
         If there are scheduled calls when perform is called, they are
         cancelled and err is logged. Future calls are scheduled as usual
@@ -90,7 +90,7 @@ class SelfHealTests(SynchronousTestCase):
         self.s._calls = [call1, call2, call3]
         self.s.dispatcher = SequenceDispatcher(
             [(("ggtc", "cf"), const(self.groups))])
-        d = self.s()
+        d = self.s.setup()
         self.successResultOf(d)
         self.log.err.assert_called_once_with(
             matches(IsInstance(RuntimeError)), "selfheal-calls-err", active=2,

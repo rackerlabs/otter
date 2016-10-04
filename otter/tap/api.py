@@ -343,7 +343,8 @@ def setup_selfheal_service(clock, config, dispatcher, health_checker, log):
     interval = get_in(["selfheal", "interval"], config, no_default=True)
     selfheal = SelfHeal(clock, dispatcher, config_value, interval, log)
     func, lock = zk.locked_logged_func(
-        dispatcher, "/selfheallock", log, "selfheal-lock-acquired", selfheal)
+        dispatcher, "/selfheallock", log, "selfheal-lock-acquired",
+        selfheal.setup)
     health_checker.checks["selfheal"] = zk.create_health_check(lock)
     sh_timer = TimerService(interval, func)
     sh_timer.clock = clock

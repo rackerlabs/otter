@@ -763,7 +763,7 @@ class SetupSelfhealTests(SynchronousTestCase):
         self.patch(
             zk, "locked_logged_func",
             exp_func(self, ("func", "lock"), base_dispatcher, "/selfheallock",
-                     log, "selfheal-lock-acquired", selfheal))
+                     log, "selfheal-lock-acquired", selfheal.setup))
         self.patch(zk, "create_health_check",
                    exp_func(self, "hc_func", "lock"))
 

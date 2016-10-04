@@ -27,8 +27,7 @@ from otter.models.interface import NoSuchScalingGroupError, ScalingGroupStatus
 @attr.s
 class SelfHeal(object):
     """
-    A class that triggers convergence on all the groups over a time range when
-    its called as a function
+    A class that triggers convergence on all the groups over a time range.
 
     :ivar clock: Reactor providing timing APIs
     :vartype: :obj:`IReactorTime`
@@ -58,7 +57,7 @@ class SelfHeal(object):
         cmp=False)
     _calls = attr.ib(default=attr.Factory(list))
 
-    def __call__(self):
+    def setup(self):
         """
         Setup convergencence triggerring and capture any error occurred
         """
