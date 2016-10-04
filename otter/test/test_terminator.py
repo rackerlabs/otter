@@ -36,10 +36,9 @@ class TerminatorTests(SynchronousTestCase):
 
     def test_success(self):
         """
-        Calls :func:`read_and_process` wrapped in logging context and performs
-        it with given dispatcher
+        Calls :func:`read_and_process` wrapped in logging and tenanted context
         """
-        seqd = SequenceDispatcher([
+        seq = [
             (BoundFields(mock.ANY, dict(otter_service="terminator")),
              nested_sequence([
                  (TenantScope(mock.ANY, "tid"),
@@ -49,16 +48,15 @@ class TerminatorTests(SynchronousTestCase):
                  )
              ])
             )
-        ])
-        d = t.terminator(seqd, "/path", "tid")
-        self.successResultOf(d)
+        ]
+        perform_sequence(seq, t.terminator("/path", "tid"))
 
     def test_error(self):
         """
         Any error occurring in :func:`read_and_process` is captured and logged
         with {"otter_service": "terminator"} field. Returns success.
         """
-        seqd = SequenceDispatcher([
+        seq = [
             (BoundFields(mock.ANY, dict(otter_service="terminator")),
              nested_sequence([
                  (TenantScope(mock.ANY, "tid"),
@@ -70,9 +68,9 @@ class TerminatorTests(SynchronousTestCase):
                  (LogErr(CheckFailure(ValueError), "terminator-err", {}), noop)
              ])
             )
-        ])
-        d = t.terminator(seqd, "/path", "tid")
-        self.successResultOf(d)
+        ]
+        result = perform_sequence(seq, t.terminator("/path", "tid"))
+        self.assertIsNone(result)
 
 
 class ReadAndProcessTests(SynchronousTestCase):

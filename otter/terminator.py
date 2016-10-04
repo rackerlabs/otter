@@ -13,8 +13,6 @@ from effect.do import do, do_return
 from toolz.functoolz import compose
 from toolz.curried import map
 
-from txeffect import perform
-
 from otter.constants import ServiceType
 from otter.cloud_client import TenantScope
 from otter.cloud_client.cloudfeeds import Direction, read_entries
@@ -27,18 +25,17 @@ from otter.models.intents import (
 from otter.util import zk
 
 
-def terminator(dispatcher, zk_prev_path, tenant_id):
+def terminator(zk_prev_path, tenant_id):
     """
     Main entry point of this module. Basically performs and logs effect
     returned by :func:`read_and_process`
 
-    :return: ``Deferred`` of None
+    :return: ``Effect``
     """
     rap_eff = read_and_process("customer_access_policy/events", zk_prev_path)
     tscope_eff = Effect(TenantScope(rap_eff, tenant_id))
-    eff = with_log(tscope_eff.on(error=err_exc_info("terminator-err")),
-                   otter_service="terminator")
-    return perform(dispatcher, eff)
+    return with_log(tscope_eff.on(error=err_exc_info("terminator-err")),
+                    otter_service="terminator")
 
 
 @do
