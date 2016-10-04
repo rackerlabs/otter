@@ -94,7 +94,7 @@ class SelfHeal(object):
                          "selfheal-calls-err", active=active)
         if not groups:
             returnValue(None)
-        wait_time = float(self.time_range) / len(groups)
+        wait_time = self.time_range / len(groups)
         for i, group in enumerate(groups):
             self._calls.append(
                 self.clock.callLater(
