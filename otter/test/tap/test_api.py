@@ -805,6 +805,74 @@ class SetupSelfhealTests(SynchronousTestCase):
             KeyError, self._test_setup, {"selfheal": {"unknown": 30.0}}, 20)
 
 
+class SetupTerminatorService(SynchronousTestCase):
+    """
+    Tests for :func:`setup_terminator_service`
+    """
+
+    def test_1(self):
+        from otter.tap import api
+        from otter.util import zk
+        from txeffect import perform
+        from effect import Effect
+        from toolz.dicttoolz import assoc_in
+        config = deepcopy(test_config)
+        config["terminator"] = {"interval": 20}
+        config["cloudfeeds"] = {"tenant_id": "tid", "url": "url",
+                                "customer_access_events_url": "capurl"}
+        exp_config = assoc_in(config, ["identity", "strategy"], "single_tenant")
+        (reactor, log, authenticator, kzc, store, supervisor, cass_client,
+         dispatcher) = [object() for i in range(8)]
+        self.patch(api, "generate_authenticator",
+                   exp_func(self, authenticator, reactor, exp_config["identity"]))
+        gfd_func = exp_func(
+            self, dispatcher, reactor, authenticator, log,
+            get_service_configs(config), kzc, store, supervisor, cass_client)
+        self.patch(api, "get_full_dispatcher", gfd_func)
+        eff = Effect("terminator")
+        self.patch(api, "terminator",
+                   exp_func(self, eff, "/terminator/prev_params", "tid"))
+        self.patch(
+            zk, "locked_logged_func",
+            exp_func(self, ("func", "lock"), dispatcher, "/terminator/lock",
+                     log, "terminator-lock-acquired", perform,
+                     dispatcher, eff))
+        self.patch(zk, "create_health_check",
+                   exp_func(self, "hc_func", "lock"))
+        health_checker = HealthChecker("clock", {})
+
+        svc = api.setup_terminator_service(
+            reactor,
+            log,
+            config,
+            kzc,
+            store,
+            supervisor,
+            cass_client,
+            health_checker)
+
+        self.assertIsInstance(svc, TimerService)
+        self.assertEqual(svc.call, ("func", (), {}))
+        self.assertIs(svc.clock, reactor)
+        self.assertIs(health_checker.checks["terminator"], "hc_func")
+
+    def test_no_terminator_conf(self):
+        """
+        Returns None if there is no "terminator" config
+        """
+
+    def test_no_cloudfeeds_tenantid(self):
+        """
+        Fails if it doesn't find "cloudfeeds" or "tenant_id" in it
+        """
+
+    def test_no_cloudfeeds_capurl(self):
+        """
+        Fails if it doesn't find "cloudfeeds" or "customer_access_events_url"
+        in it
+        """
+
+
 class ConvergerSetupTests(SynchronousTestCase):
     """Tests for :func:`setup_converger`."""
 
