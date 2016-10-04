@@ -597,6 +597,13 @@ class APIMakeServiceTests(SynchronousTestCase):
             self.reactor, config, "disp", self.health_checker, self.log)
         self.assertTrue(mock_shsvc.return_value in list(parent))
 
+        # check no selfheal config case
+        mock_txkz.reset_mock()
+        mock_shsvc.return_value = None
+        # would traceback on if service was added
+        parent = makeService(config)
+        self.assertIsInstance(parent, MultiService)
+
         # Check for no logs case also
         mock_txkz.reset_mock()
         config['zookeeper']['no_logs'] = True
@@ -778,12 +785,24 @@ class SetupSelfhealTests(SynchronousTestCase):
         """
         self._test_setup({"selfheal": {"interval": 30.0}}, 30.0)
 
-    def test_default_setup(self):
+    def test_no_config(self):
         """
-        SelfHeal service is configured with interval defaulting to 300 if
-        not found in config
+        returns None if "selfheal" config is not there
         """
-        self._test_setup({}, 300.0)
+        svc = setup_selfheal_service(
+            "clock",
+            {},
+            "disp",
+            "health_checker",
+            "log")
+        self.assertIsNone(svc)
+
+    def test_no_default(self):
+        """
+        fails if configuration doesn't have interval config
+        """
+        self.assertRaises(
+            KeyError, self._test_setup, {"selfheal": {"unknown": 30.0}}, 20)
 
 
 class ConvergerSetupTests(SynchronousTestCase):

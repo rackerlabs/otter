@@ -315,7 +315,8 @@ def makeService(config):
             # Setup selfheal service
             sh_svc = setup_selfheal_service(
                 reactor, config, dispatcher, health_checker, log)
-            parent.addService(sh_svc)
+            if sh_svc is not None:
+                parent.addService(sh_svc)
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
@@ -325,7 +326,7 @@ def makeService(config):
 
 def setup_selfheal_service(clock, config, dispatcher, health_checker, log):
     """
-    Setup selfheal timer service and add it to ``parent``
+    Setup selfheal timer service and return it.
 
     :param clock: :obj:`IReactorTime` provider
     :param dict config: Configuration dict containing selfheal info
@@ -334,10 +335,12 @@ def setup_selfheal_service(clock, config, dispatcher, health_checker, log):
         check will be added
     :param log: :obj:`BoundLog` logger used by service
 
-    :return: selfheal service
+    :return: selfheal service or None if relevant config is not found
     :rtype: :obj:`IService`
     """
-    interval = get_in(["selfheal", "interval"], config, default=300.0)
+    if "selfheal" not in config:
+        return None
+    interval = get_in(["selfheal", "interval"], config, no_default=True)
     selfheal = SelfHeal(clock, dispatcher, config_value, interval, log)
     func, lock = zk.locked_logged_func(
         dispatcher, "/selfheallock", log, "selfheal-lock-acquired", selfheal)
