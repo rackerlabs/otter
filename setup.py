@@ -38,7 +38,7 @@ def getSchema(base):
     return schemas
 
 data_files = getSchema(SCHEMA_DIR)
-data_files.append(('otter/rest', ['otter/rest/otter_ascii.txt']))
+#data_files.append(('otter/rest', ['otter/rest/otter_ascii.txt']))
 
 
 # If a twisted/plugins directory exists make sure we install the

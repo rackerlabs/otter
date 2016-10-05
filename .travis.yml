@@ -11,14 +11,11 @@ cache:
 
 install:
     - pip install -U pip wheel
-    - pip install -r requirements.txt -r dev_requirements.txt codecov
+    - pip install tox
 
 script:
     - make lint-code
-    - make coverage
-
-after_script:
-    - codecov
+    - tox
 
 branches:
   only:
