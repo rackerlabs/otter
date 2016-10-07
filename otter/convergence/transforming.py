@@ -91,6 +91,24 @@ _register_bulk_rcv3_optimizer(BulkAddToRCv3)
 _register_bulk_rcv3_optimizer(BulkRemoveFromRCv3)
 
 
+def filter_clb_mutating_types(steps):
+    """
+    Allow only one CLB mutating steps per CLB
+    """
+    mutating_clb_types = (AddNodesToCLB, RemoveNodesFromCLB, ChangeCLBNode)
+    lb_step_type = {}
+    for step in steps:
+        if step not in mutating_clb_types:
+            yield step
+        stype = lb_step_type.get(step.lb_id)
+        if stype is None:
+            lb_step_type[step.lb_id] = stype
+            yield step
+        else:
+            if type(step) is stype:
+                yield step
+
+
 def optimize_steps(steps):
     """
     Optimize steps.
@@ -108,6 +126,7 @@ def optimize_steps(steps):
         else:
             return "unoptimizable"
 
+    steps = filter_clb_mutating_types(steps)
     steps_by_type = groupby(grouping_fn, steps)
     unoptimizable = steps_by_type.pop("unoptimizable", [])
     omg_optimized = concat(_optimizers[step_type](steps)
