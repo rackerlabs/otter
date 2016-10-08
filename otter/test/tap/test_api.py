@@ -5,17 +5,21 @@ Tests for the otter-api tap plugin.
 import json
 from copy import deepcopy
 
-from effect import base_dispatcher
+from effect import Effect, base_dispatcher
 
 import mock
 
 from testtools.matchers import Contains, IsInstance
+
+from toolz.dicttoolz import assoc_in
 
 from twisted.application.internet import TimerService
 from twisted.application.service import MultiService
 from twisted.internet import defer
 from twisted.internet.task import Clock
 from twisted.trial.unittest import SynchronousTestCase
+
+from txeffect import perform
 
 from otter.auth import CachingAuthenticator, SingleTenantAuthenticator
 from otter.constants import (
@@ -26,6 +30,7 @@ from otter.log.cloudfeeds import CloudFeedsObserver
 from otter.log.formatters import get_fanout, set_fanout
 from otter.models.cass import CassScalingGroupCollection as OriginalStore
 from otter.supervisor import SupervisorService, get_supervisor, set_supervisor
+from otter.tap import api
 from otter.tap.api import (
     HealthChecker,
     Options,
@@ -39,6 +44,7 @@ from otter.test.test_auth import identity_config
 from otter.test.test_effect_dispatcher import full_intents
 from otter.test.utils import (
     CheckFailure, exp_func, matches, mock_log, patch)
+from otter.util import zk
 from otter.util.config import set_config_data
 from otter.util.deferredutils import DeferredPool
 from otter.util.zkpartitioner import Partitioner
@@ -809,68 +815,87 @@ class SetupTerminatorService(SynchronousTestCase):
     """
     Tests for :func:`setup_terminator_service`
     """
+    (reactor, log, authenticator, kzc, store, supervisor, cass_client,
+     dispatcher) = [object() for i in range(8)]
+    health_checker = HealthChecker("clock", {})
 
-    def test_1(self):
-        from otter.tap import api
-        from otter.util import zk
-        from txeffect import perform
-        from effect import Effect
-        from toolz.dicttoolz import assoc_in
+    def invoke(self, config):
+        """
+        Call :func:`setup_terminator_service` with given config and predefined
+        parameters
+        """
+        return api.setup_terminator_service(
+            self.reactor,
+            self.log,
+            config,
+            self.kzc,
+            self.store,
+            self.supervisor,
+            self.cass_client,
+            self.health_checker)
+
+    def test_success(self):
+        """
+        Creates dispatcher with single tenant authenticator. uses that to
+        setup the locked timer terminator service
+        """
         config = deepcopy(test_config)
         config["terminator"] = {"interval": 20}
         config["cloudfeeds"] = {"tenant_id": "tid", "url": "url",
                                 "customer_access_events_url": "capurl"}
-        exp_config = assoc_in(config, ["identity", "strategy"], "single_tenant")
-        (reactor, log, authenticator, kzc, store, supervisor, cass_client,
-         dispatcher) = [object() for i in range(8)]
+        exp_config = assoc_in(config, ["identity", "strategy"],
+                              "single_tenant")
         self.patch(api, "generate_authenticator",
-                   exp_func(self, authenticator, reactor, exp_config["identity"]))
+                   exp_func(self, self.authenticator, self.reactor,
+                            exp_config["identity"]))
+
         gfd_func = exp_func(
-            self, dispatcher, reactor, authenticator, log,
-            get_service_configs(config), kzc, store, supervisor, cass_client)
+            self, self.dispatcher, self.reactor, self.authenticator, self.log,
+            get_service_configs(config), self.kzc, self.store, self.supervisor,
+            self.cass_client)
         self.patch(api, "get_full_dispatcher", gfd_func)
+
         eff = Effect("terminator")
         self.patch(api, "terminator",
                    exp_func(self, eff, "/terminator/prev_params", "tid"))
+
         self.patch(
             zk, "locked_logged_func",
-            exp_func(self, ("func", "lock"), dispatcher, "/terminator/lock",
-                     log, "terminator-lock-acquired", perform,
-                     dispatcher, eff))
+            exp_func(self, ("func", "lock"), self.dispatcher,
+                     "/terminator/lock", self.log, "terminator-lock-acquired",
+                     perform, self.dispatcher, eff))
+
         self.patch(zk, "create_health_check",
                    exp_func(self, "hc_func", "lock"))
         health_checker = HealthChecker("clock", {})
 
-        svc = api.setup_terminator_service(
-            reactor,
-            log,
-            config,
-            kzc,
-            store,
-            supervisor,
-            cass_client,
-            health_checker)
+        svc = self.invoke(config)
 
         self.assertIsInstance(svc, TimerService)
         self.assertEqual(svc.call, ("func", (), {}))
-        self.assertIs(svc.clock, reactor)
-        self.assertIs(health_checker.checks["terminator"], "hc_func")
+        self.assertIs(svc.clock, self.reactor)
+        self.assertIs(self.health_checker.checks["terminator"], "hc_func")
 
     def test_no_terminator_conf(self):
         """
         Returns None if there is no "terminator" config
         """
+        self.assertIsNone(self.invoke({}))
 
     def test_no_cloudfeeds_tenantid(self):
         """
         Fails if it doesn't find "cloudfeeds" or "tenant_id" in it
         """
+        self.assertRaises(KeyError, self.invoke, {"terminator": {}})
+        self.assertRaises(KeyError, self.invoke,
+                          {"terminator": {}, "cloudfeeds": {}})
 
     def test_no_cloudfeeds_capurl(self):
         """
-        Fails if it doesn't find "cloudfeeds" or "customer_access_events_url"
-        in it
+        Fails if it doesn't find  "customer_access_events_url" in "cloudfeeds"
         """
+        self.assertRaises(KeyError, self.invoke,
+                          {"terminator": {}, "cloudfeeds": {"tenant_id": 23}})
 
 
 class ConvergerSetupTests(SynchronousTestCase):
