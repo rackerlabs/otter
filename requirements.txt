@@ -3,7 +3,7 @@ twisted==16.1.1
 service_identity==14.0.0
 jsonschema==2.4.0
 iso8601==0.1.8
-lxml
+lxml==3.6.4
 treq==15.1.0
 silverberg==0.1.12
 pyOpenSSL==0.14
