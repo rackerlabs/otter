@@ -2,6 +2,10 @@
     "environment": "staging",
     "region": "ORD",
     "url_root": "http://127.0.0.1:9000",
+    "cloudServersOpenStack": "cloudServersOpenStack",
+    "cloudLoadBalancers": "cloudLoadBalancers",
+    "cloudOrchestration": "cloudOrchestration",
+    "rackconnect": "rackconnect",
     "cassandra": {
         "seed_hosts": ["tcp:127.0.0.1:9160"],
         "keyspace": "otter",

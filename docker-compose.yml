@@ -1,0 +1,22 @@
+version: '2'
+services: 
+    otter: 
+        build: .
+        ports:
+            - "9000:9000"
+        links:
+            - mimic
+            - db
+            - zk
+        environment:
+            IDENTITY_URL: http://mimic:8900/v2.0
+            CASS_SEED_HOSTS: "[tcp:db:9168]"
+            ZK_HOSTS: "zk:2181"
+    db:
+        build:
+            context: .
+            dockerfile: cass_dockerfile
+    zk:
+        image: zookeeper:latest
+    mimic: 
+        build: https://github.com/rackerlabs/mimic.git#f317ee5d322aa7cb2b117e2984dfe8ef10558cd5
