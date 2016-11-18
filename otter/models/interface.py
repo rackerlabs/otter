@@ -67,7 +67,8 @@ class GroupState(object):
 
         self._attributes = (
             'tenant_id', 'group_id', 'group_name', 'desired', 'active',
-            'pending', 'group_touched', 'policy_touched', 'paused', 'status')
+            'pending', 'group_touched', 'policy_touched', 'paused', 'status',
+            'suspended')
 
     def __eq__(self, other):
         """

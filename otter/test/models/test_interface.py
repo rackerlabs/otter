@@ -27,7 +27,7 @@ class GroupStateTestCase(SynchronousTestCase):
         self.assertEqual(
             repr(state),
             "GroupState(tid, gid, name, 5, {'1': {}}, {}, date, {}, True, "
-            "<ScalingGroupStatus=ACTIVE>)")
+            "<ScalingGroupStatus=ACTIVE>, False)")
 
     def test_default_desired_capacity_is_zero(self):
         """
@@ -45,9 +45,9 @@ class GroupStateTestCase(SynchronousTestCase):
         """
         self.assertEqual(
             GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {},
-                       True, ScalingGroupStatus.ACTIVE),
+                       True, ScalingGroupStatus.ACTIVE, suspended=False),
             GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {},
-                       True, ScalingGroupStatus.ACTIVE,
+                       True, ScalingGroupStatus.ACTIVE, suspended=False,
                        now=lambda: 'meh'))
 
     def test_two_states_are_unequal_if_vars_different(self):
