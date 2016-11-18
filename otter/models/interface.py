@@ -32,6 +32,8 @@ class GroupState(object):
         they were executed, if ever. The time is stored as ISO860 format str
     :ivar bool paused: whether the scaling group is paused in
         scaling activities
+    :ivar bool suspended: Is the scaling group suspended due to account
+        suspension?
     :ivar GroupStatus status: status of the group.
     :ivar list error_reasons: List of string-based reasons why this group is in
         ERROR. Not needed when group is ACTIVE
@@ -43,7 +45,8 @@ class GroupState(object):
     """
     def __init__(self, tenant_id, group_id, group_name, active, pending,
                  group_touched, policy_touched, paused, status,
-                 error_reasons=[], desired=0, now=timestamp.now):
+                 suspended=False, error_reasons=[], desired=0,
+                 now=timestamp.now):
         self.tenant_id = tenant_id
         self.group_id = group_id
         self.group_name = group_name
@@ -51,6 +54,7 @@ class GroupState(object):
         self.active = active
         self.pending = pending
         self.paused = paused
+        self.suspended = suspended
         self.policy_touched = policy_touched
         self.group_touched = group_touched
         self.status = status

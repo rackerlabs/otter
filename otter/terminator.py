@@ -21,7 +21,7 @@ from otter.log.cloudfeeds import cf_err, cf_msg
 from otter.log.intents import err_exc_info, with_log
 from otter.models.interface import ScalingGroupStatus
 from otter.models.intents import (
-    DeleteGroup, GetTenantGroups, UpdateGroupErrorReasons, LoadAndUpdateGroupStatus)
+    DeleteGroup, GetTenantGroupStates, ModifyGroupStateAttribute)
 from otter.util import zk
 
 
@@ -71,11 +71,10 @@ def enable_group(group):
 
     :return: ``Effect``
     """
-    if group.status == ScalingGroupStatus.SUSPENDED:
-        yield Effect(
-            LoadAndUpdateGroupStatus(group.tenant_id, group.group_id,
-                                     ScalingGroupStatus.ACTIVE))
-        yield cf_msg('group-status-active')
+    yield Effect(
+        ModifyGroupStateAttribute(group.tenant_id, group.group_id,
+                                  "suspended", False))
+    yield cf_msg('terminator-group-active')
 
 
 @do
@@ -86,9 +85,9 @@ def suspend_group(group):
     :return: ``Effect``
     """
     yield Effect(
-        LoadAndUpdateGroupStatus(group.tenant_id, group.group_id,
-                                 ScalingGroupStatus.SUSPENDED))
-    yield cf_err('group-status-suspended')
+        ModifyGroupStateAttribute(group.tenant_id, group.group_id,
+                                  "suspended", True))
+    yield cf_err('terminator-group-suspended')
 
 
 @do
@@ -99,7 +98,7 @@ def delete_group(group):
     :return: ``Effect``
     """
     yield Effect(DeleteGroup(group.tenant_id, group.group_id))
-    yield cf_err("group-status-terminated")
+    yield cf_err("terminator-group-terminated")
 
 
 def process_entry(entry):
@@ -121,7 +120,7 @@ def process_entry(entry):
                         scaling_group_id=group.group_id)
 
     process_groups = compose(parallel, map(proc_with_log))
-    return Effect(GetTenantGroups(tenant_id)).on(
+    return Effect(GetTenantGroupStates(tenant_id)).on(
         lambda groups: process_groups(groups) if groups else None)
 
 

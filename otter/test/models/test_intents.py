@@ -10,13 +10,15 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.log.intents import get_log_dispatcher
 from otter.models.intents import (
-    DeleteGroup, GetScalingGroupInfo, GetTenantGroups, LoadAndUpdateGroupStatus,
-    ModifyGroupStatePaused, UpdateGroupErrorReasons, UpdateGroupStatus,
-    UpdateServersCache, get_model_dispatcher)
+    DeleteGroup, GetScalingGroupInfo, GetTenantGroupStates,
+    LoadAndUpdateGroupStatus, ModifyGroupStateAttribute,
+    UpdateGroupErrorReasons, UpdateGroupStatus, UpdateServersCache,
+    get_model_dispatcher)
 from otter.models.interface import (
     GroupState, IScalingGroupCollection, ScalingGroupStatus)
 from otter.test.utils import (
-    EffectServersCache, IsBoundWith, iMock, exp_func, matches, mock_group, mock_log)
+    EffectServersCache, IsBoundWith, iMock, exp_func, group_state, matches,
+    mock_group, mock_log)
 
 
 class ScalingGroupIntentsTests(SynchronousTestCase):
@@ -171,28 +173,45 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         self.assertIsNone(result)
         self.group.update_error_reasons.assert_called_once_with(['r1', 'r2'])
 
-    def test_modify_group_state_paused(self):
+    def _test_modify_group_state(self, attr, new_value, old_value):
+        """
+        `ModifyGroupStateAttribute` modifies only given attribute
+        """
         dispatcher = self.get_dispatcher(self.get_store())
-        r = sync_perform(dispatcher,
-                         Effect(ModifyGroupStatePaused(self.group, False)))
+        r = self.perform_with_group(
+            Effect(ModifyGroupStateAttribute('tid', 'gid', attr, new_value)),
+            (self.log, 'tid', 'gid'), self.group)
         self.assertIsNone(r)
         # Returned state has updated paused
         modified_state = self.group.modify_state_values[-1]
         # Returned state object is different than original
         self.assertIsNot(self.state, modified_state)
         # Nothing else is modified
-        self.assertEqual(modified_state.paused, False)
-        modified_state.paused = True
+        self.assertEqual(getattr(modified_state, attr), new_value)
+        setattr(modified_state, attr, old_value)
         self.assertEqual(self.state, modified_state)
+
+    def test_modify_state_paused(self):
+        """
+        Test `ModifyGroupStateAttribute` with "paused" attribute
+        """
+        self._test_modify_group_state("paused", False, True)
+
+    def test_modify_state_suspended(self):
+        """
+        Test `ModifyGroupStateAttribute` with "suspended" attribute
+        """
+        self._test_modify_group_state("suspended", True, False)
 
     def test_get_tenant_groups(self):
         """
-        Performing :obj:`GetTenantGroups` calls
+        Performing :obj:`GetTenantGroupStates` calls
         :func:`list_scaling_group_states`
         """
         store = self.get_store()
-        func = exp_func(self, succeed(["gs1", "gs2"]), self.log, "tid")
+        group_states = [group_state("tid", "gs1"), group_state("tid", "gs2")]
+        func = exp_func(self, succeed(group_states), self.log, "tid")
         store.list_scaling_group_states.side_effect = func
         dispatcher = self.get_dispatcher(store)
-        r = sync_perform(dispatcher, Effect(GetTenantGroups("tid")))
-        self.assertEqual(r, ["gs1", "gs2"])
+        r = sync_perform(dispatcher, Effect(GetTenantGroupStates("tid")))
+        self.assertEqual(r, group_states)

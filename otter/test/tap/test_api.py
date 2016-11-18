@@ -500,9 +500,6 @@ class APIMakeServiceTests(SynchronousTestCase):
         conf['cloudfeeds'] = {'service': 'cloudFeeds', 'tenant_id': 'tid',
                               'url': 'url'}
         makeService(conf)
-        serv_confs = get_service_configs(conf)
-        serv_confs[ServiceType.CLOUD_FEEDS] = {
-            'name': 'cloudFeeds', 'region': 'ord', 'url': 'url'}
 
         self.assertEqual(len(get_fanout().subobservers), 1)
         cf_observer = get_fanout().subobservers[0]
@@ -513,7 +510,7 @@ class APIMakeServiceTests(SynchronousTestCase):
                 authenticator=matches(IsInstance(CachingAuthenticator)),
                 tenant_id='tid',
                 region='ord',
-                service_configs=serv_confs))
+                service_configs=get_service_configs(conf)))
 
         # single tenant authenticator is created
         authenticator = cf_observer.authenticator

@@ -55,7 +55,7 @@ from otter.convergence.service import (
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import audit
 from otter.log.intents import BoundFields, msg, with_log
-from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
+from otter.models.intents import GetScalingGroupInfo, ModifyGroupStateAttribute
 from otter.models.interface import GroupNotEmptyError, ScalingGroupStatus
 from otter.supervisor import (
     CannotDeleteServerBelowMinError,
@@ -112,7 +112,9 @@ def conv_pause_group_eff(group, transaction_id):
     """
     Pause scaling group of convergence enabled tenant
     """
-    eff = parallel([Effect(ModifyGroupStatePaused(group, True)),
+    update_paused = ModifyGroupStateAttribute(group.tenant_id, group.uuid,
+                                              "paused", True)
+    eff = parallel([Effect(update_paused),
                     delete_divergent_flag(group.tenant_id, group.uuid, -1)])
     return with_log(eff, transaction_id=transaction_id,
                     tenant_id=group.tenant_id,
@@ -140,7 +142,8 @@ def conv_resume_group_eff(trans_id, group):
     Resume scaling group of convergence enabled tenant
     """
     eff = parallel([
-        Effect(ModifyGroupStatePaused(group, False)),
+        Effect(ModifyGroupStateAttribute(group.tenant_id, group.uuid,
+                                         "paused", False)),
         mark_divergent(group.tenant_id, group.uuid).on(
             lambda _: msg("mark-dirty-success"))])
     return with_log(eff, transaction_id=trans_id, tenant_id=group.tenant_id,
@@ -430,7 +433,7 @@ def maybe_execute_scaling_policy(
     if state.paused:
         raise GroupPausedError(scaling_group.tenant_id, scaling_group.uuid,
                                "execute policy {}".format(policy_id))
-    if state.status == ScalingGroupStatus.SUSPENDED:
+    if state.suspended:
         raise TenantSuspendedError(scaling_group.tenant_id)
 
     # make sure that the policy (and the group) exists before doing

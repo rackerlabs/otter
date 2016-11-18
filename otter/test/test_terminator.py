@@ -17,8 +17,7 @@ from otter.cloud_client.cloudfeeds import Direction
 from otter.indexer import atom
 from otter.log.intents import BoundFields, Log, LogErr
 from otter.models.intents import (
-    DeleteGroup, GetTenantGroups, UpdateGroupErrorReasons,
-    LoadAndUpdateGroupStatus)
+    DeleteGroup, GetTenantGroupStates, ModifyGroupStateAttribute)
 from otter.models.interface import ScalingGroupStatus
 from otter.util import zk
 from otter.test.utils import (
@@ -108,25 +107,16 @@ class ProcessGroupTests(SynchronousTestCase):
     Tests for group processing functions
     """
 
-    def test_enable_group_suspended(self):
-        """
-        :func:`enable_group` changes group status to ACTIVE and logs about it
-        if group's status is SUSPENDED
-        """
-        group = group_state("t1", "g1", status=ScalingGroupStatus.SUSPENDED)
-        seq = [
-            (LoadAndUpdateGroupStatus("t1", "g1", ScalingGroupStatus.ACTIVE),
-             noop),
-            (Log("group-status-active", dict(cloud_feed=True)), noop)
-        ]
-        perform_sequence(seq, t.enable_group(group))
-
     def test_enable_group(self):
         """
-        :func:`enable_group` does nothing if group is not SUSPENDED
+        :func:`enable_group` updates "suspended" to False
         """
         group = group_state("t1", "g1")
-        perform_sequence([], t.enable_group(group))
+        seq = [
+            (ModifyGroupStateAttribute("t1", "g1", "suspended", False), noop),
+            (Log("terminator-group-active", dict(cloud_feed=True)), noop)
+        ]
+        perform_sequence(seq, t.enable_group(group))
 
     def test_suspend_group(self):
         """
@@ -135,10 +125,8 @@ class ProcessGroupTests(SynchronousTestCase):
         """
         group = group_state("t1", "g1")
         seq = [
-            (LoadAndUpdateGroupStatus(
-                "t1", "g1", ScalingGroupStatus.SUSPENDED),
-             noop),
-            (Log("group-status-suspended",
+            (ModifyGroupStateAttribute("t1", "g1", "suspended", True), noop),
+            (Log("terminator-group-suspended",
                  dict(cloud_feed=True, isError=True)),
              noop)
         ]
@@ -151,7 +139,7 @@ class ProcessGroupTests(SynchronousTestCase):
         group = group_state("t1", "g1")
         seq = [
             (DeleteGroup("t1", "g1"), noop),
-            (Log("group-status-terminated",
+            (Log("terminator-group-terminated",
                  dict(cloud_feed=True, isError=True)), noop)
         ]
         perform_sequence(seq, t.delete_group(group))
@@ -195,7 +183,7 @@ class ProcessEntryTests(SynchronousTestCase):
             return (boundfields, nested_sequence([(("group_func", g), noop)]))
 
         seq = [
-            (GetTenantGroups("23"), const(groups)),
+            (GetTenantGroupStates("23"), const(groups)),
             parallel_sequence([[group_seq(g)] for g in groups])
         ]
         perform_sequence(seq, t.process_entry(entry))

@@ -148,10 +148,10 @@ _cql_view_webhook = (
 _cql_create_group = (
     'INSERT INTO {cf}("tenantId", "groupId", group_config, '
     'launch_config, active, pending, "policyTouched", paused, '
-    'desired, created_at, deleting) '
+    'desired, created_at, deleting, suspended) '
     'VALUES (:tenantId, :groupId, :group_config, '
     ':launch_config, :active, :pending, :policyTouched, '
-    ':paused, :desired, :created_at, false) '
+    ':paused, :desired, :created_at, false, false) '
     'USING TIMESTAMP :ts')
 _cql_view_manifest = (
     'SELECT "tenantId", "groupId", group_config, '
@@ -507,6 +507,7 @@ def _unmarshal_state(state_dict):
         status,
         desired=desired_capacity,
         error_reasons=(state_dict["error_reasons"] or []),
+        suspended=(state_dict["suspended"] or False)
     )
 
 

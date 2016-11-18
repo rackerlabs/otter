@@ -365,7 +365,8 @@ scaling_group_entry = {
     'created_at': 23,
     'deleting': False,
     'status': 'ACTIVE',
-    'error_reasons': []
+    'error_reasons': [],
+    'suspended': None
 }
 
 
@@ -585,6 +586,28 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                        False,
                                        ScalingGroupStatus.ACTIVE,
                                        desired=0))
+
+    def test_view_state_suspended(self):
+        """
+        Gets suspended attr based on "suspended" column
+        """
+        self.returns = [[
+            merge(scaling_group_entry,
+                  {'tenantId': self.tenant_id,
+                   'groupId': self.group_id,
+                   'suspended': True})
+        ]]
+        r = self.successResultOf(self.group.view_state())
+        self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
+                                       'a',
+                                       {'A': 'R'},
+                                       {'P': 'R'},
+                                       '2014-01-01T00:00:05Z.1234',
+                                       {'PT': 'R'},
+                                       False,
+                                       ScalingGroupStatus.ACTIVE,
+                                       desired=0,
+                                       suspended=True))
 
     def test_view_respsects_consistency_argument(self):
         """
@@ -2262,7 +2285,8 @@ class ViewManifestTests(CassScalingGroupTestCase):
             'created_at': 23,
             'deleting': False,
             'status': 'ACTIVE',
-            'error_reasons': None
+            'error_reasons': None,
+            'suspended': None
         }
         self.manifest = {
             'groupConfiguration': self.config,
@@ -3093,7 +3117,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'created_at': 23,
             'deleting': False,
             'status': 'ACTIVE',
-            'error_reasons': None
+            'error_reasons': None,
+            'suspended': None
         }
 
     @mock.patch('otter.models.cass.WeakLocks', return_value=2)
@@ -3127,10 +3152,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
             'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
             'launch_config, active, pending, "policyTouched", '
-            'paused, desired, created_at, deleting) '
+            'paused, desired, created_at, deleting, suspended) '
             'VALUES (:tenantId, :groupId, :group_config, :launch_config, '
             ':active, :pending, :policyTouched, :paused, :desired, '
-            ':created_at, false) '
+            ':created_at, false, false) '
             'USING TIMESTAMP :ts '
 
             'APPLY BATCH;')
@@ -3182,10 +3207,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
             'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
             'launch_config, active, pending, "policyTouched", paused, '
-            'desired, created_at, deleting) '
+            'desired, created_at, deleting, suspended) '
             'VALUES (:tenantId, :groupId, :group_config, :launch_config, '
             ':active, :pending, :policyTouched, :paused, :desired, '
-            ':created_at, false) '
+            ':created_at, false, false) '
             'USING TIMESTAMP :ts '
 
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
@@ -3245,10 +3270,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
             'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
             'launch_config, active, pending, "policyTouched", paused, '
-            'desired, created_at, deleting) '
+            'desired, created_at, deleting, suspended) '
             'VALUES (:tenantId, :groupId, :group_config, :launch_config, '
             ':active, :pending, :policyTouched, :paused, :desired, '
-            ':created_at, false) '
+            ':created_at, false, false) '
             'USING TIMESTAMP :ts '
 
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '

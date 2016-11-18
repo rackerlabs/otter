@@ -26,7 +26,7 @@ from otter.cloud_client import (
     set_nova_metadata_item)
 from otter.convergence.planning import DRAINING_METADATA
 from otter.log.intents import BoundFields, Log
-from otter.models.intents import GetScalingGroupInfo, ModifyGroupStatePaused
+from otter.models.intents import GetScalingGroupInfo, ModifyGroupStateAttribute
 from otter.models.interface import (
     GroupNotEmptyError, GroupState, IScalingGroup, NoSuchPolicyError,
     NoSuchScalingGroupError, ScalingGroupStatus)
@@ -75,7 +75,8 @@ class PauseGroupTests(SynchronousTestCase):
                                         scaling_group_id="gid")),
              nested_sequence([
                  parallel_sequence([
-                     [(ModifyGroupStatePaused(self.group, True), noop)],
+                     [(ModifyGroupStateAttribute("tid", "gid", "paused", True),
+                       noop)],
                      [(DeleteNode(path="/groups/divergent/tid_gid",
                                   version=-1),
                        noop),
@@ -118,7 +119,9 @@ class PauseGroupTests(SynchronousTestCase):
                                         scaling_group_id="gid")),
              nested_sequence([
                  parallel_sequence([
-                     [(ModifyGroupStatePaused(self.group, False), noop)],
+                     [(ModifyGroupStateAttribute("tid", "gid",
+                                                 "paused", False),
+                       noop)],
                      [(CreateOrSet(path="/groups/divergent/tid_gid",
                                    content="dirty"),
                        noop),
@@ -1189,7 +1192,7 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
         Raises `TenantSuspendedError` if tenant is SUSPENDED and does not do
         anything else
         """
-        self.mock_state.status = ScalingGroupStatus.SUSPENDED
+        self.mock_state.suspended = True
         self.assertRaises(
             controller.TenantSuspendedError,
             controller.maybe_execute_scaling_policy,
