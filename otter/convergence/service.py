@@ -312,12 +312,17 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
 
     # Gather data
     now_dt = yield Effect(Func(datetime.utcnow))
-    all_data = yield msg_with_time(
-        "gather-convergence-data",
-        convergence_exec_data(tenant_id, group_id, now_dt,
-                              get_executor=get_executor))
-    (executor, scaling_group, group_state, desired_group_state,
-     resources) = all_data
+    try:
+        all_data = yield msg_with_time(
+            "gather-convergence-data",
+            convergence_exec_data(tenant_id, group_id, now_dt,
+                                  get_executor=get_executor))
+        (executor, scaling_group, group_state, desired_group_state,
+         resources) = all_data
+    except NoSuchEndpoint:
+        result = yield convergence_failed(
+            tenant_id, group_id, [ErrorReason.Exception(sys.exc_info())])
+        yield do_return(result)
 
     # prepare plan
     steps = executor.plan(desired_group_state, datetime_to_epoch(now_dt),
@@ -340,7 +345,7 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
         result = yield convergence_succeeded(
             executor, scaling_group, group_state, resources, now_dt)
     elif worst_status == StepResult.FAILURE:
-        result = yield convergence_failed(scaling_group, reasons)
+        result = yield convergence_failed(tenant_id, group_id, reasons)
     elif worst_status is StepResult.LIMITED_RETRY:
         # We allow further iterations to proceed as long as we haven't been
         # waiting for a LIMITED_RETRY for N consecutive iterations.
@@ -349,7 +354,8 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
             yield msg('converge-limited-retry-too-long')
             yield clean_waiting
             # Prefix "Timed out" to all limited retry reasons
-            result = yield convergence_failed(scaling_group, reasons, True)
+            result = yield convergence_failed(tenant_id, group_id, reasons,
+                                              True)
         else:
             yield waiting.modify(
                 lambda group_iterations:
@@ -387,12 +393,16 @@ def convergence_succeeded(executor, scaling_group, group_state, resources,
 
 
 @do
-def convergence_failed(scaling_group, reasons, timedout=False):
+def convergence_failed(tenant_id, group_id, reasons, timedout=False):
     """
     Handle convergence failure
+
+    :param str tenant_id:
+    :param str group_id:
+    :param reasons: List of :obj:`ErrorReason` objects
+    :param bool timedout: Has convergence failed due to reason timing out?
     """
-    yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
-                                   status=ScalingGroupStatus.ERROR))
+    yield Effect(LoadAndUpdateGroupStatus(tenant_id, group_id, ScalingGroupStatus.ERROR))
     presented_reasons = sorted(present_reasons(reasons))
     if len(presented_reasons) == 0:
         presented_reasons = [u"Unknown error occurred"]
