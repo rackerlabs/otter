@@ -4,6 +4,10 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 # To customize config file during run
 RUN apt-get update && apt-get install -y jq
 
+# Install zk-shell in venv to bootstrap ZK data
+RUN mkdir /zkshellvenv && virtualenv /zkshellvenv && \
+    source /zkshellvenv/bin/activate && pip install zk-shell
+
 WORKDIR /otterapp 
 COPY setup.py ./
 COPY otter/ ./otter
