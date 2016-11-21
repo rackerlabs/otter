@@ -586,6 +586,9 @@ def converge_one_group(currently_converging, recently_converged, waiting,
         # We don't need to spam the logs about this, it's to be expected
         return
     except (NoSuchScalingGroupError, NoSuchEndpoint):
+       # NoSuchEndpoint occurs on a suspended or closed account. This is
+       # temporarily added until https://github.com/rackerlabs/autoscaling-chef/issues/833
+       # gets implemented
         yield err(None, 'converge-fatal-error')
         yield _clean_waiting(waiting, group_id)
         yield delete_divergent_flag(tenant_id, group_id, version)
