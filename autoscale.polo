@@ -30,3 +30,8 @@
         - syd.autoscale.api.rackspacecloud.com
       dependencies:
         - https://identity.api.rackspacecloud.com/v2.0
+        - https://servers.api.rackspacecloud.com/v2
+        - https://loadbalancers.api.rackspacecloud.com/v1.0
+        - https://rackconnect.api.rackspacecloud.com/v3
+        - https://orchestration.api.rackspacecloud.com/v1
+        - https://*.feeds.api.rackspacecloud.com/
