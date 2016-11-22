@@ -426,18 +426,21 @@ def converge_launch_server(desired_state, servers_with_cheese,
     # converge all the servers that remain to their desired load balancer state
     still_active_servers = filter(lambda s: s not in servers_to_delete,
                                   servers_in_active)
-    lb_converge_steps = [
-        step
-        for server in still_active_servers
-        for step in _converge_lb_state(
-            server,
-            [node for node in load_balancer_nodes if node.matches(server)],
-            load_balancers,
-            now,
-            # Temporarily using build timeout as node offline timeout.
-            # See https://github.com/rackerlabs/otter/issues/1905
-            timeout)
-        ]
+    try:
+        lb_converge_steps = [
+            step
+            for server in still_active_servers
+            for step in _converge_lb_state(
+                server,
+                [node for node in load_balancer_nodes if node.matches(server)],
+                load_balancers,
+                now,
+                # Temporarily using build timeout as node offline timeout.
+                # See https://github.com/rackerlabs/otter/issues/1905
+                timeout)
+            ]
+    except DrainingUnavailable as de:
+        return pbag([fail_convergence(de)])
 
     # Converge again if we expect state transitions on any servers
     converge_later = []
@@ -657,9 +660,8 @@ def change_lb_node(node, description, lb, now, timeout):
                                      condition=CLBNodeCondition.ENABLED,
                                      weight=description.weight,
                                      type=description.type)
-            if node.drained_at is None:
-                return fail_convergence(
-                    DrainingUnavailable(description.lb_id, node.node_id))
+            # For a new node created in DRAINING, drained_at represents
+            # node's creation time.
             if now - node.drained_at > timeout:
                 rsfmt = ("Node {} has remained OFFLINE for more than "
                          "{} seconds")

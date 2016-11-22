@@ -586,7 +586,7 @@ class DrainingUnavailable(Exception):
 @attributes([Attribute("node_id", instance_of=basestring),
              Attribute("description", instance_of=CLBDescription),
              Attribute("address", instance_of=basestring),
-             Attribute("drained_at", default_value=None),
+             Attribute("_drained_at", default_value=None),
              Attribute("is_online", instance_of=bool,
                        default_value=True),
              Attribute("connections", default_value=None)])
@@ -603,14 +603,29 @@ class CLBNode(object):
     :ivar str address: The IP address of the node.  The IP and port form a
         unique mapping on the CLB, which is assigned a node ID.  Two
         nodes with the same IP and port cannot exist on a single CLB.
-    :ivar float drained_at: Seconds since EPOCH at which this node was put in
-        DRAINING.  Should be None if node is not DRAINING or when this info is
-        not available.
+    :ivar float _drained_at: Seconds since EPOCH at which this node was put in
+        DRAINING. This also represnts the time at which the node was created
+        for a node that was created in DRAINING. Should be None if node is not
+        DRAINING or when this info is not available.
     :ivar bool is_online: Is this node ONLINE and receiving traffic? This field
         corresponds to node's `status` field.
     :ivar int connections: The number of active connections on the node - this
         is None by default (the stat is not available yet).
     """
+
+    @property
+    def drained_at(self):
+        """
+        Return when this node was drained.
+
+        :return: Seconds since EPOCH
+        :rtype: float
+        :raises: :obj:`DrainingUnavailable` if this info is not available
+        """
+        if self._drained_at is None:
+            raise DrainingUnavailable(self.description.lb_id, self.node_id)
+        return self._drained_at
+
     def matches(self, server):
         """
         See :func:`ILBNode.matches`.
@@ -628,8 +643,6 @@ class CLBNode(object):
         """
         See :func:`IDrainable.is_done_draining`.
         """
-        if self.drained_at is None:
-            raise DrainingUnavailable(self.description.lb_id, self.node_id)
         return now - self.drained_at >= timeout or self.connections == 0
 
     def is_active(self):
