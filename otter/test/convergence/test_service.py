@@ -23,6 +23,7 @@ from pyrsistent import freeze, pbag, pmap, pset, s, thaw
 
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.auth import NoSuchEndpoint
 from otter.cloud_client import NoSuchCLBError, TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import (get_desired_server_group_state,
@@ -392,12 +393,10 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         """
         self._verify_sequence([], Reference(pset([self.group_id])))
 
-    def test_no_scaling_group(self):
+    def _test_fatal_error(self, expected_error):
         """
-        When the scaling group disappears, a fatal error is logged and the
-        dirty flag is cleaned up.
+        When fatal error occurs, it is logged and divergent flag is deleted
         """
-        expected_error = NoSuchScalingGroupError(self.tenant_id, self.group_id)
         sequence = [
             (self._exec_intent, lambda i: raise_(expected_error)),
             (LogErr(CheckFailureValue(expected_error),
@@ -405,6 +404,22 @@ class ConvergeOneGroupTests(SynchronousTestCase):
              noop),
         ] + self._clean_divergent()
         self._verify_sequence(sequence)
+
+    def test_scaling_group_disappears(self):
+        """
+        When the scaling group disappears, a fatal error is logged and the
+        dirty flag is cleaned up.
+        """
+        self._test_fatal_error(
+            NoSuchScalingGroupError(self.tenant_id, self.group_id))
+
+    def test_no_such_endpoint(self):
+        """
+        When execution errors with NoSuchEndpoint, a fatal error is logged and
+        the dirty flag is cleaned up.
+        """
+        self._test_fatal_error(
+            NoSuchEndpoint(service_name="servers", region="DFW"))
 
     def test_unexpected_errors(self):
         """
