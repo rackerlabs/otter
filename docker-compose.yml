@@ -10,13 +10,12 @@ services:
             - zk
         environment:
             IDENTITY_URL: "http://mimic:8900/v2.0"
-            CASS_SEED_HOSTS: "tcp:db:9168"
+            CASS_HOSTS: "tcp:db:9160"
             ZK_HOSTS: "zk:2181"
+            BOOTSTRAP: "yes"
     db:
-        build:
-            context: .
-            dockerfile: cass_dockerfile
+        image: cassandra:2.1
     zk:
         image: zookeeper:latest
     mimic: 
-        build: https://github.com/rackerlabs/mimic.git
+        build: mimic/

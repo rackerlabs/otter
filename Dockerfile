@@ -1,18 +1,19 @@
 FROM python:2.7
 COPY requirements.txt /tmp/
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
-# To customize config file during run
-RUN apt-get update && apt-get install -y jq
 
-# Install zk-shell in venv to bootstrap ZK data
-RUN mkdir /zkshellvenv && virtualenv /zkshellvenv && \
-    source /zkshellvenv/bin/activate && pip install zk-shell
+# Use dockerize to wait for services to come up when bootstraping
+RUN apt-get update && apt-get install -y wget
+ENV DOCKERIZE_VERSION v0.2.0
+RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
 
 WORKDIR /otterapp 
 COPY setup.py ./
 COPY otter/ ./otter
 COPY scripts/ ./scripts
 COPY twisted/ ./twisted
+COPY schema/ ./schema
 RUN pip install .
 
 # Customize config.json

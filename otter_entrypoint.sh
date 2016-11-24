@@ -2,29 +2,28 @@
 
 set -e
 
-IDENTITY_URL=${IDENTITY_URL:-"http://localhost:8900/v2.0"}
-# Only one seed supported for now
-CASS_SEED_HOST=${CASS_SEED_HOST:-"tcp:localhost:9168"}
-ZK_HOST=${ZK_HOST:-"localhost:2181"}
+export IDENTITY_URL=${IDENTITY_URL:-"http://localhost:8900/v2.0"}
+export CASS_HOSTS=${CASS_HOSTS:-"tcp:localhost:9160"}
+export ZK_HOSTS=${ZK_HOSTS:-"localhost:2181"}
 
-jq ".identity.url=\"${IDENTITY_URL}\" | .identity.admin_url=\"${IDENTITY_URL}\" |
-   del(.cloudfeeds) | .cassandra.seed_hosts=[\"${CASS_SEED_HOSTS}\"] | 
-   .zookeeper.hosts=\"${ZK_HOSTS}\"" config.example.json > /etc/otter.json
+cust_conf.py config.example.json > /etc/otter.json
 
 # init CASS schema and ZK nodes if needed
-if [ -v ${BOOTSTRAP} ]
+if [ -n "$BOOTSTRAP" ]
 then
-    source /zkshellvenv/bin/activate
-    cat << EOF | zk-shell --run-from-stdin ${ZK_HOST}
-    create /groups/divergent d false false true
-    create /locks d
-    create /selfheallock d
-    create /scheduler_partition d
-    create /convergence-partitioner
-    EOF
-
-
+    CASS_HOST=$(extr_host_port.py cass host ${CASS_HOSTS})
+    CASS_PORT=$(extr_host_port.py cass port ${CASS_HOSTS})
+    ZK_HOST=$(extr_host_port.py zk host ${ZK_HOSTS})
+    ZK_PORT=$(extr_host_port.py zk port ${ZK_HOSTS})
+    dockerize -wait tcp://${CASS_HOST}:${CASS_PORT} -wait tcp://${ZK_HOST}:${ZK_PORT} -timeout 60s
+    load_zk.py ${ZK_HOST}
+    load_cql.py /otterapp/schema/setup \
+		--ban-unsafe \
+		--outfile /otterapp/schema/setup-dev.cql \
+		--replication 1 \
+		--keyspace otter \
+		--host ${CASS_HOST} \
+		--port ${CASS_PORT}
 fi
-
 
 exec "$@"
