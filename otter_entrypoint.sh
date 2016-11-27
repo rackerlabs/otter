@@ -11,12 +11,12 @@ cust_conf.py config.example.json > /etc/otter.json
 # init CASS schema and ZK nodes if needed
 if [ -n "$BOOTSTRAP" ]
 then
-    CASS_HOST=$(extr_host_port.py cass host ${CASS_HOSTS})
-    CASS_PORT=$(extr_host_port.py cass port ${CASS_HOSTS})
-    ZK_HOST=$(extr_host_port.py zk host ${ZK_HOSTS})
-    ZK_PORT=$(extr_host_port.py zk port ${ZK_HOSTS})
-    dockerize -wait tcp://${CASS_HOST}:${CASS_PORT} -wait tcp://${ZK_HOST}:${ZK_PORT} -timeout 60s
-    load_zk.py ${ZK_HOST}
+    # Assuming only one CASS host is there in "tcp:host:port" form and one
+    # ZK host is there in "host:port" form
+    CASS_HOST=$(echo $CASS_HOSTS | cut -d ":" -f 2)
+    CASS_PORT=$(echo $CASS_HOSTS | cut -d ":" -f 3)
+    dockerize -wait tcp://${CASS_HOST}:${CASS_PORT} -wait tcp://${ZK_HOSTS} -timeout 60s
+    load_zk.py ${ZK_HOSTS}
     load_cql.py /otterapp/schema/setup \
 		--ban-unsafe \
 		--outfile /otterapp/schema/setup-dev.cql \
