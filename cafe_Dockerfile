@@ -1,0 +1,22 @@
+FROM python:2.7
+COPY cafe_requirements.txt /tmp/
+ENV SUDO_USER root
+RUN pip install --no-cache-dir -r /tmp/cafe_requirements.txt
+
+WORKDIR /cafe
+COPY autoscale_cloudcafe/ ./autoscale_cloudcafe
+COPY autoscale_cloudroast/ ./autoscale_cloudroast
+RUN pip install --no-cache-dir autoscale_cloudcafe/ autoscale_cloudroast/
+
+# Use dockerize to wait for otter to come up
+RUN apt-get update && apt-get install -y wget
+ENV DOCKERIZE_VERSION v0.2.0
+RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+
+COPY dev-convergence.config /root/.cloudcafe/configs/autoscale/dev-convergence.config
+
+COPY cafe_entrypoint.sh /
+
+ENTRYPOINT ["/cafe_entrypoint.sh"]
+CMD ["dev-convergence", "-l", "tests"]

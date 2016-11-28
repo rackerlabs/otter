@@ -5,6 +5,7 @@ set -e
 export IDENTITY_URL=${IDENTITY_URL:-"http://localhost:8900/v2.0"}
 export CASS_HOSTS=${CASS_HOSTS:-"tcp:localhost:9160"}
 export ZK_HOSTS=${ZK_HOSTS:-"localhost:2181"}
+export URL_ROOT=${URL_ROOT:-"http://localhost:9000"}
 
 cust_conf.py config.example.json > /etc/otter.json
 

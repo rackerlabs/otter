@@ -5,6 +5,7 @@ import sys
 import os
 
 conf = json.load(open(sys.argv[1]))
+conf["url_root"] = os.environ["URL_ROOT"]
 conf["identity"]["url"] = os.environ["IDENTITY_URL"]
 conf["identity"]["admin_url"] = os.environ["IDENTITY_URL"]
 del conf["cloudfeeds"]

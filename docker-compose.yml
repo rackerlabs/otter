@@ -9,13 +9,25 @@ services:
             - db
             - zk
         environment:
-            IDENTITY_URL: "http://mimic:8900/v2.0"
+            IDENTITY_URL: "http://mimic:8900/identity/v2.0"
             CASS_HOSTS: "tcp:db:9160"
             ZK_HOSTS: "zk:2181"
+            URL_ROOT: "http://otter:9000"
             BOOTSTRAP: "yes"
     db:
         image: cassandra:2.1
     zk:
         image: zookeeper:latest
+        ports:
+            - "2181:2181"
     mimic: 
         build: mimic/
+    cafe-tests:
+        build:
+            dockerfile: cafe_dockerfile
+            context: .
+        command:
+            dev-convergence -p functional
+        links:
+            - otter
+            - mimic

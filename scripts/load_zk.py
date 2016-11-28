@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 import sys
+
 from kazoo.client import KazooClient
+from kazoo.exceptions import NodeExistsError
 
 
 def create_or_ignore(client, path):
