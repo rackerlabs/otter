@@ -4,7 +4,7 @@ services:
         build: .
         ports:
             - "9000:9000"
-        links:
+        depends_on:
             - mimic
             - db
             - zk
@@ -28,6 +28,6 @@ services:
             context: .
         command:
             dev-convergence -p functional
-        links:
+        depends_on:
             - otter
             - mimic
