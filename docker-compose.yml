@@ -24,7 +24,7 @@ services:
         build: mimic/
     cafe-tests:
         build:
-            dockerfile: cafe_dockerfile
+            dockerfile: cafe_Dockerfile
             context: .
         command:
             dev-convergence -p functional
