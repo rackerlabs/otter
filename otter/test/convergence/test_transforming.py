@@ -1,5 +1,8 @@
 """Tests for otter.convergence.transforming."""
 
+from hypothesis import given
+import hypothesis.strategies as st
+
 from pyrsistent import pbag, pmap, pset, s
 
 from toolz import groupby
@@ -93,17 +96,77 @@ class FilterMutatingCLBTests(SynchronousTestCase):
     Tests for :func:`filter_clb_mutating_types`
     """
 
-    def test_empty(self):
+    sample_steps = [
+        CreateServer(server_config=pmap({"name": "server"})),
+        CreateServer(server_config=pmap({"name": "server2"})),
+        DeleteServer(server_id="abc"), DeleteServer(server_id="def"),
+        AddNodesToCLB(
+            lb_id='5',
+            address_configs=s(('1.1.1.1',
+                               CLBDescription(lb_id='5', port=80)))),
+        AddNodesToCLB(
+            lb_id='5',
+            address_configs=s(('1.2.3.4',
+                               CLBDescription(lb_id='5', port=80)))),
+        AddNodesToCLB(
+            lb_id='6',
+            address_configs=s(('2.1.1.1',
+                               CLBDescription(lb_id='6', port=80)))),
+        AddNodesToCLB(
+            lb_id='6',
+            address_configs=s(('2.2.3.4',
+                               CLBDescription(lb_id='6', port=80)))),
+        RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
+        RemoveNodesFromCLB(lb_id='5', node_ids=s('2')),
+        RemoveNodesFromCLB(lb_id='6', node_ids=s('3')),
+        RemoveNodesFromCLB(lb_id='6', node_ids=s('4')),
+        ChangeCLBNode(
+            lb_id='5',
+            node_id='1',
+            condition=CLBNodeCondition.DRAINING,
+            weight=50,
+            type=CLBNodeType.PRIMARY),
+        ChangeCLBNode(
+            lb_id='5',
+            node_id='2',
+            condition=CLBNodeCondition.ENABLED,
+            weight=10,
+            type=CLBNodeType.PRIMARY),
+        ChangeCLBNode(
+            lb_id='6',
+            node_id='3',
+            condition=CLBNodeCondition.DRAINING,
+            weight=10,
+            type=CLBNodeType.PRIMARY),
+        ChangeCLBNode(
+            lb_id='6',
+            node_id='4',
+            condition=CLBNodeCondition.ENABLED,
+            weight=15,
+            type=CLBNodeType.SECONDARY)
+    ]
+
+    def test_only_one_mutating_type(self, steps):
         """
         Giving empty list returns empty list
         """
-        self.assertEqual(list(filter_clb_mutating_types([])), [])
+        filtered = filter_clb_mutating_types(steps)
+        steps_by_id = groupby(lambda s: getattr(s, "lb_id", "no"), filtered)
+        for lb_id, steps in steps_by_id.iteritems():
+            if lb_id == "no":
+                continue
+            type_count = countby(type, steps)
+            self.assertEqual(len(type_count), 1)
+
+
+
+
 
     def test_no_mutating_step(self):
         """
         If there are no mutating steps, same steps are returned
         """
-        steps = [CreateServer(server_config=pmap({"name": "server"})),
+        steps = [
                  DeleteServer(server_id="abc")]
         self.assertEqual(list(filter_clb_mutating_types(steps)), steps)
 
@@ -130,8 +193,6 @@ class FilterMutatingCLBTests(SynchronousTestCase):
         If there are multiple mutating types then steps of only one of them
         (first one) is returned along with others
         """
-
-
 
 
 class OptimizerTests(SynchronousTestCase):
