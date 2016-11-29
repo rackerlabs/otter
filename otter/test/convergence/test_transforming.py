@@ -9,11 +9,15 @@ from toolz import groupby
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.convergence.model import CLBDescription
+from otter.convergence.model import (
+    CLBDescription,
+    CLBNodeCondition,
+    CLBNodeType)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
+    ChangeCLBNode,
     CreateServer,
     CreateStack,
     DeleteServer,
@@ -146,53 +150,28 @@ class FilterMutatingCLBTests(SynchronousTestCase):
             type=CLBNodeType.SECONDARY)
     ]
 
+    @given(st.lists(st.sampled_from(sample_steps)))
     def test_only_one_mutating_type(self, steps):
         """
-        Giving empty list returns empty list
+        Test that after filtering only one CLB mutating type steps exist per
+        CLB. Also ensure that non-CLB steps remain intact.
         """
+        # Collect non-CLB types
+        clb_types = (AddNodesToCLB, RemoveNodesFromCLB, ChangeCLBNode)
+        no_lb_steps = filter(lambda s: type(s) not in clb_types, steps)
+
         filtered = filter_clb_mutating_types(steps)
+
+        # Ensure only one CLB type per CLB
         steps_by_id = groupby(lambda s: getattr(s, "lb_id", "no"), filtered)
         for lb_id, steps in steps_by_id.iteritems():
             if lb_id == "no":
                 continue
-            type_count = countby(type, steps)
-            self.assertEqual(len(type_count), 1)
-
-
-
-
-
-    def test_no_mutating_step(self):
-        """
-        If there are no mutating steps, same steps are returned
-        """
-        steps = [
-                 DeleteServer(server_id="abc")]
-        self.assertEqual(list(filter_clb_mutating_types(steps)), steps)
-
-    def test_one_mutating_step(self):
-        """
-        If there are steps of only one mutating type of one CLB all the steps
-        are returned
-        """
-
-    def test_clbs_one_mutating_type(self):
-        """
-        If there are steps of only one mutating type of all CLBs then all the
-        steps are returned
-        """
-
-    def test_one_mutating_with_others(self):
-        """
-        If there are steps of one mutating type with other types then all given
-        steps are returned
-        """
-
-    def test_multiple_mutating_steps(self):
-        """
-        If there are multiple mutating types then steps of only one of them
-        (first one) is returned along with others
-        """
+            lb_types = groupby(type, steps)
+            self.assertEqual(len(lb_types), 1,
+                             "LB {} steps: {}".format(lb_id, steps))
+        # Ensure non-CLB steps remain intact
+        self.assertEqual(no_lb_steps, steps_by_id.get("no", []))
 
 
 class OptimizerTests(SynchronousTestCase):

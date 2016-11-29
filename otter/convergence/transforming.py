@@ -95,18 +95,24 @@ _register_bulk_rcv3_optimizer(BulkRemoveFromRCv3)
 def filter_clb_mutating_types(steps):
     """
     Allow only one CLB mutating steps per CLB
+
+    :param steps: Iterable of :obj:`IStep` instances
+    :return: Iterable of :obj:`IStep` instances such that only one mutating
+        type is returned per CLB
     """
     mutating_clb_types = (AddNodesToCLB, RemoveNodesFromCLB, ChangeCLBNode)
     lb_step_type = {}
     for step in steps:
-        if type(step) not in mutating_clb_types:
+        stype = type(step)
+        if stype not in mutating_clb_types:
             yield step
-        stype = lb_step_type.get(step.lb_id)
-        if stype is None:
+            continue
+        lb_stype = lb_step_type.get(step.lb_id)
+        if lb_stype is None:
             lb_step_type[step.lb_id] = stype
             yield step
         else:
-            if type(step) is stype:
+            if stype is lb_stype:
                 yield step
 
 
