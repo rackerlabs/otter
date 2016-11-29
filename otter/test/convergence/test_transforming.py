@@ -17,6 +17,7 @@ from otter.convergence.steps import (
     RemoveNodesFromCLB,
     )
 from otter.convergence.transforming import (
+    filter_clb_mutating_types,
     get_step_limits_from_conf,
     limit_steps_by_count,
     optimize_steps)
@@ -85,6 +86,52 @@ class LimitStepCount(SynchronousTestCase):
         """
         limits = get_step_limits_from_conf({"create_server": 100})
         self.assertEqual(limits, {CreateServer: 100, CreateStack: 10})
+
+
+class FilterMutatingCLBTests(SynchronousTestCase):
+    """
+    Tests for :func:`filter_clb_mutating_types`
+    """
+
+    def test_empty(self):
+        """
+        Giving empty list returns empty list
+        """
+        self.assertEqual(list(filter_clb_mutating_types([])), [])
+
+    def test_no_mutating_step(self):
+        """
+        If there are no mutating steps, same steps are returned
+        """
+        steps = [CreateServer(server_config=pmap({"name": "server"})),
+                 DeleteServer(server_id="abc")]
+        self.assertEqual(list(filter_clb_mutating_types(steps)), steps)
+
+    def test_one_mutating_step(self):
+        """
+        If there are steps of only one mutating type of one CLB all the steps
+        are returned
+        """
+
+    def test_clbs_one_mutating_type(self):
+        """
+        If there are steps of only one mutating type of all CLBs then all the
+        steps are returned
+        """
+
+    def test_one_mutating_with_others(self):
+        """
+        If there are steps of one mutating type with other types then all given
+        steps are returned
+        """
+
+    def test_multiple_mutating_steps(self):
+        """
+        If there are multiple mutating types then steps of only one of them
+        (first one) is returned along with others
+        """
+
+
 
 
 class OptimizerTests(SynchronousTestCase):

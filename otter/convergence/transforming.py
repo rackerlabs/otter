@@ -16,6 +16,7 @@ from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
+    ChangeCLBNode,
     CreateServer,
     CreateStack,
     RemoveNodesFromCLB)
@@ -98,7 +99,7 @@ def filter_clb_mutating_types(steps):
     mutating_clb_types = (AddNodesToCLB, RemoveNodesFromCLB, ChangeCLBNode)
     lb_step_type = {}
     for step in steps:
-        if step not in mutating_clb_types:
+        if type(step) not in mutating_clb_types:
             yield step
         stype = lb_step_type.get(step.lb_id)
         if stype is None:
