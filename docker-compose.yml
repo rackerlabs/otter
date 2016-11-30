@@ -22,12 +22,33 @@ services:
             - "2181:2181"
     mimic: 
         build: mimic/
-    cafe-tests:
+    cafe:
         build:
             dockerfile: cafe_Dockerfile
             context: .
         command:
             dev-convergence -p functional
+        depends_on:
+            - otter
+            - mimic
+    trial:
+        image: otter
+        environment:
+            - AS_USERNAME=jenkins_user
+            - AS_PASSWORD=jenkins_password
+            - AS_IDENTITY=http://mimic:8900/identity/v2.0
+            - AS_FLAVOR_REF=2
+            - AS_REGION=ORD
+            - AS_CONVERGENCE_TENANT=000001
+            - AS_CONVERGENCE_TENANT_FOR_AUTH_ERRORS=000010
+            - AS_AUTOSCALE_LOCAL_URL=http://otter:9000/v1.0/{0}
+            - AS_NOVA_SC_KEY=cloudServersOpenStack
+            - AS_CLB_SC_KEY=cloudLoadBalancers
+            - AS_USING_MIMIC=yes
+            - AS_SELFHEAL_INTERVAL=20
+        command:
+            dockerize -timeout 60s -wait http://otter:9000/health -wait http://mimic:8900
+                trial -j10 otter.integration.tests
         depends_on:
             - otter
             - mimic
