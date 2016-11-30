@@ -28,6 +28,7 @@ from otter.convergence.transforming import (
     get_step_limits_from_conf,
     limit_steps_by_count,
     optimize_steps)
+from otter.util.fp import partition_bool
 
 
 class LimitStepCount(SynchronousTestCase):
@@ -158,22 +159,29 @@ class FilterMutatingCLBTests(SynchronousTestCase):
         """
         steps = pbag(steps)
 
-        # Collect non-CLB types
         clb_types = (AddNodesToCLB, RemoveNodesFromCLB, ChangeCLBNode)
-        no_lb_steps = filter(lambda s: type(s) not in clb_types, steps)
+        lb_steps, no_lb_steps = partition_bool(lambda s: type(s) in clb_types,
+                                               steps)
+        steps_by_id = groupby(lambda s: s.lb_id, lb_steps)
 
         filtered = filter_clb_mutating_types(steps)
 
-        # Ensure only one CLB type per CLB
-        steps_by_id = groupby(lambda s: getattr(s, "lb_id", "no"), filtered)
-        for lb_id, steps in steps_by_id.iteritems():
-            if lb_id == "no":
-                continue
-            lb_types = groupby(type, steps)
-            self.assertEqual(len(lb_types), 1,
-                             "LB {} steps: {}".format(lb_id, steps))
+        filtered_steps_by_id = groupby(lambda s: getattr(s, "lb_id", "no"),
+                                       filtered)
+        for lb_id, lb_steps in steps_by_id.items():
+            steps_by_type = groupby(type, lb_steps)
+            filtered_steps_by_types = groupby(type,
+                                              filtered_steps_by_id[lb_id])
+            # Ensure only one CLB type per CLB
+            self.assertEqual(len(filtered_steps_by_types), 1)
+            filtered_lb_type = filtered_steps_by_types.keys()[0]
+            # The returned steps of LB type is same as original
+            self.assertEqual(
+                filtered_steps_by_types[filtered_lb_type],
+                steps_by_type[filtered_lb_type])
+
         # Ensure non-CLB steps remain intact
-        self.assertEqual(no_lb_steps, steps_by_id.get("no", []))
+        self.assertEqual(no_lb_steps, filtered_steps_by_id.get("no", []))
 
 
 class OptimizerTests(SynchronousTestCase):
