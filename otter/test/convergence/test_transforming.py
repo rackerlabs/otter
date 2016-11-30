@@ -156,6 +156,8 @@ class FilterMutatingCLBTests(SynchronousTestCase):
         Test that after filtering only one CLB mutating type steps exist per
         CLB. Also ensure that non-CLB steps remain intact.
         """
+        steps = pbag(steps)
+
         # Collect non-CLB types
         clb_types = (AddNodesToCLB, RemoveNodesFromCLB, ChangeCLBNode)
         no_lb_steps = filter(lambda s: type(s) not in clb_types, steps)
@@ -176,6 +178,38 @@ class FilterMutatingCLBTests(SynchronousTestCase):
 
 class OptimizerTests(SynchronousTestCase):
     """Tests for :func:`optimize_steps`."""
+
+    def test_filters_clb_types(self):
+        """
+        Only one CLB type is returned per CLB
+        """
+        steps = pbag([
+            AddNodesToCLB(
+                lb_id='5',
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='5', port=80)))),
+            # Another CLB type for CLB 5. Will be removed
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
+            RemoveNodesFromCLB(lb_id='6', node_ids=s('2')),
+            # Another CLB type for CLB 6. Will be removed
+            AddNodesToCLB(
+                lb_id='6',
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='6', port=80)))),
+            # Unoptimizable steps
+            CreateServer(server_config=pmap({})),
+        ])
+        self.assertEqual(
+            optimize_steps(steps),
+            pbag([
+                AddNodesToCLB(
+                    lb_id='5',
+                    address_configs=s(
+                        ('1.1.1.1', CLBDescription(lb_id='5', port=80)))),
+                RemoveNodesFromCLB(lb_id='6', node_ids=s('2')),
+                CreateServer(server_config=pmap({}))
+            ])
+        )
 
     def test_optimize_clb_adds(self):
         """
@@ -308,7 +342,7 @@ class OptimizerTests(SynchronousTestCase):
                 lb_id='5',
                 address_configs=s(('1.1.1.1',
                                    CLBDescription(lb_id='5', port=80)))),
-            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
+            RemoveNodesFromCLB(lb_id='6', node_ids=s('1')),
             CreateServer(server_config=pmap({})),
             BulkRemoveFromRCv3(lb_node_pairs=pset([("lb-1", "node-a")])),
             BulkAddToRCv3(lb_node_pairs=pset([("lb-2", "node-b")]))
@@ -343,10 +377,8 @@ class OptimizerTests(SynchronousTestCase):
                 lb_id='6',
                 address_configs=s(('1.1.1.2',
                                    CLBDescription(lb_id='6', port=80)))),
-            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
-            RemoveNodesFromCLB(lb_id='5', node_ids=s('2')),
-            RemoveNodesFromCLB(lb_id='6', node_ids=s('3')),
-            RemoveNodesFromCLB(lb_id='6', node_ids=s('4')),
+            RemoveNodesFromCLB(lb_id='7', node_ids=s('1')),
+            RemoveNodesFromCLB(lb_id='7', node_ids=s('2')),
 
             # Unoptimizable steps
             CreateServer(server_config=pmap({})),
@@ -368,8 +400,7 @@ class OptimizerTests(SynchronousTestCase):
                                        CLBDescription(lb_id='6', port=80)),
                                       ('1.1.1.2',
                                        CLBDescription(lb_id='6', port=80)))),
-                RemoveNodesFromCLB(lb_id='5', node_ids=s('1', '2')),
-                RemoveNodesFromCLB(lb_id='6', node_ids=s('3', '4')),
+                RemoveNodesFromCLB(lb_id='7', node_ids=s('1', '2')),
 
                 # Unoptimizable steps
                 CreateServer(server_config=pmap({}))
