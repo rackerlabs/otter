@@ -112,6 +112,7 @@ from twisted.application.service import MultiService
 
 from txeffect import exc_info_to_failure, perform
 
+from otter.auth import NoSuchEndpoint
 from otter.cloud_client import TenantScope
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import (get_desired_server_group_state,
@@ -319,10 +320,11 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
                                   get_executor=get_executor))
         (executor, scaling_group, group_state, desired_group_state,
          resources) = all_data
-    except NoSuchEndpoint:
-        result = yield convergence_failed(
-            tenant_id, group_id, [ErrorReason.Exception(sys.exc_info())])
-        yield do_return(result)
+    except FirstError as fe:
+        if fe.exc_info[0] is NoSuchEndpoint:
+            result = yield convergence_failed(
+                tenant_id, group_id, [ErrorReason.Exception(fe.exc_info)])
+            yield do_return(result)
 
     # prepare plan
     steps = executor.plan(desired_group_state, datetime_to_epoch(now_dt),
