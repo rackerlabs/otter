@@ -2,6 +2,8 @@
 
 from pyrsistent import pbag, pmap, pset, s
 
+from testtools.matchers import Equals, MatchesAny
+
 from toolz import groupby
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -24,6 +26,7 @@ from otter.convergence.transforming import (
     limit_steps_by_count,
     one_clb_step,
     optimize_steps)
+from otter.test.utils import matches
 
 
 class LimitStepCount(SynchronousTestCase):
@@ -155,34 +158,34 @@ class OptimizerTests(SynchronousTestCase):
 
     def test_filters_clb_types(self):
         """
-        Only one CLB type is returned per CLB
+        Only one CLB step is returned per CLB
         """
         steps = pbag([
             AddNodesToCLB(
                 lb_id='5',
                 address_configs=s(('1.1.1.1',
                                    CLBDescription(lb_id='5', port=80)))),
-            # Another CLB type for CLB 5. Will be removed
             RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
-            RemoveNodesFromCLB(lb_id='6', node_ids=s('2')),
-            # Another CLB type for CLB 6. Will be removed
-            AddNodesToCLB(
-                lb_id='6',
-                address_configs=s(('1.1.1.1',
-                                   CLBDescription(lb_id='6', port=80)))),
-            # Unoptimizable steps
+            # Unoptimizable step
             CreateServer(server_config=pmap({})),
         ])
+        # returned steps could be pbag of any of the 2 lists below depending
+        # on how `one_clb_step` iterates over the steps. Since it is pbag the
+        # order of elements is not guaranteed
+        list1 = [
+            AddNodesToCLB(
+                lb_id='5',
+                address_configs=s(
+                    ('1.1.1.1', CLBDescription(lb_id='5', port=80)))),
+            CreateServer(server_config=pmap({}))
+        ]
+        list2 = [
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
+            CreateServer(server_config=pmap({}))
+        ]
         self.assertEqual(
-            optimize_steps(steps),
-            pbag([
-                AddNodesToCLB(
-                    lb_id='5',
-                    address_configs=s(
-                        ('1.1.1.1', CLBDescription(lb_id='5', port=80)))),
-                RemoveNodesFromCLB(lb_id='6', node_ids=s('2')),
-                CreateServer(server_config=pmap({}))
-            ])
+            matches(MatchesAny(Equals(pbag(list1)), Equals(pbag(list2)))),
+            optimize_steps(steps)
         )
 
     def test_optimize_clb_adds(self):
