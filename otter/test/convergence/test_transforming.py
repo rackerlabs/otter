@@ -1,8 +1,5 @@
 """Tests for otter.convergence.transforming."""
 
-from hypothesis import given
-import hypothesis.strategies as st
-
 from pyrsistent import pbag, pmap, pset, s
 
 from toolz import groupby
@@ -21,14 +18,12 @@ from otter.convergence.steps import (
     CreateServer,
     CreateStack,
     DeleteServer,
-    RemoveNodesFromCLB,
-    )
+    RemoveNodesFromCLB)
 from otter.convergence.transforming import (
-    filter_clb_mutating_types,
     get_step_limits_from_conf,
     limit_steps_by_count,
+    one_clb_step,
     optimize_steps)
-from otter.util.fp import partition_bool
 
 
 class LimitStepCount(SynchronousTestCase):
@@ -96,92 +91,63 @@ class LimitStepCount(SynchronousTestCase):
         self.assertEqual(limits, {CreateServer: 100, CreateStack: 10})
 
 
-class FilterMutatingCLBTests(SynchronousTestCase):
+class OneCLBStepTests(SynchronousTestCase):
     """
-    Tests for :func:`filter_clb_mutating_types`
+    Tests for :func:`one_clb_step`
     """
 
-    sample_steps = [
-        CreateServer(server_config=pmap({"name": "server"})),
-        CreateServer(server_config=pmap({"name": "server2"})),
-        DeleteServer(server_id="abc"), DeleteServer(server_id="def"),
-        AddNodesToCLB(
-            lb_id='5',
-            address_configs=s(('1.1.1.1',
-                               CLBDescription(lb_id='5', port=80)))),
-        AddNodesToCLB(
-            lb_id='5',
-            address_configs=s(('1.2.3.4',
-                               CLBDescription(lb_id='5', port=80)))),
-        AddNodesToCLB(
-            lb_id='6',
-            address_configs=s(('2.1.1.1',
-                               CLBDescription(lb_id='6', port=80)))),
-        AddNodesToCLB(
-            lb_id='6',
-            address_configs=s(('2.2.3.4',
-                               CLBDescription(lb_id='6', port=80)))),
-        RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
-        RemoveNodesFromCLB(lb_id='5', node_ids=s('2')),
-        RemoveNodesFromCLB(lb_id='6', node_ids=s('3')),
-        RemoveNodesFromCLB(lb_id='6', node_ids=s('4')),
-        ChangeCLBNode(
-            lb_id='5',
-            node_id='1',
-            condition=CLBNodeCondition.DRAINING,
-            weight=50,
-            type=CLBNodeType.PRIMARY),
-        ChangeCLBNode(
-            lb_id='5',
-            node_id='2',
-            condition=CLBNodeCondition.ENABLED,
-            weight=10,
-            type=CLBNodeType.PRIMARY),
-        ChangeCLBNode(
-            lb_id='6',
-            node_id='3',
-            condition=CLBNodeCondition.DRAINING,
-            weight=10,
-            type=CLBNodeType.PRIMARY),
-        ChangeCLBNode(
-            lb_id='6',
-            node_id='4',
-            condition=CLBNodeCondition.ENABLED,
-            weight=15,
-            type=CLBNodeType.SECONDARY)
-    ]
-
-    @given(st.lists(st.sampled_from(sample_steps)))
-    def test_only_one_mutating_type(self, steps):
+    def test_no_clb_steps(self):
         """
-        Test that after filtering only one CLB mutating type steps exist per
-        CLB. Also ensure that non-CLB steps remain intact.
+        Returns same steps when there are no CLB steps passed
         """
-        steps = pbag(steps)
+        steps = [
+            CreateServer(server_config=pmap({"name": "server"})),
+            DeleteServer(server_id="abc")
+        ]
+        self.assertEqual(list(one_clb_step(steps)), steps)
 
-        clb_types = (AddNodesToCLB, RemoveNodesFromCLB, ChangeCLBNode)
-        lb_steps, no_lb_steps = partition_bool(lambda s: type(s) in clb_types,
-                                               steps)
-        steps_by_id = groupby(lambda s: s.lb_id, lb_steps)
-
-        filtered = filter_clb_mutating_types(steps)
-
-        filtered_steps_by_id = groupby(lambda s: getattr(s, "lb_id", "no"),
-                                       filtered)
-        for lb_id, lb_steps in steps_by_id.items():
-            steps_by_type = groupby(type, lb_steps)
-            filtered_steps_by_types = groupby(type,
-                                              filtered_steps_by_id[lb_id])
-            # Ensure only one CLB type per CLB
-            self.assertEqual(len(filtered_steps_by_types), 1)
-            filtered_lb_type = filtered_steps_by_types.keys()[0]
-            # The returned steps of LB type is same as original
-            self.assertEqual(
-                filtered_steps_by_types[filtered_lb_type],
-                steps_by_type[filtered_lb_type])
-
-        # Ensure non-CLB steps remain intact
-        self.assertEqual(no_lb_steps, filtered_steps_by_id.get("no", []))
+    def test_mixed(self):
+        """
+        When there are multiple steps of same CLB then first step of each CLB
+        is returned
+        """
+        steps = [
+            CreateServer(server_config=pmap({"name": "server"})),
+            DeleteServer(server_id="abc"),
+            AddNodesToCLB(
+                lb_id='5',
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='5', port=80)))),
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
+            RemoveNodesFromCLB(lb_id='6', node_ids=s('3')),
+            AddNodesToCLB(
+                lb_id='6',
+                address_configs=s(('2.1.1.1',
+                                   CLBDescription(lb_id='6', port=80)))),
+            ChangeCLBNode(
+                lb_id='7',
+                node_id='9',
+                condition=CLBNodeCondition.ENABLED,
+                weight=10,
+                type=CLBNodeType.PRIMARY),
+            RemoveNodesFromCLB(lb_id='7', node_ids=s('4')),
+            AddNodesToCLB(
+                lb_id='7',
+                address_configs=s(('3.1.1.1',
+                                   CLBDescription(lb_id='9', port=80)))),
+            ChangeCLBNode(
+                lb_id='5',
+                node_id='11',
+                condition=CLBNodeCondition.ENABLED,
+                weight=10,
+                type=CLBNodeType.PRIMARY)
+        ]
+        self.assertEqual(
+            list(one_clb_step(steps)),
+            (steps[:3] +    # Non-CLB steps and 1 step for CLB 5
+             [steps[4]] +   # One step for CLB 6
+             [steps[6]])    # One step for CLB 7
+        )
 
 
 class OptimizerTests(SynchronousTestCase):

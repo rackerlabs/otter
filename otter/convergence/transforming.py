@@ -92,28 +92,24 @@ _register_bulk_rcv3_optimizer(BulkAddToRCv3)
 _register_bulk_rcv3_optimizer(BulkRemoveFromRCv3)
 
 
-def filter_clb_mutating_types(steps):
+def one_clb_step(steps):
     """
-    Allow only one CLB mutating steps per CLB
+    Allow only one CLB mutating step per CLB since calling only one will be
+    allowed in CLB while others will get PENDING_UPDATE.
 
     :param steps: Iterable of :obj:`IStep` instances
     :return: Iterable of :obj:`IStep` instances such that only one mutating
-        type is returned per CLB
+        step is returned per CLB
     """
-    mutating_clb_types = (AddNodesToCLB, RemoveNodesFromCLB, ChangeCLBNode)
-    lb_step_type = {}
+    # set of loadbalancer IDs whose step has been returned
+    seen_lbids = set()
     for step in steps:
-        stype = type(step)
-        if stype not in mutating_clb_types:
-            yield step
-            continue
-        lb_stype = lb_step_type.get(step.lb_id)
-        if lb_stype is None:
-            lb_step_type[step.lb_id] = stype
-            yield step
-        else:
-            if stype is lb_stype:
-                yield step
+        if isinstance(step, (AddNodesToCLB, RemoveNodesFromCLB,
+                             ChangeCLBNode)):
+            if step.lb_id in seen_lbids:
+                continue
+            seen_lbids.add(step.lb_id)
+        yield step
 
 
 def optimize_steps(steps):
@@ -133,12 +129,11 @@ def optimize_steps(steps):
         else:
             return "unoptimizable"
 
-    steps = filter_clb_mutating_types(steps)
     steps_by_type = groupby(grouping_fn, steps)
     unoptimizable = steps_by_type.pop("unoptimizable", [])
     omg_optimized = concat(_optimizers[step_type](steps)
                            for step_type, steps in steps_by_type.iteritems())
-    return pbag(concatv(omg_optimized, unoptimizable))
+    return pbag(one_clb_step(concatv(omg_optimized, unoptimizable)))
 
 
 _DEFAULT_STEP_LIMITS = pmap({
