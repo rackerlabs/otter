@@ -15,6 +15,7 @@ RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSI
     && tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
 
 COPY dev-convergence.config /root/.cloudcafe/configs/autoscale/dev-convergence.config
+COPY dev-worker.config /root/.cloudcafe/configs/autoscale/dev-worker.config
 
 COPY cafe_entrypoint.sh /
 

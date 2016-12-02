@@ -28,6 +28,10 @@ services:
         build:
             dockerfile: cafe_Dockerfile
             context: .
+        environment:
+            - OTTER_ROOT=http://otter:9000
+            - IDENTITY_ROOT=http://mimic:8900
+            - WAIT=yes
         command:
             dev-convergence -p functional
         depends_on:
