@@ -14,12 +14,13 @@ COPY otter/ ./otter
 COPY scripts/ ./scripts
 COPY twisted/ ./twisted
 COPY schema/ ./schema
-RUN pip install .
+RUN pip install -e /otterapp
 
 # Customize config.json
-COPY config.example.json ./
-COPY otter_entrypoint.sh ./
-ENTRYPOINT ["./otter_entrypoint.sh"]
+WORKDIR /
+COPY config.example.json /
+COPY otter_entrypoint.sh /
+ENTRYPOINT ["/otter_entrypoint.sh"]
 
 EXPOSE 9000
 ENV PYRSISTENT_NO_C_EXTENSION true

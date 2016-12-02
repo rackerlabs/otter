@@ -14,6 +14,8 @@ services:
             ZK_HOSTS: "zk:2181"
             URL_ROOT: "http://otter:9000"
             BOOTSTRAP: "yes"
+        volumes:
+            - .:/otterapp
     db:
         image: cassandra:2.1
     zk:
