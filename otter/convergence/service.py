@@ -215,7 +215,8 @@ def _execute_steps(steps):
     Given a set of steps, executes them, logs the result, and returns the worst
     priority with a list of reasons for that result.
 
-    :return: a tuple of (:class:`StepResult` constant., list of reasons)
+    :return: a tuple of (:class:`StepResult` constant,
+                         list of :obj:`ErrorReason`)
     """
     if len(steps) > 0:
         results = yield steps_to_effect(steps)
@@ -598,7 +599,8 @@ def converge_one_group(currently_converging, recently_converged, waiting,
     except ConcurrentError:
         # We don't need to spam the logs about this, it's to be expected
         return
-    except NoSuchScalingGroupError:
+    except (NoSuchScalingGroupError, NoSuchEndpoint):
+        # NoSuchEndpoint occurs on a suspended or closed account
         yield err(None, 'converge-fatal-error')
         yield _clean_waiting(waiting, group_id)
         yield delete_divergent_flag(tenant_id, group_id, version)

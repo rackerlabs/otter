@@ -1,0 +1,37 @@
+---
+- schema_version: 1.0.0
+  name: Autoscale
+  aliases:
+    - autoscaling
+    - otter
+  summary: Rackspace Autoscale
+  description:
+  source: https://github.com/rackerlabs/otter
+  tracker: https://github.com/rackerlabs/otter/issues
+  website: https://one.rackspace.com/display/Autoscale/Auto+Scale
+  environments:
+    - tier: production
+      default: true
+      infrastructure: public
+      datacenters:
+        - dfw
+        - ord
+        - iad
+        - lon
+        - hkg
+        - syd
+      aliases:
+        - autoscale.api.rackspacecloud.com
+        - dfw.autoscale.api.rackspacecloud.com
+        - ord.autoscale.api.rackspacecloud.com
+        - iad.autoscale.api.rackspacecloud.com
+        - lon.autoscale.api.rackspacecloud.com
+        - hkg.autoscale.api.rackspacecloud.com
+        - syd.autoscale.api.rackspacecloud.com
+      dependencies:
+        - https://identity.api.rackspacecloud.com/v2.0
+        - https://servers.api.rackspacecloud.com/v2
+        - https://loadbalancers.api.rackspacecloud.com/v1.0
+        - https://rackconnect.api.rackspacecloud.com/v3
+        - https://orchestration.api.rackspacecloud.com/v1
+        - https://*.feeds.api.rackspacecloud.com/
