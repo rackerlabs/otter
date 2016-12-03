@@ -599,7 +599,7 @@ def converge_one_group(currently_converging, recently_converged, waiting,
     except ConcurrentError:
         # We don't need to spam the logs about this, it's to be expected
         return
-    except (NoSuchScalingGroupError, NoSuchEndpoint):
+    except NoSuchScalingGroupError:
         # NoSuchEndpoint occurs on a suspended or closed account
         yield err(None, 'converge-fatal-error')
         yield _clean_waiting(waiting, group_id)
