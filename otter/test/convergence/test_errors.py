@@ -2,6 +2,7 @@ import traceback
 
 from twisted.trial.unittest import SynchronousTestCase
 
+from otter.auth import NoSuchEndpoint
 from otter.cloud_client import (
     CLBDeletedError,
     CLBNodeLimitError,
@@ -49,7 +50,10 @@ class PresentReasonsTests(SynchronousTestCase):
             CreateServerConfigurationError("Your server is wrong"):
                 'Server launch configuration is invalid: Your server is wrong',
             CreateServerOverQuoteError("You are over quota"):
-                'Servers cannot be created: You are over quota'
+                'Servers cannot be created: You are over quota',
+            NoSuchEndpoint(service_name="nova", region="ord"):
+                "Could not locate service nova in the service catalog. "
+                "Please check if your account is still active."
         }
         excs = excs.items()
         self.assertEqual(

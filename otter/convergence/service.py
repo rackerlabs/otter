@@ -92,7 +92,7 @@ from hashlib import sha1
 
 import attr
 
-from effect import Constant, Effect, Func, parallel
+from effect import Constant, Effect, FirstError, Func, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
 
@@ -124,6 +124,7 @@ from otter.convergence.gathering import (get_all_launch_server_data,
 from otter.convergence.logging import log_steps
 from otter.convergence.model import (
     ConvergenceIterationStatus,
+    ErrorReason,
     ServerState,
     StepResult)
 from otter.convergence.planning import plan_launch_server, plan_launch_stack
@@ -325,6 +326,7 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
             result = yield convergence_failed(
                 tenant_id, group_id, [ErrorReason.Exception(fe.exc_info)])
             yield do_return(result)
+        raise fe
 
     # prepare plan
     steps = executor.plan(desired_group_state, datetime_to_epoch(now_dt),
@@ -399,12 +401,16 @@ def convergence_failed(tenant_id, group_id, reasons, timedout=False):
     """
     Handle convergence failure
 
-    :param str tenant_id:
-    :param str group_id:
+    :param str tenant_id: Tenant ID
+    :param str group_id: Group ID
     :param reasons: List of :obj:`ErrorReason` objects
     :param bool timedout: Has convergence failed due to reason timing out?
+
+    :return: convergence execution status
+    :rtype: :obj:`ConvergenceIterationStatus`
     """
-    yield Effect(LoadAndUpdateGroupStatus(tenant_id, group_id, ScalingGroupStatus.ERROR))
+    yield Effect(LoadAndUpdateGroupStatus(tenant_id, group_id,
+                                          ScalingGroupStatus.ERROR))
     presented_reasons = sorted(present_reasons(reasons))
     if len(presented_reasons) == 0:
         presented_reasons = [u"Unknown error occurred"]
@@ -414,7 +420,8 @@ def convergence_failed(tenant_id, group_id, reasons, timedout=False):
     yield cf_err(
         'group-status-error', status=ScalingGroupStatus.ERROR.name,
         reasons=presented_reasons)
-    yield Effect(UpdateGroupErrorReasons(scaling_group, presented_reasons))
+    yield Effect(UpdateGroupErrorReasons(tenant_id, group_id,
+                                         presented_reasons))
     yield do_return(ConvergenceIterationStatus.Stop())
 
 

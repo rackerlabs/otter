@@ -86,7 +86,7 @@ def _present_server_over_limit_error(exception):
 
 @_present_exception.register(NoSuchEndpoint)
 def _present_no_such_endpoint(exception):
-    fmt = ("Could not locate service {} in your service catalog. "
+    fmt = ("Could not locate service {} in the service catalog. "
            "Please check if your account is still active.")
     return fmt.format(exception.service_name)
 
