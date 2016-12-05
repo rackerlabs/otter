@@ -2,24 +2,31 @@
 
 from pyrsistent import pbag, pmap, pset, s
 
+from testtools.matchers import Equals, MatchesAny
+
 from toolz import groupby
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.convergence.model import CLBDescription
+from otter.convergence.model import (
+    CLBDescription,
+    CLBNodeCondition,
+    CLBNodeType)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
+    ChangeCLBNode,
     CreateServer,
     CreateStack,
     DeleteServer,
-    RemoveNodesFromCLB,
-    )
+    RemoveNodesFromCLB)
 from otter.convergence.transforming import (
     get_step_limits_from_conf,
     limit_steps_by_count,
+    one_clb_step,
     optimize_steps)
+from otter.test.utils import matches
 
 
 class LimitStepCount(SynchronousTestCase):
@@ -87,8 +94,99 @@ class LimitStepCount(SynchronousTestCase):
         self.assertEqual(limits, {CreateServer: 100, CreateStack: 10})
 
 
+class OneCLBStepTests(SynchronousTestCase):
+    """
+    Tests for :func:`one_clb_step`
+    """
+
+    def test_no_clb_steps(self):
+        """
+        Returns same steps when there are no CLB steps passed
+        """
+        steps = [
+            CreateServer(server_config=pmap({"name": "server"})),
+            DeleteServer(server_id="abc")
+        ]
+        self.assertEqual(list(one_clb_step(steps)), steps)
+
+    def test_mixed(self):
+        """
+        When there are multiple steps of same CLB then first step of each CLB
+        is returned
+        """
+        steps = [
+            CreateServer(server_config=pmap({"name": "server"})),
+            DeleteServer(server_id="abc"),
+            AddNodesToCLB(
+                lb_id='5',
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='5', port=80)))),
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
+            RemoveNodesFromCLB(lb_id='6', node_ids=s('3')),
+            AddNodesToCLB(
+                lb_id='6',
+                address_configs=s(('2.1.1.1',
+                                   CLBDescription(lb_id='6', port=80)))),
+            ChangeCLBNode(
+                lb_id='7',
+                node_id='9',
+                condition=CLBNodeCondition.ENABLED,
+                weight=10,
+                type=CLBNodeType.PRIMARY),
+            RemoveNodesFromCLB(lb_id='7', node_ids=s('4')),
+            AddNodesToCLB(
+                lb_id='7',
+                address_configs=s(('3.1.1.1',
+                                   CLBDescription(lb_id='9', port=80)))),
+            ChangeCLBNode(
+                lb_id='5',
+                node_id='11',
+                condition=CLBNodeCondition.ENABLED,
+                weight=10,
+                type=CLBNodeType.PRIMARY)
+        ]
+        self.assertEqual(
+            list(one_clb_step(steps)),
+            (steps[:3] +    # Non-CLB steps and 1 step for CLB 5
+             [steps[4]] +   # One step for CLB 6
+             [steps[6]])    # One step for CLB 7
+        )
+
+
 class OptimizerTests(SynchronousTestCase):
     """Tests for :func:`optimize_steps`."""
+
+    def test_filters_clb_types(self):
+        """
+        Only one CLB step is returned per CLB
+        """
+        steps = pbag([
+            AddNodesToCLB(
+                lb_id='5',
+                address_configs=s(('1.1.1.1',
+                                   CLBDescription(lb_id='5', port=80)))),
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
+            # Unoptimizable step
+            CreateServer(server_config=pmap({})),
+        ])
+        # returned steps could be pbag of any of the 2 lists below depending
+        # on how `one_clb_step` iterates over the steps. Since it is pbag the
+        # order of elements is not guaranteed
+        list1 = [
+            AddNodesToCLB(
+                lb_id='5',
+                address_configs=s(
+                    ('1.1.1.1', CLBDescription(lb_id='5', port=80)))),
+            CreateServer(server_config=pmap({}))
+        ]
+        list2 = [
+            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
+            CreateServer(server_config=pmap({}))
+        ]
+        self.assertEqual(
+            matches(MatchesAny(Equals(pbag(list1)), Equals(pbag(list2)))),
+            optimize_steps(steps)
+        )
 
     def test_optimize_clb_adds(self):
         """
@@ -221,7 +319,7 @@ class OptimizerTests(SynchronousTestCase):
                 lb_id='5',
                 address_configs=s(('1.1.1.1',
                                    CLBDescription(lb_id='5', port=80)))),
-            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
+            RemoveNodesFromCLB(lb_id='6', node_ids=s('1')),
             CreateServer(server_config=pmap({})),
             BulkRemoveFromRCv3(lb_node_pairs=pset([("lb-1", "node-a")])),
             BulkAddToRCv3(lb_node_pairs=pset([("lb-2", "node-b")]))
@@ -256,10 +354,8 @@ class OptimizerTests(SynchronousTestCase):
                 lb_id='6',
                 address_configs=s(('1.1.1.2',
                                    CLBDescription(lb_id='6', port=80)))),
-            RemoveNodesFromCLB(lb_id='5', node_ids=s('1')),
-            RemoveNodesFromCLB(lb_id='5', node_ids=s('2')),
-            RemoveNodesFromCLB(lb_id='6', node_ids=s('3')),
-            RemoveNodesFromCLB(lb_id='6', node_ids=s('4')),
+            RemoveNodesFromCLB(lb_id='7', node_ids=s('1')),
+            RemoveNodesFromCLB(lb_id='7', node_ids=s('2')),
 
             # Unoptimizable steps
             CreateServer(server_config=pmap({})),
@@ -281,8 +377,7 @@ class OptimizerTests(SynchronousTestCase):
                                        CLBDescription(lb_id='6', port=80)),
                                       ('1.1.1.2',
                                        CLBDescription(lb_id='6', port=80)))),
-                RemoveNodesFromCLB(lb_id='5', node_ids=s('1', '2')),
-                RemoveNodesFromCLB(lb_id='6', node_ids=s('3', '4')),
+                RemoveNodesFromCLB(lb_id='7', node_ids=s('1', '2')),
 
                 # Unoptimizable steps
                 CreateServer(server_config=pmap({}))

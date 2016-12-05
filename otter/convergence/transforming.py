@@ -16,6 +16,7 @@ from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
     BulkRemoveFromRCv3,
+    ChangeCLBNode,
     CreateServer,
     CreateStack,
     RemoveNodesFromCLB)
@@ -91,6 +92,26 @@ _register_bulk_rcv3_optimizer(BulkAddToRCv3)
 _register_bulk_rcv3_optimizer(BulkRemoveFromRCv3)
 
 
+def one_clb_step(steps):
+    """
+    Allow only one CLB mutating step per CLB since calling only one will be
+    allowed in CLB while others will get PENDING_UPDATE.
+
+    :param steps: Iterable of :obj:`IStep` instances
+    :return: Iterable of :obj:`IStep` instances such that only one mutating
+        step is returned per CLB
+    """
+    # set of loadbalancer IDs whose step has been returned
+    seen_lbids = set()
+    for step in steps:
+        if isinstance(step, (AddNodesToCLB, RemoveNodesFromCLB,
+                             ChangeCLBNode)):
+            if step.lb_id in seen_lbids:
+                continue
+            seen_lbids.add(step.lb_id)
+        yield step
+
+
 def optimize_steps(steps):
     """
     Optimize steps.
@@ -112,7 +133,7 @@ def optimize_steps(steps):
     unoptimizable = steps_by_type.pop("unoptimizable", [])
     omg_optimized = concat(_optimizers[step_type](steps)
                            for step_type, steps in steps_by_type.iteritems())
-    return pbag(concatv(omg_optimized, unoptimizable))
+    return pbag(one_clb_step(concatv(omg_optimized, unoptimizable)))
 
 
 _DEFAULT_STEP_LIMITS = pmap({
