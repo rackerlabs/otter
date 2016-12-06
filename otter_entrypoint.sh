@@ -18,9 +18,9 @@ then
     CASS_PORT=$(echo $CASS_HOSTS | cut -d ":" -f 3)
     dockerize -wait tcp://${CASS_HOST}:${CASS_PORT} -wait tcp://${ZK_HOSTS} -timeout 60s
     load_zk.py ${ZK_HOSTS}
-    load_cql.py /otterapp/schema/setup \
+    load_cql.py /app/schema/setup \
 		--ban-unsafe \
-		--outfile /otterapp/schema/setup-dev.cql \
+		--outfile /app/schema/setup-dev.cql \
 		--replication 1 \
 		--keyspace otter \
 		--host ${CASS_HOST} \

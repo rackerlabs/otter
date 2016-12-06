@@ -8,13 +8,13 @@ ENV DOCKERIZE_VERSION v0.2.0
 RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
     && tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
 
-WORKDIR /otterapp 
+WORKDIR /app
 COPY setup.py ./
 COPY otter/ ./otter
 COPY scripts/ ./scripts
 COPY twisted/ ./twisted
 COPY schema/ ./schema
-RUN pip install -e /otterapp
+RUN pip install -e .
 
 # Customize config.json
 WORKDIR /

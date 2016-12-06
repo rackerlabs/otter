@@ -15,7 +15,9 @@ services:
             URL_ROOT: "http://otter:9000"
             BOOTSTRAP: "yes"
         volumes:
-            - .:/otterapp
+            - ./otter:/app/otter
+            - ./scripts:/app/scripts
+            - ./twisted:/app/twisted
     db:
         image: cassandra:2.1
     zk:
