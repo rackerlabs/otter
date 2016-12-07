@@ -43,7 +43,9 @@ services:
             - otter
             - mimic
     trial:
-        image: otter
+        build: .
+        volumes:
+            - ./otter:/app/otter
         environment:
             - AS_USERNAME=jenkins_user
             - AS_PASSWORD=jenkins_password
