@@ -25,7 +25,7 @@ services:
         ports:
             - "2181:2181"
     mimic: 
-        build: mimic/
+        build: https://github.com/rackerlabs/mimic.git#f317ee5d322aa7cb2b117e2984dfe8ef10558cd5
     cafe:
         build:
             dockerfile: cafe_Dockerfile
