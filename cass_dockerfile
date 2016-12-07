@@ -1,4 +1,0 @@
-FROM cassandra:2.1
-
-COPY schema/setup-dev.cql /
-RUN cqlsh -f /setup-dev.cql
