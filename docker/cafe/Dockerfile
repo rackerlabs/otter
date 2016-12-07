@@ -15,10 +15,10 @@ ENV DOCKERIZE_VERSION v0.2.0
 RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
     && tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
 
-COPY dev-convergence.config /root/.cloudcafe/configs/autoscale/dev-convergence.config
-COPY dev-worker.config /root/.cloudcafe/configs/autoscale/dev-worker.config
+COPY docker/cafe/dev-convergence.config /root/.cloudcafe/configs/autoscale/dev-convergence.config
+COPY docker/cafe/dev-worker.config /root/.cloudcafe/configs/autoscale/dev-worker.config
 
-COPY cafe_entrypoint.sh /
+COPY docker/cafe/docker_entrypoint.sh /
 
-ENTRYPOINT ["/cafe_entrypoint.sh"]
+ENTRYPOINT ["/docker_entrypoint.sh"]
 CMD ["dev-convergence", "-l", "tests"]

@@ -1,7 +1,9 @@
 version: '2'
 services: 
     otter: 
-        build: .
+        build: 
+            context: .
+            dockerfile: docker/otter/Dockerfile
         ports:
             - "9000:9000"
         depends_on:
@@ -28,8 +30,8 @@ services:
         build: https://github.com/rackerlabs/mimic.git#f317ee5d322aa7cb2b117e2984dfe8ef10558cd5
     cafe:
         build:
-            dockerfile: cafe_Dockerfile
             context: .
+            dockerfile: docker/cafe/Dockerfile
         environment:
             - OTTER_ROOT=http://otter:9000
             - IDENTITY_ROOT=http://mimic:8900
@@ -43,7 +45,9 @@ services:
             - otter
             - mimic
     trial:
-        build: .
+        build: 
+            context: .
+            dockerfile: docker/otter/Dockerfile
         volumes:
             - ./otter:/app/otter
         environment:

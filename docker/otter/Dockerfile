@@ -19,8 +19,8 @@ RUN pip install -e .
 # Customize config.json
 WORKDIR /
 COPY config.example.json /
-COPY otter_entrypoint.sh /
-ENTRYPOINT ["/otter_entrypoint.sh"]
+COPY docker/otter/docker_entrypoint.sh /
+ENTRYPOINT ["/docker_entrypoint.sh"]
 
 EXPOSE 9000
 ENV PYRSISTENT_NO_C_EXTENSION true
