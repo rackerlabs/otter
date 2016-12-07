@@ -154,7 +154,7 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         def perform_update_tuple(disp, intent):
             self.assertEqual(
                 intent,
-                ('cacheistidgid', dt, [{'id': 'a'}], True))
+                ('cacheistidgid', dt, [{'id': 'a'}]))
 
         disp = ComposedDispatcher([
             TypeDispatcher({tuple: perform_update_tuple}),

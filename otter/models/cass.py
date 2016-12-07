@@ -1831,43 +1831,57 @@ class CassScalingGroupServersCache(object):
 
         yield do_return((list(rfunc(rows)), last_update))
 
-    def insert_servers(self, last_update, servers, clear_others):
+    @do
+    def update_servers(self, time, servers):
         """
-        See :method:`IScalingGroupServersCache.insert_servers`
-        """
-        if len(servers) == 0:
-            if clear_others:
-                return self.delete_servers()
-            else:
-                return Effect(Constant(None))
-        query = ('INSERT INTO {cf} ("tenantId", "groupId", last_update, '
-                 'server_id, server_blob, server_as_active) '
-                 'VALUES(:tenantId, :groupId, :last_update, :server_id{i}, '
-                 ':server_blob{i}, :server_as_active{i});')
-        params = merge(self.params, {"last_update": last_update})
-        queries = []
-        for i, server in enumerate(servers):
-            params['server_id{}'.format(i)] = server['id']
-            params['server_as_active{}'.format(i)] = server.pop(
-                '_is_as_active', False)
-            params['server_blob{}'.format(i)] = json.dumps(server)
-            queries.append(query.format(cf=self.table, i=i))
-        if clear_others:
-            return self.delete_servers().on(
-                lambda _: cql_eff(
-                    batch(queries, get_client_ts(self.clock)), params))
-        else:
-            return cql_eff(batch(queries, get_client_ts(self.clock)), params)
+        See :method:`IScalingGroupServersCache.update_servers`
 
-    def delete_servers(self):
+        This implementation makes two important assumptions which needs to be
+        taken care by caller:
+        - It is not re-entrant for a given object; i.e a call to this must
+          be returned before another can be made
+        - `time` must be higher for subsequent calls.
+        """
+        # get current servers
+        current, last_update = yield self.get_servers()
+        if last_update is not None and time <= last_update:
+            raise ValueError(
+                "Given time arg {} must be greater than time of earlier "
+                "inserted servers {}".format(time, last_update))
+
+        # Insert new ones
+        if servers:
+            query = ('INSERT INTO {cf} ("tenantId", "groupId", last_update, '
+                     'server_id, server_blob, server_as_active) '
+                     'VALUES(:tenantId, :groupId, :last_update, :server_id{i},'
+                     ' :server_blob{i}, :server_as_active{i});')
+            params = merge(self.params, {"last_update": time})
+            queries = []
+            for i, server in enumerate(servers):
+                params['server_id{}'.format(i)] = server['id']
+                params['server_as_active{}'.format(i)] = server.pop(
+                    '_is_as_active', False)
+                params['server_blob{}'.format(i)] = json.dumps(server)
+                queries.append(query.format(cf=self.table, i=i))
+            yield cql_eff(batch(queries, get_client_ts(self.clock)), params)
+
+        # Delete earlier fetched servers
+        if last_update:
+            yield self.delete_servers(last_update, current)
+
+    def delete_servers(self, time, servers):
         """
         See :method:`IScalingGroupServersCache.delete_servers`
         """
-        query = ('DELETE FROM {cf} USING TIMESTAMP :ts '
-                 'WHERE "tenantId"=:tenantId AND "groupId"=:groupId')
-        return cql_eff(
-            query.format(cf=self.table),
-            merge(self.params, {"ts": get_client_ts(self.clock)}))
+        query = ('DELETE FROM {cf} '
+                 'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
+                 'AND last_update=:last_update AND server_id=:server_id{i};')
+        params = merge(self.params, {"last_update": time})
+        queries = []
+        for i, server in enumerate(servers):
+            params['server_id{}'.format(i)] = server['id']
+            queries.append(query.format(cf=self.table, i=i))
+        return cql_eff(batch(queries, get_client_ts(self.clock)), params)
 
 
 @implementer(IAdmin)

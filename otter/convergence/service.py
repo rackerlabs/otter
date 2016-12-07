@@ -348,7 +348,7 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
     # Handle the status from execution
     if worst_status == StepResult.SUCCESS:
         result = yield convergence_succeeded(
-            executor, scaling_group, group_state, resources, now_dt)
+            executor, scaling_group, group_state, resources)
     elif worst_status == StepResult.FAILURE:
         result = yield convergence_failed(tenant_id, group_id, reasons)
     elif worst_status is StepResult.LIMITED_RETRY:
@@ -376,8 +376,7 @@ def update_stacks_cache(scaling_group, now, stacks, include_deleted=True):
 
 
 @do
-def convergence_succeeded(executor, scaling_group, group_state, resources,
-                          now):
+def convergence_succeeded(executor, scaling_group, group_state, resources):
     """
     Handle convergence success
     """
@@ -392,6 +391,7 @@ def convergence_succeeded(executor, scaling_group, group_state, resources,
         yield cf_msg('group-status-active',
                      status=ScalingGroupStatus.ACTIVE.name)
     # update servers cache with latest servers
+    now = yield Effect(Func(datetime.utcnow))
     yield executor.update_cache(scaling_group, now, include_deleted=False,
                                 **resources)
     yield do_return(ConvergenceIterationStatus.Stop())

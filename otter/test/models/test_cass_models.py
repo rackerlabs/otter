@@ -5,7 +5,7 @@ import itertools
 import json
 from collections import namedtuple
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import partial
 
 from effect import (
@@ -72,8 +72,11 @@ from otter.test.util.test_zk import ZKCrudModel, create_fake_lock
 from otter.test.utils import (
     DummyException,
     LockMixin,
+    const,
+    intent_func,
     matches,
     mock_log,
+    noop,
     patch,
     test_dispatcher)
 from otter.util.config import set_config_data
@@ -3814,7 +3817,10 @@ class CassGroupServersCacheTests(SynchronousTestCase):
               "server_as_active": True}],
             ([{"d": "e"}], self.dt))
 
-    def _test_insert_servers(self, eff, ts=2500000):
+    def _insert_servers_tuple(self, dt, ts=2500000):
+        """
+        Return (intent, performer) tuple for executing CQL to insert servers
+        """
         query = (
             'BEGIN BATCH USING TIMESTAMP {} '
             'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
@@ -3830,60 +3836,82 @@ class CassGroupServersCacheTests(SynchronousTestCase):
              "server_as_active0": True,
              "server_id1": "b", "server_blob1": '{"id": "b"}',
              "server_as_active1": False,
-             "last_update": self.dt})
-        self.assertEqual(eff, cql_eff(query, self.params))
-        self.assertEqual(resolve_effect(eff, None), None)
+             "last_update": dt})
+        return (cql_eff(query, self.params).intent, noop)
 
-    def test_insert_servers(self):
+    def test_update_servers_all_empty(self):
         """
-        `insert_servers` issues query to insert server as json blobs
+        :func:`update_servers` gets current servers and does nothing if new
+        servers are empty
         """
-        eff = self.cache.insert_servers(
-            self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}],
-            clear_others=False)
-        self._test_insert_servers(eff)
+        self.cache.get_servers = intent_func("gs")
+        seq = [(("gs",), const(([], None)))]
+        eff = self.cache.update_servers(self.dt, [])
+        self.assertIsNone(perform_sequence(seq, eff))
 
-    def test_insert_servers_delete(self):
+    def test_update_servers_current_empty(self):
         """
-        `insert_servers` deletes existing caches before inserting
-        when clear_others=True
+        :func:`update_servers` gets current servers, inserts new ones and
+        does nothing if current servers is empty
         """
-        self.cache.delete_servers = lambda: Effect("delete")
-        eff = self.cache.insert_servers(
-            self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}],
-            clear_others=True)
-        self.assertEqual(eff.intent, "delete")
-        self.clock.advance(1)
-        eff = resolve_effect(eff, None)
-        self._test_insert_servers(eff, 3500000)
+        self.cache.get_servers = intent_func("gs")
+        seq = [
+            (("gs",), const(([], None))),
+            self._insert_servers_tuple(self.dt)
+        ]
+        eff = self.cache.update_servers(
+            self.dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}])
+        self.assertIsNone(perform_sequence(seq, eff))
 
-    def test_insert_empty(self):
+    def test_update_servers(self):
         """
-        `insert_servers` does nothing if called with empty servers list
+        :func:`update_servers` gets current servers, inserts new ones and
+        deletes fetched servers
         """
-        self.assertEqual(
-            self.cache.insert_servers(self.dt, [], clear_others=False),
-            Effect(Constant(None)))
+        self.cache.get_servers = intent_func("gs")
+        self.cache.delete_servers = intent_func("ds")
+        got_servers = [{"id": "ga"}, {"id": "gb"}]
+        new_dt = self.dt + timedelta(seconds=2)
+        seq = [
+            (("gs",), const((got_servers, self.dt))),
+            self._insert_servers_tuple(dt=new_dt),
+            (("ds", self.dt, got_servers), noop)
+        ]
+        eff = self.cache.update_servers(
+            new_dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}])
+        self.assertIsNone(perform_sequence(seq, eff))
 
-    def test_insert_empty_delete(self):
+    def test_update_servers_errors(self):
         """
-        `insert_servers` deletes servers when clear_others=True and does
-        nothing if passed list is empty
+        :func:`update_servers` errors if given time is lesser than last udpated
+        time
         """
-        self.cache.delete_servers = lambda: Effect("delete")
-        eff = self.cache.insert_servers(self.dt, [], clear_others=True)
-        self.assertEqual(eff.intent, "delete")
-        self.assertIsNone(resolve_effect(eff, None))
+        self.cache.get_servers = intent_func("gs")
+        time = self.dt - timedelta(seconds=2)
+        seq = [(("gs",), const(([{"id": "ga"}], self.dt)))]
+        eff = self.cache.update_servers(time, [{"id": "a"}])
+        self.assertRaises(ValueError, perform_sequence, seq, eff)
+
+    #def server(self, id,
 
     def test_delete_servers(self):
         """
-        `delete_servers` issues query to delete the whole cache
+        :func:`delete_servers` issues query to delete given servers
         """
-        self.assertEqual(
-            self.cache.delete_servers(),
-            cql_eff(('DELETE FROM servers_cache USING TIMESTAMP :ts WHERE '
-                     '"tenantId"=:tenantId AND "groupId"=:groupId'),
-                    merge(self.params, {"ts": 2500000})))
+        servers = [{"id": "a", "anything": "d"}, {"id": "b", "anything": "b"}]
+        query = (
+            'BEGIN BATCH USING TIMESTAMP 2500000 '
+            'DELETE FROM servers_cache WHERE "tenantId"=:tenantId AND '
+            '"groupId"=:groupId AND last_update=:last_update AND '
+            'server_id=:server_id0; '
+            'DELETE FROM servers_cache WHERE "tenantId"=:tenantId AND '
+            '"groupId"=:groupId AND last_update=:last_update AND '
+            'server_id=:server_id1; '
+            'APPLY BATCH;')
+        self.params.update(
+            {"server_id0": "a", "server_id1": "b", "last_update": self.dt})
+        eff = self.cache.delete_servers(self.dt, servers)
+        self.assertEqual(eff, cql_eff(query, self.params))
 
 
 class CassAdminTestCase(SynchronousTestCase):

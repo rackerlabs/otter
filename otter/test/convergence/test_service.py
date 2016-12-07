@@ -2,7 +2,7 @@ import sys
 import time
 import traceback
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import attr
 
@@ -66,6 +66,7 @@ from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
     CheckFailureValue, FakePartitioner,
     TestStep,
+    const,
     conste,
     intent_func,
     match_all,
@@ -885,14 +886,16 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.lb_nodes = ()
         for serv in self.servers:
             serv.desired_lbs = pset()
+        success_cache_update_time = self.now + timedelta(seconds=2)
         sequence = [
             parallel_sequence([]),
             (Log('execute-convergence', mock.ANY), noop),
             (Log('execute-convergence-results',
                  {'results': [], 'worst_status': 'SUCCESS'}), noop),
             clean_waiting(self.waiting, self.group_id),
+            (Func(datetime.utcnow), const(success_cache_update_time)),
             (UpdateServersCache(
-                "tenant-id", "group-id", self.now,
+                "tenant-id", "group-id", success_cache_update_time,
                 [thaw(self.servers[0].json.set('_is_as_active', True)),
                  thaw(self.servers[1].json.set("_is_as_active", True))]),
              noop)
@@ -918,6 +921,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             desired_lbs=self.desired_lbs,
             links=freeze([{'href': 'link3', 'rel': 'self'}]))
         self.servers += (deleted,)
+        success_cache_update_time = self.now + timedelta(seconds=2)
 
         steps = [
             TestStep(
@@ -949,8 +953,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                   'worst_status': 'SUCCESS'}), noop),
             clean_waiting(self.waiting, self.group_id),
             # Note that servers arg is non-deleted servers
+            (Func(datetime.utcnow), const(success_cache_update_time)),
             (UpdateServersCache(
-                "tenant-id", "group-id", self.now,
+                "tenant-id", "group-id", success_cache_update_time,
                 [thaw(self.servers[0].json.set("_is_as_active", True)),
                  thaw(self.servers[1].json.set("_is_as_active", True))]),
              noop)
@@ -1232,6 +1237,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         group is put back into ACTIVE.
         """
         self.manifest['state'].status = ScalingGroupStatus.ERROR
+        success_cache_update_time = self.now + timedelta(seconds=2)
 
         def plan(*args, **kwargs):
             return pbag([TestStep(Effect("step"))])
@@ -1250,8 +1256,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (Log('group-status-active',
                  dict(cloud_feed=True, status='ACTIVE')),
              noop),
+            (Func(datetime.utcnow), const(success_cache_update_time)),
             (UpdateServersCache(
-                "tenant-id", "group-id", self.now,
+                "tenant-id", "group-id", success_cache_update_time,
                 [thaw(self.servers[0].json.set('_is_as_active', True)),
                  thaw(self.servers[1].json.set('_is_as_active', True))]),
              noop),
@@ -1269,6 +1276,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
         self.lb_nodes = ()
         for serv in self.servers:
             serv.desired_lbs = pset()
+        success_cache_update_time = self.now + timedelta(seconds=2)
         sequence = [
             parallel_sequence([]),
             (Log(msg='execute-convergence', fields=mock.ANY), noop),
@@ -1280,8 +1288,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (Log('group-status-active',
                  dict(cloud_feed=True, status='ACTIVE')),
              noop),
+            (Func(datetime.utcnow), const(success_cache_update_time)),
             (UpdateServersCache(
-                "tenant-id", "group-id", self.now,
+                "tenant-id", "group-id", success_cache_update_time,
                 [thaw(self.servers[0].json.set("_is_as_active", True)),
                  thaw(self.servers[1].json.set("_is_as_active", True))]),
              noop)
@@ -1391,6 +1400,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             return []
 
         self.waiting = Reference(pmap({self.group_id: 43}))
+        success_cache_update_time = self.now + timedelta(seconds=2)
         sequence = [
             parallel_sequence([]),
             (Log('execute-convergence', mock.ANY), noop),
@@ -1399,8 +1409,9 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                              match_func(pmap({self.group_id: 43}),
                                         pmap())),
              dispatch(reference_dispatcher)),
+            (Func(datetime.utcnow), const(success_cache_update_time)),
             (UpdateServersCache(
-                "tenant-id", "group-id", self.now,
+                "tenant-id", "group-id", success_cache_update_time,
                 [thaw(self.servers[0].json.set("_is_as_active", True)),
                  thaw(self.servers[1].json.set("_is_as_active", True))]),
              noop)

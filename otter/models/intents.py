@@ -111,7 +111,7 @@ class UpdateServersCache(object):
 def perform_update_servers_cache(disp, intent):
     """ Perform :obj:`UpdateServersCache` """
     cache = CassScalingGroupServersCache(intent.tenant_id, intent.group_id)
-    return cache.insert_servers(intent.time, intent.servers, True)
+    return cache.update_servers(intent.time, intent.servers)
 
 
 @attr.s

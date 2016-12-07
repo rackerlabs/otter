@@ -650,24 +650,28 @@ class IScalingGroupServersCache(Interface):
         :rtype: Effect
         """
 
-    def insert_servers(last_update, servers, clear_others):
+    def update_servers(time, servers):
         """
-        Update the servers cache of the group with last update time
+        Update the servers cache of the group with given list of servers
 
-        :param datetime last_update: Update time of the cache
+        :param datetime time: Update time of the cache
         :param list servers: List of server dicts with optional "_is_as_active"
             field with boolean value to represent if this server has become
             active from autoscale's perpective. This field will be popped
             before storing the blob
-        :param bool clear_others: Should any other cache from a different
-            update_time be deleted?
 
         :return: Effect of None
         """
 
-    def delete_servers():
+    def delete_servers(time, servers):
         """
-        Remove all servers of the group
+        Remove given servers of the group cache
+
+        :param datetime time: Update time of the cache
+        :param list servers: List of server dicts with optional "_is_as_active"
+            field with boolean value to represent if this server has become
+            active from autoscale's perpective. This field will be popped
+            before storing the blob
         """
 
 
