@@ -35,7 +35,8 @@ services:
             - IDENTITY_ROOT=http://mimic:8900
             - WAIT=yes
         volumes:
-            - .:/cafe
+            - ./autoscale_cloudroast/test_repo:/cafe/autoscale_cloudroast/test_repo
+            - ./autoscale_cloudcafe/autoscale_fixtures:/cafe/autoscale_cloudcafe/autoscale_fixtures
         command:
             dev-convergence -p functional
         depends_on:
