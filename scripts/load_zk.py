@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+"""
+Create all the necessary znodes in Zookeeper to get otter up and running.
+Takes ZK hosts as argument.
+"""
+
 import sys
 
 from kazoo.client import KazooClient
