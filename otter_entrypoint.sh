@@ -2,12 +2,15 @@
 
 set -e
 
-export IDENTITY_URL=${IDENTITY_URL:-"http://localhost:8900/v2.0"}
-export CASS_HOSTS=${CASS_HOSTS:-"tcp:localhost:9160"}
-export ZK_HOSTS=${ZK_HOSTS:-"localhost:2181"}
-export URL_ROOT=${URL_ROOT:-"http://localhost:9000"}
+export IDENTITY_URL=${IDENTITY_URL:-"http://mimic:8900/v2.0"}
+export CASS_HOSTS=${CASS_HOSTS:-"tcp:db:9160"}
+export ZK_HOSTS=${ZK_HOSTS:-"zk:2181"}
+export URL_ROOT=${URL_ROOT:-"http://otter:9000"}
 
-cust_conf.py config.example.json > /etc/otter.json
+# Generate config if it is not already there
+if [ ! -f /etc/otter.json ]; then
+    cust_conf.py config.example.json > /etc/otter.json
+fi
 
 # init CASS schema and ZK nodes if needed
 if [ -n "$BOOTSTRAP" ]
