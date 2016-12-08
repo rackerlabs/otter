@@ -6,6 +6,7 @@ from sumtypes import match
 
 from toolz.functoolz import identity
 
+from otter.auth import NoSuchEndpoint
 from otter.cloud_client import (
     CLBDeletedError,
     CLBNodeLimitError,
@@ -81,6 +82,13 @@ def _present_server_configuration_error(exception):
 @_present_exception.register(CreateServerOverQuoteError)
 def _present_server_over_limit_error(exception):
     return "Servers cannot be created: {0}".format(exception.message)
+
+
+@_present_exception.register(NoSuchEndpoint)
+def _present_no_such_endpoint(exception):
+    fmt = ("Could not locate service {} in the service catalog. "
+           "Please check if your account is still active.")
+    return fmt.format(exception.service_name)
 
 
 @match(ErrorReason)

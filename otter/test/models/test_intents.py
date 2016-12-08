@@ -166,9 +166,9 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
         Performing :obj:`UpdateGroupErrorReasons` calls `update_error_reasons`
         """
         self.group.update_error_reasons.return_value = None
-        intent = UpdateGroupErrorReasons(self.group, ['r1', 'r2'])
-        dispatcher = self.get_dispatcher(self.get_store())
-        self.assertIsNone(sync_perform(dispatcher, Effect(intent)))
+        eff = Effect(UpdateGroupErrorReasons('t', 'g', ['r1', 'r2']))
+        result = self.perform_with_group(eff, (self.log, 't', 'g'), self.group)
+        self.assertIsNone(result)
         self.group.update_error_reasons.assert_called_once_with(['r1', 'r2'])
 
     def test_modify_group_state_paused(self):

@@ -92,7 +92,7 @@ from hashlib import sha1
 
 import attr
 
-from effect import Constant, Effect, Func, parallel
+from effect import Constant, Effect, FirstError, Func, parallel
 from effect.do import do, do_return
 from effect.ref import Reference
 
@@ -124,6 +124,7 @@ from otter.convergence.gathering import (get_all_launch_server_data,
 from otter.convergence.logging import log_steps
 from otter.convergence.model import (
     ConvergenceIterationStatus,
+    ErrorReason,
     ServerState,
     StepResult)
 from otter.convergence.planning import plan_launch_server, plan_launch_stack
@@ -314,12 +315,19 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
 
     # Gather data
     now_dt = yield Effect(Func(datetime.utcnow))
-    all_data = yield msg_with_time(
-        "gather-convergence-data",
-        convergence_exec_data(tenant_id, group_id, now_dt,
-                              get_executor=get_executor))
-    (executor, scaling_group, group_state, desired_group_state,
-     resources) = all_data
+    try:
+        all_data = yield msg_with_time(
+            "gather-convergence-data",
+            convergence_exec_data(tenant_id, group_id, now_dt,
+                                  get_executor=get_executor))
+        (executor, scaling_group, group_state, desired_group_state,
+         resources) = all_data
+    except FirstError as fe:
+        if fe.exc_info[0] is NoSuchEndpoint:
+            result = yield convergence_failed(
+                tenant_id, group_id, [ErrorReason.Exception(fe.exc_info)])
+            yield do_return(result)
+        raise fe
 
     # prepare plan
     steps = executor.plan(desired_group_state, datetime_to_epoch(now_dt),
@@ -342,7 +350,7 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
         result = yield convergence_succeeded(
             executor, scaling_group, group_state, resources, now_dt)
     elif worst_status == StepResult.FAILURE:
-        result = yield convergence_failed(scaling_group, reasons)
+        result = yield convergence_failed(tenant_id, group_id, reasons)
     elif worst_status is StepResult.LIMITED_RETRY:
         # We allow further iterations to proceed as long as we haven't been
         # waiting for a LIMITED_RETRY for N consecutive iterations.
@@ -351,7 +359,8 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
             yield msg('converge-limited-retry-too-long')
             yield clean_waiting
             # Prefix "Timed out" to all limited retry reasons
-            result = yield convergence_failed(scaling_group, reasons, True)
+            result = yield convergence_failed(tenant_id, group_id, reasons,
+                                              True)
         else:
             yield waiting.modify(
                 lambda group_iterations:
@@ -389,16 +398,20 @@ def convergence_succeeded(executor, scaling_group, group_state, resources,
 
 
 @do
-def convergence_failed(scaling_group, reasons, timedout=False):
+def convergence_failed(tenant_id, group_id, reasons, timedout=False):
     """
     Handle convergence failure
 
-    :param scaling_group: :obj:`IScalingGroup` object
+    :param str tenant_id: Tenant ID
+    :param str group_id: Group ID
     :param reasons: List of :obj:`ErrorReason` objects
     :param bool timedout: Has convergence failed due to reason timing out?
+
+    :return: convergence execution status
+    :rtype: :obj:`ConvergenceIterationStatus`
     """
-    yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
-                                   status=ScalingGroupStatus.ERROR))
+    yield Effect(LoadAndUpdateGroupStatus(tenant_id, group_id,
+                                          ScalingGroupStatus.ERROR))
     presented_reasons = sorted(present_reasons(reasons))
     if len(presented_reasons) == 0:
         presented_reasons = [u"Unknown error occurred"]
@@ -408,7 +421,8 @@ def convergence_failed(scaling_group, reasons, timedout=False):
     yield cf_err(
         'group-status-error', status=ScalingGroupStatus.ERROR.name,
         reasons=presented_reasons)
-    yield Effect(UpdateGroupErrorReasons(scaling_group, presented_reasons))
+    yield Effect(UpdateGroupErrorReasons(tenant_id, group_id,
+                                         presented_reasons))
     yield do_return(ConvergenceIterationStatus.Stop())
 
 
@@ -585,7 +599,7 @@ def converge_one_group(currently_converging, recently_converged, waiting,
     except ConcurrentError:
         # We don't need to spam the logs about this, it's to be expected
         return
-    except (NoSuchScalingGroupError, NoSuchEndpoint):
+    except NoSuchScalingGroupError:
         # NoSuchEndpoint occurs on a suspended or closed account
         yield err(None, 'converge-fatal-error')
         yield _clean_waiting(waiting, group_id)

@@ -119,13 +119,15 @@ class UpdateGroupErrorReasons(object):
     """
     Intent to update group's error reasons
     """
-    group = attr.ib()
+    tenant_id = attr.ib()
+    group_id = attr.ib()
     reasons = attr.ib()
 
 
 @deferred_performer
-def perform_update_error_reasons(disp, intent):
-    return intent.group.update_error_reasons(intent.reasons)
+def perform_update_error_reasons(log, store, disp, intent):
+    group = store.get_scaling_group(log, intent.tenant_id, intent.group_id)
+    return group.update_error_reasons(intent.reasons)
 
 
 @attr.s
@@ -157,7 +159,8 @@ def get_model_dispatcher(log, store):
         LoadAndUpdateGroupStatus:
             partial(perform_load_and_update_group_status, log, store),
         UpdateServersCache: perform_update_servers_cache,
-        UpdateGroupErrorReasons: perform_update_error_reasons,
+        UpdateGroupErrorReasons:
+            partial(perform_update_error_reasons, log, store),
         ModifyGroupStatePaused: perform_modify_group_state_paused,
         GetAllValidGroups: partial(perform_get_all_valid_groups, store),
     })

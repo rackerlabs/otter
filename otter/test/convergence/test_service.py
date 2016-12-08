@@ -7,8 +7,8 @@ from datetime import datetime
 import attr
 
 from effect import (
-    ComposedDispatcher, Effect, Error, Func, base_dispatcher, raise_,
-    sync_perform)
+    ComposedDispatcher, Effect, Error, FirstError, Func, base_dispatcher,
+    raise_, sync_perform)
 from effect.ref import (
     ModifyReference, ReadReference, Reference, reference_dispatcher)
 from effect.testing import (
@@ -66,6 +66,7 @@ from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
     CheckFailureValue, FakePartitioner,
     TestStep,
+    conste,
     intent_func,
     match_all,
     match_func,
@@ -397,6 +398,13 @@ class ConvergeOneGroupTests(SynchronousTestCase):
         """
         When fatal error occurs, it is logged and divergent flag is deleted
         """
+
+    def test_scaling_group_disappears(self):
+        """
+        When the scaling group disappears, a fatal error is logged and the
+        dirty flag is cleaned up.
+        """
+        expected_error = NoSuchScalingGroupError(self.tenant_id, self.group_id)
         sequence = [
             (self._exec_intent, lambda i: raise_(expected_error)),
             (LogErr(CheckFailureValue(expected_error),
@@ -404,22 +412,6 @@ class ConvergeOneGroupTests(SynchronousTestCase):
              noop),
         ] + self._clean_divergent()
         self._verify_sequence(sequence)
-
-    def test_scaling_group_disappears(self):
-        """
-        When the scaling group disappears, a fatal error is logged and the
-        dirty flag is cleaned up.
-        """
-        self._test_fatal_error(
-            NoSuchScalingGroupError(self.tenant_id, self.group_id))
-
-    def test_no_such_endpoint(self):
-        """
-        When execution errors with NoSuchEndpoint, a fatal error is logged and
-        the dirty flag is cleaned up.
-        """
-        self._test_fatal_error(
-            NoSuchEndpoint(service_name="servers", region="DFW"))
 
     def test_unexpected_errors(self):
         """
@@ -1149,8 +1141,8 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             clean_waiting(self.waiting, self.group_id),
-            (UpdateGroupStatus(scaling_group=self.group,
-                               status=ScalingGroupStatus.ERROR),
+            (LoadAndUpdateGroupStatus(self.tenant_id, self.group_id,
+                                      ScalingGroupStatus.ERROR),
              noop),
             (Log('group-status-error',
                  dict(isError=True, cloud_feed=True, status='ERROR',
@@ -1158,13 +1150,47 @@ class ExecuteConvergenceTests(SynchronousTestCase):
                                'Cloud Load Balancer does not exist: nolb2'])),
              noop),
             (UpdateGroupErrorReasons(
-                self.group,
+                self.tenant_id, self.group_id,
                 ['Cloud Load Balancer does not exist: nolb1',
                  'Cloud Load Balancer does not exist: nolb2']), noop)
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
             ConvergenceIterationStatus.Stop())
+
+    def test_nosuchendpoint(self):
+        """
+        If gathering raises NoSuchEndpoint wrapped in FirstError then
+        convergence fails by marking group as ERROR and reasons updated
+        """
+        exc_info = (NoSuchEndpoint,
+                    NoSuchEndpoint(service_name="nova", region="ORD"),
+                    None)
+        reason = ("Could not locate service nova in the service catalog. "
+                  "Please check if your account is still active.")
+        # Set get_all_launch_config_data to raise FirstError wrapping
+        # NoSuchEndpoint
+        self.gacd_runner = conste(FirstError(exc_info, 0))
+        seq = [
+            (LoadAndUpdateGroupStatus(self.tenant_id, self.group_id,
+                                      ScalingGroupStatus.ERROR),
+             noop),
+            (Log('group-status-error',
+                 dict(isError=True, cloud_feed=True, status='ERROR',
+                      reasons=[reason])),
+             noop),
+            (UpdateGroupErrorReasons(self.tenant_id, self.group_id, [reason]),
+             noop)
+        ]
+        self.assertEqual(
+            perform_sequence(self.get_seq() + seq, self._invoke()),
+            ConvergenceIterationStatus.Stop())
+
+        # Any other error wrapped in FirstError is ignored and propagated
+        exc_info = (ValueError, ValueError(2), None)
+        self.gacd_runner = conste(FirstError(exc_info, 0))
+        self.assertRaises(
+            FirstError, perform_sequence, self.get_seq(), self._invoke())
 
     def test_failure_unknown_reasons(self):
         """
@@ -1185,14 +1211,15 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             ]),
             (Log(msg='execute-convergence-results', fields=mock.ANY), noop),
             clean_waiting(self.waiting, self.group_id),
-            (UpdateGroupStatus(scaling_group=self.group,
-                               status=ScalingGroupStatus.ERROR),
+            (LoadAndUpdateGroupStatus(self.tenant_id, self.group_id,
+                                      ScalingGroupStatus.ERROR),
              noop),
             (Log('group-status-error',
                  dict(isError=True, cloud_feed=True, status='ERROR',
                       reasons=['Unknown error occurred'])),
              noop),
-            (UpdateGroupErrorReasons(self.group, ['Unknown error occurred']),
+            (UpdateGroupErrorReasons(self.tenant_id, self.group_id,
+                                     ['Unknown error occurred']),
              noop)
         ]
         self.assertEqual(
@@ -1314,15 +1341,16 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             (ReadReference(self.waiting), dispatch(reference_dispatcher)),
             (Log('converge-limited-retry-too-long', fields={}), noop),
             clean_waiting(self.waiting, self.group_id),
-            (UpdateGroupStatus(scaling_group=self.group,
-                               status=ScalingGroupStatus.ERROR),
+            (LoadAndUpdateGroupStatus(self.tenant_id, self.group_id,
+                                      ScalingGroupStatus.ERROR),
              noop),
             (Log('group-status-error',
                  dict(isError=True, cloud_feed=True, status='ERROR',
                       reasons=['Timed out: bar', "Timed out: foo"])),
              noop),
-            (UpdateGroupErrorReasons(
-                self.group, ['Timed out: bar', "Timed out: foo"]), noop),
+            (UpdateGroupErrorReasons(self.tenant_id, self.group_id,
+                                     ['Timed out: bar', "Timed out: foo"]),
+             noop),
         ]
         self.assertEqual(
             perform_sequence(self.get_seq() + sequence, self._invoke(plan)),
