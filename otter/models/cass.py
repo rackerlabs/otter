@@ -1843,7 +1843,7 @@ class CassScalingGroupServersCache(object):
         - `time` must be higher for subsequent calls.
         """
         # get current servers
-        current, last_update = yield self.get_servers()
+        current, last_update = yield self.get_servers(False)
         if last_update is not None and time <= last_update:
             raise ValueError(
                 "Given time arg {} must be greater than time of earlier "

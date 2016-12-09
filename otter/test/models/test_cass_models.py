@@ -3845,7 +3845,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         servers are empty
         """
         self.cache.get_servers = intent_func("gs")
-        seq = [(("gs",), const(([], None)))]
+        seq = [(("gs", False), const(([], None)))]
         eff = self.cache.update_servers(self.dt, [])
         self.assertIsNone(perform_sequence(seq, eff))
 
@@ -3856,7 +3856,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         """
         self.cache.get_servers = intent_func("gs")
         seq = [
-            (("gs",), const(([], None))),
+            (("gs", False), const(([], None))),
             self._insert_servers_tuple(self.dt)
         ]
         eff = self.cache.update_servers(
@@ -3873,7 +3873,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         got_servers = [{"id": "ga"}, {"id": "gb"}]
         new_dt = self.dt + timedelta(seconds=2)
         seq = [
-            (("gs",), const((got_servers, self.dt))),
+            (("gs", False), const((got_servers, self.dt))),
             self._insert_servers_tuple(dt=new_dt),
             (("ds", self.dt, got_servers), noop)
         ]
@@ -3888,11 +3888,9 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         """
         self.cache.get_servers = intent_func("gs")
         time = self.dt - timedelta(seconds=2)
-        seq = [(("gs",), const(([{"id": "ga"}], self.dt)))]
+        seq = [(("gs", False), const(([{"id": "ga"}], self.dt)))]
         eff = self.cache.update_servers(time, [{"id": "a"}])
         self.assertRaises(ValueError, perform_sequence, seq, eff)
-
-    #def server(self, id,
 
     def test_delete_servers(self):
         """
