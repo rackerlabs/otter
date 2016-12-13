@@ -76,6 +76,7 @@ from otter.convergence.model import (
     CLBDescription,
     CLBNode,
     CLBNodeCondition,
+    DrainingUnavailable,
     ErrorReason,
     IDrainable,
     RCv3Description,
@@ -111,6 +112,13 @@ class CLBHealthInfoNotFound(Exception):
     Error to be raised when CLB health information is required and is not found
     """
     lb_id = attr.ib()
+
+
+def fail_convergence(excp):
+    """
+    Return `FailConvergence` step with excp in it
+    """
+    return FailConvergence([ErrorReason.Exception((type(excp), excp, None))])
 
 
 def _remove_from_lb_with_draining(timeout, nodes, now):
@@ -396,8 +404,12 @@ def converge_launch_server(desired_state, servers_with_cheese,
             [node for node in load_balancer_nodes if node.matches(server)],
             now)
 
-    scale_down_steps = list(mapcat(drain_and_delete_a_server,
-                                   servers_to_delete + servers[Destiny.DRAIN]))
+    try:
+        scale_down_steps = list(
+                mapcat(drain_and_delete_a_server,
+                       servers_to_delete + servers[Destiny.DRAIN]))
+    except DrainingUnavailable as de:
+        return pbag([fail_convergence(de)])
 
     # delete all servers in error - draining does not need to be
     # handled because servers in error presumably are not serving
@@ -414,18 +426,21 @@ def converge_launch_server(desired_state, servers_with_cheese,
     # converge all the servers that remain to their desired load balancer state
     still_active_servers = filter(lambda s: s not in servers_to_delete,
                                   servers_in_active)
-    lb_converge_steps = [
-        step
-        for server in still_active_servers
-        for step in _converge_lb_state(
-            server,
-            [node for node in load_balancer_nodes if node.matches(server)],
-            load_balancers,
-            now,
-            # Temporarily using build timeout as node offline timeout.
-            # See https://github.com/rackerlabs/otter/issues/1905
-            timeout)
-        ]
+    try:
+        lb_converge_steps = [
+            step
+            for server in still_active_servers
+            for step in _converge_lb_state(
+                server,
+                [node for node in load_balancer_nodes if node.matches(server)],
+                load_balancers,
+                now,
+                # Temporarily using build timeout as node offline timeout.
+                # See https://github.com/rackerlabs/otter/issues/1905
+                timeout)
+            ]
+    except DrainingUnavailable as de:
+        return pbag([fail_convergence(de)])
 
     # Converge again if we expect state transitions on any servers
     converge_later = []
@@ -586,11 +601,8 @@ def add_server_to_lb(server, description, load_balancer):
     if isinstance(description, CLBDescription):
         if server.servicenet_address:
             if load_balancer is None:
-                return FailConvergence([
-                    ErrorReason.Exception(
-                        (CLBHealthInfoNotFound,
-                         CLBHealthInfoNotFound(description.lb_id),
-                         None))])
+                return fail_convergence(
+                    CLBHealthInfoNotFound(description.lb_id))
             if load_balancer.health_monitor:
                 description = assoc_obj(description,
                                         condition=CLBNodeCondition.DRAINING)
@@ -638,11 +650,7 @@ def change_lb_node(node, description, lb, now, timeout):
     if (type(node.description) == type(description) and
             isinstance(description, CLBDescription)):
         if lb is None:
-            return FailConvergence([
-                ErrorReason.Exception(
-                    (CLBHealthInfoNotFound,
-                     CLBHealthInfoNotFound(description.lb_id),
-                     None))])
+            return fail_convergence(CLBHealthInfoNotFound(description.lb_id))
         if (lb.health_monitor and
                 node.description.condition == CLBNodeCondition.DRAINING):
             # Enable node if it is ONLINE
@@ -652,7 +660,9 @@ def change_lb_node(node, description, lb, now, timeout):
                                      condition=CLBNodeCondition.ENABLED,
                                      weight=description.weight,
                                      type=description.type)
-            elif now - node.drained_at > timeout:
+            # For a new node created in DRAINING, drained_at represents
+            # node's creation time.
+            if now - node.drained_at > timeout:
                 rsfmt = ("Node {} has remained OFFLINE for more than "
                          "{} seconds")
                 return FailConvergence(
