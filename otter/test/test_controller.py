@@ -1510,18 +1510,31 @@ class ModifyAndTriggerTests(SynchronousTestCase):
     """
 
     def setUp(self):
-        self.group = util_mock_group("state", "t", "g")
+        self.state = sample_group_state()
+        self.group = util_mock_group(self.state, 'tid', 'gid')
         self.addCleanup(set_config_data, {})
         self.mock_tg = patch(self, "otter.controller.trigger_convergence",
                              side_effect=intent_func("tg"))
         self.logargs = {"a": "b"}
         self.disp = SequenceDispatcher([
             (BoundFields(mock.ANY, self.logargs),
-             nested_sequence([(("tg", "t", "g"), noop)]))
+             nested_sequence([(("tg", "tid", "gid"), noop)]))
         ])
 
     def modify(self, group, state):
         return "newstate"
+
+    def test_tenant_suspended(self):
+        """
+        Raises :obj:`TenantSuspendedError` if associated tenant is suspended.
+        Given modifier function is not called.
+        """
+        self.state.suspended = True
+        d = controller.modify_and_trigger(
+            self.disp, self.group, self.logargs, lambda g, s: 1 / 0)
+        self.failureResultOf(d, controller.TenantSuspendedError)
+        # convergence is not called
+        self.assertFalse(self.disp.consumed())
 
     def test_convergence_tenant(self):
         """
@@ -1546,7 +1559,7 @@ class ModifyAndTriggerTests(SynchronousTestCase):
         Only calls group.modify_state() for worker tenants. Does not trigger
         convergence
         """
-        set_non_conv_tenant("t", self)
+        set_non_conv_tenant("tid", self)
         d = controller.modify_and_trigger(
             self.disp, self.group, self.logargs, self.modify)
         self.assertIsNone(self.successResultOf(d))
