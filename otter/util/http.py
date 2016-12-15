@@ -543,3 +543,15 @@ def try_json_with_keys(maybe_json_error, keys):
         return None
     else:
         return get_in(keys, error_body, None)
+
+
+import six
+
+def text(thing):
+    if six.PY2:
+        if type(thing) is unicode:
+            return thing
+        #print thing, type(thing)
+        return six.u(thing)
+    else:
+        raise NotImplementedError

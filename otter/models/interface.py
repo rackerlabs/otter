@@ -3,89 +3,83 @@ Interface to be used by the scaling groups engine
 """
 from datetime import datetime
 
+import attr
+from attr.validators import instance_of as aiof, optional
+
 from croniter import croniter
+
+import six
 
 from twisted.python.constants import NamedConstant, Names
 
 from zope.interface import Attribute, Interface
 
+from otter.util.http import text
 from otter.util import timestamp
 
 
+class ScalingGroupStatus(Names):
+    """
+    Status of scaling group
+    """
+
+    ACTIVE = NamedConstant()
+    "Group is active and executing policies/converging"
+
+    ERROR = NamedConstant()
+    """
+    Group has errored due to (mostly) invalid launch configuration and has
+    stopped executing policies/converging
+    """
+
+    DELETING = NamedConstant()
+    """
+    Group is getting deleted and all it's resources servers/CLBs
+    are getting deleted
+    """
+
+
+@attr.s
 class GroupState(object):
     """
     Object that represents the state
 
     :ivar bytes tenant_id: the tenant ID of the scaling group whose state this
         object represents
-
     :ivar bytes group_id: the ID of the scaling group whose state this
         object represents
-    :ivar bytes group_name: the name of the scaling group whose state this
+    :ivar group_name: the name of the scaling group whose state this
         object represents
     :ivar dict active: the mapping of active server ids and their info
     :ivar dict pending: the list of pending job ids and their info
-    :ivar bytes group_touched: timezone-aware ISO860 formatted timestamp
+    :ivar group_touched: timezone-aware ISO860 formatted timestamp
         that represents when the last time any policy was executed
         on the group. Could be None.
     :ivar dict policy_touched: dictionary mapping policy ids to the last time
         they were executed, if ever. The time is stored as ISO860 format str
     :ivar bool paused: whether the scaling group is paused in
         scaling activities
-    :ivar GroupStatus status: status of the group.
+    :ivar status: Status of the group. One of :obj:`ScalingGroupStatus` members
+    :type: :obj:`NamedConstant`
     :ivar list error_reasons: List of string-based reasons why this group is in
         ERROR. Not needed when group is ACTIVE
     :ivar int desired: the desired capacity of the scaling group
     :ivar callable now: callable that returns a :class:`bytes` timestamp
         used for testing purposes. Defaults to :func:`timestamp.now`
-
-    TODO: ``remove_active``, ``pause`` and ``resume`` ?
     """
-    def __init__(self, tenant_id, group_id, group_name, active, pending,
-                 group_touched, policy_touched, paused, status,
-                 error_reasons=[], desired=0, now=timestamp.now):
-        self.tenant_id = tenant_id
-        self.group_id = group_id
-        self.group_name = group_name
-        self.desired = desired
-        self.active = active
-        self.pending = pending
-        self.paused = paused
-        self.policy_touched = policy_touched
-        self.group_touched = group_touched
-        self.status = status
-        self.error_reasons = tuple(error_reasons)
-
-        if self.group_touched is None:
-            self.group_touched = timestamp.MIN
-
-        self.now = now
-
-        self._attributes = (
-            'tenant_id', 'group_id', 'group_name', 'desired', 'active',
-            'pending', 'group_touched', 'policy_touched', 'paused', 'status')
-
-    def __eq__(self, other):
-        """
-        Two states are equal if all of the parameters are equal (except for
-        the now callable)
-        """
-        return all((getattr(self, param) == getattr(other, param)
-                    for param in self._attributes))
-
-    def __ne__(self, other):
-        """
-        Negate __eq__
-        """
-        return other.__class__ != self.__class__ or not self.__eq__(other)
-
-    def __repr__(self):
-        """
-        Prints out a representation of self
-        """
-        return "GroupState({0})".format(", ".join([
-            bytes(getattr(self, attr)) for attr in self._attributes
-        ]))
+    tenant_id = attr.ib(validator=aiof(six.text_type), convert=text)
+    group_id = attr.ib(validator=aiof(six.text_type), convert=text)
+    group_name = attr.ib(validator=aiof(six.text_type), convert=text)
+    active = attr.ib(validator=aiof(dict))
+    pending = attr.ib(validator=aiof(dict))
+    group_touched = attr.ib(validator=aiof(six.text_type),
+                            convert=lambda t: text(t or timestamp.MIN))
+    policy_touched = attr.ib(validator=aiof(dict))
+    paused = attr.ib(validator=aiof(bool))
+    status = attr.ib(validator=aiof(NamedConstant))
+    error_reasons = attr.ib(convert=tuple, default=[])
+    desired = attr.ib(validator=aiof(int), default=0)
+    now = attr.ib(default=timestamp.now)
 
     def remove_job(self, job_id):
         """
@@ -252,27 +246,6 @@ class PoliciesOverLimitError(Exception):
              "policy limit of {m} per group.")
             .format(t=tenant_id, g=group_id, m=max_policies,
                     c=curr_policies, n=new_policies))
-
-
-class ScalingGroupStatus(Names):
-    """
-    Status of scaling group
-    """
-
-    ACTIVE = NamedConstant()
-    "Group is active and executing policies/converging"
-
-    ERROR = NamedConstant()
-    """
-    Group has errored due to (mostly) invalid launch configuration and has
-    stopped executing policies/converging
-    """
-
-    DELETING = NamedConstant()
-    """
-    Group is getting deleted and all it's resources servers/CLBs
-    are getting deleted
-    """
 
 
 class IScalingGroup(Interface):
