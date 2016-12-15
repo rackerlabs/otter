@@ -4,7 +4,7 @@ Interface to be used by the scaling groups engine
 from datetime import datetime
 
 import attr
-from attr.validators import instance_of as aiof, optional
+from attr.validators import instance_of as aiof
 
 from croniter import croniter
 
@@ -14,8 +14,8 @@ from twisted.python.constants import NamedConstant, Names
 
 from zope.interface import Attribute, Interface
 
-from otter.util.http import text
 from otter.util import timestamp
+from otter.util.http import text
 
 
 class ScalingGroupStatus(Names):

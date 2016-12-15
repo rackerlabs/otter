@@ -1,8 +1,6 @@
 """
 Tests for :mod:`otter.models.interface`
 """
-from collections import namedtuple
-
 from twisted.trial.unittest import SynchronousTestCase
 
 from zope.interface.verify import verifyObject
