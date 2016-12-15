@@ -2,6 +2,10 @@
     "environment": "staging",
     "region": "ORD",
     "url_root": "http://127.0.0.1:9000",
+    "cloudServersOpenStack": "cloudServersOpenStack",
+    "cloudLoadBalancers": "cloudLoadBalancers",
+    "cloudOrchestration": "cloudOrchestration",
+    "rackconnect": "rackconnect",
     "cassandra": {
         "seed_hosts": ["tcp:127.0.0.1:9160"],
         "keyspace": "otter",
@@ -19,7 +23,8 @@
     },
     "zookeeper": {
         "hosts": "127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183",
-        "threads": 100
+        "threads": 100,
+        "no_logs": true
     },
     "scheduler": {
         "interval": 10,
@@ -66,6 +71,7 @@
         "interval": 30,
         "limited_retry_iterations": 10
     },
+    "selfheal": {"interval": 300},
     "cloud_client": {
     	"throttling": {
     	    "create_server_delay": 1,

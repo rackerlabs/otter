@@ -5,9 +5,10 @@
 
 ![Otter Cups](https://i.chzbgr.com/completestore/12/8/19/AjXtHogT4UqgJwDJsq7igA2.gif)
 
-This codebase is not able to be deployed independently. The code is
-open source as a reference, but requires dependencies not available
-within this repository.
+If you have docker installed then running `docker-compose up -d` should run otter
+along with all its dependent services and cafe and trial integration tests
+against it. Try checking `docker-compose logs cafe` to see cloudcafe test results
+and `docker-compose logs trial` to see trial integration test results.
 
 Talk with us! Join us in:
 
