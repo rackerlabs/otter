@@ -27,7 +27,7 @@ class GroupStateTestCase(SynchronousTestCase):
         self.assertEqual(
             repr(state),
             "GroupState(tid, gid, name, 5, {'1': {}}, {}, date, {}, True, "
-            "<ScalingGroupStatus=ACTIVE>)")
+            "<ScalingGroupStatus=ACTIVE>, False)")
 
     def test_default_desired_capacity_is_zero(self):
         """

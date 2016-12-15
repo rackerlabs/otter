@@ -43,6 +43,7 @@ from otter.test.utils import (
     nested_sequence,
     noop,
     patch,
+    sample_group_state,
     set_non_conv_tenant,
     test_dispatcher)
 from otter.util.config import set_config_data
@@ -897,12 +898,6 @@ class TriggerConvergenceDeletionTests(SynchronousTestCase):
         with disp.consume():
             upd.callback(None)
             self.assertEqual(self.successResultOf(d), 'triggerred')
-
-
-def sample_group_state():
-    """ GroupState object for test """
-    return GroupState('tid', 'gid', 'g', {}, {}, False, None, {},
-                      ScalingGroupStatus.ACTIVE)
 
 
 class DeleteGroupTests(SynchronousTestCase):

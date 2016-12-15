@@ -325,14 +325,16 @@ def modify_and_trigger(dispatcher, group, logargs, modifier, *args, **kwargs):
 
     :return: Deferred with None
     """
-    def modifier_wrapper(_group, state):
+    def modifier_wrapper(_group, state, *_args, **_kwargs):
+        # Ideally this will not be allowed by repose middleware but
+        # adding check for mimic based integration tests
         if state.suspended:
             raise TenantSuspendedError(_group.tenant_id)
-        return modifier(_group, state, *args, **kwargs)
+        return modifier(_group, state, *_args, **_kwargs)
 
     cannot_exec_pol_err = None
     try:
-        yield group.modify_state(modifier_wrapper)
+        yield group.modify_state(modifier_wrapper, *args, **kwargs)
     except CannotExecutePolicyError as ce:
         cannot_exec_pol_err = ce
     if tenant_is_enabled(group.tenant_id, config_value):
