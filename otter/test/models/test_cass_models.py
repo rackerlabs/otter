@@ -546,7 +546,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, launch_config, '
             'active, pending, "groupTouched", "policyTouched", paused, '
-            'desired, created_at, status, error_reasons, deleting '
+            'desired, created_at, status, error_reasons, deleting, suspended '
             'FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
@@ -713,7 +713,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         viewCql = (
             'SELECT "tenantId", "groupId", group_config, launch_config, '
             'active, pending, "groupTouched", "policyTouched", paused, '
-            'desired, created_at, status, error_reasons, deleting '
+            'desired, created_at, status, error_reasons, deleting, suspended '
             'FROM scaling_group '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         delCql = ('DELETE FROM scaling_group '
@@ -2320,7 +2320,7 @@ class ViewManifestTests(CassScalingGroupTestCase):
         view_cql = (
             'SELECT "tenantId", "groupId", group_config, launch_config, '
             'active, pending, "groupTouched", "policyTouched", paused, '
-            'desired, created_at, status, error_reasons, deleting '
+            'desired, created_at, status, error_reasons, deleting, suspended '
             'FROM scaling_group '
             'WHERE "tenantId" = :tenantId '
             'AND "groupId" = :groupId')
@@ -3366,7 +3366,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status, error_reasons '
+            'status, error_reasons, suspended '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
@@ -3396,7 +3396,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status, error_reasons '
+            'status, error_reasons, suspended '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
@@ -3426,7 +3426,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, '
-            'created_at, status, error_reasons FROM scaling_group '
+            'created_at, status, error_reasons, suspended FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
@@ -3443,7 +3443,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status, error_reasons '
+            'status, error_reasons, suspended '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false '
             'LIMIT :limit;')
@@ -3461,7 +3461,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status, error_reasons '
+            'status, error_reasons, suspended '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false AND '
             '"groupId" > :marker LIMIT :limit;')
@@ -3487,7 +3487,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'SELECT "tenantId", "groupId", group_config, active, pending, '
             '"groupTouched", "policyTouched", paused, desired, created_at, '
-            'status, error_reasons '
+            'status, error_reasons, suspended '
             'FROM scaling_group '
             'WHERE "tenantId"=:tenantId AND deleting=false LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')

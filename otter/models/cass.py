@@ -157,7 +157,7 @@ _cql_view_manifest = (
     'SELECT "tenantId", "groupId", group_config, '
     'launch_config, active, pending, "groupTouched", '
     '"policyTouched", paused, desired, created_at, status, error_reasons, '
-    'deleting FROM {cf} '
+    'deleting, suspended FROM {cf} '
     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", data, version) '
@@ -221,7 +221,8 @@ _cql_delete_one_webhook = (
 _cql_list_states = (
     'SELECT "tenantId", "groupId", group_config, active, pending, '
     '"groupTouched", "policyTouched", paused, desired, created_at, status, '
-    'error_reasons FROM {cf} WHERE "tenantId"=:tenantId AND deleting=false;')
+    'error_reasons, suspended '
+    'FROM {cf} WHERE "tenantId"=:tenantId AND deleting=false;')
 _cql_list_policy = (
     'SELECT "policyId", data FROM {cf} WHERE '
     '"tenantId" = :tenantId AND "groupId" = :groupId;')
