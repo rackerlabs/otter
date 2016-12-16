@@ -80,6 +80,7 @@ class GroupState(object):
     policy_touched = attr.ib(validator=aiof(dict))
     paused = attr.ib(validator=aiof(bool))
     status = attr.ib(validator=aiof(NamedConstant))
+    suspended = attr.ib(validator=aiof(bool), default=False)
     error_reasons = attr.ib(convert=tuple, default=[])
     desired = attr.ib(validator=aiof(int), default=0)
     now = attr.ib(default=timestamp.now)

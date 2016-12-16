@@ -900,12 +900,6 @@ class TriggerConvergenceDeletionTests(SynchronousTestCase):
             self.assertEqual(self.successResultOf(d), 'triggerred')
 
 
-def sample_group_state():
-    """ GroupState object for test """
-    return GroupState('tid', 'gid', 'g', {}, {}, None, {}, False,
-                      ScalingGroupStatus.ACTIVE)
-
-
 class DeleteGroupTests(SynchronousTestCase):
     """
     Tests for `delete_group`
