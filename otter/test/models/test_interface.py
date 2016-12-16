@@ -1,8 +1,6 @@
 """
 Tests for :mod:`otter.models.interface`
 """
-from collections import namedtuple
-
 from twisted.trial.unittest import SynchronousTestCase
 
 from zope.interface.verify import verifyObject
@@ -18,71 +16,6 @@ class GroupStateTestCase(SynchronousTestCase):
     """
     Tests for :class:`GroupState`.
     """
-    def test_repr_str(self):
-        """
-        repr(GroupState) returns something human readable
-        """
-        state = GroupState('tid', 'gid', 'name', {'1': {}}, {}, 'date', {},
-                           True, ScalingGroupStatus.ACTIVE, desired=5)
-        self.assertEqual(
-            repr(state),
-            "GroupState(tid, gid, name, 5, {'1': {}}, {}, date, {}, True, "
-            "<ScalingGroupStatus=ACTIVE>, False)")
-
-    def test_default_desired_capacity_is_zero(self):
-        """
-        If no desired capacity is passed, the default value is zero.
-        """
-        self.assertEqual(
-            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date',
-                       {}, True, ScalingGroupStatus.ACTIVE).desired,
-            0)
-
-    def test_two_states_are_equal_if_all_vars_are_equal(self):
-        """
-        Two groups with the same parameters (even if now is different) are
-        equal
-        """
-        self.assertEqual(
-            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {},
-                       True, ScalingGroupStatus.ACTIVE),
-            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {},
-                       True, ScalingGroupStatus.ACTIVE,
-                       now=lambda: 'meh'))
-
-    def test_two_states_are_unequal_if_vars_different(self):
-        """
-        Two groups with any different parameters are unequal
-        """
-        args = ('tid', 'gid', 'name', {}, {}, 'date', {}, True,
-                ScalingGroupStatus.ACTIVE)
-
-        def perterb(args, index):
-            copy = [arg for arg in args]
-            if isinstance(copy[index], str):
-                copy[index] += '_'
-            elif isinstance(copy[index], bool):
-                copy[index] = not copy[index]
-            else:  # it's a dict
-                copy[index] = {'1': {}}
-            return copy
-
-        for i in range(len(args)):
-            self.assertNotEqual(GroupState(*args), GroupState(*(perterb(args, i))))
-
-    def test_a_state_is_not_equal_to_something_else(self):
-        """
-        The classes of the two objects have to be the same.
-        """
-        _GroupState = namedtuple(
-            '_GroupState',
-            ['tenant_id', 'group_id', 'group_name', 'active', 'pending',
-             'group_touched', 'policy_touched', 'paused', 'status'])
-        self.assertNotEqual(
-            _GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {},
-                        True, ScalingGroupStatus.ACTIVE),
-            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {},
-                       True, ScalingGroupStatus.ACTIVE))
 
     def test_group_touched_is_min_if_None(self):
         """

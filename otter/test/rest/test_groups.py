@@ -137,8 +137,8 @@ class FormatterHelpers(SynchronousTestCase):
             '11111',
             'one',
             'test',
-            None,  # active ignored
-            None,  # pending Ignored!
+            {},  # active ignored
+            {},  # pending Ignored!
             None,
             {},
             True,
@@ -162,8 +162,8 @@ class FormatterHelpers(SynchronousTestCase):
             '11111',
             'one',
             'test',
-            None,  # active ignored
-            None,  # pending Ignored!
+            {},  # active ignored
+            {},  # pending Ignored!
             None,
             {},
             True,
@@ -410,7 +410,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_store.reactor = 'reactor'
 
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(
-            [GroupState('11111', 'one', '1', None, None, None, {}, False,
+            [GroupState('11111', 'one', '1', {}, {}, None, {}, False,
                         ScalingGroupStatus.ACTIVE, desired=2)]
         )
 
@@ -1003,7 +1003,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             'groupConfiguration': config_examples()[0],
             'launchConfiguration': launch_examples()[0],
             'id': 'one',
-            'state': GroupState('11111', 'one', 'g', None, None, None, {},
+            'state': GroupState('11111', 'one', 'g', {}, {}, None, {},
                                 False, ScalingGroupStatus.ACTIVE, desired=3),
             'scalingPolicies': [dict(id="5", **policy_examples()[0])]
         }
@@ -1301,7 +1301,7 @@ class GroupStateTestCase(RestAPITestMixin, SynchronousTestCase):
         self.addCleanup(set_config_data, {})
 
         self.mock_group.view_state.return_value = defer.succeed(
-            GroupState("11111", "one", 'g', None, None, False, False, False,
+            GroupState("11111", "one", 'g', {}, {}, None, {}, False,
                        ScalingGroupStatus.ACTIVE, desired=4))
         self.mock_store.connection = 'connection'
         self.mock_store.reactor = 'reactor'

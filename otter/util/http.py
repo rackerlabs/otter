@@ -8,6 +8,8 @@ from urlparse import parse_qs, urlsplit, urlunsplit
 
 from characteristic import attributes
 
+import six
+
 from toolz.dicttoolz import get_in
 
 import treq
@@ -543,3 +545,16 @@ def try_json_with_keys(maybe_json_error, keys):
         return None
     else:
         return get_in(keys, error_body, None)
+
+
+def text(thing):
+    """
+    Return text/unicode of given thing. This exists because `six.u` does not
+    handle work if `thing` is already unicode
+    """
+    if six.PY2:
+        if type(thing) is unicode:
+            return thing
+        return six.u(thing)
+    else:
+        raise NotImplementedError
