@@ -20,6 +20,7 @@ services:
             - ./otter:/app/otter
             - ./scripts:/app/scripts
             - ./twisted:/app/twisted
+            - ./schema:/app/schema
     db:
         image: cassandra:2.1
     zk:
