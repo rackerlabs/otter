@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from functools import partial
 
 from effect import (
-    Constant, Effect, ParallelEffects, TypeDispatcher, sync_perform)
+    Effect, ParallelEffects, TypeDispatcher, sync_perform)
 from effect.testing import perform_sequence, resolve_effect
 
 from jsonschema import ValidationError
@@ -3736,10 +3736,8 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         self.tenant_id = 'tid'
         self.group_id = 'gid'
         self.params = {"tenantId": self.tenant_id, "groupId": self.group_id}
-        self.clock = Clock()
-        self.clock.advance(2.5)
         self.cache = CassScalingGroupServersCache(
-            self.tenant_id, self.group_id, self.clock)
+            self.tenant_id, self.group_id)
         self.dt = datetime(2010, 10, 20, 10, 0, 0)
 
     def _test_get_servers(self, only_as_active, query_result, exp_result):
@@ -3817,12 +3815,12 @@ class CassGroupServersCacheTests(SynchronousTestCase):
               "server_as_active": True}],
             ([{"d": "e"}], self.dt))
 
-    def _insert_servers_tuple(self, dt, ts=2500000):
+    def _insert_servers_tuple(self, dt):
         """
         Return (intent, performer) tuple for executing CQL to insert servers
         """
         query = (
-            'BEGIN BATCH USING TIMESTAMP {} '
+            'BEGIN BATCH '
             'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
             'server_id, server_blob, server_as_active) '
             'VALUES(:tenantId, :groupId, :last_update, :server_id0, '
@@ -3830,7 +3828,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
             'INSERT INTO servers_cache ("tenantId", "groupId", last_update, '
             'server_id, server_blob, server_as_active) '
             'VALUES(:tenantId, :groupId, :last_update, :server_id1, '
-            ':server_blob1, :server_as_active1); APPLY BATCH;').format(ts)
+            ':server_blob1, :server_as_active1); APPLY BATCH;')
         self.params.update(
             {"server_id0": "a", "server_blob0": '{"id": "a"}',
              "server_as_active0": True,
@@ -3866,7 +3864,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
     def test_update_servers(self):
         """
         :func:`update_servers` gets current servers, inserts new ones and
-        deletes fetched servers
+        deletes servers stored on returned timestamp
         """
         self.cache.get_servers = intent_func("gs")
         self.cache.delete_servers = intent_func("ds")
@@ -3875,7 +3873,7 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         seq = [
             (("gs", False), const((got_servers, self.dt))),
             self._insert_servers_tuple(dt=new_dt),
-            (("ds", self.dt, got_servers), noop)
+            (("ds", self.dt), noop)
         ]
         eff = self.cache.update_servers(
             new_dt, [{"id": "a", "_is_as_active": True}, {"id": "b"}])
@@ -3896,20 +3894,12 @@ class CassGroupServersCacheTests(SynchronousTestCase):
         """
         :func:`delete_servers` issues query to delete given servers
         """
-        servers = [{"id": "a", "anything": "d"}, {"id": "b", "anything": "b"}]
         query = (
-            'BEGIN BATCH USING TIMESTAMP 2500000 '
             'DELETE FROM servers_cache WHERE "tenantId"=:tenantId AND '
-            '"groupId"=:groupId AND last_update=:last_update AND '
-            'server_id=:server_id0; '
-            'DELETE FROM servers_cache WHERE "tenantId"=:tenantId AND '
-            '"groupId"=:groupId AND last_update=:last_update AND '
-            'server_id=:server_id1; '
-            'APPLY BATCH;')
-        self.params.update(
-            {"server_id0": "a", "server_id1": "b", "last_update": self.dt})
-        eff = self.cache.delete_servers(self.dt, servers)
-        self.assertEqual(eff, cql_eff(query, self.params))
+            '"groupId"=:groupId AND last_update=:last_update;')
+        params = assoc(self.params, "last_update", self.dt)
+        eff = self.cache.delete_servers(self.dt)
+        self.assertEqual(eff, cql_eff(query, params))
 
 
 class CassAdminTestCase(SynchronousTestCase):

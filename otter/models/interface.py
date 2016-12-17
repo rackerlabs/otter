@@ -663,15 +663,13 @@ class IScalingGroupServersCache(Interface):
         :return: Effect of None
         """
 
-    def delete_servers(time, servers):
+    def delete_servers(time):
         """
-        Remove given servers of the group cache
+        Delete servers stored on the given timestamp
 
         :param datetime time: Update time of the cache
-        :param list servers: List of server dicts with optional "_is_as_active"
-            field with boolean value to represent if this server has become
-            active from autoscale's perpective. This field will be popped
-            before storing the blob
+
+        :return: Effect of None
         """
 
 

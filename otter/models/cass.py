@@ -11,7 +11,7 @@ from itertools import cycle, takewhile
 
 from characteristic import attributes
 
-from effect import Constant, Effect, TypeDispatcher, parallel
+from effect import Effect, TypeDispatcher, parallel
 from effect.do import do, do_return
 
 from jsonschema import ValidationError
@@ -23,7 +23,7 @@ from pyrsistent import freeze
 from silverberg.client import ConsistencyLevel
 
 from toolz.curried import filter, map
-from toolz.dicttoolz import keymap, merge
+from toolz.dicttoolz import assoc, keymap
 from toolz.functoolz import compose
 
 from twisted.internet import defer
@@ -1799,16 +1799,11 @@ class CassScalingGroupServersCache(object):
     Collection of cache of scaling group servers
     """
 
-    def __init__(self, tenant_id, group_id, clock=None):
+    def __init__(self, tenant_id, group_id):
         self.tenantId = tenant_id
         self.groupId = group_id
         self.table = "servers_cache"
         self.params = {"tenantId": self.tenantId, "groupId": self.groupId}
-        if clock is None:
-            from twisted.internet import reactor
-            self.clock = reactor
-        else:
-            self.clock = clock
 
     @do
     def get_servers(self, only_as_active):
@@ -1855,7 +1850,7 @@ class CassScalingGroupServersCache(object):
                      'server_id, server_blob, server_as_active) '
                      'VALUES(:tenantId, :groupId, :last_update, :server_id{i},'
                      ' :server_blob{i}, :server_as_active{i});')
-            params = merge(self.params, {"last_update": time})
+            params = assoc(self.params, "last_update", time)
             queries = []
             for i, server in enumerate(servers):
                 params['server_id{}'.format(i)] = server['id']
@@ -1863,25 +1858,21 @@ class CassScalingGroupServersCache(object):
                     '_is_as_active', False)
                 params['server_blob{}'.format(i)] = json.dumps(server)
                 queries.append(query.format(cf=self.table, i=i))
-            yield cql_eff(batch(queries, get_client_ts(self.clock)), params)
+            yield cql_eff(batch(queries), params)
 
         # Delete earlier fetched servers
         if last_update:
-            yield self.delete_servers(last_update, current)
+            yield self.delete_servers(last_update)
 
-    def delete_servers(self, time, servers):
+    def delete_servers(self, time):
         """
         See :method:`IScalingGroupServersCache.delete_servers`
         """
         query = ('DELETE FROM {cf} '
                  'WHERE "tenantId"=:tenantId AND "groupId"=:groupId '
-                 'AND last_update=:last_update AND server_id=:server_id{i};')
-        params = merge(self.params, {"last_update": time})
-        queries = []
-        for i, server in enumerate(servers):
-            params['server_id{}'.format(i)] = server['id']
-            queries.append(query.format(cf=self.table, i=i))
-        return cql_eff(batch(queries, get_client_ts(self.clock)), params)
+                 'AND last_update=:last_update;')
+        params = assoc(self.params, "last_update", time)
+        return cql_eff(query.format(cf=self.table), params)
 
 
 @implementer(IAdmin)
