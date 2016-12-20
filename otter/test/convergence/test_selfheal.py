@@ -155,6 +155,18 @@ class CheckTriggerTests(SynchronousTestCase):
         self.assertIsNone(
             perform_sequence(seq, sh.check_and_trigger("tid", "gid")))
 
+    def test_active_suspended(self):
+        """
+        Convergence is not triggerred on ACTIVE suspended group
+        """
+        self.state.suspended = True
+        seq = [
+            (GetScalingGroupInfo(tenant_id="tid", group_id="gid"),
+             const(("group", self.manifest))),
+        ]
+        self.assertIsNone(
+            perform_sequence(seq, sh.check_and_trigger("tid", "gid")))
+
     def test_inactive_group(self):
         """
         Convergence is not triggerred on in-ACTIVE group
