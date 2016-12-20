@@ -4,6 +4,8 @@ from copy import deepcopy
 from datetime import datetime
 from functools import partial
 
+import attr
+
 from effect import (
     ComposedDispatcher,
     Constant,
@@ -64,7 +66,6 @@ from otter.test.utils import (
     server,
     stack
 )
-from otter.util.fp import assoc_obj
 from otter.util.retry import (
     Retry, ShouldDelayAndRetry, exponential_backoff_interval, retry_times)
 from otter.util.timestamp import timestamp_to_epoch
@@ -492,12 +493,10 @@ class GetCLBContentsTests(SynchronousTestCase):
         eff = get_clb_contents()
         self.assertEqual(
             perform_sequence(seq, eff),
-            ([assoc_obj(CLBNode.from_node_json(1, node11),
-                        drained_at=1.0),
+            ([attr.assoc(CLBNode.from_node_json(1, node11), _drained_at=1.0),
               CLBNode.from_node_json(1, node12),
               CLBNode.from_node_json(2, node21),
-              assoc_obj(CLBNode.from_node_json(2, node22),
-                        drained_at=2.0)],
+              attr.assoc(CLBNode.from_node_json(2, node22), _drained_at=2.0)],
              {'1': CLB(True), '2': CLB(False)}))
 
     def test_no_lb(self):
@@ -605,7 +604,7 @@ class GetCLBContentsTests(SynchronousTestCase):
         eff = get_clb_contents()
         self.assertEqual(
             perform_sequence(seq, eff),
-            ([assoc_obj(CLBNode.from_node_json(2, node21), drained_at=2.0)],
+            ([attr.assoc(CLBNode.from_node_json(2, node21), _drained_at=2.0)],
              {'2': CLB(True)}))
 
 
