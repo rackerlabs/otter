@@ -19,3 +19,5 @@ subunit-output.txt
 *.pydev*
 .DS_Store
 _trial_temp.lock
+_docker_trial_tmp
+_docker_cafe_logs
