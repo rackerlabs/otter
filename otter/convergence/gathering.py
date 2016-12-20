@@ -35,7 +35,6 @@ from otter.convergence.model import (
     group_id_from_metadata)
 from otter.indexer import atom
 from otter.models.cass import CassScalingGroupServersCache
-from otter.util.fp import assoc_obj
 from otter.util.http import append_segments
 from otter.util.retry import (
     exponential_backoff_interval, retry_effect, retry_times)
@@ -211,9 +210,9 @@ def get_clb_contents():
         if node.description.lb_id in deleted_lbs:
             return None
         if feed is not None:
-            return assoc_obj(node, drained_at=extract_clb_drained_at(feed))
-        else:
-            return node
+            node.drained_at = extract_clb_drained_at(feed)
+        return node
+
     nodes = map(update_drained_at, concat(lb_nodes.values()))
     yield do_return((
         list(filter(bool, nodes)),
