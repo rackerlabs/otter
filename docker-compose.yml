@@ -40,6 +40,7 @@ services:
         volumes:
             - ./autoscale_cloudroast/test_repo:/cafe/autoscale_cloudroast/test_repo
             - ./autoscale_cloudcafe/autoscale_fixtures:/cafe/autoscale_cloudcafe/autoscale_fixtures
+            - ./_docker_cafe_logs:/root/.cloudcafe/logs/autoscale
         command:
             dev-convergence -p functional
         depends_on:
