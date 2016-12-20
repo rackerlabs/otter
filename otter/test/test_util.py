@@ -26,7 +26,7 @@ from otter.util.http import (
     headers,
     raise_error_on_code,
     retry_on_unauth,
-    text,
+    lenient_ascii_text,
     try_json_with_keys,
     wrap_request_error)
 
@@ -895,22 +895,15 @@ class RetryOnUnauthTests(SynchronousTestCase):
         auth.assert_called_once_with()
 
 
-class TextTests(SynchronousTestCase):
+class LenientAsciiTextTests(SynchronousTestCase):
     """
-    Tests for :func:`text`
+    Tests for :func:`lenient_ascii_text`
     """
 
     def test_unicode(self):
         """ unicode is returned as such """
-        self.assertEqual(text(u"test"), u"test")
+        self.assertEqual(lenient_ascii_text(u"test"), u"test")
 
     def test_string(self):
         """ string is converted to unicode """
-        self.assertEqual(text("test"), u"test")
-
-    def test_py3(self):
-        """ Not implemented for PY3 """
-        from otter.util.http import six
-        self.patch(six, "PY2", False)
-        self.patch(six, "PY3", True)
-        self.assertRaises(NotImplementedError, text, "some")
+        self.assertEqual(lenient_ascii_text("test"), u"test")

@@ -547,14 +547,14 @@ def try_json_with_keys(maybe_json_error, keys):
         return get_in(keys, error_body, None)
 
 
-def text(thing):
+def lenient_ascii_text(data):
     """
-    Return text/unicode of given thing. This exists because `six.u` does not
-    handle work if `thing` is already unicode
+    Return text/unicode version of given data decoded on "ascii".
+    Data can be bytes or unicode.
     """
     if six.PY2:
-        if type(thing) is unicode:
-            return thing
-        return six.u(thing)
-    else:
+        if type(data) is unicode:
+            return data
+        return data.decode("ascii")
+    else:  # pragma: no cover
         raise NotImplementedError
