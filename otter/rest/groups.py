@@ -670,20 +670,10 @@ class OtterGroup(object):
         Trigger convergence on given scaling group
         """
 
-        class ConvergeErrorGroup(Exception):
-            pass
-
         def can_converge(group, state):
             if state.paused:
                 raise GroupPausedError(group.tenant_id, group.uuid, "converge")
-            conv_on_error = extract_bool_arg(request, 'on_error', True)
-            if not conv_on_error and state.status == ScalingGroupStatus.ERROR:
-                raise ConvergeErrorGroup()
             return state
-
-        def converge_error_group_header(f):
-            f.trap(ConvergeErrorGroup)
-            request.setHeader("x-not-converging", "true")
 
         if tenant_is_enabled(self.tenant_id, config_value):
             group = self.store.get_scaling_group(
@@ -692,7 +682,7 @@ class OtterGroup(object):
                 self.dispatcher,
                 group,
                 bound_log_kwargs(self.log),
-                can_converge).addErrback(converge_error_group_header)
+                can_converge)
         else:
             request.setResponseCode(404)
 
