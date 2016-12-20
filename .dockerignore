@@ -1,5 +1,4 @@
-config.json
-*.pyc
+.git
 _trial_temp
 _trial_coverage
 .coverage
@@ -9,8 +8,6 @@ _build
 _builddoc
 .self.txt
 otter-deploy*
-schema/setup-*.cql
-schema/teardown-*.cql
 *.egg-info
 .ve
 build
@@ -21,7 +18,6 @@ subunit-output.txt
 *.project
 *.pydev*
 .DS_Store
-docbook/target
 _trial_temp.lock
 _docker_trial_tmp
 _docker_cafe_logs

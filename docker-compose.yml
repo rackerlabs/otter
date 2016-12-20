@@ -1,0 +1,74 @@
+version: '2'
+services: 
+    otter: 
+        build: 
+            context: .
+            dockerfile: docker/otter/Dockerfile
+        ports:
+            - "9000:9000"
+        depends_on:
+            - mimic
+            - db
+            - zk
+        environment:
+            IDENTITY_URL: "http://mimic:8900/identity/v2.0"
+            CASS_HOSTS: "tcp:db:9160"
+            ZK_HOSTS: "zk:2181"
+            URL_ROOT: "http://otter:9000"
+            BOOTSTRAP: "yes"
+        volumes:
+            - ./otter:/app/otter
+            - ./scripts:/app/scripts
+            - ./twisted:/app/twisted
+    db:
+        image: cassandra:2.1
+    zk:
+        image: zookeeper:latest
+        ports:
+            - "2181:2181"
+    mimic: 
+        build: https://github.com/rackerlabs/mimic.git#594dd5c8e80b670fa2d0c42f5eec9645e14aa54e
+        command: twistd -n mimic --realtime --verbose
+    cafe:
+        build:
+            context: .
+            dockerfile: docker/cafe/Dockerfile
+        environment:
+            - OTTER_ROOT=http://otter:9000
+            - IDENTITY_ROOT=http://mimic:8900
+            - WAIT=yes
+        volumes:
+            - ./autoscale_cloudroast/test_repo:/cafe/autoscale_cloudroast/test_repo
+            - ./autoscale_cloudcafe/autoscale_fixtures:/cafe/autoscale_cloudcafe/autoscale_fixtures
+            - ./_docker_cafe_logs:/root/.cloudcafe/logs/autoscale
+        command:
+            dev-convergence -p functional
+        depends_on:
+            - otter
+            - mimic
+    trial:
+        build: 
+            context: .
+            dockerfile: docker/otter/Dockerfile
+        volumes:
+            - ./otter:/app/otter
+            - ./_docker_trial_tmp:/tmp
+        environment:
+            - AS_USERNAME=jenkins_user
+            - AS_PASSWORD=jenkins_password
+            - AS_IDENTITY=http://mimic:8900/identity/v2.0
+            - AS_FLAVOR_REF=2
+            - AS_REGION=ORD
+            - AS_CONVERGENCE_TENANT=000001
+            - AS_CONVERGENCE_TENANT_FOR_AUTH_ERRORS=000010
+            - AS_AUTOSCALE_LOCAL_URL=http://otter:9000/v1.0/{0}
+            - AS_NOVA_SC_KEY=cloudServersOpenStack
+            - AS_CLB_SC_KEY=cloudLoadBalancers
+            - AS_USING_MIMIC=yes
+            - AS_SELFHEAL_INTERVAL=20
+        command:
+            dockerize -timeout 60s -wait http://otter:9000/health -wait http://mimic:8900
+                trial -j10 --temp-directory=/tmp/_trial_temp otter.integration.tests
+        depends_on:
+            - otter
+            - mimic

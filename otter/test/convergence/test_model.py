@@ -16,6 +16,7 @@ from otter.convergence.model import (
     CLBNode,
     CLBNodeCondition,
     CLBNodeType,
+    DrainingUnavailable,
     HeatStack,
     IDrainable,
     ILBDescription,
@@ -207,6 +208,16 @@ class CLBNodeTests(SynchronousTestCase):
                        address='10.1.1.1', drained_at=0.0)
         self.assertFalse(node.is_done_draining(now=15, timeout=30))
 
+    def test_done_draining_unavailable(self):
+        """
+        If drained_at is not available then :func:`CLBNode.is_done_draining`
+        raises :obj:`DrainingUnavailable` exception
+        """
+        node = CLBNode(node_id='1234', description=self.drain_desc,
+                       address='10.1.1.1', drained_at=None)
+        self.assertRaises(
+            DrainingUnavailable, node.is_done_draining, now=15, timeout=30)
+
     def test_active_if_node_is_enabled(self):
         """
         If the node is ENABLED, :func:`CLBNode.is_active` returns `True`.
@@ -246,7 +257,7 @@ class CLBNodeTests(SynchronousTestCase):
         self.assertEqual(
             node,
             CLBNode(node_id='node1', address='1.2.3.4',
-                    connections=None, drained_at=0.0,
+                    connections=None, drained_at=None,
                     is_online=False,
                     description=CLBDescription(
                         lb_id='123', port=20,
@@ -266,7 +277,7 @@ class CLBNodeTests(SynchronousTestCase):
         self.assertEqual(
             node,
             CLBNode(node_id='node1', address='1.2.3.4',
-                    connections=None, drained_at=0.0,
+                    connections=None, drained_at=None,
                     is_online=False,
                     description=CLBDescription(
                         lb_id='123', port=20,
