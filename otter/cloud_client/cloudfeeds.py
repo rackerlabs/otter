@@ -6,9 +6,11 @@ from urlparse import parse_qs, urlparse
 
 from effect.do import do, do_return
 
+from toolz.functoolz import identity
+
 from twisted.python.constants import NamedConstant, Names
 
-from otter.cloud_client import service_request
+from otter.cloud_client import log_success_response, service_request
 from otter.constants import ServiceType
 from otter.indexer import atom
 from otter.util.http import append_segments
@@ -40,11 +42,11 @@ class Direction(Names):
 
 
 @do
-def read_entries(service_type, url, params, direction):
+def read_entries(service_type, url, params, direction, log_msg_type=None):
     """
     Read all feed entries and follow in given direction until it is empty
 
-    :param service_type: Either CLOUD_FEEDS or CLOUD_FEEDS_CAP
+    :param service_type: Service hosting the feed
     :type service_type: A member of :class:`ServiceType`
     :param str url: CF URL to append
     :param dict params: HTTP parameters
@@ -59,11 +61,17 @@ def read_entries(service_type, url, params, direction):
         direction_link = atom.next_link
     else:
         raise ValueError("Invalid direction")
+
+    if log_msg_type is not None:
+        log_cb = log_success_response(log_msg_type, identity, False)
+    else:
+        log_cb = identity
+
     all_entries = []
     while True:
         resp, feed_str = yield service_request(
             service_type, "GET", url, params=params,
-            json_response=False)
+            json_response=False).on(log_cb)
         feed = atom.parse(feed_str)
         entries = atom.entries(feed)
         if entries == []:

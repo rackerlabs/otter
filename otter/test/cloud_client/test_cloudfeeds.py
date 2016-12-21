@@ -1,17 +1,19 @@
 """Tests for otter.cloud_client.cloudfeeds"""
 
+from functools import wraps
+
 from effect import sync_perform
-from effect.testing import (
-    EQFDispatcher, base_dispatcher, perform_sequence, sync_perform)
+from effect.testing import EQFDispatcher, base_dispatcher, perform_sequence
 
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.cloud_client import service_request
 from otter.cloud_client import cloudfeeds as cf
+from otter.cloud_client import service_request
 from otter.constants import ServiceType
 from otter.indexer import atom
-from otter.test.cloud_client.test_init import service_request_eqf
-from otter.test.utils import const, stub_json_response, stub_pure_response
+from otter.test.cloud_client.test_init import log_intent, service_request_eqf
+from otter.test.utils import (
+    const, noop, stub_json_response, stub_pure_response)
 from otter.util.pure_http import APIError, has_code
 
 
@@ -47,6 +49,17 @@ class CloudFeedsTests(SynchronousTestCase):
         self.assertRaises(APIError, sync_perform, dispatcher, eff)
 
 
+def both_links(method):
+    """
+    Call given test method with "next" and "previous" rel
+    """
+    @wraps(method)
+    def f(self):
+        method(self, "next")
+        method(self, "previous")
+    return f
+
+
 class ReadEntriesTests(SynchronousTestCase):
 
     entry = '<entry><summary>{}</summary></entry>'
@@ -69,7 +82,8 @@ class ReadEntriesTests(SynchronousTestCase):
             rel=rel, rel_link=link,
             entries=''.join(self.entry.format(s) for s in summaries))
 
-    def _test_empty(self, rel):
+    @both_links
+    def test_empty(self, rel):
         """
         Does not go further when there are no entries and return []
         """
@@ -81,13 +95,8 @@ class ReadEntriesTests(SynchronousTestCase):
             self.service_type, self.url, {}, self.directions[rel])
         self.assertEqual(perform_sequence(seq, entries_eff), ([], {}))
 
-    def test_empty_previous(self):
-        self._test_empty("previous")
-
-    def test_empty_next(self):
-        self._test_empty("next")
-
-    def _test_single_page(self, rel):
+    @both_links
+    def test_single_page(self, rel):
         """
         Collects entries and goes to next link if there are entries and returns
         if next one is empty
@@ -108,13 +117,8 @@ class ReadEntriesTests(SynchronousTestCase):
             ["summary1", "summ2"])
         self.assertEqual(params, {"page": ["2"]})
 
-    def test_single_page_previous(self):
-        self._test_single_page("previous")
-
-    def test_single_page_next(self):
-        self._test_single_page("next")
-
-    def _test_multiple_pages(self, rel):
+    @both_links
+    def test_multiple_pages(self, rel):
         """
         Collects entries and goes to next link if there are entries and
         continues until next link returns empty list
@@ -138,13 +142,32 @@ class ReadEntriesTests(SynchronousTestCase):
             ["summ1", "summ2", "summ3", "summ4"])
         self.assertEqual(params, {"page": ["3"]})
 
-    def test_multiple_pages_previous(self):
-        self._test_multiple_pages("previous")
+    @both_links
+    def test_log_responses(self, rel):
+        """
+        Each request sent is logged if `log_msg_type` is given
+        """
+        feed1_str = self.feed(rel, "https://url?page=2", ["summ1", "summ2"])
+        feed2_str = self.feed(rel, "https://url?page=3", ["summ3", "summ4"])
+        feed3_str = self.feed(rel, "link", [])
+        seq = [
+            (self.svc_intent(), const(stub_json_response(feed1_str))),
+            (log_intent("nodemsg", feed1_str, False), noop),
+            (self.svc_intent({"page": ['2']}),
+             const(stub_json_response(feed2_str))),
+            (log_intent("nodemsg", feed2_str, False), noop),
+            (self.svc_intent({"page": ['3']}),
+             const(stub_json_response(feed3_str))),
+            (log_intent("nodemsg", feed3_str, False), noop)
+        ]
+        entries, params = perform_sequence(
+            seq,
+            cf.read_entries(
+                self.service_type, self.url, {}, self.directions[rel],
+                "nodemsg"))
 
-    def test_multiple_pages_next(self):
-        self._test_multiple_pages("next")
-
-    def _test_no_link(self, rel):
+    @both_links
+    def test_no_link(self, rel):
         """
         Returns entries collected till now if there is no rel link
         """
@@ -160,12 +183,6 @@ class ReadEntriesTests(SynchronousTestCase):
                 self.service_type, self.url, {"a": "b"}, self.directions[rel]))
         self.assertEqual(atom.summary(entries[0]), "summary")
         self.assertEqual(params, {"a": "b"})
-
-    def test_no_link_previous(self):
-        self._test_no_link("previous")
-
-    def test_no_link_next(self):
-        self._test_no_link("next")
 
     def test_invalid_direction(self):
         """
