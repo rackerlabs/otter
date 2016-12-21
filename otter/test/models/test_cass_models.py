@@ -3299,6 +3299,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '1234'}
         expectedCQL = ('SELECT COUNT(*) FROM scaling_group '
                        'WHERE "tenantId"=:tenantId AND deleting=false;')
+        self.mock_key.return_value = '1111'
 
         d = self.collection.create_scaling_group(
             mock.Mock(), '1234', self.config, self.launch)

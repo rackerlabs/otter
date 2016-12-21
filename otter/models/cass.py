@@ -1448,7 +1448,7 @@ class CassScalingGroupCollection:
                 config['name'],
                 {},
                 {},
-                data['created_at'],
+                data['created_at'].isoformat(),
                 {},
                 data['paused'],
                 ScalingGroupStatus.ACTIVE,

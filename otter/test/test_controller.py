@@ -170,7 +170,7 @@ class CalculateDeltaTestCase(SynchronousTestCase):
         Only care about the active and pending values, so generate a whole
         :class:`GroupState` with other fake info
         """
-        return GroupState(1, 1, "test", active, pending, None, {}, False,
+        return GroupState('1', '1', "test", active, pending, None, {}, False,
                           ScalingGroupStatus.ACTIVE)
 
     def test_positive_change_within_min_max(self):
@@ -648,8 +648,8 @@ class CheckCooldownsTestCase(SynchronousTestCase):
         Only care about the group_touched and policy_touched values, so
         generate a whole :class:`GroupState` with other fake info
         """
-        return GroupState(1, 1, "test", {}, {}, group_touched, policy_touched,
-                          False, ScalingGroupStatus.ACTIVE)
+        return GroupState("1", "1", "test", {}, {}, group_touched,
+                          policy_touched, False, ScalingGroupStatus.ACTIVE)
 
     def test_check_cooldowns_global_cooldown_and_policy_cooldown_pass(self):
         """
@@ -901,7 +901,7 @@ class TriggerConvergenceDeletionTests(SynchronousTestCase):
 
 def sample_group_state():
     """ GroupState object for test """
-    return GroupState('tid', 'gid', 'g', {}, {}, False, None, {},
+    return GroupState('tid', 'gid', 'g', {}, {}, None, {}, False,
                       ScalingGroupStatus.ACTIVE)
 
 
@@ -1467,7 +1467,7 @@ class ConvergeTestCase(SynchronousTestCase):
         updated with new desired and state is returned
         """
         log = mock_log()
-        state = GroupState('tenant', 'group', "test", [], [], None, {},
+        state = GroupState('tenant', 'group', "test", {}, {}, None, {},
                            False, ScalingGroupStatus.ACTIVE)
         group_config = {'maxEntities': 100, 'minEntities': 0}
         policy = {'change': 5}
@@ -1488,7 +1488,7 @@ class ConvergeTestCase(SynchronousTestCase):
         state.desired is not udpated and None is returned synchronously
         """
         log = mock_log()
-        state = GroupState('tenant', 'group-id', "test", [], [], None, {},
+        state = GroupState('tenant', 'group-id', "test", {}, {}, None, {},
                            False, ScalingGroupStatus.ACTIVE)
         group_config = {'maxEntities': 100, 'minEntities': 0}
         policy = {'change': 0}
@@ -1598,8 +1598,8 @@ class ConvergenceRemoveServerTests(SynchronousTestCase):
                                 active={'s0': {'id': 's0'}},
                                 pending={},
                                 group_touched=None,
-                                policy_touched=None,
-                                paused=None,
+                                policy_touched={},
+                                paused=False,
                                 status=ScalingGroupStatus.ACTIVE,
                                 desired=1)
         self.group = iMock(IScalingGroup, tenant_id='tenant_id',

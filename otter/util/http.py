@@ -8,6 +8,8 @@ from urlparse import parse_qs, urlsplit, urlunsplit
 
 from characteristic import attributes
 
+import six
+
 from toolz.dicttoolz import get_in
 
 import treq
@@ -543,3 +545,16 @@ def try_json_with_keys(maybe_json_error, keys):
         return None
     else:
         return get_in(keys, error_body, None)
+
+
+def lenient_ascii_text(data):
+    """
+    Return text/unicode version of given data decoded on "ascii".
+    Data can be bytes or unicode.
+    """
+    if six.PY2:
+        if type(data) is unicode:
+            return data
+        return data.decode("ascii")
+    else:  # pragma: no cover
+        raise NotImplementedError
