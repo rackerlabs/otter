@@ -2,8 +2,15 @@
 Cloud feeds related APIs
 """
 
+from urlparse import parse_qs, urlparse
+
+from effect.do import do, do_return
+
+from twisted.python.constants import NamedConstant, Names
+
 from otter.cloud_client import service_request
 from otter.constants import ServiceType
+from otter.indexer import atom
 from otter.util.http import append_segments
 from otter.util.pure_http import has_code
 
@@ -22,3 +29,48 @@ def publish_autoscale_event(event, log=None):
             'content-type': ['application/vnd.rackspace.atom+json']},
         data=event, log=log, success_pred=has_code(201),
         json_response=False)
+
+
+class Direction(Names):
+    """
+    Which direction to follow the feeds?
+    """
+    PREVIOUS = NamedConstant()
+    NEXT = NamedConstant()
+
+
+@do
+def read_entries(service_type, url, params, direction):
+    """
+    Read all feed entries and follow in given direction until it is empty
+
+    :param service_type: Either CLOUD_FEEDS or CLOUD_FEEDS_CAP
+    :type service_type: A member of :class:`ServiceType`
+    :param str url: CF URL to append
+    :param dict params: HTTP parameters
+    :param direction: Where to continue fetching?
+    :type direction: A member of :class:`Direction`
+
+    :return: (``list`` of :obj:`Element`, last fetched params) tuple
+    """
+    if direction == Direction.PREVIOUS:
+        direction_link = atom.previous_link
+    elif direction == Direction.NEXT:
+        direction_link = atom.next_link
+    else:
+        raise ValueError("Invalid direction")
+    all_entries = []
+    while True:
+        resp, feed_str = yield service_request(
+            service_type, "GET", url, params=params,
+            json_response=False)
+        feed = atom.parse(feed_str)
+        entries = atom.entries(feed)
+        if entries == []:
+            break
+        all_entries.extend(entries)
+        link = direction_link(feed)
+        if link is None:
+            break
+        params = parse_qs(urlparse(link).query)
+    yield do_return((all_entries, params))
