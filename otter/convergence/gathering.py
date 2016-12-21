@@ -14,14 +14,17 @@ from toolz.itertoolz import concat
 
 from otter.auth import NoSuchEndpoint
 from otter.cloud_client import (
+    list_servers_details_all,
+    list_stacks_all,
+    service_request
+)
+from otter.cloud_client.clb import (
     CLBNotFoundError,
     get_clb_health_monitor,
     get_clb_node_feed,
     get_clb_nodes,
-    get_clbs,
-    list_servers_details_all,
-    list_stacks_all,
-    service_request)
+    get_clbs
+)
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLB,
@@ -32,7 +35,8 @@ from otter.convergence.model import (
     RCv3Description,
     RCv3Node,
     get_stack_tag_for_group,
-    group_id_from_metadata)
+    group_id_from_metadata
+)
 from otter.indexer import atom
 from otter.models.cass import CassScalingGroupServersCache
 from otter.util.http import append_segments

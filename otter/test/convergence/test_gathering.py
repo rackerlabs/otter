@@ -28,10 +28,9 @@ from toolz.functoolz import compose
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import NoSuchEndpoint
-from otter.cloud_client import (
-    CLBNotFoundError,
-    service_request
-)
+from otter.cloud_client import service_request
+from otter.cloud_client.clb import CLBNotFoundError
+
 from otter.constants import ServiceType
 from otter.convergence.gathering import (
     extract_clb_drained_at,

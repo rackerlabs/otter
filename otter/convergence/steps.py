@@ -19,23 +19,24 @@ from twisted.python.constants import NamedConstant
 from zope.interface import Interface, implementer
 
 from otter.cloud_client import (
-    CLBNodeLimitError,
-    CLBNotFoundError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
-    NoSuchCLBNodeError,
-    add_clb_nodes,
-    change_clb_node,
     check_stack,
     create_server,
     create_stack,
     delete_stack,
     has_code,
-    remove_clb_nodes,
     rcv3,
     service_request,
     set_nova_metadata_item,
     update_stack)
+from otter.cloud_client.clb import (
+    CLBNodeLimitError,
+    CLBNotFoundError,
+    NoSuchCLBNodeError,
+    add_clb_nodes,
+    change_clb_node,
+    remove_clb_nodes)
 from otter.constants import ServiceType
 from otter.convergence.model import ErrorReason, HeatStack, StepResult
 from otter.util.fp import set_in

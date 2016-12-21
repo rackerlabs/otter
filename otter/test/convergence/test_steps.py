@@ -14,17 +14,8 @@ from testtools.matchers import ContainsAll
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import (
-    CLBDeletedError,
-    CLBDuplicateNodesError,
-    CLBImmutableError,
-    CLBNodeLimitError,
-    CLBNotActiveError,
-    CLBNotFoundError,
-    CLBRateLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
-    NoSuchCLBError,
-    NoSuchCLBNodeError,
     NoSuchServerError,
     NovaComputeFaultError,
     NovaRateLimitError,
@@ -33,16 +24,29 @@ from otter.cloud_client import (
     create_stack,
     delete_stack,
     has_code,
-    service_request,
     rcv3,
-    update_stack)
+    service_request,
+    update_stack
+)
+from otter.cloud_client.clb import (
+    CLBDeletedError,
+    CLBDuplicateNodesError,
+    CLBImmutableError,
+    CLBNodeLimitError,
+    CLBNotActiveError,
+    CLBNotFoundError,
+    CLBRateLimitError,
+    NoSuchCLBError,
+    NoSuchCLBNodeError
+)
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
     CLBNodeCondition,
     CLBNodeType,
     ErrorReason,
-    StepResult)
+    StepResult
+)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -70,7 +74,8 @@ from otter.test.utils import (
     resolve_effect,
     stack,
     stub_pure_response,
-    transform_eq)
+    transform_eq
+)
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError
 from otter.util.retry import (
