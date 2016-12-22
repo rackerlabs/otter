@@ -496,6 +496,9 @@ def _unmarshal_state(state_dict):
 
     status = _group_status(state_dict['status'],
                            state_dict.get('deleting', False))
+    suspended = state_dict["suspended"]
+    if suspended is None:
+        suspended = False
 
     return GroupState(
         state_dict["tenantId"], state_dict["groupId"],
@@ -508,7 +511,7 @@ def _unmarshal_state(state_dict):
         status,
         desired=desired_capacity,
         error_reasons=(state_dict["error_reasons"] or []),
-        suspended=(state_dict["suspended"] or False)
+        suspended=suspended
     )
 
 
