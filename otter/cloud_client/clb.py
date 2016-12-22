@@ -1,19 +1,18 @@
 from functools import partial
 from operator import itemgetter
-from urlparse import parse_qs, urlparse
 
 import attr
 
 from characteristic import Attribute, attributes
 
 from effect import catch, raise_
-from effect.do import do, do_return
 
 import six
 
 from toolz.functoolz import identity
 from toolz.itertoolz import concat
 
+from otter.cloud_client import cloudfeeds as cf
 from otter.cloud_client import (
     log_success_response,
     match_errors,
@@ -21,7 +20,6 @@ from otter.cloud_client import (
     regex,
     service_request)
 from otter.constants import ServiceType
-from otter.indexer import atom
 from otter.util.http import APIError, append_segments, try_json_with_keys
 from otter.util.pure_http import has_code
 
@@ -370,32 +368,6 @@ def get_clbs():
         success=lambda (response, body): body['loadBalancers'])
 
 
-def _node_feed_page(lb_id, node_id, params):
-    """
-    Return page of CLB node feed
-
-    :param int lb_id: Cloud Load balancer ID
-    :param int node_id: Node ID of in loadbalancer node
-    :param dict params: Request query parameters
-
-    :returns: Unparsed response body as string
-    :rtype: `str`
-    """
-    return service_request(
-        ServiceType.CLOUD_LOAD_BALANCERS, 'GET',
-        append_segments('loadbalancers', str(lb_id), 'nodes',
-                        '{}.atom'.format(node_id)),
-        params=params,
-        json_response=False
-    ).on(
-        error=only_json_api_errors(
-            lambda c, b: _process_clb_api_error(c, b, lb_id))
-    ).on(
-        log_success_response('request-get-clb-node-feed', identity)
-    ).on(itemgetter(1))
-
-
-@do
 def get_clb_node_feed(lb_id, node_id):
     """
     Get the atom feed associated with a CLB node.
@@ -406,20 +378,17 @@ def get_clb_node_feed(lb_id, node_id):
     :returns: Effect of ``list`` of atom entry :class:`Element`
     :rtype: ``Effect``
     """
-    all_entries = []
-    params = {}
-    while True:
-        feed_str = yield _node_feed_page(lb_id, node_id, params)
-        feed = atom.parse(feed_str)
-        entries = atom.entries(feed)
-        if entries == []:
-            break
-        all_entries.extend(entries)
-        next_link = atom.next_link(feed)
-        if not next_link:
-            break
-        params = parse_qs(urlparse(next_link).query)
-    yield do_return(all_entries)
+    return cf.read_entries(
+        ServiceType.CLOUD_LOAD_BALANCERS,
+        append_segments('loadbalancers', str(lb_id), 'nodes',
+                        '{}.atom'.format(node_id)),
+        {},
+        cf.Direction.NEXT,
+        "request-get-clb-node-feed"
+    ).on(itemgetter(0)).on(
+        error=only_json_api_errors(
+            lambda c, b: _process_clb_api_error(c, b, lb_id))
+    )
 
 
 def get_clb_health_monitor(lb_id):
