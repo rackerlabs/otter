@@ -73,7 +73,6 @@ class GroupState(object):
     :ivar callable now: callable that returns a :class:`bytes` timestamp
         used for testing purposes. Defaults to :func:`timestamp.now`
     """
-
     tenant_id = attr.ib(validator=aiof(six.text_type),
                         convert=lenient_ascii_text)
     group_id = attr.ib(validator=aiof(six.text_type),
