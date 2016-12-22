@@ -15,7 +15,7 @@ from twisted.python.constants import NamedConstant, Names
 from zope.interface import Attribute, Interface
 
 from otter.util import timestamp
-from otter.util.http import text
+from otter.util.http import lenient_ascii_text
 
 
 class ScalingGroupStatus(Names):
@@ -44,17 +44,21 @@ class GroupState(object):
     """
     Object that represents the state
 
-    :ivar bytes tenant_id: the tenant ID of the scaling group whose state this
+    :ivar tenant_id: the tenant ID of the scaling group whose state this
         object represents
-    :ivar bytes group_id: the ID of the scaling group whose state this
+    :type: :obj:`six.text_type`
+    :ivar group_id: the ID of the scaling group whose state this
         object represents
+    :type: :obj:`six.text_type`
     :ivar group_name: the name of the scaling group whose state this
         object represents
+    :type: :obj:`six.text_type`
     :ivar dict active: the mapping of active server ids and their info
     :ivar dict pending: the list of pending job ids and their info
     :ivar group_touched: timezone-aware ISO860 formatted timestamp
         that represents when the last time any policy was executed
         on the group. Could be None.
+    :type: :obj:`six.text_type`
     :ivar dict policy_touched: dictionary mapping policy ids to the last time
         they were executed, if ever. The time is stored as ISO860 format str
     :ivar bool paused: whether the scaling group is paused in
@@ -70,13 +74,17 @@ class GroupState(object):
         used for testing purposes. Defaults to :func:`timestamp.now`
     """
 
-    tenant_id = attr.ib(validator=aiof(six.text_type), convert=text)
-    group_id = attr.ib(validator=aiof(six.text_type), convert=text)
-    group_name = attr.ib(validator=aiof(six.text_type), convert=text)
+    tenant_id = attr.ib(validator=aiof(six.text_type),
+                        convert=lenient_ascii_text)
+    group_id = attr.ib(validator=aiof(six.text_type),
+                       convert=lenient_ascii_text)
+    group_name = attr.ib(validator=aiof(six.text_type),
+                         convert=lenient_ascii_text)
     active = attr.ib(validator=aiof(dict))
     pending = attr.ib(validator=aiof(dict))
-    group_touched = attr.ib(validator=aiof(six.text_type),
-                            convert=lambda t: text(t or timestamp.MIN))
+    group_touched = attr.ib(
+        validator=aiof(six.text_type),
+        convert=lambda t: lenient_ascii_text(t or timestamp.MIN))
     policy_touched = attr.ib(validator=aiof(dict))
     paused = attr.ib(validator=aiof(bool))
     status = attr.ib(validator=aiof(NamedConstant))

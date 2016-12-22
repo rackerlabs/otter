@@ -28,7 +28,8 @@ services:
         ports:
             - "2181:2181"
     mimic: 
-        build: https://github.com/rackerlabs/mimic.git#f317ee5d322aa7cb2b117e2984dfe8ef10558cd5
+        build: https://github.com/rackerlabs/mimic.git#594dd5c8e80b670fa2d0c42f5eec9645e14aa54e
+        command: twistd -n mimic --realtime --verbose
     cafe:
         build:
             context: .
@@ -40,6 +41,7 @@ services:
         volumes:
             - ./autoscale_cloudroast/test_repo:/cafe/autoscale_cloudroast/test_repo
             - ./autoscale_cloudcafe/autoscale_fixtures:/cafe/autoscale_cloudcafe/autoscale_fixtures
+            - ./_docker_cafe_logs:/root/.cloudcafe/logs/autoscale
         command:
             dev-convergence -p functional
         depends_on:
@@ -51,6 +53,7 @@ services:
             dockerfile: docker/otter/Dockerfile
         volumes:
             - ./otter:/app/otter
+            - ./_docker_trial_tmp:/tmp
         environment:
             - AS_USERNAME=jenkins_user
             - AS_PASSWORD=jenkins_password
@@ -66,7 +69,7 @@ services:
             - AS_SELFHEAL_INTERVAL=20
         command:
             dockerize -timeout 60s -wait http://otter:9000/health -wait http://mimic:8900
-                trial -j10 otter.integration.tests
+                trial -j10 --temp-directory=/tmp/_trial_temp otter.integration.tests
         depends_on:
             - otter
             - mimic
