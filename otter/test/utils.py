@@ -636,7 +636,7 @@ class FakeSupervisor(Service, object):
 
 def sample_group_state(tid='tid', gid='gid'):
     """ GroupState object for test """
-    return GroupState('tid', 'gid', 'g', {}, {}, None, {}, False,
+    return GroupState(tid, gid, 'g', {}, {}, None, {}, False,
                       ScalingGroupStatus.ACTIVE)
 
 
