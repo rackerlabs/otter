@@ -41,7 +41,7 @@ from zope.interface.verify import verifyObject
 from otter.convergence.model import HeatStack, NovaServer, ServerState
 from otter.log.bound import BoundLog, bound_log_kwargs
 from otter.models.interface import (
-    IScalingGroup, IScalingGroupServersCache, GroupState, ScalingGroupStatus)
+    GroupState, IScalingGroup, IScalingGroupServersCache, ScalingGroupStatus)
 from otter.supervisor import ISupervisor
 from otter.util.config import set_config_data, update_config_data
 from otter.util.deferredutils import DeferredPool
