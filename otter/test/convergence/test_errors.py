@@ -4,10 +4,12 @@ from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import NoSuchEndpoint
 from otter.cloud_client import (
+    CreateServerConfigurationError,
+    CreateServerOverQuoteError
+)
+from otter.cloud_client.clb import (
     CLBDeletedError,
     CLBNodeLimitError,
-    CreateServerConfigurationError,
-    CreateServerOverQuoteError,
     NoSuchCLBError,
     NoSuchCLBNodeError
 )

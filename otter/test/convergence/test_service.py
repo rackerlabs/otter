@@ -24,7 +24,8 @@ from pyrsistent import freeze, pbag, pmap, pset, s, thaw
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.auth import NoSuchEndpoint
-from otter.cloud_client import NoSuchCLBError, TenantScope
+from otter.cloud_client import TenantScope
+from otter.cloud_client.clb import NoSuchCLBError
 from otter.constants import CONVERGENCE_DIRTY_DIR
 from otter.convergence.composition import (get_desired_server_group_state,
                                            get_desired_stack_group_state)
