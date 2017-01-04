@@ -1853,10 +1853,12 @@ class CassScalingGroupServersCache(object):
             params = assoc(self.params, "last_update", time)
             queries = []
             for i, server in enumerate(servers):
-                params['server_id{}'.format(i)] = server['id']
-                params['server_as_active{}'.format(i)] = server.pop(
-                    '_is_as_active', False)
-                params['server_blob{}'.format(i)] = json.dumps(server)
+                params.update({
+                    'server_id{}'.format(i): server['id'],
+                    'server_as_active{}'.format(i): server.pop('_is_as_active',
+                                                               False),
+                    'server_blob{}'.format(i): json.dumps(server)
+                })
                 queries.append(query.format(cf=self.table, i=i))
             yield cql_eff(batch(queries), params)
 
