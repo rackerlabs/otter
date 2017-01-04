@@ -637,7 +637,7 @@ class IScalingGroupServersCache(Interface):
     tenant_id = Attribute("Rackspace Tenant ID of the owner of this group.")
     group_id = Attribute("UUID of the scaling group - immutable.")
 
-    def get_servers(only_as_active):
+    def get_servers(only_as_active):    # pragma: no cover
         """
         Return latest cache of servers in a group along with last time the
         cache was updated.
@@ -650,7 +650,7 @@ class IScalingGroupServersCache(Interface):
         :rtype: Effect
         """
 
-    def update_servers(time, servers):
+    def update_servers(time, servers):  # pragma: no cover
         """
         Update the servers cache of the group with given list of servers
 
@@ -663,7 +663,7 @@ class IScalingGroupServersCache(Interface):
         :return: Effect of None
         """
 
-    def delete_servers(time):
+    def delete_servers(time):  # pragma: no cover
         """
         Delete servers stored on the given timestamp
 
