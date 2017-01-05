@@ -34,22 +34,23 @@ def get_service_configs(config):
     :param dict config: Config from file containing service names that will be
         there in service catalog
     """
+    region = config['region']
     configs = {
         ServiceType.CLOUD_SERVERS: {
             'name': config['cloudServersOpenStack'],
-            'region': config['region'],
+            'region': region,
         },
         ServiceType.CLOUD_LOAD_BALANCERS: {
             'name': config['cloudLoadBalancers'],
-            'region': config['region'],
+            'region': region,
         },
         ServiceType.CLOUD_ORCHESTRATION: {
             'name': config['cloudOrchestration'],
-            'region': config['region'],
+            'region': region,
         },
         ServiceType.RACKCONNECT_V3: {
             'name': config['rackconnect'],
-            'region': config['region'],
+            'region': region,
         }
     }
 
@@ -58,11 +59,22 @@ def get_service_configs(config):
         configs[ServiceType.CLOUD_METRICS_INGEST] = {
             'name': metrics['service'], 'region': metrics['region']}
 
+    # {"cloudfeeds"...} contains config for 2 feeds services: One where otter
+    # pushes scaling group events `otter.log.cloudfeeds` as {"url": ...}
+    # and other where it fetches customer access events for terminator which
+    # is {"customer_access_events": {"url": "http://url"} or
+    #                               {"name": "service name"}}
+    # The {"name"..} option is to test otter against mimic that only returns
+    # URLs from service catalog.
     cf = config.get('cloudfeeds')
     if cf is not None:
         configs[ServiceType.CLOUD_FEEDS] = {'url': cf['url']}
-        customer_access_url = cf.get("customer_access_events_url")
-        if customer_access_url is not None:
-            configs[ServiceType.CLOUD_FEEDS_CAP] = {'url': customer_access_url}
+        cap_conf = cf.get("customer_access_events")
+        if cap_conf is not None:
+            if "url" in cap_conf:
+                cap_service_conf = {"url": cap_conf["url"]}
+            else:
+                cap_service_conf = {"name": cap_conf["name"], "region": region}
+            configs[ServiceType.CLOUD_FEEDS_CAP] = cap_service_conf
 
     return configs
