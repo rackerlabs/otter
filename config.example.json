@@ -65,7 +65,7 @@
         "service": "cloudFeeds",
         "tenant_id": "identity_admin_tenant",
         "url": "http://cfurl.net/not/in/service/catalog",
-        "customer_acess_events_url": "https://dfwurl/not_in_catalog"
+        "customer_acess_events": {"url": "https://dfwurl/not_in_catalog"}
     },
     "converger": {
         "build_timeout": 3600,
