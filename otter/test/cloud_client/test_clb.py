@@ -3,7 +3,7 @@
 import json
 
 from effect import sync_perform
-from effect.testing import EQFDispatcher, perform_sequence
+from effect.testing import EQFDispatcher, const, noop, perform_sequence
 
 import six
 
@@ -33,8 +33,6 @@ from otter.indexer import atom
 from otter.test.cloud_client.test_init import log_intent, service_request_eqf
 from otter.test.utils import (
     StubResponse,
-    const,
-    noop,
     stub_json_response,
     stub_pure_response
 )

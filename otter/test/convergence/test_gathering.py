@@ -16,7 +16,8 @@ from effect import (
 
 from effect.async import perform_parallel_async
 from effect.testing import (
-    EQDispatcher, EQFDispatcher, Stub, parallel_sequence, perform_sequence)
+    EQDispatcher, EQFDispatcher, Stub, intent_func, nested_sequence,
+    parallel_sequence, perform_sequence)
 
 import mock
 
@@ -58,8 +59,6 @@ from otter.log.intents import Log
 from otter.test.utils import (
     EffectServersCache,
     StubResponse,
-    intent_func,
-    nested_sequence,
     patch,
     resolve_stubs,
     server,

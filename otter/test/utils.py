@@ -10,7 +10,7 @@ from operator import attrgetter
 
 from effect import (
     ComposedDispatcher, Constant, Effect, ParallelEffects, TypeDispatcher,
-    base_dispatcher, raise_)
+    base_dispatcher)
 from effect.async import perform_parallel_async
 from effect.testing import (
     perform_sequence,
@@ -901,39 +901,6 @@ class TestStep(object):
 
     def as_effect(self):
         return self.effect
-
-
-def noop(_):
-    """Ignore input and return None."""
-    pass
-
-
-def const(v):
-    """
-    Return function that takes an argument but always return given `v`.
-    Useful with `SequenceDispatcher`. For example,
-
-    >>> dt = datetime(1970, 1, 1)
-    >>> SequenceDispatcher([(Func(datetime.now), const(dt))])
-    """
-
-    return lambda i: v
-
-
-def conste(e):
-    """
-    Like ``const`` but takes and exception and returns function that raises
-    the exception
-    """
-    return lambda i: raise_(e)
-
-
-def intent_func(fname):
-    """
-    Return function that returns Effect of tuple of fname and its args. Useful
-    in writing tests that expect intent based on args
-    """
-    return lambda *a: Effect((fname,) + a)
 
 
 def exp_seq_func(testcase, seq):

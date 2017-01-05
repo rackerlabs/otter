@@ -12,7 +12,8 @@ from characteristic import attributes
 from effect import (
     ComposedDispatcher, Constant, Delay, Effect, Error, Func, TypeDispatcher,
     base_dispatcher, sync_perform)
-from effect.testing import SequenceDispatcher, perform_sequence
+from effect.testing import (
+    SequenceDispatcher, const, conste, intent_func, noop, perform_sequence)
 
 from kazoo.exceptions import (
     BadVersionError, LockTimeout, NoNodeError, NodeExistsError,
@@ -21,8 +22,7 @@ from kazoo.exceptions import (
 from twisted.internet.defer import fail, maybeDeferred, succeed
 from twisted.trial.unittest import SynchronousTestCase
 
-from otter.test.utils import (
-    const, conste, exp_func, intent_func, mock_log, noop, test_dispatcher)
+from otter.test.utils import exp_func, mock_log, test_dispatcher
 from otter.util import zk
 from otter.util.zk import (
     CreateOrSet, CreateOrSetLoopLimitReachedError,

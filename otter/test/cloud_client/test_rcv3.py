@@ -2,7 +2,7 @@
 Tests for otter.cloud_client.rcv3
 """
 
-from effect.testing import perform_sequence
+from effect.testing import const, noop, perform_sequence
 
 from pyrsistent import pset
 
@@ -13,8 +13,7 @@ from twisted.trial.unittest import SynchronousTestCase
 from otter.cloud_client import ServiceType, service_request
 from otter.cloud_client import rcv3 as r
 from otter.test.cloud_client.test_init import log_intent
-from otter.test.utils import (
-    const, noop, patch, stub_json_response)
+from otter.test.utils import patch, stub_json_response
 from otter.util.pure_http import has_code
 
 
