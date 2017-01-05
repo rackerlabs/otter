@@ -12,7 +12,7 @@ from effect import (
 from effect.ref import (
     ModifyReference, ReadReference, Reference, reference_dispatcher)
 from effect.testing import (
-    SequenceDispatcher, conste, intent_func, nested_sequence, noop,
+    SequenceDispatcher, const, conste, intent_func, nested_sequence, noop,
     parallel_sequence, perform_sequence)
 
 from kazoo.exceptions import BadVersionError, NoNodeError
