@@ -12,7 +12,8 @@ from effect import (
 from effect.ref import (
     ModifyReference, ReadReference, Reference, reference_dispatcher)
 from effect.testing import (
-    SequenceDispatcher, parallel_sequence, perform_sequence)
+    SequenceDispatcher, conste, intent_func, nested_sequence, noop,
+    parallel_sequence, perform_sequence)
 
 from kazoo.exceptions import BadVersionError, NoNodeError
 from kazoo.recipe.partitioner import PartitionState
@@ -65,15 +66,13 @@ from otter.models.interface import (
 from otter.test.convergence.test_planning import server
 from otter.test.util.test_zk import ZNodeStatStub
 from otter.test.utils import (
-    CheckFailureValue, FakePartitioner,
+    CheckFailureValue,
+    FakePartitioner,
     TestStep,
-    conste,
-    intent_func,
     match_all,
     match_func,
-    mock_group, mock_log,
-    nested_sequence,
-    noop,
+    mock_group,
+    mock_log,
     raise_to_exc_info,
     transform_eq)
 from otter.util.zk import CreateOrSet, DeleteNode, GetChildren, GetStat
