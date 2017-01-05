@@ -553,7 +553,7 @@ class DeleteActiveServersTests(SynchronousTestCase):
             '5': {'created': '2014-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
         self.fake_state = GroupState('t', 'g', 'n', self.data, {}, False,
-                                     False, False, ScalingGroupStatus.ACTIVE)
+                                     {}, False, ScalingGroupStatus.ACTIVE)
         self.evict_servers = {'1': self.data['1'], '4': self.data['4'],
                               '3': self.data['3']}
 
@@ -727,7 +727,7 @@ class ExecScaleDownTests(SynchronousTestCase):
             'a5': {'created': '2014-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: a1, a4, a3, a2, a5
         self.fake_state = GroupState('t', 'g', '', self.active, self.pending,
-                                     False, False, False,
+                                     False, {}, False,
                                      ScalingGroupStatus.ACTIVE)
         self.find_pending_jobs_to_cancel = patch(
             self, 'otter.supervisor.find_pending_jobs_to_cancel')
@@ -793,7 +793,7 @@ class ExecuteLaunchConfigTestCase(SynchronousTestCase):
                 return jself.d
 
         patch(self, 'otter.supervisor._Job', new=FakeJob)
-        self.state = GroupState('t', 'g', 'n', {}, {}, 0, 1, 2,
+        self.state = GroupState('t', 'g', 'n', {}, {}, None, {}, False,
                                 ScalingGroupStatus.ACTIVE)
 
     def test_no_jobs_started(self):
@@ -1119,7 +1119,7 @@ class RemoveServerTests(SynchronousTestCase):
         self.tid = 'trans_id'
         self.log = mock_log()
         self.state = GroupState('tid', 'gid', 'g', {'s0': {'id': 's0'}}, {},
-                                None, None, None, ScalingGroupStatus.ACTIVE,
+                                None, {}, False, ScalingGroupStatus.ACTIVE,
                                 desired=1)
         self.group = mock_group(self.state)
         self.gen_jobid = patch(self, 'otter.supervisor.generate_job_id',

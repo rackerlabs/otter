@@ -6,7 +6,7 @@ import json
 import re
 
 import attr
-from attr.validators import instance_of
+from attr.validators import instance_of, optional
 
 from characteristic import Attribute, attributes
 
@@ -583,13 +583,7 @@ class DrainingUnavailable(Exception):
 
 
 @implementer(ILBNode, IDrainable)
-@attributes([Attribute("node_id", instance_of=basestring),
-             Attribute("description", instance_of=CLBDescription),
-             Attribute("address", instance_of=basestring),
-             Attribute("_drained_at", default_value=None),
-             Attribute("is_online", instance_of=bool,
-                       default_value=True),
-             Attribute("connections", default_value=None)])
+@attr.s
 class CLBNode(object):
     """
     A Rackspace Cloud Load Balancer node.
@@ -612,6 +606,12 @@ class CLBNode(object):
     :ivar int connections: The number of active connections on the node - this
         is None by default (the stat is not available yet).
     """
+    node_id = attr.ib(validator=instance_of(basestring))
+    description = attr.ib(validator=instance_of(CLBDescription))
+    address = attr.ib(validator=instance_of(basestring))
+    _drained_at = attr.ib(validator=optional(instance_of(float)), default=None)
+    is_online = attr.ib(validator=optional(instance_of(bool)), default=True)
+    connections = attr.ib(default=None)
 
     @property
     def drained_at(self):
@@ -625,6 +625,15 @@ class CLBNode(object):
         if self._drained_at is None:
             raise DrainingUnavailable(self.description.lb_id, self.node_id)
         return self._drained_at
+
+    @drained_at.setter
+    def drained_at(self, updated):
+        """
+        Update the internal _drained_at value
+
+        :param float updated: The updated value as seconds since EPOCH
+        """
+        self._drained_at = updated
 
     def matches(self, server):
         """

@@ -3,7 +3,8 @@ import json
 from uuid import uuid4
 
 from effect import Effect, Func, base_dispatcher, raise_, sync_perform
-from effect.testing import SequenceDispatcher, perform_sequence
+from effect.testing import (
+    SequenceDispatcher, intent_func, noop, perform_sequence)
 
 from mock import ANY, patch
 
@@ -14,17 +15,8 @@ from testtools.matchers import ContainsAll
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import (
-    CLBDeletedError,
-    CLBDuplicateNodesError,
-    CLBImmutableError,
-    CLBNodeLimitError,
-    CLBNotActiveError,
-    CLBNotFoundError,
-    CLBRateLimitError,
     CreateServerConfigurationError,
     CreateServerOverQuoteError,
-    NoSuchCLBError,
-    NoSuchCLBNodeError,
     NoSuchServerError,
     NovaComputeFaultError,
     NovaRateLimitError,
@@ -33,16 +25,29 @@ from otter.cloud_client import (
     create_stack,
     delete_stack,
     has_code,
-    service_request,
     rcv3,
-    update_stack)
+    service_request,
+    update_stack
+)
+from otter.cloud_client.clb import (
+    CLBDeletedError,
+    CLBDuplicateNodesError,
+    CLBImmutableError,
+    CLBNodeLimitError,
+    CLBNotActiveError,
+    CLBNotFoundError,
+    CLBRateLimitError,
+    NoSuchCLBError,
+    NoSuchCLBNodeError
+)
 from otter.constants import ServiceType
 from otter.convergence.model import (
     CLBDescription,
     CLBNodeCondition,
     CLBNodeType,
     ErrorReason,
-    StepResult)
+    StepResult
+)
 from otter.convergence.steps import (
     AddNodesToCLB,
     BulkAddToRCv3,
@@ -64,13 +69,12 @@ from otter.convergence.steps import (
 from otter.log.intents import Log
 from otter.test.utils import (
     StubResponse,
-    intent_func,
     matches,
-    noop,
     resolve_effect,
     stack,
     stub_pure_response,
-    transform_eq)
+    transform_eq
+)
 from otter.util.hashkey import generate_server_name
 from otter.util.http import APIError
 from otter.util.retry import (

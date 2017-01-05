@@ -3,7 +3,9 @@ Tests for :mod:`otter.convergence.selfheal`
 """
 
 from effect import base_dispatcher, raise_
-from effect.testing import SequenceDispatcher
+from effect.testing import (
+    SequenceDispatcher, const, conste, intent_func, nested_sequence, noop,
+    perform_sequence)
 
 import mock
 
@@ -17,9 +19,7 @@ from otter.log.intents import BoundFields, Log
 from otter.models.intents import GetAllValidGroups, GetScalingGroupInfo
 from otter.models.interface import (
     GroupState, NoSuchScalingGroupError, ScalingGroupStatus)
-from otter.test.utils import (
-    CheckFailure, const, conste, intent_func, matches, mock_log,
-    nested_sequence, noop, perform_sequence)
+from otter.test.utils import CheckFailure, matches, mock_log
 
 
 class SelfHealTests(SynchronousTestCase):

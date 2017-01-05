@@ -7,7 +7,9 @@ import time
 from io import StringIO
 
 from effect import Constant, Effect, Func, base_dispatcher
-from effect.testing import SequenceDispatcher, perform_sequence
+from effect.testing import (
+    SequenceDispatcher, const, intent_func, nested_sequence, noop,
+    perform_sequence)
 
 import mock
 
@@ -41,12 +43,8 @@ from otter.test.test_auth import identity_config
 from otter.test.utils import (
     CheckFailureValue,
     Provides,
-    const,
-    intent_func,
     matches,
     mock_log,
-    nested_sequence,
-    noop,
     patch,
     resolve_effect
 )

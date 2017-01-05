@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from characteristic import attributes
 
-from effect.testing import SequenceDispatcher
+from effect.testing import SequenceDispatcher, intent_func, nested_sequence
 
 import mock
 
@@ -14,7 +14,6 @@ from pyrsistent import pset
 from twisted.trial.unittest import SynchronousTestCase
 
 from otter.cloud_client import TenantScope
-from otter.test.utils import intent_func, nested_sequence
 from otter.worker import _rcv3
 
 

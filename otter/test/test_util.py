@@ -26,6 +26,7 @@ from otter.util.http import (
     headers,
     raise_error_on_code,
     retry_on_unauth,
+    lenient_ascii_text,
     try_json_with_keys,
     wrap_request_error)
 
@@ -892,3 +893,17 @@ class RetryOnUnauthTests(SynchronousTestCase):
         d = retry_on_unauth(func, auth)
         self.failureResultOf(d, ValueError)
         auth.assert_called_once_with()
+
+
+class LenientAsciiTextTests(SynchronousTestCase):
+    """
+    Tests for :func:`lenient_ascii_text`
+    """
+
+    def test_unicode(self):
+        """ unicode is returned as such """
+        self.assertEqual(lenient_ascii_text(u"test"), u"test")
+
+    def test_string(self):
+        """ string is converted to unicode """
+        self.assertEqual(lenient_ascii_text("test"), u"test")

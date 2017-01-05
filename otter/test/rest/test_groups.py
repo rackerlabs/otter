@@ -136,8 +136,8 @@ class FormatterHelpers(SynchronousTestCase):
             '11111',
             'one',
             'test',
-            None,  # active ignored
-            None,  # pending Ignored!
+            {},  # active ignored
+            {},  # pending Ignored!
             None,
             {},
             True,
@@ -161,8 +161,8 @@ class FormatterHelpers(SynchronousTestCase):
             '11111',
             'one',
             'test',
-            None,  # active ignored
-            None,  # pending Ignored!
+            {},  # active ignored
+            {},  # pending Ignored!
             None,
             {},
             True,
@@ -409,7 +409,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, SynchronousTestCase):
         self.mock_store.reactor = 'reactor'
 
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(
-            [GroupState('11111', 'one', '1', None, None, None, {}, False,
+            [GroupState('11111', 'one', '1', {}, {}, None, {}, False,
                         ScalingGroupStatus.ACTIVE, desired=2)]
         )
 
@@ -1002,7 +1002,7 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             'groupConfiguration': config_examples()[0],
             'launchConfiguration': launch_examples()[0],
             'id': 'one',
-            'state': GroupState('11111', 'one', 'g', None, None, None, {},
+            'state': GroupState('11111', 'one', 'g', {}, {}, None, {},
                                 False, ScalingGroupStatus.ACTIVE, desired=3),
             'scalingPolicies': [dict(id="5", **policy_examples()[0])]
         }
@@ -1201,24 +1201,6 @@ class OneGroupTestCase(RestAPITestMixin, SynchronousTestCase):
             403, endpoint='{}converge'.format(self.endpoint), method='POST')
         self.assertTrue(self.mock_controller.modify_and_trigger.called)
 
-    def test_error_group_converge(self):
-        """
-        Calling `../converge?on_error=False` will not trigger convergence
-        on ERROR group
-        """
-        set_config_data({'convergence-tenants': ['11111']})
-        self.addCleanup(set_config_data, {})
-        self.mock_state = GroupState(
-            '11111', 'one', '', {}, {}, None, {}, False,
-            ScalingGroupStatus.ERROR)  # error group
-        response_wrapper = self.request(
-            endpoint='{}converge?on_error=false'.format(self.endpoint),
-            method='POST')
-        self.assert_response(response_wrapper, 204)
-        values = response_wrapper.response.headers.getRawHeaders(
-            'x-not-converging')
-        self.assertEqual(values, ["true"])
-
     def test_group_converge_worker_tenant(self):
         """
         Calling `../converge` on non-convergence enabled tenant returns 404
@@ -1300,7 +1282,7 @@ class GroupStateTestCase(RestAPITestMixin, SynchronousTestCase):
         self.addCleanup(set_config_data, {})
 
         self.mock_group.view_state.return_value = defer.succeed(
-            GroupState("11111", "one", 'g', None, None, False, False, False,
+            GroupState("11111", "one", 'g', {}, {}, None, {}, False,
                        ScalingGroupStatus.ACTIVE, desired=4))
         self.mock_store.connection = 'connection'
         self.mock_store.reactor = 'reactor'
