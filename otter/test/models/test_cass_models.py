@@ -10,7 +10,8 @@ from functools import partial
 
 from effect import (
     Effect, ParallelEffects, TypeDispatcher, sync_perform)
-from effect.testing import perform_sequence, resolve_effect
+from effect.testing import (
+    const, intent_func, noop, perform_sequence, resolve_effect)
 
 from jsonschema import ValidationError
 
@@ -72,11 +73,8 @@ from otter.test.util.test_zk import ZKCrudModel, create_fake_lock
 from otter.test.utils import (
     DummyException,
     LockMixin,
-    const,
-    intent_func,
     matches,
     mock_log,
-    noop,
     patch,
     test_dispatcher)
 from otter.util.config import set_config_data
