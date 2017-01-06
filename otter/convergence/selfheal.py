@@ -127,7 +127,7 @@ def check_and_trigger(tenant_id, group_id):
     else:
         state = info["state"]
         if (state.status == ScalingGroupStatus.ACTIVE and
-                (not state.paused) and (not state.suspended)):
+                not (state.paused or state.suspended)):
             yield with_log(
                 trigger_convergence(tenant_id, group_id),
                 tenant_id=tenant_id, scaling_group_id=group_id)
