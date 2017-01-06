@@ -104,6 +104,7 @@ class TenantSuspendedError(Exception):
     tenantid is suspended.
     """
     def __init__(self, tenant_id):
+        self.tenant_id = tenant_id
         fmt = "Tenant {t} is SUSPENDED."
         super(TenantSuspendedError, self).__init__(fmt.format(t=tenant_id))
 

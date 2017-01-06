@@ -1527,7 +1527,8 @@ class ModifyAndTriggerTests(SynchronousTestCase):
         self.state.suspended = True
         d = controller.modify_and_trigger(
             self.disp, self.group, self.logargs, lambda g, s: 1 / 0)
-        self.failureResultOf(d, controller.TenantSuspendedError)
+        f = self.failureResultOf(d, controller.TenantSuspendedError)
+        self.assertEqual(f.value.tenant_id, "tid")
         # convergence is not called
         self.assertFalse(self.disp.consumed())
 
