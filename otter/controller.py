@@ -317,14 +317,15 @@ def empty_group(log, trans_id, group):
 @defer.inlineCallbacks
 def modify_and_trigger(dispatcher, group, logargs, modifier, *args, **kwargs):
     """
-    Modify group state and trigger convergence after that. Checks if group is
-    suspended before calling modifier
+    Modify group state and trigger convergence after that if the group is not
+    suspended. Otherwise fail with :obj:`TenantSuspendedError`.
 
     :param IScalingGroup group: Scaling group whose state is getting modified
     :param log: Bound logger
     :param modifier: Callable as described in IScalingGroup.modify_state
 
-    :return: Deferred with None
+    :return: Deferred with None if modification and convergence succeeded.
+        Fails with :obj:`TenantSuspendedError` if group is suspended.
     """
     def modifier_wrapper(_group, state, *_args, **_kwargs):
         # Ideally this will not be allowed by repose middleware but
