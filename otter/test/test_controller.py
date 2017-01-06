@@ -1521,8 +1521,8 @@ class ModifyAndTriggerTests(SynchronousTestCase):
 
     def test_tenant_suspended(self):
         """
-        Raises :obj:`TenantSuspendedError` if associated tenant is suspended.
-        Given modifier function is not called.
+        Fails with :obj:`TenantSuspendedError` if associated tenant is
+        suspended. Given modifier function is not called.
         """
         self.state.suspended = True
         d = controller.modify_and_trigger(
