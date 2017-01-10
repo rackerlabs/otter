@@ -143,6 +143,31 @@ class ReadEntriesTests(SynchronousTestCase):
         self.assertEqual(params, {"page": ["3"]})
 
     @both_links
+    def test_follow_limit(self, rel):
+        """
+        Collects entries and keeping following rel link until `follow_limit` is
+        reached.
+        """
+        feeds = [self.feed(rel, "https://url?page={}".format(i + 1),
+                           ["summ{}".format(i + 1)])
+                 for i in range(5)]
+        seq = [
+            (self.svc_intent(), const(stub_json_response(feeds[0]))),
+            (self.svc_intent({"page": ['1']}),
+             const(stub_json_response(feeds[1]))),
+            (self.svc_intent({"page": ['2']}),
+             const(stub_json_response(feeds[2]))),
+        ]
+        entries, params = perform_sequence(
+            seq,
+            cf.read_entries(
+                self.service_type, self.url, {}, self.directions[rel], 3))
+        self.assertEqual(
+            [atom.summary(entry) for entry in entries],
+            ["summ1", "summ2", "summ3"])
+        self.assertEqual(params, {"page": ["3"]})
+
+    @both_links
     def test_log_responses(self, rel):
         """
         Each request sent is logged if `log_msg_type` is given
@@ -164,7 +189,7 @@ class ReadEntriesTests(SynchronousTestCase):
             seq,
             cf.read_entries(
                 self.service_type, self.url, {}, self.directions[rel],
-                "nodemsg"))
+                log_msg_type="nodemsg"))
 
     @both_links
     def test_no_link(self, rel):

@@ -42,7 +42,8 @@ class Direction(Names):
 
 
 @do
-def read_entries(service_type, url, params, direction, log_msg_type=None):
+def read_entries(service_type, url, params, direction, follow_limit=100,
+                 log_msg_type=None):
     """
     Read all feed entries and follow in given direction until it is empty
 
@@ -52,6 +53,8 @@ def read_entries(service_type, url, params, direction, log_msg_type=None):
     :param dict params: HTTP parameters
     :param direction: Where to continue fetching?
     :type direction: A member of :class:`Direction`
+    :param int follow_limit: Maximum number of times to follow in given
+        direction
 
     :return: (``list`` of :obj:`Element`, last fetched params) tuple
     """
@@ -68,7 +71,7 @@ def read_entries(service_type, url, params, direction, log_msg_type=None):
         log_cb = identity
 
     all_entries = []
-    while True:
+    while follow_limit > 0:
         resp, feed_str = yield service_request(
             service_type, "GET", url, params=params,
             json_response=False).on(log_cb)
@@ -81,4 +84,5 @@ def read_entries(service_type, url, params, direction, log_msg_type=None):
         if link is None:
             break
         params = parse_qs(urlparse(link).query)
+        follow_limit -= 1
     yield do_return((all_entries, params))
