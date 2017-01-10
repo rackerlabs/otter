@@ -3,7 +3,7 @@ Tests for logging in convergence (that steps are correctly logged).
 """
 
 from effect import sync_perform
-from effect.testing import SequenceDispatcher
+from effect.testing import SequenceDispatcher, noop
 
 from pyrsistent import freeze, pbag, pset
 
@@ -17,7 +17,7 @@ from otter.convergence.steps import (
     ConvergeLater, CreateServer, DeleteServer, RemoveNodesFromCLB,
     SetMetadataItemOnServer)
 from otter.log.intents import Log
-from otter.test.utils import noop, test_dispatcher
+from otter.test.utils import test_dispatcher
 
 
 def _clbd(lbid, port):

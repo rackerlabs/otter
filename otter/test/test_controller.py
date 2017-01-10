@@ -9,7 +9,8 @@ from effect import (
     raise_,
     sync_perform)
 from effect.testing import (
-    SequenceDispatcher, parallel_sequence, perform_sequence)
+    SequenceDispatcher, intent_func, nested_sequence, noop, parallel_sequence,
+    perform_sequence)
 
 import mock
 
@@ -36,12 +37,9 @@ from otter.supervisor import (
 from otter.test.utils import (
     StubResponse,
     iMock,
-    intent_func,
     matches,
     mock_group as util_mock_group,
     mock_log,
-    nested_sequence,
-    noop,
     patch,
     set_non_conv_tenant,
     test_dispatcher)
