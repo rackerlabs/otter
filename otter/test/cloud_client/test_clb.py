@@ -4,7 +4,7 @@ import json
 
 from effect import sync_perform
 from effect.testing import (
-    EQFDispatcher, const,intent_func,  noop, perform_sequence)
+    EQFDispatcher, const, intent_func, noop, perform_sequence)
 
 import six
 

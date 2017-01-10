@@ -3,7 +3,8 @@
 from functools import wraps
 
 from effect import sync_perform
-from effect.testing import EQFDispatcher, base_dispatcher, perform_sequence
+from effect.testing import (
+    EQFDispatcher, base_dispatcher, const, noop, perform_sequence)
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -12,8 +13,7 @@ from otter.cloud_client import service_request
 from otter.constants import ServiceType
 from otter.indexer import atom
 from otter.test.cloud_client.test_init import log_intent, service_request_eqf
-from otter.test.utils import (
-    const, noop, stub_json_response, stub_pure_response)
+from otter.test.utils import stub_json_response, stub_pure_response
 from otter.util.pure_http import APIError, has_code
 
 
