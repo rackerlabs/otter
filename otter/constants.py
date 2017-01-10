@@ -62,7 +62,7 @@ def get_service_configs(config):
     # {"cloudfeeds"...} contains config for 2 feeds services: One where otter
     # pushes scaling group events `otter.log.cloudfeeds` as {"url": ...}
     # and other where it fetches customer access events for terminator which
-    # is {"customer_access_events": {"url": "http://url"} or
+    # is {"customer_access_events": {"url": "https://url"} or
     #                               {"name": "service name"}}
     # The {"name"..} option is to test otter against mimic that only returns
     # URLs from service catalog.
