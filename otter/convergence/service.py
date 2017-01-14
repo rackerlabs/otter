@@ -83,6 +83,21 @@ The top-level entry-points into this module are :func:`trigger_convergence` and
 # or config has changed), only if there are _any_ outstanding requests for
 # convergence, since convergence always uses the most recent data.
 
+
+# # Note [Convergence servers cache]
+# Each convergence cycle runs 3 primary steps: gather, generate plan and
+# execute plan. For launch_server type convergence it keeps cache of servers
+# fetched during gather step to provide 2 functionalities: provide quick list
+# for `GET .../groupId/state` API and to keep track of deleted servers IPs to
+# remove those IPs from group's LBs. The cache is updated during fetch step and
+# after the execution with information about which servers are in their
+# respective LBs. The cache stores multiple versions based on timestamp. See
+# `IScalingGroupServersCache`. Hence, each call to cache update is expected to
+# have higher timestamp which it mostly will since it is always called from
+# same node. The cache interface can be better.
+# See https://github.com/rackerlabs/otter/issues/1966
+
+
 import operator
 import time
 import uuid
@@ -266,6 +281,7 @@ def convergence_exec_data(tenant_id, group_id, now, get_executor):
         desired_capacity = 0
     else:
         desired_capacity = group_state.desired
+        # See [Convergence servers cache] comment on top of the file.
         yield executor.update_cache(scaling_group, now, **resources)
 
     desired_group_state = executor.get_desired_group_state(
@@ -348,7 +364,7 @@ def execute_convergence(tenant_id, group_id, build_timeout, waiting,
     # Handle the status from execution
     if worst_status == StepResult.SUCCESS:
         result = yield convergence_succeeded(
-            executor, scaling_group, group_state, resources, now_dt)
+            executor, scaling_group, group_state, resources)
     elif worst_status == StepResult.FAILURE:
         result = yield convergence_failed(tenant_id, group_id, reasons)
     elif worst_status is StepResult.LIMITED_RETRY:
@@ -376,8 +392,7 @@ def update_stacks_cache(scaling_group, now, stacks, include_deleted=True):
 
 
 @do
-def convergence_succeeded(executor, scaling_group, group_state, resources,
-                          now):
+def convergence_succeeded(executor, scaling_group, group_state, resources):
     """
     Handle convergence success
     """
@@ -391,7 +406,9 @@ def convergence_succeeded(executor, scaling_group, group_state, resources,
                                        status=ScalingGroupStatus.ACTIVE))
         yield cf_msg('group-status-active',
                      status=ScalingGroupStatus.ACTIVE.name)
-    # update servers cache with latest servers
+    # update servers cache with latest servers.
+    # See [Convergence servers cache] comment on top of the file.
+    now = yield Effect(Func(datetime.utcnow))
     yield executor.update_cache(scaling_group, now, include_deleted=False,
                                 **resources)
     yield do_return(ConvergenceIterationStatus.Stop())

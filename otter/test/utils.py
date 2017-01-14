@@ -950,8 +950,8 @@ class EffectServersCache(object):
     def get_servers(self, with_as_active):
         return Effect((self.ids("gs"), with_as_active))
 
-    def insert_servers(self, time, servers, clear):
-        return Effect((self.ids("is"), time, servers, clear))
+    def update_servers(self, time, servers):
+        return Effect((self.ids("is"), time, servers))
 
     def delete_servers(self):
         return Effect(self.ids("ds"))
