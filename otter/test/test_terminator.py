@@ -3,9 +3,11 @@ Tests for :mod:`otter.terminator`
 """
 
 import json
+from operator import attrgetter
 
 import mock
 
+from effect import ParallelEffects
 from effect.testing import SequenceDispatcher, parallel_sequence
 
 from twisted.trial.unittest import SynchronousTestCase
@@ -22,7 +24,7 @@ from otter.models.interface import ScalingGroupStatus
 from otter.util import zk
 from otter.test.utils import (
     CheckFailure, const, conste, group_state, intent_func, nested_sequence,
-    noop, perform_sequence)
+    noop, perform_sequence, exp_seq_func)
 
 
 class TerminatorTests(SynchronousTestCase):
@@ -84,20 +86,35 @@ class ReadAndProcessTests(SynchronousTestCase):
         """
         self.patch(t, "read_entries", intent_func("re"))
         self.patch(t, "process_entry", intent_func("pe"))
-        entries = ["element node1", "element node2"]
+
+        feeds = ["feed{}".format(i) for i in range(5)]
+        entries = [t.AtomEntry("t1", "SUSPENDED"), t.AtomEntry("t2", "FULL"),
+                   t.AtomEntry("t1", "FULL"), t.AtomEntry("t2", "SUSPENDED"),
+                   t.AtomEntry("t3", "TERMINATED")]
+        ei_seq = [((feed,), {}, entry) for feed, entry in zip(feeds, entries)]
+        self.patch(t, "extract_info", exp_seq_func(self, ei_seq))
+
+        def parallel_performer(intent):
+            # Check first entry per tenant
+            self.assertEqual(
+                set(map(attrgetter("intent"), intent.effects)),
+                set([("pe", entries[0]),
+                     ("pe", entries[1]),
+                     ("pe", entries[4])])
+            )
+
         params = {"a": "b"}
         params_json = json.dumps(params).encode("utf-8")
         new_params = {"b": "c"}
         new_params_json = json.dumps(new_params).encode("utf-8")
+
         seq = [
             (zk.GetNode("/prevpath"), const((params_json, "stat"))),
             (("re", ServiceType.CLOUD_FEEDS_CAP, "url", params,
               Direction.PREVIOUS),
-             const((entries, new_params))),
+             const((feeds, new_params))),
             (zk.UpdateNode("/prevpath", new_params_json), noop),
-            parallel_sequence([
-                [(("pe", entries[0]), noop)], [(("pe", entries[1]), noop)]
-            ])
+            (ParallelEffects(mock.ANY), parallel_performer)
         ]
         perform_sequence(seq, t.read_and_process("url", "/prevpath"))
 
@@ -146,33 +163,12 @@ class ProcessGroupTests(SynchronousTestCase):
 
 
 
-entrystr = """
-<entry xmlns="http://www.w3.org/2005/Atom">
-  <atom:id xmlns:atom="http://www.w3.org/2005/Atom">urn:uuid:1a60f657-4e61-4c91-beaa-3ba31af9ebbb</atom:id>
-  <atom:category xmlns:atom="http://www.w3.org/2005/Atom" term="tid:1009514"/>
-  <atom:category xmlns:atom="http://www.w3.org/2005/Atom" term="rgn:GLOBAL"/>
-  <atom:category xmlns:atom="http://www.w3.org/2005/Atom" term="dc:GLOBAL"/>
-  <atom:category xmlns:atom="http://www.w3.org/2005/Atom" term="customerservice.access_policy.info"/>
-  <atom:category xmlns:atom="http://www.w3.org/2005/Atom" term="type:customerservice.access_policy.info"/>
-  <title type="text">CustomerService</title>
-  <content type="application/xml">
-    <event xmlns="http://docs.rackspace.com/core/event" xmlns:ns2="http://docs.rackspace.com/event/customer/access_policy" dataCenter="GLOBAL" environment="PROD" eventTime="2016-06-15T22:40:38.999Z" id="1a60f657-4e61-4c91-beaa-3ba31af9ebbb" region="GLOBAL" tenantId="{tenant_id}" type="INFO" version="2">
-      <ns2:product previousEvent="" serviceCode="CustomerService" status="{status}" version="1"/>
-    </event>
-  </content>
-  <link href="https://url/customer_access_policy/events/entries/urn:uuid:1a60f657-4e61-4c91-beaa-3ba31af9ebbb" rel="self"/>
-  <updated>2016-06-15T22:40:39.215Z</updated>
-  <published>2016-06-15T22:40:39.215Z</published>
-</entry>
-"""
-
-
 class ProcessEntryTests(SynchronousTestCase):
     """
     Tests for :func:`process_entry`
     """
     def _test_proc_group(self, status, func_name):
-        entry = atom.parse(entrystr.format(tenant_id="23", status=status))
+        entry = t.AtomEntry("23", status)
         self.patch(t, func_name, intent_func("group_func"))
         groups = [group_state("t1", "g1"), group_state("t1", "g2")]
 
@@ -207,12 +203,35 @@ class ProcessEntryTests(SynchronousTestCase):
         self._test_proc_group("TERMINATED", "delete_group")
 
 
+entrystr = """
+<entry xmlns="http://www.w3.org/2005/Atom">
+  <atom:id xmlns:atom="http://www.w3.org/2005/Atom">urn:uuid:1a60f657-4e61-4c91-beaa-3ba31af9ebbb</atom:id>
+  <atom:category xmlns:atom="http://www.w3.org/2005/Atom" term="tid:1009514"/>
+  <atom:category xmlns:atom="http://www.w3.org/2005/Atom" term="rgn:GLOBAL"/>
+  <atom:category xmlns:atom="http://www.w3.org/2005/Atom" term="dc:GLOBAL"/>
+  <atom:category xmlns:atom="http://www.w3.org/2005/Atom" term="customerservice.access_policy.info"/>
+  <atom:category xmlns:atom="http://www.w3.org/2005/Atom" term="type:customerservice.access_policy.info"/>
+  <title type="text">CustomerService</title>
+  <content type="application/xml">
+    <event xmlns="http://docs.rackspace.com/core/event" xmlns:ns2="http://docs.rackspace.com/event/customer/access_policy" dataCenter="GLOBAL" environment="PROD" eventTime="2016-06-15T22:40:38.999Z" id="1a60f657-4e61-4c91-beaa-3ba31af9ebbb" region="GLOBAL" tenantId="{tenant_id}" type="INFO" version="2">
+      <ns2:product previousEvent="" serviceCode="CustomerService" status="{status}" version="1"/>
+    </event>
+  </content>
+  <link href="https://url/customer_access_policy/events/entries/urn:uuid:1a60f657-4e61-4c91-beaa-3ba31af9ebbb" rel="self"/>
+  <updated>2016-06-15T22:40:39.215Z</updated>
+  <published>2016-06-15T22:40:39.215Z</published>
+</entry>
+"""
+
 class ExtractInfoTests(SynchronousTestCase):
     """
     Tests for :func:`extract_info`
     """
     def test_success(self):
-        entry = atom.parse(entrystr.format(tenant_id="823645", status="SUSPENDED"))
-        tenant_id, status = t.extract_info(entry)
-        self.assertEqual(tenant_id, "823645")
-        self.assertEqual(status, "SUSPENDED")
+        """
+        Extracts tenant_id and status and returns as `AtomEntry`
+        """
+        entry = atom.parse(
+            entrystr.format(tenant_id="823645", status="SUSPENDED"))
+        self.assertEqual(
+            t.extract_info(entry), t.AtomEntry("823645", "SUSPENDED"))
