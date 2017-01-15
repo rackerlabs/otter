@@ -14,14 +14,17 @@ class GetServiceMappingTests(SynchronousTestCase):
         """
         Sample config
         """
-        self.config = {'cloudServersOpenStack': 'nova',
-                       'cloudLoadBalancers': 'clb',
-                       'cloudOrchestration': 'orch',
-                       'rackconnect': 'rc',
-                       'region': 'DFW',
-                       'metrics': {'service': 'm',
-                                   'region': 'IAD'},
-                       'cloudfeeds': {'service': 'cf', 'url': 'url'}}
+        self.config = {
+            'cloudServersOpenStack': 'nova',
+            'cloudLoadBalancers': 'clb',
+            'cloudOrchestration': 'orch',
+            'rackconnect': 'rc',
+            'region': 'DFW',
+            'metrics': {'service': 'm',
+                        'region': 'IAD'},
+            'cloudfeeds': {'url': 'cf_url',
+                           "customer_access_events": {"url": "cap_url"}}
+        }
 
     def test_takes_from_config(self):
         """
@@ -50,20 +53,29 @@ class GetServiceMappingTests(SynchronousTestCase):
                     'name': 'm',
                     'region': 'IAD',
                 },
-                ServiceType.CLOUD_FEEDS: {
-                    'name': 'cf',
-                    'region': 'DFW',
-                    'url': 'url'
-                }
+                ServiceType.CLOUD_FEEDS: {'url': 'cf_url'},
+                ServiceType.CLOUD_FEEDS_CAP: {"url": "cap_url"},
             })
 
     def test_cloudfeeds_optional(self):
         """
-        Does not return cloud feeds service if the config is not there
+        Does not return cloud feeds services if the config is not there
         """
         del self.config['cloudfeeds']
-        self.assertNotIn(ServiceType.CLOUD_FEEDS,
-                         get_service_configs(self.config))
+        confs = get_service_configs(self.config)
+        self.assertNotIn(ServiceType.CLOUD_FEEDS, confs)
+        self.assertNotIn(ServiceType.CLOUD_FEEDS_CAP, confs)
+
+    def test_cloudfeeds_cap(self):
+        """
+        Includes CLOUD_FEEDS_CAP service with "name" and "region" when
+        "customer_access_events" is {"name": "service"} in config
+        """
+        self.config["cloudfeeds"]["customer_access_events"] = {"name": "cap"}
+        srv_confs = get_service_configs(self.config)
+        self.assertEqual(
+            srv_confs[ServiceType.CLOUD_FEEDS_CAP],
+            {"name": "cap", "region": "DFW"})
 
     def test_metrics_optional(self):
         """
