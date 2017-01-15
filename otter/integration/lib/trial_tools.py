@@ -57,6 +57,7 @@ from otter.util.logging_treq import LoggingTreq
 username = os.environ['AS_USERNAME']
 password = os.environ['AS_PASSWORD']
 endpoint = os.environ['AS_IDENTITY']
+mimic_root = os.environ.get('AS_MIMIC_ROOT')
 flavor_ref = os.environ['AS_FLAVOR_REF']
 region = os.environ['AS_REGION']
 scheduler_interval = float(os.environ.get("AS_SCHEDULER_INTERVAL", "10"))
@@ -209,7 +210,8 @@ class TestHelper(object):
         """
         setup_test_log_observer(test_case)
         self.test_case = test_case
-        self.pool = HTTPConnectionPool(reactor, False)
+        self.reactor = reactor
+        self.pool = HTTPConnectionPool(self.reactor, False)
         self.treq = LoggingTreq(log=log, log_response=True)
         self.test_case.addCleanup(self.pool.closeCachedConnections)
 
@@ -231,7 +233,7 @@ class TestHelper(object):
         kwargs.setdefault("min_entities", 0)
 
         server_name_prefix = "{}-{}".format(
-            random_string(), reactor.seconds())
+            random_string(), self.reactor.seconds())
         if "server_name_prefix" in kwargs:
             server_name_prefix = "{}-{}".format(kwargs['server_name_prefix'],
                                                 server_name_prefix)

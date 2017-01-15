@@ -2,7 +2,26 @@
 Test terminator
 """
 
-from twisted.internet import reactor
+import json
+
+import attr
+
+from twisted.internet.defer import gatherResults, inlineCallbacks
+from twisted.trial.unittest import TestCase
+
+from otter.integration.lib.resources import TestResources
+from otter.integration.lib.trial_tools import (
+    TestHelper,
+    get_identity,
+    get_resource_mapping,
+    mimic_root,
+    not_mimic,
+    region,
+    skip_if,
+    sleep
+)
+from otter.integration.lib.utils import diagnose
+from otter.util.http import check_success
 
 
 class TerminatorTests(TestCase):
@@ -17,11 +36,14 @@ class TerminatorTests(TestCase):
         self.helper = TestHelper(self, num_clbs=1)
         self.rcs = TestResources()
         self.identity = get_identity(pool=self.helper.pool)
+        self.access_policy_feeds = CFCustomerAccess(
+            mimic_root, self.helper.treq, self.helper.pool)
         return self.identity.authenticate_user(
             self.rcs,
             resources=get_resource_mapping(),
             region=region)
 
+    @inlineCallbacks
     def _test_group_behavior(self, access_event, group_behavior):
         """
         If terminator receives event about account being suspended, all
@@ -30,15 +52,16 @@ class TerminatorTests(TestCase):
         # create 2 groups
         group1, _ = self.helper.create_group(min_entities=1)
         group2, _ = self.helper.create_group(min_entities=1)
-        yield gatherResult([
+        yield gatherResults([
             self.helper.start_group_and_wait(group1, self.rcs),
             self.helper.start_group_and_wait(group2, self.rcs)
         ])
         # add account access feed event
-        yield self.access_policy_feeds.add_event(self.rcs.tenant, access_event)
-        yield sleep(reactor, 10)
+        yield self.access_policy_feeds.add_events(
+            [(self.rcs.tenant, access_event)])
+        yield sleep(self.helper.reactor, 10)
         # Check if groups behave as expected
-        yield gatherResult([
+        yield gatherResults([
             group_behavior(group1), group_behavior(group2)
         ])
 
@@ -78,3 +101,23 @@ class TerminatorTests(TestCase):
 
         # ACTIVATE them and check
         self._test_group_behavior("ACTIVE", group_active)
+
+
+@attr.s
+class CFCustomerAccess(object):
+    root = attr.ib()
+    treq = attr.ib()
+    pool = attr.ib()
+
+    def __attrs_post_init(self):
+        self.cap_root = "{}/cloudfeeds_cap".format(self.root.rsplit("/"))
+
+    @diagnose("Mimic", "Adding CF CAP event")
+    def add_events(self, events):
+        d = self.treq.post(
+            self.cap_root + "/events",
+            json.dumps(
+                {"events": [{"tenant_id": tenant_id, "status": status}
+                            for tenant_id, status in events]}),
+            pool=self.pool)
+        return d.addCallback(check_success, [201])
