@@ -45,7 +45,8 @@ from otter.supervisor import (
 )
 from otter.test.rest.request import (
     DummyException, RestAPITestMixin, setup_mod_and_trigger)
-from otter.test.utils import IsBoundWith, matches, patch, set_non_conv_tenant
+from otter.test.utils import (
+    IsBoundWith, matches, patch, sample_group_state, set_non_conv_tenant)
 from otter.util.config import set_config_data
 from otter.worker.validate_config import InvalidLaunchConfiguration
 
@@ -1352,6 +1353,12 @@ class GroupServersTests(RestAPITestMixin, SynchronousTestCase):
         Mock remove_server_from_group
         """
         super(GroupServersTests, self).setUp()
+        # super's `mock_state` is not expected to be touched but overriding
+        # here since `modify_and_trigger` needs to check group suspension.
+        # Other REST tests don't need to do this as they patch
+        # `modify_and_trigger` instead of the function passed in it
+        self.mock_state = sample_group_state('11111', 'one')
+        self.mock_group._state = self.mock_state
         self.otter.dispatcher = "disp"
         self.mock_rsfg = patch(
             self, 'otter.rest.groups.controller.remove_server_from_group',

@@ -98,6 +98,17 @@ class GroupPausedError(Exception):
             fmt.format(t=tenant_id, g=group_id, o=operation))
 
 
+class TenantSuspendedError(Exception):
+    """
+    Exception to be raised when an operation cannot be performed because
+    tenantid is suspended.
+    """
+    def __init__(self, tenant_id):
+        self.tenant_id = tenant_id
+        fmt = "Tenant {t} is SUSPENDED."
+        super(TenantSuspendedError, self).__init__(fmt.format(t=tenant_id))
+
+
 def conv_pause_group_eff(group, transaction_id):
     """
     Pause scaling group of convergence enabled tenant
@@ -306,17 +317,26 @@ def empty_group(log, trans_id, group):
 @defer.inlineCallbacks
 def modify_and_trigger(dispatcher, group, logargs, modifier, *args, **kwargs):
     """
-    Modify group state and trigger convergence after that
+    Modify group state and trigger convergence after that if the group is not
+    suspended. Otherwise fail with :obj:`TenantSuspendedError`.
 
     :param IScalingGroup group: Scaling group whose state is getting modified
     :param log: Bound logger
     :param modifier: Callable as described in IScalingGroup.modify_state
 
-    :return: Deferred with None
+    :return: Deferred with None if modification and convergence succeeded.
+        Fails with :obj:`TenantSuspendedError` if group is suspended.
     """
+    def modifier_wrapper(_group, state, *_args, **_kwargs):
+        # Ideally this will not be allowed by repose middleware but
+        # adding check for mimic based integration tests
+        if state.suspended:
+            raise TenantSuspendedError(_group.tenant_id)
+        return modifier(_group, state, *_args, **_kwargs)
+
     cannot_exec_pol_err = None
     try:
-        yield group.modify_state(modifier, *args, **kwargs)
+        yield group.modify_state(modifier_wrapper, *args, **kwargs)
     except CannotExecutePolicyError as ce:
         cannot_exec_pol_err = ce
     if tenant_is_enabled(group.tenant_id, config_value):

@@ -40,7 +40,8 @@ from zope.interface.verify import verifyObject
 
 from otter.convergence.model import HeatStack, NovaServer, ServerState
 from otter.log.bound import BoundLog, bound_log_kwargs
-from otter.models.interface import IScalingGroup, IScalingGroupServersCache
+from otter.models.interface import (
+    GroupState, IScalingGroup, IScalingGroupServersCache, ScalingGroupStatus)
 from otter.supervisor import ISupervisor
 from otter.util.config import set_config_data, update_config_data
 from otter.util.deferredutils import DeferredPool
@@ -633,6 +634,12 @@ class FakeSupervisor(Service, object):
         return succeed(None)
 
 
+def sample_group_state(tid='tid', gid='gid'):
+    """ GroupState object for test """
+    return GroupState(tid, gid, 'g', {}, {}, None, {}, False,
+                      ScalingGroupStatus.ACTIVE)
+
+
 def mock_group(state, tenant_id='tenant', group_id='group'):
     """
     Return mocked `IScalingGroup` that has tunable `modify_state` method
@@ -642,9 +649,10 @@ def mock_group(state, tenant_id='tenant', group_id='group'):
     group = iMock(IScalingGroup, tenant_id=tenant_id, uuid=group_id)
     group.pause_modify_state = False
     group.modify_state_values = []
+    group._state = state
 
     def fake_modify_state(f, modify_state_reason=None, *args, **kwargs):
-        d = maybeDeferred(f, group, state, *args, **kwargs)
+        d = maybeDeferred(f, group, group._state, *args, **kwargs)
         d.addCallback(lambda r: group.modify_state_values.append(r))
         if group.pause_modify_state:
             group.modify_state_pause_d = Deferred()
