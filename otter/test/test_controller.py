@@ -1180,21 +1180,6 @@ class MaybeExecuteScalingPolicyTestCase(SynchronousTestCase):
         self.assertFalse(self.group.view_launch_config.called)
         self.assertEqual(self.mock_state.policy_touched, {})
 
-    def test_tenant_suspended(self):
-        """
-        Raises `TenantSuspendedError` if tenant is SUSPENDED and does not do
-        anything else
-        """
-        self.mock_state.suspended = True
-        self.assertRaises(
-            controller.TenantSuspendedError,
-            controller.maybe_execute_scaling_policy,
-            self.mock_log, 'transaction', self.group, self.mock_state, 'pol1')
-        # Nothing else is called
-        self.assertFalse(self.group.view_config.called)
-        self.assertFalse(self.group.view_launch_config.called)
-        self.assertEqual(self.mock_state.policy_touched, {})
-
     def test_execute_launch_config_success_on_positive_delta(self):
         """
         If lock is acquired, all cooldowns are all fine, ``calculate_delta``
