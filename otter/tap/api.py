@@ -13,7 +13,7 @@ from kazoo.client import KazooClient
 from silverberg.cluster import RoundRobinCassandraCluster
 from silverberg.logger import LoggingCQLClient
 
-from toolz.dicttoolz import get_in
+from toolz.dicttoolz import get_in, assoc_in
 
 from twisted.application.internet import TimerService
 from twisted.application.service import MultiService, Service
@@ -25,6 +25,8 @@ from twisted.internet.task import coiterate
 from twisted.python import usage
 from twisted.python.threadpool import ThreadPool
 from twisted.web.server import Site
+
+from txeffect import perform
 
 from txkazoo import TxKazooClient
 from txkazoo.log import TxLogger
@@ -48,6 +50,7 @@ from otter.rest.application import Otter
 from otter.rest.bobby import set_bobby
 from otter.scheduler import SchedulerService
 from otter.supervisor import SupervisorService, set_supervisor
+from otter.terminator import terminator
 from otter.util import zk
 from otter.util.config import config_value, set_config_data
 from otter.util.cqlbatch import TimingOutCQLClient
@@ -318,10 +321,59 @@ def makeService(config):
             if sh_svc is not None:
                 parent.addService(sh_svc)
 
+            # setup terminator
+            term_svc = setup_terminator_service(
+                reactor, log, config, kz_client, store, supervisor,
+                cassandra_cluster, health_checker)
+            if term_svc is not None:
+                parent.addService(term_svc)
+
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
 
     return parent
+
+
+def setup_terminator_service(reactor, log, config, kz_client, store,
+                             supervisor, cass_client, health_checker):
+    """
+    Setup terminator timer service. It takes individual components instead
+    of dispatcher because this service uses SingleTenantAuthenticator instead
+    of ImpersonatingAuthenticator available in dispatcher.
+
+    :param reactor: Twisted reactor used as clock and other operations
+    :param log: :obj:`BoundLog` logger used by service
+    :param dict config: Configuration dict containing terminator and identity
+        info
+    :param kz_client: :obj:`TxKazooClient` object used to talk to ZK
+    :param store: :obj:`IScalingScheduleCollection` object
+    :param supervisor: :obj:`ISupervisor` object needed for
+    :param health_checker: ``HealthChecker`` object where SelfHeal's health
+        check will be added
+
+    :return: terminator service
+    :rtype: :obj:`IService`
+    """
+    if "terminator" not in config:
+        return None
+    config = assoc_in(config, ["identity", "strategy"], "single_tenant")
+    authenticator = generate_authenticator(reactor, config["identity"])
+    dispatcher = get_full_dispatcher(reactor, authenticator, log,
+                                     get_service_configs(config),
+                                     kz_client, store, supervisor, cass_client)
+    interval = get_in(["terminator", "interval"], config, no_default=True)
+    cf_tenant = get_in(["cloudfeeds", "tenant_id"], config, no_default=True)
+    # ensure customer_access_events_url is also in config
+    get_in(["cloudfeeds", "customer_access_events_url"], config,
+           no_default=True)
+    term_eff = terminator("/terminator/prev_params", cf_tenant)
+    func, lock = zk.locked_logged_func(
+        dispatcher, "/terminator/lock", log, "terminator-lock-acquired",
+        perform, dispatcher, term_eff)
+    health_checker.checks["terminator"] = zk.create_health_check(lock)
+    svc = TimerService(interval, func)
+    svc.clock = reactor
+    return svc
 
 
 def setup_selfheal_service(clock, config, dispatcher, health_checker, log):

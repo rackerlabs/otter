@@ -11,6 +11,7 @@ from effect import (
     perform, sync_perform, sync_performer)
 
 from toolz.dicttoolz import merge
+from toolz.functoolz import curry
 
 from twisted.python.failure import Failure
 
@@ -88,6 +89,17 @@ def err(failure, msg, **fields):
     Return Effect of LogErr
     """
     return Effect(LogErr(failure, msg, fields))
+
+
+@curry
+def err_exc_info(msg, exc_info, **fields):
+    """
+    Return Effect of LogErr with exc_info converted to failure. This function
+    provides msg first and is curried to use it as effect error handler:
+
+    >>> effect_returning_function().on(error=err_exc_info("ferr", f1="a"))
+    """
+    return err(exc_info_to_failure(exc_info), msg, **fields)
 
 
 def get_fields():

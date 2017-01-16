@@ -18,7 +18,7 @@ def parse(feed_data):
     return etree.fromstring(feed_data)
 
 
-def xpath(path, elem):
+def xpath(path, elem, namespaces=_namespaces):
     """
     Get a particular path from an etree
 
@@ -28,7 +28,7 @@ def xpath(path, elem):
     :return: whatever `lxml.xpath` would return based on the path, but
         should be used to obtain a list of :class:`Elements`
     """
-    return etree.XPath(path, namespaces=_namespaces)(elem)
+    return etree.XPath(path, namespaces=namespaces)(elem)
 
 
 def entries(feed):

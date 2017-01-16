@@ -1059,8 +1059,7 @@ class ExecuteConvergenceTests(SynchronousTestCase):
             clean_waiting(self.waiting, self.group_id),
         ]
         if with_delete:
-            sequence.append((DeleteGroup(tenant_id=self.tenant_id,
-                                         group_id=self.group_id), noop))
+            sequence.append((DeleteGroup(self.tenant_id, self.group_id), noop))
         self.assertEqual(
             # skipping cache update intents returned in get_seq()
             perform_sequence(self.get_seq(False, True) + sequence,

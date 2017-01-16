@@ -49,11 +49,13 @@ def perform_get_scaling_group_info(log, store, dispatcher, intent):
     returnValue((group, manifest))
 
 
-@attributes(['tenant_id', 'group_id'])
+@attr.s
 class DeleteGroup(object):
     """
     Delete scaling group
     """
+    tenant_id = attr.ib()
+    group_id = attr.ib()
 
 
 @deferred_performer
@@ -64,6 +66,15 @@ def perform_delete_group(log, store, dispatcher, intent):
     log = merge_effectful_fields(dispatcher, log)
     group = store.get_scaling_group(log, intent.tenant_id, intent.group_id)
     return group.delete_group()
+
+
+@attr.s
+class GetTenantGroupStates(object):
+    """
+    Intent to get groups of a tenant. Its performer will return list of
+    :obj:`GroupState` objects
+    """
+    tenant_id = attr.ib()
 
 
 @attributes(['scaling_group', 'status'])
@@ -131,22 +142,25 @@ def perform_update_error_reasons(log, store, disp, intent):
 
 
 @attr.s
-class ModifyGroupStatePaused(object):
+class ModifyGroupStateAttribute(object):
     """
-    Intent to update group state pause
+    Intent to update group state's attribute
     """
-    group = attr.ib()
-    paused = attr.ib()
+    tenant_id = attr.ib()
+    group_id = attr.ib()
+    attribute = attr.ib()
+    value = attr.ib()
 
 
 @deferred_performer
-def perform_modify_group_state_paused(disp, intent):
-    """ Perform `ModifyGroupStatePaused` """
+def perform_modify_group_state_attr(log, store, disp, intent):
+    """ Perform `ModifyGroupStateAttribute` """
 
-    def update_paused(_group, state):
-        return assoc_obj(state, paused=intent.paused)
+    def update_state(_group, state):
+        return assoc_obj(state, **{intent.attribute: intent.value})
 
-    return intent.group.modify_state(update_paused)
+    group = store.get_scaling_group(log, intent.tenant_id, intent.group_id)
+    return group.modify_state(update_state)
 
 
 def get_model_dispatcher(log, store):
@@ -161,6 +175,10 @@ def get_model_dispatcher(log, store):
         UpdateServersCache: perform_update_servers_cache,
         UpdateGroupErrorReasons:
             partial(perform_update_error_reasons, log, store),
-        ModifyGroupStatePaused: perform_modify_group_state_paused,
+        ModifyGroupStateAttribute: partial(perform_modify_group_state_attr,
+                                           log, store),
         GetAllValidGroups: partial(perform_get_all_valid_groups, store),
+        GetTenantGroupStates:
+            deferred_performer(
+                lambda d, i: store.list_scaling_group_states(log, i.tenant_id))
     })

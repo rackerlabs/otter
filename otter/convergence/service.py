@@ -398,8 +398,8 @@ def convergence_succeeded(executor, scaling_group, group_state, resources):
     """
     if group_state.status == ScalingGroupStatus.DELETING:
         # servers have been deleted. Delete the group for real
-        yield Effect(DeleteGroup(tenant_id=scaling_group.tenant_id,
-                                 group_id=scaling_group.uuid))
+        yield Effect(DeleteGroup(scaling_group.tenant_id,
+                                 scaling_group.uuid))
         yield do_return(ConvergenceIterationStatus.GroupDeleted())
     elif group_state.status == ScalingGroupStatus.ERROR:
         yield Effect(UpdateGroupStatus(scaling_group=scaling_group,
