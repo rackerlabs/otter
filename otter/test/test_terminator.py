@@ -8,7 +8,9 @@ from operator import attrgetter
 import mock
 
 from effect import ParallelEffects
-from effect.testing import SequenceDispatcher, parallel_sequence
+from effect.testing import (
+    SequenceDispatcher, const, conste, parallel_sequence, intent_func,
+    nested_sequence, noop, perform_sequence)
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -22,9 +24,7 @@ from otter.models.intents import (
     DeleteGroup, GetTenantGroupStates, ModifyGroupStateAttribute)
 from otter.models.interface import ScalingGroupStatus
 from otter.util import zk
-from otter.test.utils import (
-    CheckFailure, const, conste, group_state, intent_func, nested_sequence,
-    noop, perform_sequence, exp_seq_func)
+from otter.test.utils import CheckFailure, group_state, exp_seq_func
 
 
 class TerminatorTests(SynchronousTestCase):
