@@ -33,7 +33,7 @@ class TerminatorTests(TestCase):
         """
         Setup medium to access services
         """
-        self.helper = TestHelper(self, num_clbs=1)
+        self.helper = TestHelper(self, num_clbs=0)
         self.rcs = TestResources()
         self.identity = get_identity(pool=self.helper.pool)
         self.access_policy_feeds = CFCustomerAccess(
