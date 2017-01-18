@@ -813,7 +813,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                      policy_touched={},
                                      paused=True,
                                      status=ScalingGroupStatus.ACTIVE,
-                                     desired=5)
+                                     desired=5,
+                                     suspended=True)
             return group_state
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
@@ -824,14 +825,17 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.group.view_state.assert_called_once_with(ConsistencyLevel.QUORUM)
         expectedCql = (
             'INSERT INTO scaling_group("tenantId", "groupId", active, '
-            'pending, "groupTouched", "policyTouched", paused, desired) '
+            'pending, "groupTouched", "policyTouched", paused, desired, '
+            'suspended) '
             'VALUES(:tenantId, :groupId, :active, :pending, :groupTouched, '
-            ':policyTouched, :paused, :desired) USING TIMESTAMP :ts')
+            ':policyTouched, :paused, :desired, :suspended) '
+            'USING TIMESTAMP :ts')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
                         "active": _S({}), "pending": _S({}),
                         "groupTouched": '0001-01-01T00:00:00Z',
                         "policyTouched": _S({}),
-                        "paused": True, "desired": 5, "ts": 10345000}
+                        "paused": True, "desired": 5, "suspended": True,
+                        "ts": 10345000}
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.QUORUM)
 
