@@ -20,7 +20,7 @@ from otter.cloud_client import TenantScope
 from otter.cloud_client.cloudfeeds import Direction, read_entries
 from otter.indexer import atom
 from otter.log.cloudfeeds import cf_err, cf_msg
-from otter.log.intents import err_exc_info, with_log
+from otter.log.intents import err, err_exc_info, with_log
 from otter.models.interface import ScalingGroupStatus
 from otter.models.intents import (
     DeleteGroup, GetTenantGroupStates, ModifyGroupStateAttribute)
@@ -71,9 +71,14 @@ def read_and_process(url, zk_prev_path):
     :return: ``Effect`` of list
     """
     prev_params_json, stat = yield Effect(zk.GetNode(zk_prev_path))
-    prev_params = json.loads(prev_params_json.decode("utf-8"))
+    prev_params = {}
+    try:
+        prev_params = json.loads(prev_params_json.decode("utf-8"))
+    except Exception as e:
+        yield err(None, "terminator-params-err", params_json=prev_params_json)
     entries, prev_params = yield read_entries(
-        ServiceType.CLOUD_FEEDS_CAP, url, prev_params, Direction.PREVIOUS)
+        ServiceType.CLOUD_FEEDS_CAP, url, prev_params, Direction.PREVIOUS,
+        log_msg_type="terminator-events-response")
     yield Effect(
         zk.UpdateNode(zk_prev_path, json.dumps(prev_params).encode("utf-8")))
     entries = pipe(entries,

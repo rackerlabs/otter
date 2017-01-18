@@ -8,7 +8,7 @@ from characteristic import Attribute, attributes
 
 from pyrsistent import PSet
 
-from twisted.internet.defer import FirstError
+from twisted.internet.defer import FirstError, maybeDeferred
 from twisted.internet.error import ConnectionRefusedError
 
 from otter.convergence.model import ServerState
@@ -127,6 +127,6 @@ def diagnose(system, message):
     def decorate(f):
         @wraps(f)
         def new_function(*args, **kwargs):
-            return f(*args, **kwargs).addErrback(wrap_failure)
+            return maybeDeferred(f, *args, **kwargs).addErrback(wrap_failure)
         return new_function
     return decorate

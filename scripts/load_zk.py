@@ -27,7 +27,9 @@ nodes_to_create = [
     "/locks",
     "/selfheallock",
     "/scheduler_partition",
-    "/convergence-partitioner"
+    "/convergence-partitioner",
+    "/terminator/prev_params",
+    "/terminator/lock"
 ]
 
 for node in nodes_to_create:

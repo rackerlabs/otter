@@ -22,5 +22,7 @@ del conf["cloud_client"]
 conf["converger"]["interval"] = 10
 conf["converger"]["build_timeout"] = 30
 conf["selfheal"]["interval"] = 20
+conf["terminator"]["cf_cap_url"] = os.environ["CF_CAP_URL"]
+conf["terminator"]["interval"] = 10
 
 print(json.dumps(conf, indent=2))

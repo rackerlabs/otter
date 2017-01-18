@@ -15,6 +15,7 @@ services:
             CASS_HOSTS: "tcp:db:9160"
             ZK_HOSTS: "zk:2181"
             URL_ROOT: "http://otter:9000"
+            CF_CAP_URL: "http://mimic:8900/cloudfeeds_cap"
             BOOTSTRAP: "yes"
         volumes:
             - ./otter:/app/otter
@@ -28,7 +29,7 @@ services:
         ports:
             - "2181:2181"
     mimic: 
-        build: https://github.com/rackerlabs/mimic.git#594dd5c8e80b670fa2d0c42f5eec9645e14aa54e
+        build: ../mimic
         command: twistd -n mimic --realtime --verbose
     cafe:
         build:
@@ -58,6 +59,7 @@ services:
             - AS_USERNAME=jenkins_user
             - AS_PASSWORD=jenkins_password
             - AS_IDENTITY=http://mimic:8900/identity/v2.0
+            - AS_MIMIC_ROOT=http://mimic:8900
             - AS_FLAVOR_REF=2
             - AS_REGION=ORD
             - AS_CONVERGENCE_TENANT=000001
@@ -67,9 +69,13 @@ services:
             - AS_CLB_SC_KEY=cloudLoadBalancers
             - AS_USING_MIMIC=yes
             - AS_SELFHEAL_INTERVAL=20
+            - AS_TERMINATOR_INTERVAL=10
+            - TERMINATOR_TENANT1=000002
+            - TERMINATOR_TENANT2=000003
+            - TERMINATOR_TENANT3=000004
         command:
             dockerize -timeout 60s -wait http://otter:9000/health -wait http://mimic:8900
-                trial -j10 --temp-directory=/tmp/_trial_temp otter.integration.tests
+                trial -j3 --temp-directory=/tmp/_trial_temp otter.integration.tests.test_terminator.TerminatorTests
         depends_on:
             - otter
             - mimic

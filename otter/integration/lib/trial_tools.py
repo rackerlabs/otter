@@ -57,7 +57,6 @@ from otter.util.logging_treq import LoggingTreq
 username = os.environ['AS_USERNAME']
 password = os.environ['AS_PASSWORD']
 endpoint = os.environ['AS_IDENTITY']
-mimic_root = os.environ.get('AS_MIMIC_ROOT')
 flavor_ref = os.environ['AS_FLAVOR_REF']
 region = os.environ['AS_REGION']
 scheduler_interval = float(os.environ.get("AS_SCHEDULER_INTERVAL", "10"))

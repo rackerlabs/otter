@@ -221,7 +221,20 @@ msg_types = {
         "SelfHeal service errored occurred when scheduling convergence"),
     "selfheal-calls-err": "SelfHeal service has {active} scheduled calls",
     "selfheal-lock-acquired": "SelfHeal service acquired lock",
-    "selfheal-group-deleted": "Group deleted when selfhealing"
+    "selfheal-group-deleted": "Group deleted when selfhealing",
+
+    # Terminator
+    "terminator-params-err": (
+        "Error decoding params json {params_json}. Using no params instead"),
+    "terminator-group-active": (
+        "Scaling group {scaling_group_id} has been enabled since tenant "
+        "{tenant_id} has become ACTIVE again"),
+    "terminator-group-suspended": (
+        "Scaling group {scaling_group_id} has been suspended since tenant "
+        "{tenant_id} has been suspended"),
+    "terminator-group-terminated": (
+        "Scaling group {scaling_group_id} has been deleted since tenant "
+        "{tenant_id} has been closed")
 }
 
 

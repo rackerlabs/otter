@@ -182,10 +182,11 @@ class ScalingGroupIntentsTests(SynchronousTestCase):
             Effect(ModifyGroupStateAttribute('tid', 'gid', attr, new_value)),
             (self.log, 'tid', 'gid'), self.group)
         self.assertIsNone(r)
-        # Returned state has updated paused
+        # Returned state has updated attr
         modified_state = self.group.modify_state_values[-1]
         # Returned state object is different than original
         self.assertIsNot(self.state, modified_state)
+        self.assertNotEqual(self.state, modified_state)
         # Nothing else is modified
         self.assertEqual(getattr(modified_state, attr), new_value)
         setattr(modified_state, attr, old_value)

@@ -7,10 +7,10 @@ from operator import attrgetter
 
 import mock
 
-from effect import ParallelEffects
+from effect import Effect, ParallelEffects
 from effect.testing import (
     SequenceDispatcher, const, conste, parallel_sequence, intent_func,
-    nested_sequence, noop, perform_sequence)
+    nested_sequence, noop, perform_sequence, parallel_sequence)
 
 from twisted.trial.unittest import SynchronousTestCase
 
@@ -24,7 +24,7 @@ from otter.models.intents import (
     DeleteGroup, GetTenantGroupStates, ModifyGroupStateAttribute)
 from otter.models.interface import ScalingGroupStatus
 from otter.util import zk
-from otter.test.utils import CheckFailure, group_state, exp_seq_func
+from otter.test.utils import CheckFailure, group_state, exp_func, exp_seq_func
 
 
 class TerminatorTests(SynchronousTestCase):
@@ -78,6 +78,28 @@ class ReadAndProcessTests(SynchronousTestCase):
     """
     Tests for :func:`read_and_process`
     """
+
+    def test_empty(self):
+        self.patch(t, "process_entry", intent_func("pe"))
+        self.patch(t, "extract_info", lambda: 1 / 0)
+        params = {"a": "b"}
+        self.patch(
+            t, "read_entries",
+            exp_func(self, Effect("re"), ServiceType.CLOUD_FEEDS_CAP, "url",
+                     params, Direction.PREVIOUS,
+                     log_msg_type="terminator-events-response"))
+        params_json = json.dumps(params).encode("utf-8")
+        new_params = {"b": "c"}
+        new_params_json = json.dumps(new_params).encode("utf-8")
+
+        seq = [
+            (zk.GetNode("/prevpath"), const((params_json, "stat"))),
+            ("re", const(([], new_params))),
+            (zk.UpdateNode("/prevpath", new_params_json), noop),
+            (parallel_sequence([]))
+        ]
+        perform_sequence(seq, t.read_and_process("url", "/prevpath"))
+
 
     def test_success(self):
         """
@@ -213,8 +235,8 @@ entrystr = """
   <atom:category xmlns:atom="http://www.w3.org/2005/Atom" term="type:customerservice.access_policy.info"/>
   <title type="text">CustomerService</title>
   <content type="application/xml">
-    <event xmlns="http://docs.rackspace.com/core/event" xmlns:ns2="http://docs.rackspace.com/event/customer/access_policy" dataCenter="GLOBAL" environment="PROD" eventTime="2016-06-15T22:40:38.999Z" id="1a60f657-4e61-4c91-beaa-3ba31af9ebbb" region="GLOBAL" tenantId="{tenant_id}" type="INFO" version="2">
-      <ns2:product previousEvent="" serviceCode="CustomerService" status="{status}" version="1"/>
+    <event xmlns="http://docs.rackspace.com/core/event" dataCenter="GLOBAL" environment="PROD" eventTime="2016-06-15T22:40:38.999Z" id="1a60f657-4e61-4c91-beaa-3ba31af9ebbb" region="GLOBAL" tenantId="{tenant_id}" type="INFO" version="2">
+      <product xmlns="http://docs.rackspace.com/event/customer/access_policy" previousEvent="" serviceCode="CustomerService" status="{status}" version="1"/>
     </event>
   </content>
   <link href="https://url/customer_access_policy/events/entries/urn:uuid:1a60f657-4e61-4c91-beaa-3ba31af9ebbb" rel="self"/>

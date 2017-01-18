@@ -362,10 +362,9 @@ def setup_terminator_service(reactor, log, config, kz_client, store,
                                      get_service_configs(config),
                                      kz_client, store, supervisor, cass_client)
     interval = get_in(["terminator", "interval"], config, no_default=True)
-    cf_tenant = get_in(["cloudfeeds", "tenant_id"], config, no_default=True)
+    cf_tenant = get_in(["terminator", "tenant_id"], config, no_default=True)
     # ensure customer_access_events_url is also in config
-    get_in(["cloudfeeds", "customer_access_events_url"], config,
-           no_default=True)
+    get_in(["terminator", "cf_cap_url"], config, no_default=True)
     term_eff = terminator("/terminator/prev_params", cf_tenant)
     func, lock = zk.locked_logged_func(
         dispatcher, "/terminator/lock", log, "terminator-lock-acquired",
