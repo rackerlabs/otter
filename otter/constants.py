@@ -59,22 +59,18 @@ def get_service_configs(config):
         configs[ServiceType.CLOUD_METRICS_INGEST] = {
             'name': metrics['service'], 'region': metrics['region']}
 
-    # {"cloudfeeds"...} contains config for 2 feeds services: One where otter
-    # pushes scaling group events `otter.log.cloudfeeds` as {"url": ...}
-    # and other where it fetches customer access events for terminator which
-    # is {"customer_access_events": {"url": "https://url"} or
-    #                               {"name": "service name"}}
-    # The {"name"..} option is to test otter against mimic that only returns
-    # URLs from service catalog.
+    # {"cloudfeeds": {"url": "https://url"}} config is for service which
+    # is used to push scaling group events: `otter.log.cloudfeeds`.
     cf = config.get('cloudfeeds')
     if cf is not None:
         configs[ServiceType.CLOUD_FEEDS] = {'url': cf['url']}
-        cap_conf = cf.get("customer_access_events")
-        if cap_conf is not None:
-            if "url" in cap_conf:
-                cap_service_conf = {"url": cap_conf["url"]}
-            else:
-                cap_service_conf = {"name": cap_conf["name"], "region": region}
-            configs[ServiceType.CLOUD_FEEDS_CAP] = cap_service_conf
+
+    # "terminator" contains config to setup terminator service and
+    # cloud feed client to access customer access policy events. This and
+    # above cloudfeeds service have fixed URL as opposed to service being
+    # there  in service catalog
+    term = config.get('terminator')
+    if term is not None:
+        configs[ServiceType.CLOUD_FEEDS_CAP] = {'url': term['cf_cap_url']}
 
     return configs

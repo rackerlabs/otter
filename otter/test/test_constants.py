@@ -22,8 +22,8 @@ class GetServiceMappingTests(SynchronousTestCase):
             'region': 'DFW',
             'metrics': {'service': 'm',
                         'region': 'IAD'},
-            'cloudfeeds': {'url': 'cf_url',
-                           "customer_access_events": {"url": "cap_url"}}
+            'cloudfeeds': {'url': 'cf_url'},
+            'terminator': {'cf_cap_url': 'cap_url'}
         }
 
     def test_takes_from_config(self):
@@ -62,20 +62,10 @@ class GetServiceMappingTests(SynchronousTestCase):
         Does not return cloud feeds services if the config is not there
         """
         del self.config['cloudfeeds']
+        del self.config['terminator']
         confs = get_service_configs(self.config)
         self.assertNotIn(ServiceType.CLOUD_FEEDS, confs)
         self.assertNotIn(ServiceType.CLOUD_FEEDS_CAP, confs)
-
-    def test_cloudfeeds_cap(self):
-        """
-        Includes CLOUD_FEEDS_CAP service with "name" and "region" when
-        "customer_access_events" is {"name": "service"} in config
-        """
-        self.config["cloudfeeds"]["customer_access_events"] = {"name": "cap"}
-        srv_confs = get_service_configs(self.config)
-        self.assertEqual(
-            srv_confs[ServiceType.CLOUD_FEEDS_CAP],
-            {"name": "cap", "region": "DFW"})
 
     def test_metrics_optional(self):
         """
