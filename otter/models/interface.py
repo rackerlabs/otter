@@ -63,6 +63,8 @@ class GroupState(object):
         they were executed, if ever. The time is stored as ISO860 format str
     :ivar bool paused: whether the scaling group is paused in
         scaling activities
+    :ivar bool suspended: Is the scaling group suspended due to account
+        suspension?
     :ivar status: Status of the group. One of :obj:`ScalingGroupStatus` members
     :type: :obj:`NamedConstant`
     :ivar list error_reasons: List of string-based reasons why this group is in
@@ -85,6 +87,7 @@ class GroupState(object):
     policy_touched = attr.ib(validator=aiof(dict))
     paused = attr.ib(validator=aiof(bool))
     status = attr.ib(validator=aiof(NamedConstant))
+    suspended = attr.ib(validator=aiof(bool), default=False)
     error_reasons = attr.ib(convert=tuple, default=[])
     desired = attr.ib(validator=aiof(int), default=0)
     now = attr.ib(default=timestamp.now)

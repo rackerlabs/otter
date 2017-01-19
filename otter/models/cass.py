@@ -148,16 +148,16 @@ _cql_view_webhook = (
 _cql_create_group = (
     'INSERT INTO {cf}("tenantId", "groupId", group_config, '
     'launch_config, active, pending, "policyTouched", paused, '
-    'desired, created_at, deleting) '
+    'desired, created_at, deleting, suspended) '
     'VALUES (:tenantId, :groupId, :group_config, '
     ':launch_config, :active, :pending, :policyTouched, '
-    ':paused, :desired, :created_at, false) '
+    ':paused, :desired, :created_at, false, false) '
     'USING TIMESTAMP :ts')
 _cql_view_manifest = (
     'SELECT "tenantId", "groupId", group_config, '
     'launch_config, active, pending, "groupTouched", '
     '"policyTouched", paused, desired, created_at, status, error_reasons, '
-    'deleting FROM {cf} '
+    'deleting, suspended FROM {cf} '
     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", data, version) '
@@ -165,8 +165,9 @@ _cql_insert_policy = (
     ':{name}version)')
 _cql_insert_group_state = (
     'INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
-    '"policyTouched", paused, desired) VALUES(:tenantId, :groupId, :active, '
-    ':pending, :groupTouched, :policyTouched, :paused, :desired) '
+    '"policyTouched", paused, desired, suspended) '
+    'VALUES(:tenantId, :groupId, :active, :pending, :groupTouched, '
+    ':policyTouched, :paused, :desired, :suspended) '
     'USING TIMESTAMP :ts')
 
 # --- Event related queries
@@ -221,7 +222,8 @@ _cql_delete_one_webhook = (
 _cql_list_states = (
     'SELECT "tenantId", "groupId", group_config, active, pending, '
     '"groupTouched", "policyTouched", paused, desired, created_at, status, '
-    'error_reasons FROM {cf} WHERE "tenantId"=:tenantId AND deleting=false;')
+    'error_reasons, suspended '
+    'FROM {cf} WHERE "tenantId"=:tenantId AND deleting=false;')
 _cql_list_policy = (
     'SELECT "policyId", data FROM {cf} WHERE '
     '"tenantId" = :tenantId AND "groupId" = :groupId;')
@@ -507,6 +509,7 @@ def _unmarshal_state(state_dict):
         status,
         desired=desired_capacity,
         error_reasons=(state_dict["error_reasons"] or []),
+        suspended=bool(state_dict["suspended"])
     )
 
 
@@ -816,6 +819,7 @@ class CassScalingGroup(object):
                 'active': serialize_json_data(new_state.active, 1),
                 'pending': serialize_json_data(new_state.pending, 1),
                 'paused': new_state.paused,
+                'suspended': new_state.suspended,
                 'desired': new_state.desired,
                 'groupTouched': new_state.group_touched,
                 'policyTouched': serialize_json_data(new_state.policy_touched,
