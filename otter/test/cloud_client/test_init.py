@@ -80,6 +80,8 @@ def make_service_configs():
             'name': 'cloudLoadBalancers',
             'region': 'DFW'},
         ServiceType.CLOUD_FEEDS: {
+            'name': 'cloud_feeds',
+            'region': 'DFW',
             'url': 'special cloudfeeds url'
         },
         ServiceType.CLOUD_ORCHESTRATION: {
