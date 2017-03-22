@@ -7,6 +7,11 @@ Follow these steps to authenticate to the Rackspace Cloud by
 - :ref:`Review the authentication response <review-auth-resp>`
 - :ref:`Configure environment variables <configure-environment-variables>`
 
+.. important::
+
+    The cURL examples in this guide are provided for reference only. Because
+    the use of cURL has environmental dependencies, copying and pasting the
+    examples might not work in your environment.
 
 .. _send-auth-req-curl:
 

@@ -3,36 +3,27 @@
 Get your credentials
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-`Log in to the Rackspace Cloud Control panel`_ to get your Rackspace Cloud account username,
-API key, and account number. You'll need this information to communicate with Rackspace Cloud
-services by using the REST API.
+To communicate with Rackspace Cloud services by using the REST API, you need
+your Rackspace Cloud account username, API key, and account number.
 
 .. note::
-     In the API service documentation, the account number is referred to as your tenant ID
-     or tenant name.
+     In the API documentation, the account number is referred to as
+     your *tenant ID* or *tenant name*.
 
-After you log in, click your username on the upper-right side of the top navigation pane.
-Then, select **Account Settings** to open the page.
+To get this information, log in to the
+:mycloud:`Rackspace Cloud Control Panel<>`.
 
-.. image:: ../common-gs/images/show-api-key-control-panel.png
+-  Your account username is the username that you use to log in.
 
+-  To get your account number, click the **username** menu in the top-right
+   corner of the control panel. The account number is shown at the top of the
+   menu.
 
-Save your API key
-^^^^^^^^^^^^^^^^^^
-
-- On the Account Settings page, find the API Key in the **Login Details** section.
-- Click  **Show** to see the value and copy it to a text editor of your choice.
-- Click **Hide** to secure the API key value in the browser.
-
-Save your account number
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-- On the Account Settings page, scroll down to the **Account Details** section.
-- Copy and save the account number.
+-  To get your API key, follow the instructions in
+   :how-to:`View and reset your API key <view-and-reset-your-api-key>`.
 
 .. important::
-      Protect your API key. Do not expose the value in code samples, screen captures, or
-      insecure client-server communications. Also, make sure that the value is not
-      included in source code that is stored in public repositories.
-
-.. _Log in to the Rackspace Cloud Control panel: https://mycloud.rackspace.com   
+      Protect your API key. Do not expose the value in code samples, screen
+      captures, or insecure client-server communications. Also, ensure that
+      the value is not included in source code that is stored in public
+      repositories.

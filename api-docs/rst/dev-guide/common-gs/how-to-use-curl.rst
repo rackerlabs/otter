@@ -9,6 +9,12 @@ distributions, Mac OS® X, and Microsoft Windows®. For information about cURL, 
 To run the cURL request examples shown in this guide, copy each example from the HTML version
 of this guide directly to the command line or a script.
 
+.. important::
+
+    The cURL examples in this guide are provided for reference only. Because
+    the use of cURL has environmental dependencies, copying and pasting the
+    examples might not work in your environment.
+
 .. _auth-curl-json:
 
 The following example shows a cURL command for sending an authentication request to
