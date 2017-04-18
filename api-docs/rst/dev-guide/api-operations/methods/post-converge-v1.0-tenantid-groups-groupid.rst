@@ -9,8 +9,8 @@ Trigger convergence
 
     POST /v1.0/{tenantId}/groups/groupId/converge
 
-This operation triggers convergence for a specific scaling group. Convergence implies that Autoscale attempts to continuously converge to the desired state of the scaling group, instead of manipulating servers only once.
-When the convergence process starts, it will continue until the desired number of servers are in the ACTIVE state.
+This operation triggers convergence for a specific scaling group. Convergence implies that Autoscale attempts to continuously converge to the desired state of the scaling group, instead of manipulating scaling units only once.
+When the convergence process starts, it will continue until the desired number of scaling units are in the ACTIVE state.
 
 This operation does not take any data and does not return any data. If it succeeds, a 204 response code is returned.
 

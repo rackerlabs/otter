@@ -11,7 +11,7 @@ Create scaling group
 
 This operation creates a scaling group.
 
-This operation creates a scaling group or a collection of servers and load balancers that are managed by a scaling policy. To describe the group, specify the scaling group configuration, launch configuration, and optional scaling policies in the request body in JSON format.
+This operation creates a scaling group that is managed by a scaling policy. To describe the group, specify the scaling group configuration, launch configuration, and optional scaling policies in the request body in JSON format.
 
 If the request succeeds, the response body describes the created group in JSON format. The response includes an ID and links for the group.
 
@@ -68,6 +68,9 @@ This table shows the possible response codes for this operation:
 |                         |                           |the "personality"       |
 |                         |                           |parameter exceeds       |
 |                         |                           |maximum limit.          |
++-------------------------+---------------------------+------------------------+
+|400                      |InvalidLaunchConfiguration |The stack configuration |
+|                         |                           |is invalid.             |
 +-------------------------+---------------------------+------------------------+
 |400                      |InvalidMinEntities         |The "minEntities" value |
 |                         |                           |is greater than the     |
@@ -157,20 +160,23 @@ This table shows the body parameters for the request:
 |Name                                               |Type         |Description                                        |
 +===================================================+=============+===================================================+
 |\ **launchConfiguration**                          |Object       |A launch configuration defines what to do when a   |
-|                                                   |*(Required)* |new server is created, including information about |
-|                                                   |             |the server image, the flavor of the server image,  |
-|                                                   |             |and the cloud load balancer or RackConnectV3 load  |
-|                                                   |             |balancer pool to which to connect. You must set    |
-|                                                   |             |the ``type`` parameter to ``launch_server``.       |
-|                                                   |             |                                                   |
+|                                                   |*(Required)* |new scaling unit is created, including information |
+|                                                   |             |about the server image, the flavor of the server   |
+|                                                   |             |image, the cloud load balancer or RackConnectV3    |
+|                                                   |             |load balancer pool to which to connect, or the     |
+|                                                   |             |stack template to use. You must set the ``type``   |
+|                                                   |             |parameter to ``launch_server`` or                  |
+|                                                   |             |``launch_stack``.                                  |
 +---------------------------------------------------+-------------+---------------------------------------------------+
-|launchConfiguration.\ **args**                     |Object       |The configuration used to create new servers in    |
-|                                                   |*(Required)* |the scaling group. You must specify the ``server`` |
+|launchConfiguration.\ **args**                     |Object       |The configuration used to create new servers or    |
+|                                                   |*(Required)* |stacks in the scaling group. For ``launch_server`` |
+|                                                   |             |configurations, you must specify the ``server``    |
 |                                                   |             |attribute, and can also specify the optional       |
 |                                                   |             |``loadBalancers`` attribute. Most launch           |
 |                                                   |             |configurations have both a server and a cloud load |
 |                                                   |             |balancer or RackConnectV3 load balancer pool       |
-|                                                   |             |configured.                                        |
+|                                                   |             |configured. For ``launch_stack`` configurations,   |
+|                                                   |             |you must specify the ``stack`` attribute.          |
 +---------------------------------------------------+-------------+---------------------------------------------------+
 |launchConfiguration.args.\ **loadBalancers**       |Array        |One or more cloud load balancers or RackConnectV3  |
 |                                                   |*(Optional)* |load balancer pools to which to add new servers.   |
@@ -242,19 +248,57 @@ This table shows the body parameters for the request:
 |launchConfiguration.args.server.personality.[*].\  |String       |The content items that is injected into the file   |
 |**contents**                                       |*(Required)* |system of the new cloud server image.              |
 +---------------------------------------------------+-------------+---------------------------------------------------+
-|launchConfiguration.args.server.\ **user_data**    |String       |The base64 encoded string of your create server    |
-|                                                   |*(Optional)* |template.                                          |
+|launchConfiguration.args.\ **stack**               |Object       |The attributes that Auto Scale uses to create a    |
+|                                                   |*(Required)* |new stack. The attributes that you specify for the |
+|                                                   |             |stack entity apply to all new stacks in the        |
+|                                                   |             |scaling group. Note the stack arguments are        |
+|                                                   |             |directly passed to Heat when creating a stack. For |
+|                                                   |             |more information, see `Create                      |
+|                                                   |             |Stack<http://api.rackspace.com/api-                |
+|                                                   |             |ref-orchestration.html#stack_create>`__.           |
 +---------------------------------------------------+-------------+---------------------------------------------------+
-|launchConfiguration.\ **type**                     |String       |The type of the launch configuration. For this     |
-|                                                   |*(Required)* |release, this parameter must be set to             |
-|                                                   |             |``launch_server``.                                 |
+|launchConfiguration.args.stack.\ **template**      |YAML String  |The template that describes the stack. Either      |
+|                                                   |or Object    |template or template_url must be specified. See    |
+|                                                   |*(Optional)* |`Create Stack<http://api.rackspace.com/api-        |
+|                                                   |             |ref-orchestration.html#stack_create>`__.           |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.args.stack.\ **template_url**  |String       |A URI to a template. Either template or            |
+|                                                   |*(Optional)* |template_url must be specified.                    |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.args.stack.\                   |Boolean      |Set to `True` (or `False`) to keep (or delete) the |
+|**disable_rollback**                               |*(Optional)* |resources that have been created if the stack      |
+|                                                   |             |fails to create. Defaults to `True`.               |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.args.stack.\ **environment**   |Object       |The JSON environment for the stack. See            |
+|                                                   |*(Optional)* |`Environments<http://                              |
+|                                                   |             |docs.openstack.org/developer/heat/template_guide/  |
+|                                                   |             |environment.html>`__ for more information.         |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.args.stack.\ **files**         |Object       |The contents of files that the template            |
+|                                                   |*(Optional)* |references. See `Create Stack<http://api.          |
+|                                                   |             |rackspace.com/api-ref-orchestration.html           |
+|                                                   |             |#stack_create>`__ for information on the structure |
+|                                                   |             |of the Object.                                     |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.args.stack.\ **parameters**    |Object       |Key/value pairs of the parameters and their values |
+|                                                   |*(Optional)* |to pass to the parameters in the template. See     |
+|                                                   |             |`Create Stack<http://api.rackspace.com/            |
+|                                                   |             |api-ref-orchestration.html#stack_create>`__ for    |
+|                                                   |             |more information.                                  |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.args.stack.\ **timeout_mins**  |Integer      |The stack creation timeout, in minutes.            |
+|                                                   |*(Optional)* |                                                   |
++---------------------------------------------------+-------------+---------------------------------------------------+
+|launchConfiguration.\ **type**                     |String       |The type of the launch configuration. This         |
+|                                                   |*(Required)* |parameter must be set to ``launch_server`` or      |
+|                                                   |             |``launch_stack``.                                  |
 +---------------------------------------------------+-------------+---------------------------------------------------+
 |\ **groupConfiguration**                           |Object       |The configuration options for the scaling group.   |
 |                                                   |*(Required)* |The scaling group configuration specifies the      |
 |                                                   |             |basic elements of the Auto Scale configuration. It |
-|                                                   |             |manages how many servers can participate in the    |
-|                                                   |             |scaling group. It specifies information related to |
-|                                                   |             |load balancers.                                    |
+|                                                   |             |manages how many scaling units can participate in  |
+|                                                   |             |the scaling group. It specifies information        |
+|                                                   |             |related to load balancers.                         |
 +---------------------------------------------------+-------------+---------------------------------------------------+
 |groupConfiguration.\ **maxEntities**               |Object       |The maximum number of entities that are allowed in |
 |                                                   |*(Optional)* |the scaling group. If unconfigured, defaults to    |
@@ -314,18 +358,18 @@ This table shows the body parameters for the request:
 |                                                   |             |specified.                                         |
 +---------------------------------------------------+-------------+---------------------------------------------------+
 |scalingPolicies.[*].\ **changePercent**            |Number       |The percent change to make in the number of        |
-|                                                   |*(Optional)* |servers in the scaling group. If this number is    |
-|                                                   |             |positive, the number of servers increases by the   |
+|                                                   |*(Optional)* |units in the scaling group. If this number is      |
+|                                                   |             |positive, the number of units increases by the     |
 |                                                   |             |given percentage. If this parameter is set to a    |
-|                                                   |             |negative number, the number of servers decreases   |
+|                                                   |             |negative number, the number of units decreases     |
 |                                                   |             |by the given percentage. The absolute change in    |
-|                                                   |             |the number of servers is rounded to the nearest    |
+|                                                   |             |the number of units is rounded to the nearest      |
 |                                                   |             |integer. This means that if -X% of the current     |
-|                                                   |             |number of servers translates to -0.5 or -0.25 or - |
-|                                                   |             |0.75 servers, the actual number of servers that    |
+|                                                   |             |number of units translates to -0.5 or -0.25 or -   |
+|                                                   |             |0.75 units, the actual number of units that        |
 |                                                   |             |are shut down is 1. If X% of the current number of |
-|                                                   |             |servers translates to 1.2 or 1.5 or 1.7 servers,   |
-|                                                   |             |the actual number of servers that are launched is  |
+|                                                   |             |units translates to 1.2 or 1.5 or 1.7 units,       |
+|                                                   |             |the actual number of units that are launched is    |
 |                                                   |             |2.                                                 |
 +---------------------------------------------------+-------------+---------------------------------------------------+
 |scalingPolicies.[*].\ **cooldown**                 |Number       |The cool-down period, in seconds, before this      |
@@ -340,18 +384,18 @@ This table shows the body parameters for the request:
 |                                                   |             |webhook-based policies or ``schedule`` for         |
 |                                                   |             |schedule-based policies.                           |
 +---------------------------------------------------+-------------+---------------------------------------------------+
-|scalingPolicies.[*].\ **change**                   |Integer      |The change to make in the number of servers in the |
+|scalingPolicies.[*].\ **change**                   |Integer      |The change to make in the number of units in the   |
 |                                                   |*(Optional)* |scaling group. This parameter must be an integer.  |
 |                                                   |             |If the value is a positive integer, the number of  |
-|                                                   |             |servers increases. If the value is a negative      |
-|                                                   |             |integer, the number of servers decreases.          |
+|                                                   |             |units increases. If the value is a negative        |
+|                                                   |             |integer, the number of units decreases.            |
 +---------------------------------------------------+-------------+---------------------------------------------------+
-|scalingPolicies.[*].\ **desiredCapacity**          |Integer      |The desired server capacity of the scaling the     |
-|                                                   |*(Optional)* |group; that is, how many servers should be in the  |
-|                                                   |             |scaling group. This value must be an absolute      |
+|scalingPolicies.[*].\ **desiredCapacity**          |Integer      |The desired scaling unit capacity of the scaling   |
+|                                                   |*(Optional)* |the group; that is, how many units should be in    |
+|                                                   |             |the scaling group. This value must be an absolute  |
 |                                                   |             |number, greater than or equal to zero. For         |
 |                                                   |             |example, if this parameter is set to ten,          |
-|                                                   |             |executing the policy brings the number of servers  |
+|                                                   |             |executing the policy brings the number of units    |
 |                                                   |             |to ten. The minimum allowed value is zero. Note    |
 |                                                   |             |that the configured group maxEntities and          |
 |                                                   |             |minEntities takes precedence over this setting.    |
