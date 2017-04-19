@@ -19,6 +19,7 @@ script:
 
 after_success:
     - codecov
+    - cat coverage.xml | head -5
 
 branches:
   only:
