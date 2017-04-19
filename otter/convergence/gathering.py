@@ -236,7 +236,7 @@ _DRAINING_RE = re.compile(
 def extract_clb_drained_at(feed):
     """
     Extract time when node was changed to DRAINING from a CLB atom feed. Will
-    return node's creation time if node was created with DRAINING. Return None
+    return node's creation time if node was created with DRAINING. Return 0
     if couldnt find for any reason.
 
     :param list feed: ``list`` of atom entry :class:`Elements`
@@ -247,7 +247,7 @@ def extract_clb_drained_at(feed):
     for entry in feed:
         if _DRAINING_RE.match(atom.summary(entry)):
             return timestamp_to_epoch(atom.updated(entry))
-    return None
+    return 0
 
 
 def get_rcv3_contents():
