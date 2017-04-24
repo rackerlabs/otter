@@ -59,7 +59,7 @@ class TimedOutError(Exception):
                 desc=deferred_description, timeout=timeout))
 
 
-def timeout_deferred(deferred, timeout, clock, deferred_description=None):
+def timeout_deferred(deferred, timeout, clock, deferred_description=None, cancel=None):
     """
     Time out a deferred - schedule for it to be canceling it after ``timeout``
     seconds from now, as per the clock.
@@ -76,6 +76,7 @@ def timeout_deferred(deferred, timeout, clock, deferred_description=None):
         Deferred's purpose - if not provided, defaults to the ``repr`` of the
         Deferred.  To be passed to :class:`TimedOutError` for a pretty
         Exception string.
+    :param func cancel: Function called when timing out instead of cancelling the deferred
     :param IReactorTime clock: Clock to be used to schedule the timeout -
         used for testing.
 
@@ -87,7 +88,10 @@ def timeout_deferred(deferred, timeout, clock, deferred_description=None):
 
     def time_it_out():
         timed_out[0] = True
-        deferred.cancel()
+        if cancel:
+            cancel()
+        else:
+            deferred.cancel()
 
     delayed_call = clock.callLater(timeout, time_it_out)
 
@@ -110,8 +114,22 @@ def timeout_deferred(deferred, timeout, clock, deferred_description=None):
     deferred.addBoth(cancel_timeout)
 
 
+def _retry_without_cancel(do_work, timeout, can_retry, next_interval, clock,
+                          deferred_description):
+    """
+    Similar to `retry_and_timeout` except that it does not cancel currently
+    running work if timeout occurs. It waits for that to complete
+    """
+
+    retrier = _Retrier(do_work, can_retry, next_interval, clock)
+    deferred = retrier.start()
+    timeout_deferred(deferred, timeout, clock=clock,
+                     deferred_description=deferred_description, cancel=retrier.stop)
+    return deferred
+
+
 def retry_and_timeout(do_work, timeout, can_retry=None, next_interval=None,
-                      clock=None, deferred_description=None):
+                      cancel_on_timeout=True, clock=None, deferred_description=None):
     """
     Retry a function until the function succeeds or timeout has been reached.
     This is just a composition of :func:`timeout_deferred` and :func:`retry`
@@ -139,11 +157,16 @@ def retry_and_timeout(do_work, timeout, can_retry=None, next_interval=None,
         from twisted.internet import reactor
         clock = reactor
 
-    d = retry(do_work, can_retry=can_retry, next_interval=next_interval,
-              clock=clock)
-    timeout_deferred(d, timeout, clock=clock,
-                     deferred_description=deferred_description)
-    return d
+    if cancel_on_timeout:
+        d = retry(do_work, can_retry=can_retry, next_interval=next_interval,
+                  clock=clock)
+        timeout_deferred(d, timeout, clock=clock,
+                         deferred_description=deferred_description)
+        return d
+    else:
+        return _retry_without_cancel(do_work, can_retry=can_retry,
+                                     next_interval=next_interval, clock=clock,
+                                     deferred_description=deferred_description)
 
 
 class DeferredPool(object):

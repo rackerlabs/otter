@@ -71,7 +71,7 @@ class _Retrier(object):
         of ``self.do_work``
         """
         if self.cancelled:
-            return
+            raise defer.CancelledError
 
         if not self.can_retry(f):
             return f
@@ -120,6 +120,16 @@ class _Retrier(object):
         """
         self.do_real_work()
         return self.deferred
+
+    def stop(self):
+        """
+        Stop retrying by cancelling next schedule but will not disturb currently
+        running operation. Use start()'s deferred.cancel() to stop retrying and stop
+        currently running operation
+        """
+        self.cancelled = True
+        if self.delayed_call is not None:
+            self.delayed_call.cancel()
 
 
 def transient_errors_except(*args):
