@@ -3,7 +3,7 @@
 Getting help
 ~~~~~~~~~~~~~~~~~
 
-Rackspace provides fanatical support:
+Rackspace provides **Fanatical Support**®:
 
 -  Join the `Developer forum`_ to get help from the Rackspace Cloud Developer 
    community. 
