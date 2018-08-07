@@ -1,0 +1,2 @@
+UPGRADE_PIP_TO_LATEST=true
+APP_SCRIPT=.s2i/app.sh
