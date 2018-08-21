@@ -22,3 +22,5 @@ singledispatch==3.4.0.3
 six==1.9.0
 sumtypes==0.1a4
 thimble==0.2.0
+# We need yunomi strictly so that 'make unit' works--no other reason.
+yunomi==0.3.0
