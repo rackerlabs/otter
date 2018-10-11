@@ -1,9 +1,7 @@
 version: '2'
 services: 
     otter: 
-        build: 
-            context: .
-            dockerfile: docker/otter/Dockerfile
+        image: otter:latest 
         ports:
             - "9000:9000"
         depends_on:
@@ -21,18 +19,16 @@ services:
             - ./scripts:/app/scripts
             - ./twisted:/app/twisted
     db:
-        image: cassandra:2.1
+        image: cassandra:latest
     zk:
         image: zookeeper:latest
         ports:
             - "2181:2181"
     mimic: 
-        build: https://github.com/rackerlabs/mimic.git#594dd5c8e80b670fa2d0c42f5eec9645e14aa54e
+        image: mimic:latest
         command: twistd -n mimic --realtime --verbose
     cafe:
-        build:
-            context: .
-            dockerfile: docker/cafe/Dockerfile
+        image: cafe:latest
         environment:
             - OTTER_ROOT=http://otter:9000
             - IDENTITY_ROOT=http://mimic:8900
@@ -47,9 +43,7 @@ services:
             - otter
             - mimic
     trial:
-        build: 
-            context: .
-            dockerfile: docker/otter/Dockerfile
+        image: otter:latest 
         volumes:
             - ./otter:/app/otter
             - ./_docker_trial_tmp:/tmp
