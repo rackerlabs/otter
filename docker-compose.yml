@@ -61,8 +61,23 @@ services:
             - AS_USING_MIMIC=yes
             - AS_SELFHEAL_INTERVAL=20
         command:
+            # We have -z 1 here to randomize the order (with a seed of positive
+            # integer 1). In this case, if you run "trial" by itself it tends to
+            # freeze up mimic pretty hard. It works fine running it along side
+            # the 'cafe' tests and just letting everything go with
+            # 'docker-compose up'. It also works fine if you randomize the
+            # tests.
+            # 
+            # Admittedly, I had to raise pyOpenSSL version to 16.2.0 from 16.0.0
+            # and crytography to 1.9 from 1.4 to get the Dockerfile to work.
+            # Also, I use a version 246 commits behind, to match the version we
+            # originally had here.
+            # 
+            # I think this probably means we have some mimic bug, but we lost
+            # the last mimic developer sometime around July, 2018, and I haven't
+            # tried a newer version yet. This will work for now.
             dockerize -timeout 60s -wait http://otter:9000/health -wait http://mimic:8900
-                trial -j10 --temp-directory=/tmp/_trial_temp otter.integration.tests
+                trial -z 1 -j10 --temp-directory=/tmp/_trial_temp otter.integration.tests
         depends_on:
             - otter
             - mimic
