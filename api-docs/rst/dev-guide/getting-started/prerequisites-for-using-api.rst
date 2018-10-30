@@ -14,5 +14,5 @@ You can find your account number and API key on the Account Settings page in the
 
 .. include:: ../common-gs/get-credentials.rst
 
-.. _Cloud Control Panel: https://mycloud.rackspace.com
+.. _Cloud Control Panel: https://login.rackspace.com
 .. _sign up: https://cart.rackspace.com/cloud/
