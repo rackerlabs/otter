@@ -24,4 +24,4 @@ This Getting Started Guide shows how to send requests by using cURL.
 .. _Openstack client applications: https://wiki.openstack.org/wiki/OpenStackClients
 .. _Postman: http://www.getpostman.com
 .. _RESTClient for Firefox: https://addons.mozilla.org/en-US/firefox/addon/restclient
-.. _Cloud Control Panel: https://mycloud.rackspace.com
+.. _Cloud Control Panel: https://login.rackspace.com
