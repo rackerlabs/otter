@@ -43,8 +43,10 @@ lint: listoutdated lint-code
 lint-code: flake8diff
 	pyflakes ${PYDIRS}
 
+# I removed --allow-external=cafe,cloudcafe to get linting to pass on
+# the Jenkins server.
 listoutdated:
-	pip list --outdated --allow-external=cafe,cloudcafe
+	pip list --outdated 
 
 # concatenate both environment variables together - if both are unset, the
 # concatenation will be empty
