@@ -307,9 +307,8 @@ class HelperTests(SynchronousTestCase):
                             111111, log=self.log)
 
         self.assertEqual(self.successResultOf(d), 'ausername')
-
         self.treq.get.assert_called_once_with(
-            'http://identity/v1.1/mosso/111111',
+            'http://identity/v2.0/mosso/111111',
             auth=('username', 'password'),
             allow_redirects=False, log=self.log)
 

@@ -60,7 +60,6 @@ from otter.util.http import (
 )
 from otter.util.retry import repeating_interval, retry, retry_times
 
-
 class _DoNothingLogger(BoundLog):
     """This class implements a do-nothing logger for the benefit of
     those wishing to call authenticate_user without a logger.
@@ -383,11 +382,11 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
     :return: Username of the magical identity:user-admin user for the tenantid.
     """
     d = treq.get(
-        append_segments(auth_endpoint.replace('v2.0', 'v1.1'), 'mosso', str(tenant_id)),
+        append_segments(auth_endpoint, 'mosso', str(tenant_id)),
         auth=(username, password),
         allow_redirects=False,
         log=log)
-    d.addCallback(check_success, [301])
+    d.addCallback(check_success, [201])
     d.addErrback(wrap_upstream_error, 'identity', 'mosso', auth_endpoint)
     d.addCallback(treq.json_content)
     d.addCallback(lambda user: user['user']['id'])
