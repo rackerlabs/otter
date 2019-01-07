@@ -35,10 +35,10 @@ regional endpoint where the Cloud Auto Scale service is provisioned.
    You should copy the base URLs directly from the catalog rather than
    trying to construct them manually.
 
-   Rackspace Cloud Identity returns an endpoint with your account ID.
+   Rackspace Identity returns an endpoint with your account ID.
    Note the following information about account ID:
 
-   * Account ID from Cloud Identity is the same as the Project ID given
+   * Account ID from Rackspace Identity is the same as the Project ID given
      by the ``X-Project-ID`` header set. (You might also see account ID
      or project ID referred to as tenant ID.)
    * You do not have to provide the account ID for the Cloud Auto Scale
