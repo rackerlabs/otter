@@ -5,8 +5,8 @@ Getting help
 
 Rackspace provides fanatical support:
 
--  Join the `Developer forum`_ to get help from the Rackspace Cloud Developer 
-   community. 
+-  Join the `Developer forum`_ to get help from the Rackspace Cloud Developer
+   community.
 
 -  To access live chat, support tickets, and support phone numbers, go
    to the `Contact Us`_ page.
@@ -19,11 +19,10 @@ Rackspace provides fanatical support:
 
 -  For a list of all offices, addresses, and phone numbers, go to the
    `Contact Rackspace`_ page.
-   
 
-.. _Rackspace Support: http://support.rackspace.com 
+
+.. _Rackspace Support: http://support.rackspace.com
 .. _Contact Us: http://www.rackspace.com/apps/support/contactform
 .. _Dedicated Support: http://www.rackspace.com/managed_hosting/support/dedicatedteam
 .. _Managed Support: http://www.rackspace.com/managed_hosting/support
-.. _Contact Rackspace: http://www.rackspace.com/information/contactus  
-.. _Developer forum: https://community.rackspace.com/developers/f/7
+.. _Contact Rackspace: http://www.rackspace.com/information/contactus
