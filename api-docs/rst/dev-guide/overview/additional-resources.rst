@@ -10,8 +10,7 @@ contribute to source code by using the `Autoscale github repository`_.
 - For general information about Autoscale, see the `Autoscale FAQ`_
   in the Rackspace Knowledge Center.
 
-- We welcome feedback, comments, and bug reports. Log into the Rackspace
-  customer portal at https://feedback.rackspace.com/.
+- We welcome feedback, comments, and bug reports.
 
 - To get information about other Rackspace Cloud service APIs, visit the
   `Rackspace API Documentation`_.
@@ -29,7 +28,7 @@ contribute to source code by using the `Autoscale github repository`_.
 .. _Autoscale FAQ: http://www.rackspace.com/knowledge_center/product-faq/auto-scale
 .. _Rackspace API Documentation: https://developer.rackspace.com/docs/
 .. _Rackspace Autoscale Getting Started Guide Overview: http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstarted/content/Overview.html
-.. _Rackspace Knowledge Center: http://www.rackspace.com/knowledge_center/
+.. _Rackspace Knowledge Center: https://support.rackspace.com/how-to/
 .. _api.rackspace.com: http://api.rackspace.com/
 .. _Quickstart for Autoscale: https://developer.rackspace.com/docs/auto-scale/getting-started/
 .. _Autoscale github repository: https://github.com/rackerlabs/otter
