@@ -28,7 +28,7 @@ Auto Scale service. Each account has only one account owner, and that
 role is assigned by default to any Rackspace Cloud account when the
 account is created.
 
-See the *Rackspace Identity Client Developer Guide* for information about
+See the *Identity Client Developer Guide* for information about
 how to perform the following tasks:
 
 -  `Create account users <http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_addUser_v2.0_users_User_Calls.html>`__

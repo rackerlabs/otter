@@ -17,7 +17,7 @@ Follow these steps to authenticate to the Rackspace Cloud by
 
 Send an authentication request
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-From a command prompt, send a **POST tokens** request to the Rackspace Identity
+From a command prompt, send a **POST tokens** request to the Identity
 service.  Include your username and :ref:`API key <get-credentials>`
 as shown in the following example.
 
@@ -155,7 +155,7 @@ To reference the value in an API request, prefix the variable name with a $, for
    Replace *publicURL* with the publicURL value listed in the service catalog.
 
    .. note::
-       Rackspace Identity returns an endpoint URL with your tenant ID (account ID).
+       The Identity service returns an endpoint URL with your tenant ID (account ID).
        With Rackspace Auto Scale, you have two options for including the tenant ID in API requests.
 
        - Include it in the URL.

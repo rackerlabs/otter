@@ -14,7 +14,7 @@ expires, you can send another authentication request to get a new one.
 
 .. note::
      For more information about authentication tokens, see the following topics in the
-     Rackspace Identity developer documentation.
+     Identity developer documentation.
 
      - :rax-devdocs:`Authentication token operations <cloud-identity/v2/developer-guide/#document-api-operations/token-operations>`
 
