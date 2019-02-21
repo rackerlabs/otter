@@ -261,10 +261,15 @@ class ImpersonatingAuthenticator(object):
         see :meth:`IAuthenticator.authenticate_tenant`
         """
         auth = partial(self._auth_me, log=log)
-        token = extract_token(auth)
+       # if not self._token:
+       #     self._token = extract_token(authenticate_user(self._url,
+       #                       self._identity_admin_user,
+       #                       self._identity_admin_password,
+       #                       tenant_id=tenant_id,
+       #                       log=log))
         d = user_for_tenant(self._admin_url,
                             self._identity_admin_user,
-                            token,
+                            self._token,
                             tenant_id, log=log)
 
         def impersonate(user):
