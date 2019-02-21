@@ -310,7 +310,7 @@ class HelperTests(SynchronousTestCase):
 
         self.treq.get.assert_called_once_with(
             'http://identity/v2.0/users?name=ausername',
-            headers=headers('auth-token'),
+            auth=('ausername', 'auth-token'),
             allow_redirects=False, log=self.log)
 
     def test_user_for_tenant_propagates_errors(self):
@@ -511,7 +511,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         self.successResultOf(self.ia.authenticate_tenant(111111))
         self.user_for_tenant.assert_called_once_with(self.admin_url,
                                                      'service_user',
-                                                     None,
+                                                     'service_password',
                                                      111111,
                                                      log=None)
         self.user_for_tenant.reset_mock()
@@ -519,7 +519,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
 
         self.user_for_tenant.assert_called_once_with(self.admin_url, 'service_user',
-                                                     None, 111111,
+                                                     'service_password', 111111,
                                                      log=self.log)
 
     def test_authenticate_tenant_impersonates_first_user(self):
