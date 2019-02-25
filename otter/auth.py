@@ -261,6 +261,7 @@ class ImpersonatingAuthenticator(object):
         see :meth:`IAuthenticator.authenticate_tenant`
         """
         auth = partial(self._auth_me, log=log)
+        auth()
         if self._token is None:
 #            raise Exception("RAHUL no token found")
             d = authenticate_user(self._url,
@@ -401,7 +402,7 @@ def user_for_tenant(auth_endpoint, username, token, tenant_id, log=None):
     d.addCallback(check_success, [200, 203])
     d.addErrback(wrap_upstream_error, 'identity', 'users', auth_endpoint)
     d.addCallback(treq.json_content)
-    d.addCallback(lambda user: user['user']['username'])
+    d.addCallback(lambda user: user['user']['id'])
     return d
 
 

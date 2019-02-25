@@ -558,7 +558,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         self.authenticate_user.assert_called_with(self.url, self.user,
                                                        self.password,
                                                        log=self.log)
-        self.log.msg.assert_called_once_with('Getting new identity admin token')
+        self.log.msg.assert_called_with('Getting new identity admin token')
 
     def test_authenticate_tenant_gets_endpoints_for_the_impersonation_token(self):
         """
@@ -585,7 +585,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         self.authenticate_user.assert_called_with(self.url, self.user,
                                                        self.password,
                                                        log=self.log)
-        self.log.msg.assert_called_once_with('Getting new identity admin token')
+        self.log.msg.assert_called_with('Getting new identity admin token')
 
     def test_authenticate_tenant_returns_impersonation_token_and_endpoint_list(self):
         """
