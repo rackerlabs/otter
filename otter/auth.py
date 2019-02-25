@@ -262,7 +262,7 @@ class ImpersonatingAuthenticator(object):
         """
         auth = partial(self._auth_me, log=log)
         if self._token is None:
-            raise Exception("RAHUL no token found")
+#            raise Exception("RAHUL no token found")
             d = authenticate_user(self._url,
                               self._identity_admin_user,
                               self._identity_admin_password,
