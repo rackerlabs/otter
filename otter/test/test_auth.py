@@ -302,7 +302,10 @@ class HelperTests(SynchronousTestCase):
         response_body = {'user': {'id': 'ausername'}}
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.get.return_value = succeed(response)
-
+        h = {}
+        h['X-Auth-Token'] = 'auth-token'
+        h['Content-Type'] = 'application/json'
+        h['Accept'] = 'application/json'
         d = user_for_tenant('http://identity/v2.0', 'ausername', 'auth-token',
                             111111, log=self.log)
 
@@ -310,7 +313,7 @@ class HelperTests(SynchronousTestCase):
 
         self.treq.get.assert_called_once_with(
             'http://identity/v2.0/users?name=ausername',
-            headers=headers('auth-token'),
+            headers=h,
             allow_redirects=False, log=self.log)
 
     def test_user_for_tenant_propagates_errors(self):

@@ -388,9 +388,13 @@ def user_for_tenant(auth_endpoint, username, token, tenant_id, log=None):
 
     :return: Username of the magical identity:user-admin user for the tenantid.
     """
+    h = {}
+    h['X-Auth-Token'] = token
+    h['Content-Type'] = 'application/json'
+    h['Accept'] = 'application/json'
     d = treq.get(
         append_segments(auth_endpoint, 'users')+'?name='+str(username),
-        headers=headers(token),
+        headers=h,
         allow_redirects=False,
         log=log)
     d.addCallback(check_success, [200])
