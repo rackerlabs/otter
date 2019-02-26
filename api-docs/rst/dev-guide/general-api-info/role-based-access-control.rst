@@ -123,6 +123,6 @@ RBAC permissions cross-reference to Auto Scale operations
 
 API operations for Auto Scale might not be available to all roles.
 To see which operations are permitted to invoke which calls, review the
-`Permissions Matrix for Auto Scale`_ article in the Rackspace Knowledge Center.
+`Permissions Matrix for Auto Scale`_ article.
 
 .. _Permissions Matrix for Auto Scale: http://www.rackspace.com/knowledge_center/article/permissions-matrix-for-auto-scale
