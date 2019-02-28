@@ -261,7 +261,7 @@ class ImpersonatingAuthenticator(object):
         see :meth:`IAuthenticator.authenticate_tenant`
         """
         auth = partial(self._auth_me, log=log)
-        auth()
+        d = auth()
         if self._token is None:
 #            raise Exception("RAHUL no token found")
             d = authenticate_user(self._url,
