@@ -263,15 +263,16 @@ class ImpersonatingAuthenticator(object):
         """
         auth = partial(self._auth_me, log=log)
 #        d = auth()
-        log.msg("RAHU3180 : Testing msg func")
+#        log.msg("RAHU3180 : Testing msg func")
         if self._token is None:
-#            raise Exception("RAHUL no token found")
-            d = authenticate_user(self._url,
-                              self._identity_admin_user,
-                              self._identity_admin_password,
-                              log=log)
-            d.addCallback(extract_token)
-            d.addCallback(partial(setattr, self, "_token"))
+            e = authenticate_user(self._url,
+                                  self._identity_admin_user,
+                                  self._identity_admin_password,
+                                  log=log)
+            e.addCallback(extract_token)
+
+#            e.addErrback(_log_failed_auth)
+            e.addCallback(partial(setattr, self, "_token"))
         d = user_for_tenant(self._admin_url,
                             self._identity_admin_user,
                             self._token,
