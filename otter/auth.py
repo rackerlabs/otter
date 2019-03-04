@@ -43,6 +43,7 @@ from functools import partial
 from characteristic import attributes
 
 from twisted.internet.defer import succeed
+from twisted.python import log
 
 from txeffect import deferred_performer
 
@@ -261,7 +262,8 @@ class ImpersonatingAuthenticator(object):
         see :meth:`IAuthenticator.authenticate_tenant`
         """
         auth = partial(self._auth_me, log=log)
-        d = auth()
+#        d = auth()
+        log.msg("RAHU3180 : Testing msg func")
         if self._token is None:
 #            raise Exception("RAHUL no token found")
             d = authenticate_user(self._url,
