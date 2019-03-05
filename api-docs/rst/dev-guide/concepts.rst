@@ -788,10 +788,10 @@ To get started with RackConnect v3 cloud bursting:
 **Related information**
 
 - `RackConnect product information`_
-- `Knowledge Center articles for RackConnect`_.
+- `How-To articles for RackConnect`_.
 
 .. _RackConnect product information: http://www.rackspace.com/cloud/hybrid/rackconnect
-.. _Knowledge Center articles for RackConnect: http://www.rackspace.com/knowledge_center/product-page/rackconnect
+.. _How-To articles for RackConnect: http://www.rackspace.com/knowledge_center/product-page/rackconnect
 
 
 .. _convergence-concept:
