@@ -43,7 +43,7 @@ from functools import partial
 from characteristic import attributes
 
 from twisted.internet.defer import succeed
-from twisted.python import log
+#from twisted.python import log
 
 from txeffect import deferred_performer
 
@@ -228,11 +228,22 @@ class ImpersonatingAuthenticator(object):
     """
     def __init__(self, identity_admin_user, identity_admin_password, url, admin_url):
         self._identity_admin_user = identity_admin_user
+        #self._authenticator = authenticator
         self._identity_admin_password = identity_admin_password
         self._url = url
         self._admin_url = admin_url
+        #self._log = self._bind_log(default_log)
         # cached token to admin identity
         self._token = None
+
+#    def _bind_log(self, log, **kwargs):
+#        """
+#        Binds relevant authenticator arguments to a `BoundLog`
+#        """
+#        return log.bind(system='otter.auth.rahul',
+#                        authenticator=self._authenticator,
+#                        cache_ttl=self._ttl,
+#                        **kwargs)
 
     @wait(ignore_kwargs=['log'])
     def _auth_me(self, log=None):
@@ -257,13 +268,14 @@ class ImpersonatingAuthenticator(object):
         d.addCallback(partial(setattr, self, "_token"))
         return d
 
+    @wait(ignore_kwargs=['log'])
     def authenticate_tenant(self, tenant_id, log=None):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
         auth = partial(self._auth_me, log=log)
 #        d = auth()
-#        log.msg("RAHU3180 : Testing msg func")
+        default_log.msg("RAHU3180 : Testing msg func")
         if self._token is None:
             e = authenticate_user(self._url,
                                   self._identity_admin_user,
