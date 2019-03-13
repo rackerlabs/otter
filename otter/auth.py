@@ -263,9 +263,18 @@ class ImpersonatingAuthenticator(object):
         auth = partial(self._auth_me, log=log)
         # Update the user_for_tenant function to
         #  use v2.0 API version only
-        d = user_for_tenant(self._admin_url,
-                            self._token,
-                            tenant_id, log=log)
+        # if self._token is None:
+        d = authenticate_user(self._url,
+                              self._identity_admin_user,
+                              self._identity_admin_password,
+                              log=log)
+        d.addCallback(extract_token)
+        d.addCallback(partial(setattr, self, "_token"))
+        d.addCallback(lambda ignore: user_for_tenant(self._admin_url,
+                      self._token, tenant_id, log=log))
+#        d = user_for_tenant(self._admin_url,
+#                            self._token,
+#                            tenant_id, log=log)
 
         def impersonate(user):
             iud = impersonate_user(self._admin_url,
@@ -390,7 +399,7 @@ def user_for_tenant(auth_endpoint, token, tenant_id, log=None):
     d.addCallback(check_success, [200, 203])
     d.addErrback(wrap_upstream_error, 'identity', 'users', auth_endpoint)
     d.addCallback(treq.json_content)
-    d.addCallback(lambda user: user['users'][0]['username'])
+    d.addCallback(lambda user: user['users'][0]['username'])    
     return d
 
 
