@@ -299,7 +299,7 @@ class HelperTests(SynchronousTestCase):
         the list of users for a given tenant.
         """
         response = mock.Mock(code=200)
-        response_body = {'user': {'id': 'ausername'}}
+        response_body = {'users': [{'username': 'ausername'}]}
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.get.return_value = succeed(response)
         h = {}

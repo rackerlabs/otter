@@ -44,7 +44,7 @@ ready to:
 
 1) Execute the test cases for autoscale api.
 
-                       or
+or
 
 2) Write entirely new tests in this repository using the CloudCAFE Framework.
 
@@ -54,22 +54,78 @@ Tests can be run regardless of the current directory. The format of the runner i
 
 cafe-runner autoscale CONFIG(minus .config) PARAMS
 
-Example:
-cafe-runner autoscale dev -p functional --parallel
-    runs all the autoscale tests under the functional folder in parallel
-cafe runner autoscale dev -m test_create_scaling_group
-	runs the test 'test_create_scaling_group'
+### Examples:
+
+#### run all the autoscale tests under the functional folder in parallel
+
+```cafe-runner autoscale dev -p functional --parallel```
+
+#### runs the test `test_create_scaling_group`
+
+```cafe runner autoscale dev -m test_create_scaling_group```
+	
 
 Options:
 ----------
-cafe-runner autoscale dev -p functional (runs all functional tests)
-cafe-runner autoscale dev -p system -t speed=quick (runs all quick system tests)
-cafe-runner autoscale dev -p system -t speed=slow (runs all system tests that require servers to build to active state)
-cafe-runner autoscale dev -p system -t type=lbaas (runs load balancer intergration tests)
-cafe-runner autoscale dev -p system -t type=repose (runs repose integration tests)
-cafe-runner autoscale dev -p system -t type=rbac (runs rbac integration tests)
-cafe-runner autoscale dev -p system -t type=one-time (runs system tests, that are not intended to be run frequently in production)
 
-cafe-runner autoscale dev -m test_delete_all -t groups (deletes all the groups on the account)
-cafe-runner autoscale dev -m test_delete_all -t servers (deletes all the servers on the account)
-cafe-runner autoscale dev -m test_delete_all -t lbaas (deletes all the nodes on the load balancers)
+### functional tests (run all)
+
+```
+cafe-runner autoscale dev -p functional
+```
+
+### quick system tests (run all)
+
+```
+cafe-runner autoscale dev -p system -t speed=quick 
+```
+
+### System tests requiring servers to build to active state
+
+```
+cafe-runner autoscale dev -p system -t speed=slow 
+```
+
+### Load balancer integration tests
+
+```
+cafe-runner autoscale dev -p system -t type=lbaas 
+```
+
+### Repose integration tests
+
+```
+cafe-runner autoscale dev -p system -t type=repose 
+```
+
+### RBAC integration tests
+
+```
+cafe-runner autoscale dev -p system -t type=rbac 
+```
+
+### System tests
+
+You shouldn't run system tests frequently in production.
+
+```
+cafe-runner autoscale dev -p system -t type=one-time
+```
+
+### Delete all groups on the account
+
+```
+cafe-runner autoscale dev -m test_delete_all -t groups
+```
+
+### Delete all servers on the account
+
+```
+cafe-runner autoscale dev -m test_delete_all -t servers
+```
+
+### Delete all nodes on the load balancers
+
+```
+cafe-runner autoscale dev -m test_delete_all -t lbaas
+```
