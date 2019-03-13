@@ -273,6 +273,22 @@ class ImpersonatingAuthenticator(object):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
+        def _log_failed_auth(err):
+            """
+            Log this as a string we know we can find in the logging feed
+            """
+            if log:
+                log.err(err, 'RAHU3180: Failed to get a new identity admin token.',
+                        otter_msg_type='admin-login-failed-rahu3180')
+            return err
+        def _log_failed_auth_users(err):
+            """
+            Log this as a string we know we can find in the logging feed
+            """
+            if log:
+                log.err(err, 'RAHU3180: Failed to get a new identity admin token. !!!USERS!!!',
+                        otter_msg_type='admin-login-failed-rahu3180')
+            return err
         auth = partial(self._auth_me, log=log)
         # if self._token is None:
         d = authenticate_user(self._url,
@@ -280,9 +296,11 @@ class ImpersonatingAuthenticator(object):
                               self._identity_admin_password,
                               log=log)
         d.addCallback(extract_token)
+        d.addErrback(_log_failed_auth)
         d.addCallback(partial(setattr, self, "_token"))
         d.addCallback(lambda ignore: user_for_tenant(self._admin_url, self._identity_admin_user,
                       self._token, tenant_id, log=log))
+        d.addErrback(_log_failed_auth_users)
 #        d = user_for_tenant(self._admin_url,
 #                            self._token,
 #                            tenant_id, log=log)
