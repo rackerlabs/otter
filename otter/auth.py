@@ -291,13 +291,14 @@ class ImpersonatingAuthenticator(object):
             return err
         auth = partial(self._auth_me, log=log)
         # if self._token is None:
-        d = authenticate_user(self._url,
-                              self._identity_admin_user,
-                              self._identity_admin_password,
-                              log=log)
-        d.addCallback(extract_token)
-        d.addErrback(_log_failed_auth)
-        d.addCallback(partial(setattr, self, "_token"))
+#        d = authenticate_user(self._url,
+#                              self._identity_admin_user,
+#                              self._identity_admin_password,
+#                              log=log)
+#        d.addCallback(extract_token)
+#        d.addErrback(_log_failed_auth)
+#        d.addCallback(partial(setattr, self, "_token"))
+        d = self._auth_me(log)
         d.addCallback(lambda ignore: user_for_tenant(self._admin_url, self._identity_admin_user,
                       self._token, tenant_id, log=log))
         d.addErrback(_log_failed_auth_users)
