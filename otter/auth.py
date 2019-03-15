@@ -43,6 +43,7 @@ from functools import partial
 from characteristic import attributes
 
 from twisted.internet.defer import succeed
+#from twisted.python import log
 
 from txeffect import deferred_performer
 
@@ -227,11 +228,22 @@ class ImpersonatingAuthenticator(object):
     """
     def __init__(self, identity_admin_user, identity_admin_password, url, admin_url):
         self._identity_admin_user = identity_admin_user
+        #self._authenticator = authenticator
         self._identity_admin_password = identity_admin_password
         self._url = url
         self._admin_url = admin_url
+        #self._log = self._bind_log(default_log)
         # cached token to admin identity
         self._token = None
+
+#    def _bind_log(self, log, **kwargs):
+#        """
+#        Binds relevant authenticator arguments to a `BoundLog`
+#        """
+#        return log.bind(system='otter.auth.rahul',
+#                        authenticator=self._authenticator,
+#                        cache_ttl=self._ttl,
+#                        **kwargs)
 
     @wait(ignore_kwargs=['log'])
     def _auth_me(self, log=None):
@@ -256,17 +268,46 @@ class ImpersonatingAuthenticator(object):
         d.addCallback(partial(setattr, self, "_token"))
         return d
 
+    @wait(ignore_kwargs=['log'])
     def authenticate_tenant(self, tenant_id, log=None):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
+        def _log_failed_auth(err):
+            """
+            Log this as a string we know we can find in the logging feed
+            """
+            if log:
+                log.err(err, 'RAHU3180: Failed to get a new identity admin token.',
+                        otter_msg_type='admin-login-failed-rahu3180')
+            return err
+        def _log_failed_auth_users(err):
+            """
+            Log this as a string we know we can find in the logging feed
+            """
+            if log:
+                log.err(err, 'RAHU3180: Failed to get a new identity admin token. !!!USERS!!!',
+                        otter_msg_type='admin-login-failed-rahu3180', deffered_val=d.users)
+            return err
         auth = partial(self._auth_me, log=log)
-
-        d = user_for_tenant(self._admin_url,
-                            self._identity_admin_user,
-                            self._identity_admin_password,
+        if self._token is None:
+#        d = authenticate_user(self._url,
+#                              self._identity_admin_user,
+#                              self._identity_admin_password,
+#                              log=log)
+#        d.addCallback(extract_token)
+#        d.addErrback(_log_failed_auth)
+#        d.addCallback(partial(setattr, self, "_token"))
+            d = self._auth_me(log)
+            d.addCallback(lambda ignore: user_for_tenant(self._admin_url, self._identity_admin_user,
+                      self._token, tenant_id, log=log))
+            d.addErrback(_log_failed_auth_users)
+        else:
+            d = user_for_tenant(self._admin_url, self._identity_admin_user,
+                            self._token,
                             tenant_id, log=log)
-
+        if log:
+            log.msg("RAHU3180: HAHAHAHA")
         def impersonate(user):
             iud = impersonate_user(self._admin_url,
                                    self._token,
@@ -371,7 +412,7 @@ def endpoints_for_token(auth_endpoint, identity_admin_token, user_token,
     return d
 
 
-def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
+def user_for_tenant(auth_endpoint, username, token, tenant_id, log=None):
     """
     Use a super secret API to get the special actual username for a tenant id.
 
@@ -382,15 +423,20 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
 
     :return: Username of the magical identity:user-admin user for the tenantid.
     """
+    h = {}
+    h['X-Auth-Token'] = token
+    h['Content-Type'] = 'application/json'
+    h['Accept'] = 'application/json'
     d = treq.get(
-        append_segments(auth_endpoint.replace('v2.0', 'v1.1'), 'mosso', str(tenant_id)),
-        auth=(username, password),
+        append_segments(auth_endpoint, 'users')+'?name='+str(username),
+        headers=h,
         allow_redirects=False,
         log=log)
-    d.addCallback(check_success, [301])
-    d.addErrback(wrap_upstream_error, 'identity', 'mosso', auth_endpoint)
+    d.addCallback(check_success, [200, 203])
+    d.addErrback(wrap_upstream_error, 'identity', 'users', auth_endpoint)
     d.addCallback(treq.json_content)
-    d.addCallback(lambda user: user['user']['id'])
+    d.addCallback(lambda user: user['user']['username'])
+#    d.addCallback(lambda user: user['user']['id'])
     return d
 
 
