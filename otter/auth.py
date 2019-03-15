@@ -306,7 +306,8 @@ class ImpersonatingAuthenticator(object):
             d = user_for_tenant(self._admin_url, self._identity_admin_user,
                             self._token,
                             tenant_id, log=log)
-
+        if log:
+            log.debug("RAHU3180: HAHAHAHA")
         def impersonate(user):
             iud = impersonate_user(self._admin_url,
                                    self._token,
