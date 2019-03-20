@@ -548,12 +548,12 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
             succeed({'access': {'token': {'id': 'impersonation_token'}}})]
         self.successResultOf(self.ia.authenticate_tenant(111111, self.log))
         self.impersonate_user.assert_has_calls(
-            [mock.call(self.admin_url, None, 'test_user', log=self.log),
+            [mock.call(self.admin_url, 'auth-token', 'test_user', log=self.log),
              mock.call(self.admin_url, 'auth-token', 'test_user', log=self.log)])
-        self.authenticate_user.assert_called_once_with(self.url, self.user,
+        self.authenticate_user.assert_called_with(self.url, self.user,
                                                        self.password,
                                                        log=self.log)
-        self.log.msg.assert_called_once_with('Getting new identity admin token')
+        self.log.msg.assert_called_with('Getting new identity admin token')
 
     def test_authenticate_tenant_gets_endpoints_for_the_impersonation_token(self):
         """
@@ -575,12 +575,12 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
             succeed({'endpoints': [{'name': 'anEndpoint', 'type': 'anType'}]})]
         self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
         self.endpoints_for_token.assert_has_calls(
-            [mock.call(self.admin_url, None, 'impersonation_token', log=self.log),
+            [mock.call(self.admin_url, 'auth-token', 'impersonation_token', log=self.log),
              mock.call(self.admin_url, 'auth-token', 'impersonation_token', log=self.log)])
-        self.authenticate_user.assert_called_once_with(self.url, self.user,
+        self.authenticate_user.assert_called_with(self.url, self.user,
                                                        self.password,
                                                        log=self.log)
-        self.log.msg.assert_called_once_with('Getting new identity admin token')
+        self.log.msg.assert_called_with('Getting new identity admin token')
 
     def test_authenticate_tenant_returns_impersonation_token_and_endpoint_list(self):
         """

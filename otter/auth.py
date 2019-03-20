@@ -261,11 +261,11 @@ class ImpersonatingAuthenticator(object):
         see :meth:`IAuthenticator.authenticate_tenant`
         """
         auth = partial(self._auth_me, log=log)
-
-        d = user_for_tenant(self._admin_url,
+        d = auth()
+        d.addCallback(lambda ignore: user_for_tenant(self._admin_url,
                             self._identity_admin_user,
                             self._identity_admin_password,
-                            tenant_id, log=log)
+                            tenant_id, log=log))
 
         def impersonate(user):
             iud = impersonate_user(self._admin_url,
