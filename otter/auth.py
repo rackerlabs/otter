@@ -382,13 +382,31 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
 
     :return: Username of the magical identity:user-admin user for the tenantid.
     """
+
+    def _log_failed_auth(err):
+        """
+        Log this as a string we know we can find in the logging feed
+        """
+        if log:
+            log.err(err, 'Failed to get a new identity admin token.',
+                    otter_msg_type='admin-login-failed')
+        return err
+
+    if log:
+        log.msg('Getting new identity admin token')
+
+    d_token = authenticate_user(auth_endpoint, username, password, log)
+    d_token.addCallback(extract_token)
+    token = ''
+    d_token.addErrback(_log_failed_auth)
+    d_token.addCallback(setattr, token)
     d = treq.get(
-        append_segments(auth_endpoint.replace('v2.0', 'v1.1'), 'mosso', str(tenant_id)),
-        auth=(username, password),
+        append_segments(auth_endpoint, 'users') + '?name=' + str(username),
+        headers=headers(token),
         allow_redirects=False,
         log=log)
-    d.addCallback(check_success, [301])
-    d.addErrback(wrap_upstream_error, 'identity', 'mosso', auth_endpoint)
+    d.addCallback(check_success, [201, 203])
+    d.addErrback(wrap_upstream_error, 'identity', 'users', auth_endpoint)
     d.addCallback(treq.json_content)
     d.addCallback(lambda user: user['user']['id'])
     return d
