@@ -264,7 +264,7 @@ class ImpersonatingAuthenticator(object):
         d = auth()
         d.addCallback(lambda ignore: user_for_tenant(self._admin_url,
                             self._identity_admin_user,
-                            self._identity_admin_password,
+                            self._identity_admin_password, self._token,
                             tenant_id, log=log))
 
         def impersonate(user):
@@ -371,7 +371,7 @@ def endpoints_for_token(auth_endpoint, identity_admin_token, user_token,
     return d
 
 
-def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
+def user_for_tenant(auth_endpoint, username, password, token, tenant_id, log=None):
     """
     Use a super secret API to get the special actual username for a tenant id.
 
@@ -384,7 +384,7 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
     """
     d = treq.get(
         append_segments(auth_endpoint.replace('v2.0', 'v1.1'), 'mosso', str(tenant_id)),
-        auth=(username, password),
+        headers=headers(token),
         allow_redirects=False,
         log=log)
     d.addCallback(check_success, [301])
