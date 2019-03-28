@@ -299,17 +299,17 @@ class HelperTests(SynchronousTestCase):
         the list of users for a given tenant.
         """
         response = mock.Mock(code=200)
-        response_body = {'user': {'id': 'ausername'}}
+        response_body = {'user': {'username': 'username'}}
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.get.return_value = succeed(response)
 
-        d = user_for_tenant('http://identity/v2.0', 'username', 'password', 'auth-token',
-                            111111, log=self.log)
+        d = user_for_tenant('http://identity/v2.0', 'username', 'auth-token',
+                            log=self.log)
 
-        self.assertEqual(self.successResultOf(d), 'ausername')
+        self.assertEqual(self.successResultOf(d), 'username')
 
         self.treq.get.assert_called_once_with(
-            'http://identity/v1.1/mosso/111111',
+            'http://identity/v2.0/users?name=username',
             headers=headers('auth-token'),
             allow_redirects=False, log=self.log)
 
@@ -321,8 +321,7 @@ class HelperTests(SynchronousTestCase):
         self.treq.content.return_value = succeed('error_body')
         self.treq.get.return_value = succeed(response)
 
-        d = user_for_tenant('http://identity/v2.0', 'username', 'password', 'auth-token',
-                            111111)
+        d = user_for_tenant('http://identity/v2.0', 'username', 'auth-token')
         failure = self.failureResultOf(d)
 
         self.assertTrue(failure.check(UpstreamError))
@@ -509,7 +508,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         """
         self.successResultOf(self.ia.authenticate_tenant(111111))
         self.user_for_tenant.assert_called_once_with(self.admin_url, self.user,
-                                                     self.password, 'auth-token', 111111,
+                                                     'auth-token',
                                                      log=None)
 
         self.user_for_tenant.reset_mock()
@@ -517,7 +516,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
 
         self.user_for_tenant.assert_called_once_with(self.admin_url, self.user,
-                                                     self.password, 'auth-token', 111111,
+                                                     'auth-token',
                                                      log=self.log)
 
     def test_authenticate_tenant_impersonates_first_user(self):
