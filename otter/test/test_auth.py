@@ -36,7 +36,7 @@ from otter.auth import (
 )
 from otter.effect_dispatcher import get_simple_dispatcher
 from otter.test.utils import SameJSON, iMock, mock_log, patch
-from otter.util.http import APIError, UpstreamError
+from otter.util.http import APIError, UpstreamError, headers
 
 
 expected_headers = {'accept': ['application/json'],
@@ -303,14 +303,14 @@ class HelperTests(SynchronousTestCase):
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.get.return_value = succeed(response)
 
-        d = user_for_tenant('http://identity/v2.0', 'username', 'password',
+        d = user_for_tenant('http://identity/v2.0', 'username', 'password', 'auth-token',
                             111111, log=self.log)
 
         self.assertEqual(self.successResultOf(d), 'ausername')
 
         self.treq.get.assert_called_once_with(
             'http://identity/v1.1/mosso/111111',
-            auth=('username', 'password'),
+            headers=headers('auth-token'),
             allow_redirects=False, log=self.log)
 
     def test_user_for_tenant_propagates_errors(self):
@@ -321,7 +321,7 @@ class HelperTests(SynchronousTestCase):
         self.treq.content.return_value = succeed('error_body')
         self.treq.get.return_value = succeed(response)
 
-        d = user_for_tenant('http://identity/v2.0', 'username', 'password',
+        d = user_for_tenant('http://identity/v2.0', 'username', 'password', 'auth-token',
                             111111)
         failure = self.failureResultOf(d)
 
@@ -509,7 +509,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         """
         self.successResultOf(self.ia.authenticate_tenant(111111))
         self.user_for_tenant.assert_called_once_with(self.admin_url, self.user,
-                                                     self.password, 111111,
+                                                     self.password, 'auth-token', 111111,
                                                      log=None)
 
         self.user_for_tenant.reset_mock()
@@ -517,7 +517,7 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
         self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
 
         self.user_for_tenant.assert_called_once_with(self.admin_url, self.user,
-                                                     self.password, 111111,
+                                                     self.password, 'auth-token', 111111,
                                                      log=self.log)
 
     def test_authenticate_tenant_impersonates_first_user(self):
@@ -548,12 +548,12 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
             succeed({'access': {'token': {'id': 'impersonation_token'}}})]
         self.successResultOf(self.ia.authenticate_tenant(111111, self.log))
         self.impersonate_user.assert_has_calls(
-            [mock.call(self.admin_url, None, 'test_user', log=self.log),
+            [mock.call(self.admin_url, 'auth-token', 'test_user', log=self.log),
              mock.call(self.admin_url, 'auth-token', 'test_user', log=self.log)])
-        self.authenticate_user.assert_called_once_with(self.url, self.user,
+        self.authenticate_user.assert_called_with(self.url, self.user,
                                                        self.password,
                                                        log=self.log)
-        self.log.msg.assert_called_once_with('Getting new identity admin token')
+        self.log.msg.assert_called_with('Getting new identity admin token')
 
     def test_authenticate_tenant_gets_endpoints_for_the_impersonation_token(self):
         """
@@ -575,12 +575,12 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
             succeed({'endpoints': [{'name': 'anEndpoint', 'type': 'anType'}]})]
         self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
         self.endpoints_for_token.assert_has_calls(
-            [mock.call(self.admin_url, None, 'impersonation_token', log=self.log),
+            [mock.call(self.admin_url, 'auth-token', 'impersonation_token', log=self.log),
              mock.call(self.admin_url, 'auth-token', 'impersonation_token', log=self.log)])
-        self.authenticate_user.assert_called_once_with(self.url, self.user,
+        self.authenticate_user.assert_called_with(self.url, self.user,
                                                        self.password,
                                                        log=self.log)
-        self.log.msg.assert_called_once_with('Getting new identity admin token')
+        self.log.msg.assert_called_with('Getting new identity admin token')
 
     def test_authenticate_tenant_returns_impersonation_token_and_endpoint_list(self):
         """
