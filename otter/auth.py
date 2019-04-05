@@ -273,8 +273,6 @@ class ImpersonatingAuthenticator(object):
 #        if tenant_id:
 #            request['auth']['tenantId'] = tenant_id
         token = ''
-        LOG.debug("RAHU3180: Test log")
-        LOG.info("RAHU1991: Test log")
         def set_token(token_val):
             global token
             token = token_val
@@ -298,6 +296,7 @@ class ImpersonatingAuthenticator(object):
                               log=log)
         d.addCallback(extract_token)
         d.addCallback(set_token)
+        LOG.debug("RAHU3180: Token is : %(token)s"%{'token': token})
         d.addCallback(lambda ignore: user_for_tenant(self._admin_url,
                       token,
                       log=log))
