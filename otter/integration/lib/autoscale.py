@@ -30,6 +30,8 @@ from otter.util.retry import (
     repeating_interval,
     terminal_errors_except
 )
+from twisted.logger import Logger
+LOG = Logger()
 
 pp = pprint.PrettyPrinter(indent=4)
 verbosity = int(os.environ.get('AS_VERBOSITY', 0))
@@ -534,7 +536,9 @@ class ScalingGroup(object):
         """
         def check(result):
             response, group_state = result
+            LOG.debug("RAHU0808: mismatch result: %(result)s"%{'result': result})
             mismatch = matcher.match(group_state['group'])
+            
             if mismatch:
                 msg("Waiting for group {} to reach desired group state.\n"
                     "Mismatch: {}"
@@ -545,6 +549,7 @@ class ScalingGroup(object):
             return rcs
 
         def poll():
+#            LOG.debug("RAHU8080: polling get_scaling_group: %(get_sg)s"%{'get_sg': self.get_scaling_group_state(rcs, [200])})
             return self.get_scaling_group_state(rcs, [200]).addCallback(check)
 
         return retry_and_timeout(

@@ -690,7 +690,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                 {"name": "default"}
             ])
         yield group.start(self.rcs, self)
-        LOG.debug("RAHU1991 FAIL:  self.rcs: %(rcs1)s, self.rcs.token: %(token)s self.rcs.tenant: %(tenant)s"%{'rcs1':self.rcs, 'token':self.rcs.token, 'tenant':self.rcs.tenant})
+        LOG.debug("RAHU1991 FAIL: self.rcs.token: %(token)s self.rcs.tenant: %(tenant)s"%{'rcs1':self.rcs, 'token':self.rcs.token, 'tenant':self.rcs.tenant})
         initial_servers = yield wait_for_servers(
             self.rcs, pool=self.helper.pool, group=group,
             timeout=otter_build_timeout,
@@ -986,8 +986,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             resources=get_resource_mapping(),
             region=region
         )
-        LOG.debug("RAHU3180: PASS   rcs: %(rcs)s   identitity: %(identity)s rcs.token: %(token)s   rcs.tenant:%(tenant)s"%{'rcs': rcs, 'identity': identity, 'token':rcs.token, 'tenant':rcs.tenant})
-        LOG.debug("RAHU3180 PASS:  self.rcs: %(rcs1)s, self.rcs.token: %(token)s self.rcs.tenant: %(tenant)s"%{'rcs1':self.rcs, 'token':self.rcs.token, 'tenant':self.rcs.tenant})
+        LOG.debug("RAHU3180: PASS   identitity: %(identity)s rcs.token: %(token)s   rcs.tenant:%(tenant)s"%{'rcs': rcs, 'identity': identity, 'token':rcs.token, 'tenant':rcs.tenant})
+        LOG.debug("RAHU3180 PASS: self.rcs.token: %(token)s self.rcs.tenant: %(tenant)s"%{'rcs1':self.rcs, 'token':self.rcs.token, 'tenant':self.rcs.tenant})
         # inject behavior errors for this user, so that when otter
         # impersonates, it gets failures
         mimic_identity = MimicIdentity(pool=self.helper.pool, test_case=self,

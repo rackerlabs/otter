@@ -16,7 +16,8 @@ import treq
 
 from otter.log.formatters import serialize_to_jsonable
 from otter.util.config import config_value
-
+from twisted.logger import Logger
+LOG = Logger()
 
 class RequestError(Exception):
     """
@@ -218,6 +219,7 @@ def check_success(response, success_codes, _treq=None):
 
     :return: response or a deferred that errbacks with an APIError.
     """
+    LOG.debug("RAHU1618: response of call is Response: %(resp)s"%{'resp': response})
     if _treq is None:
         _treq = treq
 
