@@ -59,7 +59,8 @@ from otter.util.http import (
     wrap_upstream_error,
 )
 from otter.util.retry import repeating_interval, retry, retry_times
-
+from twisted.logger import Logger
+LOG = Logger()
 
 class _DoNothingLogger(BoundLog):
     """This class implements a do-nothing logger for the benefit of
@@ -272,7 +273,8 @@ class ImpersonatingAuthenticator(object):
 #        if tenant_id:
 #            request['auth']['tenantId'] = tenant_id
         token = ''
-
+        LOG.debug("RAHU3180: Test log")
+        LOG.info("RAHU1991: Test log")
         def set_token(token_val):
             global token
             token = token_val
