@@ -1009,7 +1009,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=2,
             max_entities=10)
         yield self.helper.start_group_and_wait(group, rcs, desired=5)
-        LOG.debug("RAHU3180: PASS group created: %(group)s"%{'group':group}`)
+        LOG.debug("RAHU3180: PASS group created: %(group)s"%{'group':group})
 
     @inlineCallbacks
     def test_error_reasons_are_updated(self):
