@@ -207,7 +207,7 @@ class TestHelper(object):
         """
         Set up the test case, HTTP pool, identity, and cleanup.
         """
-        setup_test_log_observer(test_case)
+       # setup_test_log_observer(test_case)
         self.test_case = test_case
         self.pool = HTTPConnectionPool(reactor, False)
         self.treq = LoggingTreq(log=log, log_response=True)
