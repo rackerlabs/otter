@@ -53,7 +53,8 @@ from otter.integration.lib.trial_tools import (
     tag
 )
 from otter.integration.lib.utils import diagnose
-
+from twisted.logger import Logger
+LOG = Logger()
 
 # if this is None, the test will be skipped
 convergence_tenant_auth_errors = os.environ.get(
@@ -689,7 +690,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
                 {"name": "default"}
             ])
         yield group.start(self.rcs, self)
-
+        LOG.debug("RAHU1991 FAIL: self.rcs.token: %(token)s self.rcs.tenant: %(tenant)s"%{'rcs1':self.rcs, 'token':self.rcs.token, 'tenant':self.rcs.tenant})
         initial_servers = yield wait_for_servers(
             self.rcs, pool=self.helper.pool, group=group,
             timeout=otter_build_timeout,
@@ -985,7 +986,8 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             resources=get_resource_mapping(),
             region=region
         )
-
+        LOG.debug("RAHU3180: PASS   identitity: %(identity)s rcs.token: %(token)s   rcs.tenant:%(tenant)s"%{'rcs': rcs, 'identity': identity, 'token':rcs.token, 'tenant':rcs.tenant})
+        LOG.debug("RAHU3180 PASS: self.rcs.token: %(token)s self.rcs.tenant: %(tenant)s"%{'rcs1':self.rcs, 'token':self.rcs.token, 'tenant':self.rcs.tenant})
         # inject behavior errors for this user, so that when otter
         # impersonates, it gets failures
         mimic_identity = MimicIdentity(pool=self.helper.pool, test_case=self,
@@ -1007,6 +1009,7 @@ class ConvergenceTestsNoLBs(unittest.TestCase):
             min_entities=2,
             max_entities=10)
         yield self.helper.start_group_and_wait(group, rcs, desired=5)
+        LOG.debug("RAHU3180: PASS group created: %(group)s"%{'group':group})
 
     @inlineCallbacks
     def test_error_reasons_are_updated(self):

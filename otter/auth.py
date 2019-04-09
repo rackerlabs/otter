@@ -59,7 +59,8 @@ from otter.util.http import (
     wrap_upstream_error,
 )
 from otter.util.retry import repeating_interval, retry, retry_times
-
+from twisted.logger import Logger
+LOG = Logger()
 
 class _DoNothingLogger(BoundLog):
     """This class implements a do-nothing logger for the benefit of
@@ -261,11 +262,44 @@ class ImpersonatingAuthenticator(object):
         see :meth:`IAuthenticator.authenticate_tenant`
         """
         auth = partial(self._auth_me, log=log)
-
-        d = user_for_tenant(self._admin_url,
-                            self._identity_admin_user,
-                            self._identity_admin_password,
-                            tenant_id, log=log)
+#        request = {
+#            "auth": {
+#                    "passwordCredentials": {
+#                        "username": self._identity_admin_user,
+#                        "password": self._identity_admin_password
+#                    }
+#            }
+#        }
+#        if tenant_id:
+#            request['auth']['tenantId'] = tenant_id
+        token = ''
+        def set_token(token_val):
+            global token
+            token = token_val
+#        d = treq.post(
+#            append_segments(self._admin_url, 'tokens'),
+#            json.dumps(request),
+#            headers=headers(),
+#            log=log,
+#            pool=None
+#            ) 
+#        d.addCallback(check_success, [200, 203])
+#        d.addErrback(
+#            wrap_upstream_error, 'identity',
+#            ('authenticating', self._identity_admin_user), self._admin_url
+#        )
+#        d.addCallback(treq.json_content)
+#        d.addCallback(extract_token)
+        d = authenticate_user(self._url,
+                              self._identity_admin_user,
+                              self._identity_admin_password,
+                              log=log)
+        d.addCallback(extract_token)
+        d.addCallback(set_token)
+        LOG.debug("RAHU3180: Token is : %(token)s"%{'token': token})
+        d.addCallback(lambda ignore: user_for_tenant(self._admin_url,
+                      token,
+                      log=log))
 
         def impersonate(user):
             iud = impersonate_user(self._admin_url,
@@ -371,7 +405,7 @@ def endpoints_for_token(auth_endpoint, identity_admin_token, user_token,
     return d
 
 
-def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
+def user_for_tenant(auth_endpoint, token, log=None):
     """
     Use a super secret API to get the special actual username for a tenant id.
 
@@ -383,16 +417,15 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
     :return: Username of the magical identity:user-admin user for the tenantid.
     """
     d = treq.get(
-        append_segments(auth_endpoint.replace('v2.0', 'v1.1'), 'mosso', str(tenant_id)),
-        auth=(username, password),
+        append_segments(auth_endpoint, 'users'),
+        headers=headers(token),
         allow_redirects=False,
         log=log)
-    d.addCallback(check_success, [301])
-    d.addErrback(wrap_upstream_error, 'identity', 'mosso', auth_endpoint)
+    d.addCallback(check_success, [200, 203])
+    d.addErrback(wrap_upstream_error, 'identity', 'users', auth_endpoint)
     d.addCallback(treq.json_content)
-    d.addCallback(lambda user: user['user']['id'])
+    d.addCallback(lambda user: user['users'][0]['username'])
     return d
-
 
 def authenticate_user(auth_endpoint, username, password, tenant_id=None,
                       log=None, pool=None):
