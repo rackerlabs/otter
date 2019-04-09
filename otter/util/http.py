@@ -219,7 +219,7 @@ def check_success(response, success_codes, _treq=None):
 
     :return: response or a deferred that errbacks with an APIError.
     """
-    LOG.debug("RAHU1618: response of call is Response: %(resp)s"%{'resp': response})
+    LOG.debug("RAHU1618: response of call is Response: %(resp)s"%{'resp': response.content})
     if _treq is None:
         _treq = treq
 
