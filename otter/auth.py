@@ -261,35 +261,12 @@ class ImpersonatingAuthenticator(object):
         see :meth:`IAuthenticator.authenticate_tenant`
         """
         auth = partial(self._auth_me, log=log)
-#        request = {
-#            "auth": {
-#                    "passwordCredentials": {
-#                        "username": self._identity_admin_user,
-#                        "password": self._identity_admin_password
-#                    }
-#            }
-#        }
-#        if tenant_id:
-#            request['auth']['tenantId'] = tenant_id
         token = ''
 
         def set_token(token_val):
             global token
             token = token_val
-#        d = treq.post(
-#            append_segments(self._admin_url, 'tokens'),
-#            json.dumps(request),
-#            headers=headers(),
-#            log=log,
-#            pool=None
-#            ) 
-#        d.addCallback(check_success, [200, 203])
-#        d.addErrback(
-#            wrap_upstream_error, 'identity',
-#            ('authenticating', self._identity_admin_user), self._admin_url
-#        )
-#        d.addCallback(treq.json_content)
-#        d.addCallback(extract_token)
+
         d = authenticate_user(self._url,
                               self._identity_admin_user,
                               self._identity_admin_password,
