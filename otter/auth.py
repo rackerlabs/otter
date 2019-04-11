@@ -264,9 +264,14 @@ class ImpersonatingAuthenticator(object):
         d = auth()
         if log:
             log.msg("RAHU3180-1: self._token: %(token)s"%{'token': self._token})
+        def log_user(user):
+            if log:
+                log.msg("RAHU-USER: (user)%s"%{'user': user})
+            return user
         d.addCallback(lambda ignore: user_for_tenant(self._admin_url,
                             self._token,
                             log=log))
+        d.addCallback(log_user)
         if log:
             log.msg("RAHU3180-2: self._token: %(token)s"%{'token': self._token})
         def impersonate(user):
@@ -388,14 +393,9 @@ def user_for_tenant(auth_endpoint, token, log=None):
         headers=headers(token),
         allow_redirects=False,
         log=log)
-    def user_val(user, log):
-        if log:
-            log.msg("RAHU3180: Response: (resp)s"%{'resp': user})
-        return user
     d.addCallback(check_success, [200, 203])
     d.addErrback(wrap_upstream_error, 'identity', 'users', auth_endpoint)
     d.addCallback(treq.json_content)
-    d.addCallback(lambda users: user_val(users, log=log))
     d.addCallback(lambda user: user['users'][0]['username'])
     return d
 
