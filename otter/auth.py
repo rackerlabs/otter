@@ -266,7 +266,7 @@ class ImpersonatingAuthenticator(object):
             if log:
                 log.msg("RAHU3180: token_value is : (val)%s" %{'val': token_val})
 #            token = token_val
-            return token
+            return token_val
 
         d = authenticate_user(self._url,
                               self._identity_admin_user,
