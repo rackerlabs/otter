@@ -265,6 +265,8 @@ class ImpersonatingAuthenticator(object):
 
         def set_token(token_val):
             global token
+            if log:
+                log.msg("RAHU3180: token_value is : (val)%s" %{'val': token_val})
             token = token_val
 
         d = authenticate_user(self._url,
@@ -285,7 +287,8 @@ class ImpersonatingAuthenticator(object):
             return iud
 
         d.addCallback(lambda user: retry_on_unauth(partial(impersonate, user), auth))
-
+        if log:
+            log.msg("RAHU-self-token: %(token)s"%{'token': self._token})
         def endpoints(token):
             scd = endpoints_for_token(self._admin_url, self._token,
                                       token, log=log)
