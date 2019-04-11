@@ -261,13 +261,12 @@ class ImpersonatingAuthenticator(object):
         see :meth:`IAuthenticator.authenticate_tenant`
         """
         auth = partial(self._auth_me, log=log)
-        token = ''
 
         def set_token(token_val):
-            global token
             if log:
                 log.msg("RAHU3180: token_value is : (val)%s" %{'val': token_val})
-            token = token_val
+#            token = token_val
+            return token
 
         d = authenticate_user(self._url,
                               self._identity_admin_user,
@@ -275,7 +274,7 @@ class ImpersonatingAuthenticator(object):
                               log=log)
         d.addCallback(extract_token)
         d.addCallback(set_token)
-        d.addCallback(lambda ignore: user_for_tenant(self._admin_url,
+        d.addCallback(lambda token: user_for_tenant(self._admin_url,
                       token,
                       log=log))
 
