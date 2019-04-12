@@ -263,9 +263,9 @@ class ImpersonatingAuthenticator(object):
         auth = partial(self._auth_me, log=log)
         d = auth()
         d.addCallback(lambda ignore: user_for_tenant(self._admin_url,
-                            self._token,
-                            tenant_id,
-                            log=log))
+                      self._token,
+                      tenant_id,
+                      log=log))
 
         def impersonate(user):
             iud = impersonate_user(self._admin_url,
@@ -381,7 +381,8 @@ def user_for_tenant(auth_endpoint, token, tenant_id, log=None):
     :return: Username of the magical identity:user-admin user for the tenantid.
     """
     d = treq.get(
-        append_segments(auth_endpoint, 'users') + '?tenant_id='+ str(tenant_id) + '&admin_only=true',
+        append_segments(auth_endpoint, 'users') + '?tenant_id=' +
+        str(tenant_id) + '&admin_only=true',
         headers=headers(token),
         allow_redirects=False,
         log=log)

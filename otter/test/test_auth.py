@@ -547,17 +547,24 @@ class ImpersonatingAuthenticatorTests(SynchronousTestCase):
             succeed({'access': {'token': {'id': 'impersonation_token'}}})]
         self.successResultOf(self.ia.authenticate_tenant(111111, self.log))
         self.impersonate_user.assert_has_calls(
-            [mock.call(self.admin_url, 'auth-token', 'test_user', log=self.log),
-             mock.call(self.admin_url, 'auth-token', 'test_user', log=self.log)])
+                                   [
+                                       mock.call(self.admin_url, 'auth-token',
+                                                 'test_user', log=self.log),
+                                       mock.call(self.admin_url, 'auth-token',
+                                                 'test_user', log=self.log)
+                                   ]
+                                   )
         self.authenticate_user.assert_called_with(self.url, self.user,
-                                                       self.password,
-                                                       log=self.log)
+                                                  self.password,
+                                                  log=self.log)
         self.log.msg.assert_called_with('Getting new identity admin token')
 
-    def test_authenticate_tenant_gets_endpoints_for_the_impersonation_token(self):
+    def test_authenticate_tenant_gets_endpoints_for_the_impersonation_token(
+            self
+            ):
         """
-        authenticate_tenant fetches all the endpoints for the impersonation with
-        cached token.
+        authenticate_tenant fetches all the endpoints for the
+        impersonation with cached token.
         """
         self.ia._token = 'auth-token'
         self.successResultOf(self.ia.authenticate_tenant(111111, log=self.log))
