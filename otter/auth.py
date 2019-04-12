@@ -261,11 +261,11 @@ class ImpersonatingAuthenticator(object):
         see :meth:`IAuthenticator.authenticate_tenant`
         """
         auth = partial(self._auth_me, log=log)
-
-        d = user_for_tenant(self._admin_url,
-                            self._identity_admin_user,
-                            self._identity_admin_password,
-                            tenant_id, log=log)
+        d = auth()
+        d.addCallback(lambda ignore: user_for_tenant(self._admin_url,
+                            self._token,
+                            tenant_id,
+                            log=log))
 
         def impersonate(user):
             iud = impersonate_user(self._admin_url,
@@ -371,26 +371,24 @@ def endpoints_for_token(auth_endpoint, identity_admin_token, user_token,
     return d
 
 
-def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
+def user_for_tenant(auth_endpoint, token, tenant_id, log=None):
     """
     Use a super secret API to get the special actual username for a tenant id.
 
     :param str auth_endpoint: Identity Admin API endpoint.
-    :param str username: A service username.
-    :param str password: A service password.
-    :param tenant_id: The tenant ID we wish to find the user for.
+    :param str token: A service token.
 
     :return: Username of the magical identity:user-admin user for the tenantid.
     """
     d = treq.get(
-        append_segments(auth_endpoint.replace('v2.0', 'v1.1'), 'mosso', str(tenant_id)),
-        auth=(username, password),
+        append_segments(auth_endpoint, 'users') + '?tenant_id='+ str(tenant_id) + '&admin_only=true',
+        headers=headers(token),
         allow_redirects=False,
         log=log)
-    d.addCallback(check_success, [301])
-    d.addErrback(wrap_upstream_error, 'identity', 'mosso', auth_endpoint)
+    d.addCallback(check_success, [200, 203])
+    d.addErrback(wrap_upstream_error, 'identity', 'users', auth_endpoint)
     d.addCallback(treq.json_content)
-    d.addCallback(lambda user: user['user']['id'])
+    d.addCallback(lambda user: user['users'][0]['username'])
     return d
 
 
