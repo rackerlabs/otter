@@ -266,7 +266,7 @@ class ImpersonatingAuthenticator(object):
             log.msg("RAHU3180-1: self._token: %(token)s"%{'token': self._token})
         def log_user(user):
             if log:
-                log.msg("RAHU-USER: (user)%s"%{'user': user})
+                log.msg("RAHU-USER: (user)%s Type: %(type)s)"%{'user': user, 'type': type(user)})
             return user
         d.addCallback(lambda ignore: user_for_tenant(self._admin_url,
                             self._token,
@@ -396,7 +396,7 @@ def user_for_tenant(auth_endpoint, token, log=None):
     d.addCallback(check_success, [200, 203])
     d.addErrback(wrap_upstream_error, 'identity', 'users', auth_endpoint)
     d.addCallback(treq.json_content)
-    d.addCallback(lambda user: user['users'][0]['username'])
+    d.addCallback(lambda user: str(user['users'][0]['username']))
     return d
 
 
@@ -458,6 +458,14 @@ def impersonate_user(auth_endpoint, identity_admin_token, username,
 
     :return: Decoded JSON as dict.
     """
+    dic = {
+            "RAX-AUTH:impersonation": {
+                "user": {"username": username},
+                "expire-in-seconds": expire_in
+            }
+        }
+    if log:
+        log.msg("RAHU-Impersonate post_data: %(dict)s admin_token: %(token)s"%{"dict": dic, "token": identity_admin_token})
     d = treq.post(
         append_segments(auth_endpoint, 'RAX-AUTH', 'impersonation-tokens'),
         json.dumps({
