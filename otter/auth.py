@@ -261,12 +261,19 @@ class ImpersonatingAuthenticator(object):
         see :meth:`IAuthenticator.authenticate_tenant`
         """
         auth = partial(self._auth_me, log=log)
-
-        d = user_for_tenant(self._admin_url,
-                            self._identity_admin_user,
-                            self._identity_admin_password,
-                            tenant_id, log=log)
-
+        d = auth()
+        if log:
+            log.msg("RAHU3180-1: self._token: %(token)s"%{'token': self._token})
+        def log_user(user):
+            if log:
+                log.msg("RAHU-USER: (user)%s Type: %(type)s)"%{'user': user, 'type': type(user)})
+            return user
+        d.addCallback(lambda ignore: user_for_tenant(self._admin_url,
+                            self._token,
+                            log=log))
+        d.addCallback(log_user)
+        if log:
+            log.msg("RAHU3180-2: self._token: %(token)s"%{'token': self._token})
         def impersonate(user):
             iud = impersonate_user(self._admin_url,
                                    self._token,
@@ -275,7 +282,8 @@ class ImpersonatingAuthenticator(object):
             return iud
 
         d.addCallback(lambda user: retry_on_unauth(partial(impersonate, user), auth))
-
+        if log:
+            log.msg("RAHU3180-3: self._token: %(token)s"%{'token': self._token})
         def endpoints(token):
             scd = endpoints_for_token(self._admin_url, self._token,
                                       token, log=log)
@@ -371,26 +379,24 @@ def endpoints_for_token(auth_endpoint, identity_admin_token, user_token,
     return d
 
 
-def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
+def user_for_tenant(auth_endpoint, token, log=None):
     """
     Use a super secret API to get the special actual username for a tenant id.
 
     :param str auth_endpoint: Identity Admin API endpoint.
-    :param str username: A service username.
-    :param str password: A service password.
-    :param tenant_id: The tenant ID we wish to find the user for.
+    :param str token: A service token.
 
     :return: Username of the magical identity:user-admin user for the tenantid.
     """
     d = treq.get(
-        append_segments(auth_endpoint.replace('v2.0', 'v1.1'), 'mosso', str(tenant_id)),
-        auth=(username, password),
+        append_segments(auth_endpoint, 'users'),
+        headers=headers(token),
         allow_redirects=False,
         log=log)
-    d.addCallback(check_success, [301])
-    d.addErrback(wrap_upstream_error, 'identity', 'mosso', auth_endpoint)
+    d.addCallback(check_success, [200, 203])
+    d.addErrback(wrap_upstream_error, 'identity', 'users', auth_endpoint)
     d.addCallback(treq.json_content)
-    d.addCallback(lambda user: user['user']['id'])
+    d.addCallback(lambda user: str(user['users'][0]['username']))
     return d
 
 
@@ -452,6 +458,14 @@ def impersonate_user(auth_endpoint, identity_admin_token, username,
 
     :return: Decoded JSON as dict.
     """
+    dic = {
+            "RAX-AUTH:impersonation": {
+                "user": {"username": username},
+                "expire-in-seconds": expire_in
+            }
+        }
+    if log:
+        log.msg("RAHU-Impersonate post_data: %(dict)s admin_token: %(token)s"%{"dict": dic, "token": identity_admin_token})
     d = treq.post(
         append_segments(auth_endpoint, 'RAX-AUTH', 'impersonation-tokens'),
         json.dumps({
