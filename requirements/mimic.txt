@@ -1,1 +1,2 @@
-git+https://github.com/rackerlabs/mimic.git@594dd5c8e80b670fa2d0c42f5eec9645e14aa54e
+#git+https://github.com/rackerlabs/mimic.git@594dd5c8e80b670fa2d0c42f5eec9645e14aa54e
+git+ssh://github.com/rackerlabs/autoscale-mimic.git@autoscale-546
