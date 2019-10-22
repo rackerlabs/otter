@@ -115,23 +115,23 @@ rst_epilog = """
 
 # External link library
 extlinks = {
-    'rax': ('http://www.rackspace.com/%s', ''),
-    'rax-cloud': ('http://www.rackspace.com/cloud/%s', ''),
-    'rax-docs': ('http://docs.rackspace.com/%s', ''),
+    'rax': ('https://www.rackspace.com/%s', ''),
+    'rax-cloud': ('https://www.rackspace.com/cloud/%s', ''),
+    'rax-docs': ('https://docs.rackspace.com/%s', ''),
     'rax-dev': ('https://developer.rackspace.com/%s', ''),
     'rax-devdocs': ('https://developer.rackspace.com/docs/%s', ''),
     'rax-devguide': (
-        'http:/developer.rackspace.com/docs/%s/developer-guide/', ''),
+        'https:/developer.rackspace.com/docs/%s/developer-guide/', ''),
     'rax-api': (
-        'http:/developer.rackspace.com/docs/%s/developer-guide/#api-reference',
+        'https:/developer.rackspace.com/docs/%s/developer-guide/#api-reference',
         ''),
     'rax-git': ('https://github.com/rackspace/%s', ''),
     'rax-glossary': ('https://developer.rackspace.com/docs/glossary/%s', ''),
     'mycloud': ('https://login.rackspace.com/%s', ''),
-    'how-to': ('http://support.rackspace.com/how-to/%s', ''),
-    'os': ('http://www.openstack.org/%s', ''),
-    'os-docs': ('http://docs.openstack.org/%s', ''),
-    'os-wiki': ('http://wiki.openstack.org/%s', ''),
+    'how-to': ('https://support.rackspace.com/how-to/%s', ''),
+    'os': ('https://www.openstack.org/%s', ''),
+    'os-docs': ('https://docs.openstack.org/%s', ''),
+    'os-wiki': ('https://wiki.openstack.org/%s', ''),
     'git-repo': ('https://github.com/rackerlabs/'
                  'docs-core-infra-user-guide/%s', ''),
     'rackerlabs': ('https://github.com/rackerlabs/%s', ''),
