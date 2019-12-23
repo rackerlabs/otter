@@ -240,7 +240,8 @@ class AutoscaleFixture(BaseTestFixture):
         cls.lbaas_client = lbaas_client
         cls.rcv3_client = rcv3_client
 
-        # ImageRefs of ununtu and non-ubuntu images that will be used
+        # ImageRefs of the ubuntu operating system and the non-ubuntu
+        operating system images that will be used
         # when creating groups
         image_refs = image_ids_with_and_without_name(images_client)
         cls.lc_image_ref, cls.lc_image_ref_alt = image_refs

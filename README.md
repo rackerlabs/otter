@@ -72,8 +72,8 @@ Build the documentation:
 
 ### Deployment
 
-- `make bundle` builds a "bundle" appropriate for deployment (Ubuntu
-  only).  For Jenkins and Chef use only.
+- `make bundle` builds a "bundle" appropriate for deployment (the Ubuntu
+  operating system only).  For Jenkins and Chef use only.
 - `make run` starts up an instance of the Otter API.
 
 ### Cleaning up
