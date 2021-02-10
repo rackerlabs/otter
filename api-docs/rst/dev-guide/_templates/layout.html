@@ -1,0 +1,97 @@
+{# TEMPLATE VAR SETTINGS #}
+{%- set url_root = pathto('', 1) %}
+{%- if url_root == '#' %}{% set url_root = '' %}{% endif %}
+{%- if not embedded and docstitle %}
+  {%- set titlesuffix = " &mdash; "|safe + docstitle|e %}
+{%- else %}
+  {%- set titlesuffix = "" %}
+{%- endif %}
+{%- set lang_attr = 'en' if language == None else (language | replace('_', '-')) %}
+{%- set sphinx_writer = 'writer-html5' if html5_doctype else 'writer-html4' %}
+
+<!DOCTYPE html>
+<html class="{{ sphinx_writer }}" lang="{{ lang_attr }}" >
+{% include "head.html" %}
+<body class="wy-body-for-nav docs">
+
+  {% block extrabody %}
+  {% include "header.html" %}
+  {% endblock %}
+
+  <div class="container-fluid">
+    <div class="row">
+     {% include "search-modal.html" %}
+    {# SIDE NAV, TOGGLES ON MOBILE #}
+    <div class="col-sm-12 col-md-12 col-lg-3">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side sidebar">
+      <div class="wy-side-scroll" data-drc-global-sidebar="">
+
+        {% block navigation %}
+        <div class="wy-menu wy-menu-vertical sidebar-container ng-isolate-scope sticky-top" data-drc-sticky="" data-offset-top="321" data-drc-flex-height="" data-flex-bottom="443" data-drc-collapsible-nav="" data-spy="affix" role="navigation" aria-label="main navigation">
+          <a href="https://github.com/rackerlabs/mpc-hyper-v/issues" target="_blank" class="github-link">
+            <span class="icon fa fa-github"></span>
+            <span class="link-text">Submit an issue</span>
+          </a>
+          {% block menu %}
+          {% set toctree = toctree(maxdepth=4, collapse=theme_collapse_navigation, includehidden=True) %}
+    
+          {% if toctree %}
+            {{ toctree }}
+          {% else %}
+            <!-- Local TOC -->
+            <div class="local-toc">{{ toc }}</div>
+          {% endif %}
+        {% endblock %}
+        </div>
+        {% endblock %}
+      </div>
+    </nav>
+  </div>
+
+
+<div class="col-sm-12 col-md-12 col-lg-9 content">
+      <div class="wy-nav-content docs-section">
+      {%- block content %}
+        <div class="rst-content">
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+          {%- block document %}
+           <div itemprop="articleBody">
+            {% block body %}{% endblock %}
+           </div>
+           {% if self.comments()|trim %}
+           <div class="articleComments">
+            {% block comments %}{% endblock %}
+           </div>
+           {% endif%}
+          </div>
+          {%- endblock %}
+        </div>
+      {%- if (theme_prev_next_buttons_location == 'bottom' or theme_prev_next_buttons_location == 'both') and (next or prev) %}
+      <div class="rst-footer-buttons row justify-content-between" role="navigation" aria-label="footer navigation">
+        <div class="prev col-sm-12 col-md-6 col-lg-6 float-left">
+        {%- if prev %}
+        <span class="label" aria-hidden="true">Previous</span>
+        <a href="{{ prev.link|e }}" title="{{ prev.title|striptags|e }}" accesskey="p" rel="prev">{{ prev.title|striptags|e }}</a>
+        {%- endif %}
+        </div>
+        <div class="next col-sm-12 col-md-6 col-lg-6 float-right">
+          {%- if next %}
+          <span class="label" aria-hidden="true">Next</span>
+          <a href="{{ next.link|e }}" title="{{ next.title|striptags|e }}" accesskey="n" rel="next">{{ next.title|striptags|e }}</a>
+          {%- endif %}
+        </div>
+      </div>
+    {%- endif %}
+      {%- endblock %}
+  {% include "versions.html" %}
+  {# Do not conflict with RTD insertion of analytics script #}
+      </div>
+      </div>
+    </div>
+</div>
+{%- block footer %}
+{% include "footer.html" %}
+{% endblock %}
+{% include "scripts.html" %}
+</body>
+</html>
