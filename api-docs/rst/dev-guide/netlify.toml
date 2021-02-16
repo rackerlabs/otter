@@ -14,3 +14,9 @@
 [context.deploy-preview]
   publish = "_build/html"
   command = "make clean html"
+
+[[redirects]]
+  from = "/*"
+  to = "/docs/autoscale/v1/developer-guide/:splat"
+  status = 301
+  force = false
