@@ -1,0 +1,5 @@
+Sphinx>=3.4.2
+sphinx-hoverxref>=0.2b1
+sphinx-notfound-page>=0.4
+sphinx_rtd_theme>=0.4
+algoliasearch>=2.0,<3.0
