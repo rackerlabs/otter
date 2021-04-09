@@ -4,9 +4,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     {% block htmltitle %}
     <title>{{ title|striptags|e }}{{ titlesuffix }}</title>
-    {% endblock %}
-  
-    {# CSS #}
+      {% endblock %}<meta name="description" property="og:description" />
+    <meta name="category" property="article:section" content="Rackspace Autoscale 1.0"/>
+    <meta name="category" property="product:category" content="Rackspace Autoscale 1.0"/>
+    <meta name="keywords" property="article:tag" content="Rackspace Autoscale 1.0"/>    {# CSS #}
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
     <link rel="stylesheet" href="{{ pathto('_static/' + style, 1) }}" type="text/css" />
     <link rel="stylesheet" href="{{ pathto('_static/pygments.css', 1) }}" type="text/css" />
