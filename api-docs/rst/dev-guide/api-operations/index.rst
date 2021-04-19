@@ -1,3 +1,8 @@
+.._api-reference:
+
+===================
+**API Reference**
+===================
 
   .. meta::
      :description: Rackspace Autoscale API Reference
