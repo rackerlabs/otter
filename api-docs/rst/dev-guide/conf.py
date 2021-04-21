@@ -170,7 +170,8 @@ else:
 # further.  For a list of options available for each theme, see the
 # documentation.
 html_theme_options = {
-    "collapse_navigation" : False
+    "collapse_navigation" : False,
+    "sticky_navigation": True, 
 }
 
 # Add any paths that contain custom themes here, relative to this directory.
