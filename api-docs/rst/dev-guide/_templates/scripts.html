@@ -1,2 +1,125 @@
 
-<script type="text/javascript" src="https://docs.rackspace.com/assets/bundle.js"></script>
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/algoliasearch@4.0.0/dist/algoliasearch-lite.umd.js" integrity="sha256-MfeKq2Aw9VAkaE9Caes2NOxQf6vUa8Av0JqcUXUGkd0=" crossorigin="anonymous"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@algolia/algoliasearch-netlify-frontend@0/dist/algoliasearchNetlify.js"></script>
+<script type="text/javascript">
+    var TxtRotate = function(el, toRotate, period) {
+        this.toRotate = toRotate;
+        this.el = el;
+        this.loopNum = 0;
+        this.period = parseInt(period, 10) || 2000;
+        this.txt = '';
+        this.tick();
+        this.isDeleting = false;
+      };
+      
+      TxtRotate.prototype.tick = function() {
+        var i = this.loopNum % this.toRotate.length;
+        var fullTxt = this.toRotate[i];
+      
+        if (this.isDeleting) {
+          this.txt = fullTxt.substring(0, this.txt.length - 1);
+        } else {
+          this.txt = fullTxt.substring(0, this.txt.length + 1);
+        }
+      
+        this.el.innerHTML = '<span class="wrap">'+this.txt+'</span>';
+      
+        var that = this;
+        var delta = 300 - Math.random() * 100;
+      
+        if (this.isDeleting) { delta /= 2; }
+      
+        if (!this.isDeleting && this.txt === fullTxt) {
+          delta = this.period;
+          this.isDeleting = true;
+        } else if (this.isDeleting && this.txt === '') {
+          this.isDeleting = false;
+          this.loopNum++;
+          delta = 500;
+        }
+      
+        setTimeout(function() {
+          that.tick();
+        }, delta);
+      };
+    
+    function openTab(evt, tabName) {
+        var i, x, tablinks;
+        x = document.getElementsByClassName("product-type");
+        for (i = 0; i < x.length; i++) {
+            x[i].style.display = "none";
+        }
+        tablinks = document.getElementsByClassName("tablink");
+        for (i = 0; i < x.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.parentElement.className += " active";
+    }
+    window.onload = function () {
+        if (document.getElementById("gs-ctrl") != undefined) {
+            document.getElementById("gs-ctrl").className += " active"
+        }
+        if (!window.location.href.includes("faq") && !window.location.href.includes("all-articles") && (document
+                .getElementById("acc-man") != undefined)) {
+            document.getElementById("acc-man").className += " active";
+        }
+        if (window.location.href.includes("faq") && (document.getElementById("acc-faq") != undefined)) {
+            document.getElementById("acc-faq").className += " active";
+        }
+        if (window.location.href.includes("all-articles") && (document.getElementById("acc-all") != undefined)) {
+            document.getElementById("acc-all").className += " active";
+        }
+        if (window.location.href.includes("faq")) {
+            var elements = document.getElementsByClassName("panel-group");
+            for (var i = 0; i < elements.length; i++) {
+                elements[i].className += " faq-list"
+            }
+            $('a[data-toggle="collapse"]').addClass('inactive');
+        }
+        $("table").addClass(["table", "table-striped", "table-bordered"]);
+    
+        var arrOfPtags = document.getElementsByTagName("p");
+        for (var i = 0; i < arrOfPtags.length; i++) {
+            if (arrOfPtags[i].innerHTML.toLowerCase().includes("<strong>note</strong>") || arrOfPtags[i].innerHTML
+                .toLowerCase().includes("<strong>note:</strong>")) {
+                arrOfPtags[i].className += "callout-note";
+            }
+            if (arrOfPtags[i].innerHTML.toLowerCase().includes("<strong>important</strong>") || arrOfPtags[i]
+                .innerHTML.toLowerCase().includes("<strong>important:</strong>")) {
+                arrOfPtags[i].className += "callout-important";
+            }
+            if (arrOfPtags[i].innerHTML.toLowerCase().includes("<strong>warning</strong>") || arrOfPtags[i]
+                .innerHTML.toLowerCase().includes("<strong>warning:</strong>")) {
+                arrOfPtags[i].className += "callout-warning";
+            }
+            if (arrOfPtags[i].innerHTML.toLowerCase().includes("<strong>tip</strong>") || arrOfPtags[i].innerHTML
+                .toLowerCase().includes("<strong>tip:</strong>")) {
+                arrOfPtags[i].className += "callout-tip";
+            }
+        }
+        $('#searchModal').on("shown.bs.modal", function() {
+            $('.ais-SearchBox-input').focus();
+        })
+        var elements = document.getElementsByClassName('txt-rotate');
+        for (var i=0; i<elements.length; i++) {
+          var toRotate = elements[i].getAttribute('data-rotate');
+          var period = elements[i].getAttribute('data-period');
+          if (toRotate) {
+            new TxtRotate(elements[i], JSON.parse(toRotate), period);
+          }
+        }
+        
+        var css = document.createElement("style");
+        css.type = "text/css";
+        css.innerHTML = ".txt-rotate > .wrap { border-right: 0.08em solid #666 }";
+        document.body.appendChild(css);
+    }
+</script>
+<script src="https://docs.rackspace.com/assets/bundle.js"></script>
+<script
+    src="https://polyfill.io/v3/polyfill.min.js?features=default%2CArray.prototype.find%2CArray.prototype.includes%2CPromise%2CObject.assign%2CObject.entries">
+</script>
