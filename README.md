@@ -1,5 +1,8 @@
 [![Build Status](https://travis-ci.org/rackerlabs/otter.svg?branch=master)](https://travis-ci.org/rackerlabs/otter)
 [![codecov](https://codecov.io/gh/rackerlabs/otter/branch/master/graph/badge.svg)](https://codecov.io/gh/rackerlabs/otter)
+
+[![Netlify Status](https://api.netlify.com/api/v1/badges/77f7564f-2369-48bf-9745-9bdb583115ce/deploy-status)](https://app.netlify.com/sites/otter/deploys)
+
 # Rackspace Autoscale
 
 *There Otter be an Otter scaling system.*
@@ -35,6 +38,14 @@ Emeritus otters:
 - rockstar
 
 ## `make` targets
+
+## Local Setup
+
+`npm i -g netlify-cli`
+`netlify init`
+`netlify build`
+`netlify dev`
+`netlify deploy`
 
 ### Development
 
