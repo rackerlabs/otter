@@ -3,8 +3,7 @@
 import json
 
 from effect import sync_perform
-from effect.testing import (
-    EQFDispatcher, const, intent_func, noop, perform_sequence)
+from effect.testing import EQFDispatcher, const, noop, perform_sequence
 
 import six
 
@@ -30,6 +29,7 @@ from otter.cloud_client.clb import (
     get_clbs,
     remove_clb_nodes)
 from otter.constants import ServiceType
+from otter.indexer import atom
 from otter.test.cloud_client.test_init import log_intent, service_request_eqf
 from otter.test.utils import (
     StubResponse,
@@ -431,33 +431,99 @@ class CLBClientTests(SynchronousTestCase):
 
 
 class GetCLBNodeFeedTests(SynchronousTestCase):
-    """
-    Tests for :func:`get_clb_node_feed`
-    """
 
-    def test_calls_read_entries(self):
+    entry = '<entry><summary>{}</summary></entry>'
+    feed_fmt = (
+        '<feed xmlns="http://www.w3.org/2005/Atom">'
+        '<link rel="next" href="{next_link}"/>{entries}</feed>')
+
+    def svc_intent(self, params={}):
+        return service_request(
+            ServiceType.CLOUD_LOAD_BALANCERS, "GET",
+            "loadbalancers/12/nodes/13.atom", params=params,
+            json_response=False).intent
+
+    def feed(self, next_link, summaries):
+        return self.feed_fmt.format(
+            next_link=next_link,
+            entries=''.join(self.entry.format(s) for s in summaries))
+
+    def test_empty(self):
         """
-        Calls `cf.read_entries` with CLB servicetype and atom URL and returns
-        the feed part of the result
+        Does not goto next link when there are no entries and returns []
         """
-        from otter.cloud_client.clb import cf
-        self.patch(cf, "read_entries", intent_func("re"))
-        eff = get_clb_node_feed("12", "13")
+        feedstr = self.feed("next-doesnt-matter", [])
         seq = [
-            (("re", ServiceType.CLOUD_LOAD_BALANCERS,
-              "loadbalancers/12/nodes/13.atom", {}, cf.Direction.NEXT,
-              "request-get-clb-node-feed"),
-             const((["feed1"], {"param": "2"})))
+            (self.svc_intent(), const(stub_json_response(feedstr))),
+            (log_intent("request-get-clb-node-feed", feedstr), const(feedstr))
         ]
-        self.assertEqual(perform_sequence(seq, eff), ["feed1"])
+        self.assertEqual(
+            perform_sequence(seq, get_clb_node_feed("12", "13")), [])
+
+    def test_single_page(self):
+        """
+        Collects entries and goes to next link if there are entries and returns
+        if next one is empty
+        """
+        feed1_str = self.feed("https://url?page=2", ["summary1", "summ2"])
+        feed2_str = self.feed("next-link", [])
+        seq = [
+            (self.svc_intent(), const(stub_json_response(feed1_str))),
+            (log_intent("request-get-clb-node-feed", feed1_str),
+             const(feed1_str)),
+            (self.svc_intent({"page": ['2']}),
+             const(stub_json_response(feed2_str))),
+            (log_intent("request-get-clb-node-feed", feed2_str),
+             const(feed2_str)),
+        ]
+        entries = perform_sequence(seq, get_clb_node_feed("12", "13"))
+        self.assertEqual(
+            [atom.summary(entry) for entry in entries], ["summary1", "summ2"])
+
+    def test_multiple_pages(self):
+        """
+        Collects entries and goes to next link if there are entries and
+        continues until next link returns empty list
+        """
+        feed1_str = self.feed("https://url?page=2", ["summ1", "summ2"])
+        feed2_str = self.feed("https://url?page=3", ["summ3", "summ4"])
+        feed3_str = self.feed("next-link", [])
+        seq = [
+            (self.svc_intent(), const(stub_json_response(feed1_str))),
+            (log_intent("request-get-clb-node-feed", feed1_str),
+             const(feed1_str)),
+            (self.svc_intent({"page": ['2']}),
+             const(stub_json_response(feed2_str))),
+            (log_intent("request-get-clb-node-feed", feed2_str),
+             const(feed2_str)),
+            (self.svc_intent({"page": ['3']}),
+             const(stub_json_response(feed3_str))),
+            (log_intent("request-get-clb-node-feed", feed3_str),
+             const(feed3_str)),
+        ]
+        entries = perform_sequence(seq, get_clb_node_feed("12", "13"))
+        self.assertEqual(
+            [atom.summary(entry) for entry in entries],
+            ["summ1", "summ2", "summ3", "summ4"])
+
+    def test_no_next_link(self):
+        """
+        Returns entries collected till now if there is no next link
+        """
+        feedstr = (
+            '<feed xmlns="http://www.w3.org/2005/Atom">'
+            '<entry><summary>summary</summary></entry></feed>')
+        seq = [
+            (self.svc_intent(), const(stub_json_response(feedstr))),
+            (log_intent("request-get-clb-node-feed", feedstr),
+             const(feedstr))
+        ]
+        entries = perform_sequence(seq, get_clb_node_feed("12", "13"))
+        self.assertEqual(atom.summary(entries[0]), "summary")
 
     def test_error_handling(self):
         """
         Parses regular CLB errors and raises corresponding exceptions
         """
-        svc_intent = service_request(
-            ServiceType.CLOUD_LOAD_BALANCERS, "GET",
-            "loadbalancers/12/nodes/13.atom", params={},
-            json_response=False).intent
         assert_parses_common_clb_errors(
-            self, svc_intent, get_clb_node_feed("12", "13"), "12")
+            self, self.svc_intent(), get_clb_node_feed("12", "13"), "12")

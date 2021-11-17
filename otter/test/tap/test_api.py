@@ -495,7 +495,8 @@ class APIMakeServiceTests(SynchronousTestCase):
                               'url': 'url'}
         makeService(conf)
         serv_confs = get_service_configs(conf)
-        serv_confs[ServiceType.CLOUD_FEEDS] = {'url': 'url'}
+        serv_confs[ServiceType.CLOUD_FEEDS] = {
+            'name': 'cloudFeeds', 'region': 'ord', 'url': 'url'}
 
         self.assertEqual(len(get_fanout().subobservers), 1)
         cf_observer = get_fanout().subobservers[0]
