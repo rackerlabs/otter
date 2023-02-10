@@ -17,5 +17,5 @@ mock==1.0.1
 yunomi==0.3.0
 
 # Debugging niceties
-ipython==2.3.1
+ipython==8.10.0
 pudb==2014.1
