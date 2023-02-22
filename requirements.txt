@@ -6,7 +6,7 @@ iso8601==0.1.8
 lxml==4.9.1
 treq==22.1.0
 silverberg==0.1.12
-pyOpenSSL==0.14
+pyOpenSSL==17.5.0
 jsonfig==0.1.1
 testtools==1.9.0
 croniter==0.3.5
