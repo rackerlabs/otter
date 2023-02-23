@@ -34,3 +34,4 @@ of the Autoscale service.
    api-operations/index
    release-notes
    copyright
+
