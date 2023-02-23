@@ -119,14 +119,14 @@ request_format = {
         "title": "autoscale",
         "content": {
             "event": {
-                "@type": "http://docs.rackspace.com/core/event",
+                "@type": "https://docs.rackspace.com/core/event",
                 "id": "",
                 "version": "2",
                 "eventTime": "",
                 "type": "INFO",
                 "region": "",
                 "product": {
-                    "@type": "http://docs.rackspace.com/event/autoscale",
+                    "@type": "https://docs.rackspace.com/event/autoscale",
                     "serviceCode": "Autoscale",
                     "version": "1",
                     "message": ""

@@ -106,7 +106,7 @@ class MimicNova(object):
             instance.
         :param dict ids_to_status: A mapping of server IDs to the string status
             to which they should be changed.  (see
-            http://docs.rackspace.com/servers/api/v2/cs-devguide/content/
+            https://docs.rackspace.com/servers/api/v2/cs-devguide/content/
             List_Servers_Server_Statuses-d1e2078.html for a list of statuses)
 
         :return: A deferred that fires with the content of the response, which

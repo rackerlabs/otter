@@ -24,10 +24,10 @@ contribute to source code by using the `Autoscale github repository`_.
 
   Use the tabs at the top to see the different supported languages.
 
-.. _Autoscale FAQ: http://www.rackspace.com/knowledge_center/product-faq/auto-scale
+.. _Autoscale FAQ: https://www.rackspace.com/knowledge_center/product-faq/auto-scale
 .. _Rackspace API Documentation: https://developer.rackspace.com/docs/
-.. _Rackspace Autoscale Getting Started Guide Overview: http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstarted/content/Overview.html
+.. _Rackspace Autoscale Getting Started Guide Overview: https://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstarted/content/Overview.html
 .. _Rackspace How-To articles: https://support.rackspace.com/how-to/
-.. _api.rackspace.com: http://api.rackspace.com/
+.. _api.rackspace.com: https://api.rackspace.com/
 .. _Quickstart for Autoscale: https://developer.rackspace.com/docs/auto-scale/getting-started/
 .. _Autoscale github repository: https://github.com/rackerlabs/otter

@@ -17,5 +17,5 @@ You should also be familiar with the following technologies:
 -  JSON data serialization formats
 
 
-.. _Rackspace Auto Scale service: http://www.rackspace.com/knowledge_center/article/rackspace-auto-scale-overview
+.. _Rackspace Auto Scale service: https://www.rackspace.com/knowledge_center/article/rackspace-auto-scale-overview
 .. _Rackspace Cloud Account: https://cart.rackspace.com/cloud

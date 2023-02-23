@@ -12,7 +12,7 @@ Rackspace API. The following table outlines the mapping between flavor
 ID and the available flavors in the Control Panel.
 
 For more information and details on flavors, see the `Server
-Flavors <http://docs.rackspace.com/servers/api/v2/cs-devguide/content/server_flavors.html>`__
+Flavors <https://docs.rackspace.com/servers/api/v2/cs-devguide/content/server_flavors.html>`__
 section in the *Rackspace Cloud Servers Developer's Guide*.
 
 ..  note::
@@ -22,7 +22,7 @@ section in the *Rackspace Cloud Servers Developer's Guide*.
         - Performance 1 flavors are now General Purpose v1 flavors
         - Performance 2 flavors are now I/O v1 flavors
 
-Use the `List Flavors <http://docs.rackspace.com/servers/api/v2/cs-devguide/content/List_Flavors-d1e4188.html>`__
+Use the `List Flavors <https://docs.rackspace.com/servers/api/v2/cs-devguide/content/List_Flavors-d1e4188.html>`__
 operation, described in the *Rackspace Cloud Servers Developer's Guide*
 to get a list of all current servers.
 
