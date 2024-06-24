@@ -64,12 +64,7 @@
     "cloudfeeds": {
         "service": "cloudFeeds",
         "tenant_id": "identity_admin_tenant",
-        "url": "https://cfurl.example.net/not/in/service/catalog"
-    },
-    "terminator": {
-        "interval": 300,
-        "tenant_id": "identity_admin_tenant",
-        "cf_cap_url": "https://cfurl.example.net/not/in/service/catalog"
+        "url": "http://cfurl.net/not/in/service/catalog"
     },
     "converger": {
         "build_timeout": 3600,

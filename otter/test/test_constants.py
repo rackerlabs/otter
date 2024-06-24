@@ -14,17 +14,14 @@ class GetServiceMappingTests(SynchronousTestCase):
         """
         Sample config
         """
-        self.config = {
-            'cloudServersOpenStack': 'nova',
-            'cloudLoadBalancers': 'clb',
-            'cloudOrchestration': 'orch',
-            'rackconnect': 'rc',
-            'region': 'DFW',
-            'metrics': {'service': 'm',
-                        'region': 'IAD'},
-            'cloudfeeds': {'url': 'cf_url'},
-            'terminator': {'cf_cap_url': 'cap_url'}
-        }
+        self.config = {'cloudServersOpenStack': 'nova',
+                       'cloudLoadBalancers': 'clb',
+                       'cloudOrchestration': 'orch',
+                       'rackconnect': 'rc',
+                       'region': 'DFW',
+                       'metrics': {'service': 'm',
+                                   'region': 'IAD'},
+                       'cloudfeeds': {'service': 'cf', 'url': 'url'}}
 
     def test_takes_from_config(self):
         """
@@ -53,19 +50,20 @@ class GetServiceMappingTests(SynchronousTestCase):
                     'name': 'm',
                     'region': 'IAD',
                 },
-                ServiceType.CLOUD_FEEDS: {'url': 'cf_url'},
-                ServiceType.CLOUD_FEEDS_CAP: {"url": "cap_url"},
+                ServiceType.CLOUD_FEEDS: {
+                    'name': 'cf',
+                    'region': 'DFW',
+                    'url': 'url'
+                }
             })
 
     def test_cloudfeeds_optional(self):
         """
-        Does not return cloud feeds services if the config is not there
+        Does not return cloud feeds service if the config is not there
         """
         del self.config['cloudfeeds']
-        del self.config['terminator']
-        confs = get_service_configs(self.config)
-        self.assertNotIn(ServiceType.CLOUD_FEEDS, confs)
-        self.assertNotIn(ServiceType.CLOUD_FEEDS_CAP, confs)
+        self.assertNotIn(ServiceType.CLOUD_FEEDS,
+                         get_service_configs(self.config))
 
     def test_metrics_optional(self):
         """
