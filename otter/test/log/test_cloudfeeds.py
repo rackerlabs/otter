@@ -193,14 +193,14 @@ class EventTests(SynchronousTestCase):
                 "title": "autoscale",
                 "content": {
                     "event": {
-                        "@type": "http://docs.rackspace.com/core/event",
+                        "@type": "https://docs.rackspace.com/core/event",
                         "id": "",
                         "version": "2",
                         "eventTime": "1970-01-01T00:00:00Z",
                         "type": "INFO",
                         "region": "ord",
                         "product": {
-                            "@type": ("http://docs.rackspace.com/event/"
+                            "@type": ("https://docs.rackspace.com/event/"
                                       "autoscale"),
                             "serviceCode": "Autoscale",
                             "version": "1",

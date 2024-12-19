@@ -179,7 +179,7 @@ This table shows the body parameters for the request:
 |args.\ **server**              |Object       |The attributes that Auto Scale uses to create a    |
 |                               |*(Required)* |new server. For more information, see `Create      |
 |                               |             |Servers                                            |
-|                               |             |<http://docs.rackspace.com/servers/api/v2/cs-      |
+|                               |             |<https://docs.rackspace.com/servers/api/v2/cs-      |
 |                               |             |devguide/content/CreateServers.html>`. The         |
 |                               |             |attributes that are specified for the server       |
 |                               |             |entity will apply to all new servers in the        |
@@ -189,7 +189,7 @@ This table shows the body parameters for the request:
 |                               |*(Required)* |flavor Id for the server. A flavor is a resource   |
 |                               |             |configuration for a server. For more information   |
 |                               |             |on available flavors, see the `Server flavors      |
-|                               |             |<http://docs.rackspace.com/cas/api/v1.0/autoscale- |
+|                               |             |<https://docs.rackspace.com/cas/api/v1.0/autoscale- |
 |                               |             |devguide/content/server-flavors.html>` section.    |
 +-------------------------------+-------------+---------------------------------------------------+
 |args.server.\ **imageRef**     |String       |The ID of the cloud server image from which new    |

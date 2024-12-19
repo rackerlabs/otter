@@ -21,8 +21,8 @@ Rackspace provides fanatical support:
    `Contact Rackspace`_ page.
 
 
-.. _Rackspace Support: http://support.rackspace.com
-.. _Contact Us: http://www.rackspace.com/apps/support/contactform
-.. _Dedicated Support: http://www.rackspace.com/managed_hosting/support/dedicatedteam
-.. _Managed Support: http://www.rackspace.com/managed_hosting/support
-.. _Contact Rackspace: http://www.rackspace.com/information/contactus
+.. _Rackspace Support: https://support.rackspace.com
+.. _Contact Us: https://www.rackspace.com/apps/support/contactform
+.. _Dedicated Support: https://www.rackspace.com/managed_hosting/support/dedicatedteam
+.. _Managed Support: https://www.rackspace.com/managed_hosting/support
+.. _Contact Rackspace: https://www.rackspace.com/information/contactus

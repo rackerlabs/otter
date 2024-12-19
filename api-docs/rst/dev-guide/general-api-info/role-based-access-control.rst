@@ -31,11 +31,11 @@ account is created.
 See the *Identity Client Developer Guide* for information about
 how to perform the following tasks:
 
--  `Create account users <http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_addUser_v2.0_users_User_Calls.html>`__
+-  `Create account users <https://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_addUser_v2.0_users_User_Calls.html>`__
 
--  `Assign roles to account users <http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/PUT_addUserRole__v2.0_users__userId__roles_OS-KSADM__roleid__Role_Calls.html>`__
+-  `Assign roles to account users <https://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/PUT_addUserRole__v2.0_users__userId__roles_OS-KSADM__roleid__Role_Calls.html>`__
 
--  `Delete global role from user <http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/DELETE_deleteUserRole__v2.0_users__userId__roles_OS-KSADM__roleid__Role_Calls.html>`__
+-  `Delete global role from user <https://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/DELETE_deleteUserRole__v2.0_users__userId__roles_OS-KSADM__roleid__Role_Calls.html>`__
 
 ..  note::
       The account owner (``identity:user-admin``) role cannot hold any additional roles because it
@@ -125,4 +125,4 @@ API operations for Auto Scale might not be available to all roles.
 To see which operations are permitted to invoke which calls, review the
 `Permissions Matrix for Auto Scale`_ article.
 
-.. _Permissions Matrix for Auto Scale: http://www.rackspace.com/knowledge_center/article/permissions-matrix-for-auto-scale
+.. _Permissions Matrix for Auto Scale: https://www.rackspace.com/knowledge_center/article/permissions-matrix-for-auto-scale

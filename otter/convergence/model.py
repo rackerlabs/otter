@@ -274,7 +274,7 @@ class NovaServer(object):
         key.
 
         See
-        http://docs.rackspace.com/servers/api/v2/cs-devguide/content/
+        https://docs.rackspace.com/servers/api/v2/cs-devguide/content/
         Get_Server_Details-d1e2623.html
 
         :return: :obj:`NovaServer` instance

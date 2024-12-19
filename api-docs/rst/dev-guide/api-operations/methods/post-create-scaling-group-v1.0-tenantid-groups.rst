@@ -205,7 +205,7 @@ This table shows the body parameters for the request:
 |                                                   |             |server arguments are directly passed to nova when  |
 |                                                   |             |creating a server. For more information see        |
 |                                                   |             |`Create Your Server with the nova Client           |
-|                                                   |             |<http://docs.rackspace.com/servers/api/v2/cs-      |
+|                                                   |             |<https://docs.rackspace.com/servers/api/v2/cs-      |
 |                                                   |             |gettingstarted/content/nova_create_server.html>`__ |
 +---------------------------------------------------+-------------+---------------------------------------------------+
 |launchConfiguration.args.server.\ **flavorRef**    |String       |The flavor of the server image. Specifies the      |
@@ -223,14 +223,14 @@ This table shows the body parameters for the request:
 |                                                   |             |one that you imported using a non-Rackspace        |
 |                                                   |             |server. For more information, see the `Disk        |
 |                                                   |             |Configuration Extension                            |
-|                                                   |             |<http://docs.rackspace.com/servers/api/v2/cs-      |
+|                                                   |             |<https://docs.rackspace.com/servers/api/v2/cs-      |
 |                                                   |             |devguide/content/diskconfig_attribute.html>`__     |
 |                                                   |             |documentation for Rackspace Cloud Servers.         |
 +---------------------------------------------------+-------------+---------------------------------------------------+
 |launchConfiguration.args.server.\ **personality**  |Array        |The file path and/or the content that you want to  |
 |                                                   |*(Required)* |inject into a server image. For more information,  |
 |                                                   |             |see the `Server personality                        |
-|                                                   |             |<http://docs.rackspace.com/servers/api/v2/cs-      |
+|                                                   |             |<https://docs.rackspace.com/servers/api/v2/cs-      |
 |                                                   |             |devguide/content/Server_Personality-               |
 |                                                   |             |d1e2543.html>`__ documentation for Rackspace Cloud |
 |                                                   |             |Servers.                                           |

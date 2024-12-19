@@ -45,13 +45,13 @@ real numbers.
        - Autoscale can use all Rackspace Cloud Server create server API
          parameters. For more details, see the `Create servers`_  documentation.
 
-.. _Cloud Servers Getting Started guide: http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/overview.html
+.. _Cloud Servers Getting Started guide: https://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/overview.html
 .. _public Autoscale github Wiki: https://github.com/rackerlabs/otter/wiki
 .. _public Autoscale github documentation: https://github.com/rackerlabs/otter/tree/master/doc
-.. _Rackspace Cloud Servers documentation: http://docs.rackspace.com/
-.. _Load Balancers Getting Started Guide: http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/LB_Overview.html
+.. _Rackspace Cloud Servers documentation: https://docs.rackspace.com/
+.. _Load Balancers Getting Started Guide: https://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/LB_Overview.html
 .. _Chef: http://www.opscode.com/chef/
-.. _Create servers: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html
+.. _Create servers: https://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html
 
 
 .. _scaling-groups:
@@ -193,12 +193,12 @@ directly passed to nova when creating a server.
 
 
 
-.. _Server flavors: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/server_flavors.html
-.. _Disk Configuration: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/diskconfig_attribute.html
-.. _Server Metadata: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html
-.. _configure RackConnect v2 with Autoscale Cloud Bursting Using Autoscale, RackConnect, and F5 Load Balancers: http://www.rackspace.com/knowledge_center/article/cloud-bursting-using-auto-scale-rackconnect-and-f5-load-balancers
-.. _Server Personality: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html
-.. _Config-Drive Extension: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/config_drive_ext.html
+.. _Server flavors: https://docs.rackspace.com/servers/api/v2/cs-devguide/content/server_flavors.html
+.. _Disk Configuration: https://docs.rackspace.com/servers/api/v2/cs-devguide/content/diskconfig_attribute.html
+.. _Server Metadata: https://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html
+.. _configure RackConnect v2 with Autoscale Cloud Bursting Using Autoscale, RackConnect, and F5 Load Balancers: https://www.rackspace.com/knowledge_center/article/cloud-bursting-using-auto-scale-rackconnect-and-f5-load-balancers
+.. _Server Personality: https://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html
+.. _Config-Drive Extension: https://docs.rackspace.com/servers/api/v2/cs-devguide/content/config_drive_ext.html
 .. _Using Cloud Init with Rackspace Cloud: https://developer.rackspace.com/blog/using-cloud-init-with-rackspace-cloud/
 
 
@@ -230,7 +230,7 @@ servers.
       	  or by using `List Load Balancer Details`_.
 
 
- .. _List Load Balancer Details: http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/List_LB_Details.html
+ .. _List Load Balancer Details: https://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/List_LB_Details.html
 
 
 .. _launch-config-examples:
@@ -352,20 +352,20 @@ Learn more
 See the following topics for information about configuring Cloud Servers through an API.
 
 -   `Next Generation Cloud Servers Getting
-    Started Guide <http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/overview.html>`__
+    Started Guide <https://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/overview.html>`__
 
 -   `Next Generation Cloud Servers Developer
-    Guide <http://docs.rackspace.com/servers/api/v2/cs-devguide/content/ch_api_operations.html>`__
+    Guide <https://docs.rackspace.com/servers/api/v2/cs-devguide/content/ch_api_operations.html>`__
 
--   `RackConnect v3 API <http://docs.rackspace.com/rackconnect/api/v3/rackconnect-devguide/content/Overview.html>`__
+-   `RackConnect v3 API <https://docs.rackspace.com/rackconnect/api/v3/rackconnect-devguide/content/Overview.html>`__
 
 See these topics for information about configuring Cloud Load Balancers through an API:
 
 -   `Rackspace Cloud Load Balancers Getting
-    Started <http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/LB_Overview.html>`__
+    Started <https://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/LB_Overview.html>`__
 
 -   `Rackspace Cloud Load Balancers Developer
-    Guide <http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/Overview-d1e82.html>`__
+    Guide <https://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/Overview-d1e82.html>`__
 
 .. _webhooks-and-capabilities:
 
@@ -790,8 +790,8 @@ To get started with RackConnect v3 cloud bursting:
 - `RackConnect product information`_
 - `How-To articles for RackConnect`_.
 
-.. _RackConnect product information: http://www.rackspace.com/cloud/hybrid/rackconnect
-.. _How-To articles for RackConnect: http://www.rackspace.com/knowledge_center/product-page/rackconnect
+.. _RackConnect product information: https://www.rackspace.com/cloud/hybrid/rackconnect
+.. _How-To articles for RackConnect: https://www.rackspace.com/knowledge_center/product-page/rackconnect
 
 
 .. _convergence-concept:

@@ -171,7 +171,7 @@ server = {
     # to do some level of sanity checking, this schema validates subset of instance that
     # is getting validated in code
     "description": ("Attributes to provide to nova create server: "
-                    "http://docs.rackspace.com/servers/api/v2/"
+                    "https://docs.rackspace.com/servers/api/v2/"
                     "cs-devguide/content/CreateServers.html."
                     "Whatever attributes are passed here will apply to "
                     "all new servers (including the name attribute)."),
