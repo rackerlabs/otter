@@ -28,6 +28,13 @@ Behavioral changes
   In the current release, the server remains in the scaling group instead of
   being deleted.
 
+* An autoscaled server is tied to the load balancer it was originally attached to.
+  This means that changing load balancer in launch configuration does not automatically attach
+  all existing servers in new load balancer. It only attaches *new* servers to the new load balancer.
+  Convergence ensures that all servers are always attached to their respective
+  load balancers. Hence, deleting a load balancer that was originally configured in the
+  scaling group will result that group in ``ERROR``.
+
 Known issues
 ~~~~~~~~~~~~
 |no changes|
