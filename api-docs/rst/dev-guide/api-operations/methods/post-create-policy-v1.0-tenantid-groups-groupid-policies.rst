@@ -171,91 +171,91 @@ This table shows the URI parameters for the request:
 
 This table shows the body parameters for the request:
 
-+--------------------+-------------+-------------------------------------------+
-|Name                |Type         |Description                                |
-+====================+=============+===========================================+
-|[*]                 |Array        |An array of scaling policies.              |
-|                    |*(Required)* |                                           |
-+--------------------+-------------+-------------------------------------------+
-|[*].\ **args**      |Object       |Additional configuration information for   |
-|                    |*(Optional)* |policies of type ``schedule``. This        |
-|                    |             |parameter is not required for policies of  |
-|                    |             |type ``webhook``. This parameter must be   |
-|                    |             |set to either ``at`` or ``cron``, which    |
-|                    |             |are mutually exclusive.                    |
-+--------------------+-------------+-------------------------------------------+
-|[*].args.\ **cron** |String       |The time when the policy will be executed, |
-|                    |*(Optional)* |as a cron entry. For example, if this is   |
-|                    |             |parameter is set to ``1 0 * * *``, the     |
-|                    |             |policy will be executed at one minute past |
-|                    |             |midnight (00:01) every day of the month,   |
-|                    |             |and every day of the week. For more        |
-|                    |             |information about cron, read:              |
-|                    |             |http://en.wikipedia.org/wiki/Cron          |
-+--------------------+-------------+-------------------------------------------+
-|[*].args.\ **at**   |String       |The time when this policy will be          |
-|                    |*(Optional)* |executed. The time must be formatted       |
-|                    |             |according to this service's custom :ref:   |
-|                    |             |`Date and Time format <date-time-format>`  |
-|                    |             |with seconds, otherwise a 400 error may be |
-|                    |             |returned. The policy will be triggered     |
-|                    |             |within a 10-second range of the time       |
-|                    |             |specified, so if you set the ``at`` time   |
-|                    |             |to ``2013-05-19T08:07:08Z``, it will be    |
-|                    |             |triggered anytime between 08:07:08 to      |
-|                    |             |08:07:18. This property is mutually        |
-|                    |             |exclusive with the ``cron`` parameter.     |
-+--------------------+-------------+-------------------------------------------+
-|[*].\               |Number       |The percent change to make in the number   |
-|**changePercent**   |*(Optional)* |of servers in the scaling group. If this   |
-|                    |             |number is positive, the number of servers  |
-|                    |             |will increase by the given percentage. If  |
-|                    |             |this parameter is set to a negative        |
-|                    |             |number, the number of servers decreases by |
-|                    |             |the given percentage. The absolute change  |
-|                    |             |in the number of servers will be rounded   |
-|                    |             |to the nearest integer. This means that if |
-|                    |             |-X% of the current number of servers       |
-|                    |             |translates to -0.5 or -0.25 or -0.75       |
-|                    |             |servers, the actual number of servers that |
-|                    |             |will be shut down is 1. If X% of the       |
-|                    |             |current number of servers translates to    |
-|                    |             |1.2 or 1.5 or 1.7 servers, the actual      |
-|                    |             |number of servers that will be launched is |
-|                    |             |2                                          |
-+--------------------+-------------+-------------------------------------------+
-|[*].\ **cooldown**  |Number       |The cooldown period, in seconds, before    |
-|                    |*(Required)* |this particular scaling policy can be      |
-|                    |             |executed again. The policy cooldown period |
-|                    |             |does not affect the global scaling group   |
-|                    |             |cooldown. The minimum value for this       |
-|                    |             |parameter is 0 seconds, the maximum value  |
-|                    |             |is 86400 seconds (24 hrs).                 |
-+--------------------+-------------+-------------------------------------------+
-|[*].\ **type**      |Enum         |The type of policy that will be executed   |
-|                    |*(Required)* |for the current release, this value can be |
-|                    |             |either ``webhook`` or ``schedule``.        |
-+--------------------+-------------+-------------------------------------------+
-|[*].\ **change**    |Integer      |The change to make in the number of        |
-|                    |*(Optional)* |servers in the scaling group. This         |
-|                    |             |parameter must be an integer. If the value |
-|                    |             |is a positive integer, the number of       |
-|                    |             |servers increases. If the value is a       |
-|                    |             |negative integer, the number of servers    |
-|                    |             |decreases.                                 |
-+--------------------+-------------+-------------------------------------------+
-|[*].\               |Integer      |The desired server capacity of the scaling |
-|**desiredCapacity** |*(Optional)* |the group; that is, how many servers       |
-|                    |             |should be in the scaling group. This value |
-|                    |             |must be an absolute number, greater than   |
-|                    |             |or equal to zero. For example, if this     |
-|                    |             |parameter is set to ten, executing the     |
-|                    |             |policy brings the number of servers to     |
-|                    |             |ten. The minimum allowed value is zero.    |
-|                    |             |Note that maxEntities and minEntities for  |
-|                    |             |the configured group take precedence over  |
-|                    |             |this setting.                              |
-+--------------------+-------------+-------------------------------------------+
++--------------------+-------------+------------------------------------------------+
+|Name                |Type         |Description                                     |
++====================+=============+================================================+
+|[*]                 |Array        |An array of scaling policies.                   |
+|                    |*(Required)* |                                                |
++--------------------+-------------+------------------------------------------------+
+|[*].\ **args**      |Object       |Additional configuration information for        |
+|                    |*(Optional)* |policies of type ``schedule``. This             |
+|                    |             |parameter is not required for policies of       |
+|                    |             |type ``webhook``. This parameter must be        |
+|                    |             |set to either ``at`` or ``cron``, which         |
+|                    |             |are mutually exclusive.                         |
++--------------------+-------------+------------------------------------------------+
+|[*].args.\ **cron** |String       |The time when the policy will be executed,      |
+|                    |*(Optional)* |as a cron entry. For example, if this is        |
+|                    |             |parameter is set to ``1 0 * * *``, the          |
+|                    |             |policy will be executed at one minute past      |
+|                    |             |midnight (00:01) every day of the month,        |
+|                    |             |and every day of the week. For more             |
+|                    |             |information about cron, read:                   |
+|                    |             |http://en.wikipedia.org/wiki/Cron               |
++--------------------+-------------+------------------------------------------------+
+|[*].args.\ **at**   |String       |The time when this policy will be               |
+|                    |*(Optional)* |executed. The time must be formatted            |
+|                    |             |according to this service's custom              |
+|                    |             |:ref:`Date and Time format <date-time-format>`  |
+|                    |             |with seconds, otherwise a 400 error may be      |
+|                    |             |returned. The policy will be triggered          |
+|                    |             |within a 10-second range of the time            |
+|                    |             |specified, so if you set the ``at`` time        |
+|                    |             |to ``2013-05-19T08:07:08Z``, it will be         |
+|                    |             |triggered anytime between 08:07:08 to           |
+|                    |             |08:07:18. This property is mutually             |
+|                    |             |exclusive with the ``cron`` parameter.          |
++--------------------+-------------+------------------------------------------------+
+|[*].\               |Number       |The percent change to make in the number        |
+|**changePercent**   |*(Optional)* |of servers in the scaling group. If this        |
+|                    |             |number is positive, the number of servers       |
+|                    |             |will increase by the given percentage. If       |
+|                    |             |this parameter is set to a negative             |
+|                    |             |number, the number of servers decreases by      |
+|                    |             |the given percentage. The absolute change       |
+|                    |             |in the number of servers will be rounded        |
+|                    |             |to the nearest integer. This means that if      |
+|                    |             |-X% of the current number of servers            |
+|                    |             |translates to -0.5 or -0.25 or -0.75            |
+|                    |             |servers, the actual number of servers that      |
+|                    |             |will be shut down is 1. If X% of the            |
+|                    |             |current number of servers translates to         |
+|                    |             |1.2 or 1.5 or 1.7 servers, the actual           |
+|                    |             |number of servers that will be launched is      |
+|                    |             |2                                               |
++--------------------+-------------+------------------------------------------------+
+|[*].\ **cooldown**  |Number       |The cooldown period, in seconds, before         |
+|                    |*(Required)* |this particular scaling policy can be           |
+|                    |             |executed again. The policy cooldown period      |
+|                    |             |does not affect the global scaling group        |
+|                    |             |cooldown. The minimum value for this            |
+|                    |             |parameter is 0 seconds, the maximum value       |
+|                    |             |is 86400 seconds (24 hrs).                      |
++--------------------+-------------+------------------------------------------------+
+|[*].\ **type**      |Enum         |The type of policy that will be executed        |
+|                    |*(Required)* |for the current release, this value can be      |
+|                    |             |either ``webhook`` or ``schedule``.             |
++--------------------+-------------+------------------------------------------------+
+|[*].\ **change**    |Integer      |The change to make in the number of             |
+|                    |*(Optional)* |servers in the scaling group. This              |
+|                    |             |parameter must be an integer. If the value      |
+|                    |             |is a positive integer, the number of            |
+|                    |             |servers increases. If the value is a            |
+|                    |             |negative integer, the number of servers         |
+|                    |             |decreases.                                      |
++--------------------+-------------+------------------------------------------------+
+|[*].\               |Integer      |The desired server capacity of the scaling      |
+|**desiredCapacity** |*(Optional)* |the group; that is, how many servers            |
+|                    |             |should be in the scaling group. This value      |
+|                    |             |must be an absolute number, greater than        |
+|                    |             |or equal to zero. For example, if this          |
+|                    |             |parameter is set to ten, executing the          |
+|                    |             |policy brings the number of servers to          |
+|                    |             |ten. The minimum allowed value is zero.         |
+|                    |             |Note that maxEntities and minEntities for       |
+|                    |             |the configured group take precedence over       |
+|                    |             |this setting.                                   |
++--------------------+-------------+------------------------------------------------+
 
 
 
